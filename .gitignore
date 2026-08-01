@@ -1,0 +1,63 @@
+# Environment & Virtualenvs
+.venv/
+env/
+venv/
+ENV/
+*.env
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Credentials & Sensitive Files
+credentials.json
+
+# Local Runtime Databases & Locks
+*.db
+*.lock
+database.db
+daemon.lock
+src/backend/database.db
+src/daemon.lock
+
+# Test & Debug Scripts (Non-production / Scratch)
+src/test_*.py
+src/capture_*.py
+src/generate_simulation.py
+src/open_*.py
+src/reset.py
+src/runner.py
+src/run_omzet.py
+src/switch_*.py
+src/validate_*.py
+src/pull_hours_api.py
+src/shopee_api_scraper.py
+src/debug_*.py
+
+# Legacy / Non-production Directories
+API/
+src/API/
+src/backups/
+src/baseline/
+src/monthly/
+src/scratch/
+src/sessions/
+src/logs/
+src/skill/
+shopee-omzet-automation/
+
+# Data Cache & Profiles
+src/data/chrome_profile*
+src/data/session*.json
+src/data/output/
+src/data/reports/
+src/data/debug/
+src/data/warmer_stats.json
