@@ -1,0 +1,54 @@
+# ============================================================
+# docker-compose.prod.yml  –  Production Environment
+# ============================================================
+# - No volume mounts (code baked into image)
+# - No --reload
+# - Health checks enabled
+# - Auto-restart on failure
+# ============================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: fm-web-prod
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONPATH=/app/src
+      - ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - fm-net
+    restart: always
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: fm-bot-prod
+    volumes:
+      - bot-data:/app/src/data    # Persist runtime data across restarts
+    environment:
+      - PYTHONPATH=/app/src
+      - ENV=production
+      - WEB_API_URL=http://web:8080
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - fm-net
+    restart: always
+
+volumes:
+  bot-data:
+
+networks:
+  fm-net:
+    driver: bridge

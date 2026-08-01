@@ -1,0 +1,55 @@
+# ============================================================
+# docker-compose.dev.yml  –  Development Environment
+# ============================================================
+# - Volume mounts for hot reload (no rebuild on code changes)
+# - Uvicorn --reload enabled
+# - Shared network between web + bot
+# ============================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: fm-web-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src            # Hot reload: edit code, see changes live
+    command: >
+      uv run uvicorn backend.main:app
+      --host 0.0.0.0
+      --port 8080
+      --reload
+      --reload-dir /app/src
+    environment:
+      - PYTHONPATH=/app/src
+      - ENV=development
+    networks:
+      - fm-net
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: fm-bot-dev
+    volumes:
+      - ./src:/app/src            # Hot reload daemon code
+      - bot-data:/app/src/data    # Persist pulled hours, session data
+    environment:
+      - PYTHONPATH=/app/src
+      - ENV=development
+      - WEB_API_URL=http://web:8080  # Daemon talks to web container
+    depends_on:
+      - web
+    networks:
+      - fm-net
+    restart: unless-stopped
+
+volumes:
+  bot-data:
+
+networks:
+  fm-net:
+    driver: bridge
