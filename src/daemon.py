@@ -89,6 +89,15 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
 
     # Initialize DB
     db.init_db()
+
+    # ── SERVICE STARTUP WARMUP & SHOPEE DASHBOARD LOGIN ──────────
+    if not dry_run:
+        log.info("🚀 [SERVICE STARTUP] Performing initial Shopee Dashboard session login & warmup...")
+        try:
+            worker.warmup_all_account_sessions()
+        except Exception as e:
+            log.warning(f"⚠️ [SERVICE STARTUP] Warmup warning: {e}")
+
     cycle_count = 0
 
     while RUNNING:

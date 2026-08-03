@@ -23,6 +23,52 @@ from backend import db
 log = get_logger("backend_worker")
 
 
+def warmup_all_account_sessions():
+    """
+    On service startup, iterates over registered merchant accounts and ensures
+    each account is logged in to the Shopee Partner Dashboard, saving active sessions.
+    """
+    log.info("🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for all registered accounts...")
+    try:
+        outlets = fetch_merchant_outlets()
+    except Exception as e:
+        log.warning(f"⚠️ [STARTUP WARMUP] Could not fetch control source outlets for warmup: {e}")
+        return
+
+    processed_accounts = set()
+    for outlet in outlets:
+        username = (outlet.username or "").strip()
+        if not username or username in processed_accounts:
+            continue
+        processed_accounts.add(username)
+
+        session_file = SCRIPT_DIR.parent / "data" / f"session_{username}.json"
+        browser.set_session_file(session_file)
+
+        saved = browser.load_session()
+        if saved and saved.get("shopee_tob_token") and saved.get("shopee_tob_entity_id"):
+            if browser.validate_session(saved["shopee_tob_token"], saved["shopee_tob_entity_id"]):
+                log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' session valid & ready for Shopee Dashboard.")
+                continue
+
+        # If invalid or missing, open browser & perform login
+        log.info(f"  🌐 [STARTUP WARMUP] Logging in account '{username}' to Shopee Dashboard via Browser...")
+        try:
+            session = browser.get_session(
+                username=username,
+                password=outlet.password,
+                phone=outlet.hp,
+                target_name=outlet.nama_portal,
+                headless=True
+            )
+            if session and session.get("shopee_tob_token"):
+                log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' successfully logged in & session saved.")
+            else:
+                log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' login completed, session pending.")
+        except Exception as ex:
+            log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' warmup exception: {ex}")
+
+
 def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
