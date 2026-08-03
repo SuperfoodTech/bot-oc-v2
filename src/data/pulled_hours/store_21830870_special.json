@@ -1,0 +1,29 @@
+{
+  "code": 0,
+  "data": {
+    "special_hours": [
+      {
+        "date_desc": "",
+        "date_end": 1798736399999,
+        "date_start": 1765731600000,
+        "date_type": 1,
+        "intervals": [
+          {
+            "end_relative_sec": 0,
+            "start_relative_sec": 0
+          },
+          {
+            "end_relative_sec": 0,
+            "start_relative_sec": 0
+          },
+          {
+            "end_relative_sec": 0,
+            "start_relative_sec": 0
+          }
+        ]
+      }
+    ],
+    "store_id": "21830870"
+  },
+  "msg": "success"
+}
