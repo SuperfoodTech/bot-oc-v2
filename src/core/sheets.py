@@ -2,6 +2,7 @@
 core/sheets.py
 ==============
 Module to fetch and parse merchant outlet data from the published Google Sheets CSV control source.
+Uses dynamic header-name index mapping to ensure column accuracy regardless of padding/order.
 """
 
 import csv
@@ -58,6 +59,7 @@ class MerchantOutlet:
 def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[MerchantOutlet]:
     """
     Downloads the published CSV from Google Sheets and parses rows into MerchantOutlet objects.
+    Uses dynamic column name resolution for accurate parsing.
     """
     resp = requests.get(csv_url, timeout=15)
     resp.raise_for_status()
@@ -69,8 +71,33 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
     if not rows:
         return []
 
-    # Find header row or use index-based parsing
-    header = rows[0]
+    # Dynamic header column resolver
+    header_lower = [h.strip().lower() for h in rows[0]]
+
+    def find_col_idx(substring: str, fallback_idx: int) -> int:
+        for idx, h in enumerate(header_lower):
+            if substring.lower() in h:
+                return idx
+        return fallback_idx
+
+    idx_utama       = find_col_idx("status utama", 14)
+    idx_vercel_lnk  = find_col_idx("vercel link", 15)
+    idx_vercel_pwd  = find_col_idx("vercel kata sandi", 16)
+    idx_senin       = find_col_idx("senin", 17)
+    idx_selasa      = find_col_idx("selasa", 18)
+    idx_rabu        = find_col_idx("rabu", 19)
+    idx_kamis       = find_col_idx("kamis", 20)
+    idx_jumat       = find_col_idx("jumat", 21)
+    idx_sabtu       = find_col_idx("sabtu", 22)
+    idx_minggu      = find_col_idx("minggu", 23)
+    idx_notes       = find_col_idx("notes", 24)
+    idx_langganan   = find_col_idx("status langganan", 33)
+    idx_penangguhan = find_col_idx("penangguhan", 34)
+    idx_alasan      = find_col_idx("alasan", 35)
+    idx_mulai_p     = find_col_idx("tanggal mulai penangguhan", 36)
+    idx_akhir_p     = find_col_idx("tanggal berakhir penangguhan", 37)
+    idx_aktual      = find_col_idx("status aktual", 38)
+
     outlets = []
 
     for row in rows[1:]:
@@ -86,12 +113,24 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
             # Skip non-Shopee or empty rows
             continue
 
+        tgl_berakhir = get_col(4)
+        status_langganan_raw = get_col(idx_langganan)
+        if not status_langganan_raw:
+            if tgl_berakhir:
+                try:
+                    dt = datetime.strptime(tgl_berakhir, "%Y-%m-%d")
+                    status_langganan_raw = "Aktif" if dt >= datetime.now() else "Kedaluwarsa"
+                except Exception:
+                    status_langganan_raw = "Aktif"
+            else:
+                status_langganan_raw = "Aktif"
+
         outlet = MerchantOutlet(
             aplikator=aplikator,
             kepemilikan=get_col(1),
             paket=get_col(2),
             tanggal_mulai_layanan=get_col(3),
-            tanggal_berakhir_layanan=get_col(4),
+            tanggal_berakhir_layanan=tgl_berakhir,
             hp=get_col(5),
             username=get_col(6),
             password=get_col(7),
@@ -101,26 +140,25 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
             store_id=get_col(11),
             nama_panjang_outlet=get_col(12),
             nama_pendek_outlet=get_col(13),
-            status_utama=get_col(14),
-            status_aktual=get_col(15),
-            vercel_link=get_col(16),
-            vercel_password=get_col(17),
+            status_utama=get_col(idx_utama),
+            status_aktual=get_col(idx_aktual),
+            vercel_link=get_col(idx_vercel_lnk),
+            vercel_password=get_col(idx_vercel_pwd),
             regular_hours={
-                "Senin": get_col(18),
-                "Selasa": get_col(19),
-                "Rabu": get_col(20),
-                "Kamis": get_col(21),
-                "Jumat": get_col(22),
-                "Sabtu": get_col(23),
-                "Minggu": get_col(24),
+                "Senin": get_col(idx_senin),
+                "Selasa": get_col(idx_selasa),
+                "Rabu": get_col(idx_rabu),
+                "Kamis": get_col(idx_kamis),
+                "Jumat": get_col(idx_jumat),
+                "Sabtu": get_col(idx_sabtu),
+                "Minggu": get_col(idx_minggu),
             },
-            special_hours=get_col(25),
-            # Trailing columns (search by name or last columns)
-            status_langganan=get_col(len(row) - 5) if len(row) >= 30 else "Aktif",
-            penangguhan=get_col(len(row) - 4) if len(row) >= 30 else "Tidak",
-            alasan_penangguhan=get_col(len(row) - 3) if len(row) >= 30 else "",
-            tgl_mulai_penangguhan=get_col(len(row) - 2) if len(row) >= 30 else "",
-            tgl_berakhir_penangguhan=get_col(len(row) - 1) if len(row) >= 30 else "",
+            special_hours=get_col(idx_notes),
+            status_langganan=status_langganan_raw,
+            penangguhan=get_col(idx_penangguhan) or "Tidak",
+            alasan_penangguhan=get_col(idx_alasan),
+            tgl_mulai_penangguhan=get_col(idx_mulai_p),
+            tgl_berakhir_penangguhan=get_col(idx_akhir_p),
         )
         outlets.append(outlet)
 
