@@ -1,7 +1,7 @@
 """
 worker.py
 =========
-Backend Worker Engine that syncs store states, evaluates PRD rules, and triggers direct API open/close actions.
+Backend Worker Engine that syncs store states, evaluates PRD rules, and triggers direct API open/close actions or Selenium browser login.
 """
 
 import sys
@@ -17,9 +17,59 @@ sys.path.insert(0, str(SCRIPT_DIR.parent))
 from core.logger import get_logger
 from core.sheets import fetch_merchant_outlets, MerchantOutlet
 from core.decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_NO_CHANGE
+from core import browser
 from backend import db
 
 log = get_logger("backend_worker")
+
+
+def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
+    """
+    Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
+    """
+    log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_pendek_outlet})...")
+
+    # 1. Fast path: try saved session token
+    saved_session = browser.load_session()
+    if saved_session and saved_session.get("shopee_tob_token") and saved_session.get("shopee_tob_entity_id"):
+        tob_token = saved_session["shopee_tob_token"]
+        entity_id = saved_session["shopee_tob_entity_id"]
+        if browser.validate_session(tob_token, entity_id):
+            log.info(f"  ⚡ Valid session token found. Triggering Direct API for Store {outlet.store_id}...")
+            if action == ACTION_OPEN:
+                success = browser.open_store_api(tob_token, entity_id)
+            else:
+                success = browser.pause_store_api(tob_token, entity_id)
+            if success:
+                log.info(f"  ✅ [DIRECT API SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                return True
+
+    # 2. Browser Selenium Fallback (Full Login Sequence)
+    log.info(f"  🌐 Launching Selenium Chrome Browser to login & execute {action} for Store {outlet.store_id}...")
+    try:
+        session = browser.get_session(
+            username=outlet.username,
+            password=outlet.password,
+            phone=outlet.hp,
+            target_name=outlet.nama_portal,
+            headless=True
+        )
+
+        if session and session.get("shopee_tob_token") and session.get("shopee_tob_entity_id"):
+            tob_token = session["shopee_tob_token"]
+            entity_id = session["shopee_tob_entity_id"]
+            if action == ACTION_OPEN:
+                success = browser.open_store_api(tob_token, entity_id)
+            else:
+                success = browser.pause_store_api(tob_token, entity_id)
+            if success:
+                log.info(f"  ✅ [SELENIUM BROWSER SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                return True
+    except Exception as e:
+        log.error(f"  ❌ Selenium browser login error for Store {outlet.store_id}: {e}")
+
+    log.error(f"  ❌ Gagal mengeksekusi {action} untuk Store {outlet.store_id}.")
+    return False
 
 
 def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
@@ -55,13 +105,16 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
 
         # 3. If action needed and execute_actions is True
         if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
-            action_desc = f"Triggered {decision.action} for Store {outlet.store_id}"
+            log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id}...")
+            exec_ok = execute_outlet_shopee_action(outlet, decision.action)
+
+            reason_text = f"{decision.reason} | Shopee Action: {'SUCCESS' if exec_ok else 'FAILED'}"
             actions_taken.append({
                 "store_id": outlet.store_id,
                 "store_name": outlet.nama_pendek_outlet,
                 "action": decision.action,
                 "target_state": decision.target_state,
-                "reason": decision.reason
+                "reason": reason_text
             })
 
             # Record in SQLite audit log
@@ -70,7 +123,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 store_name=outlet.nama_pendek_outlet,
                 action=decision.action,
                 target_state=decision.target_state,
-                reason=decision.reason
+                reason=reason_text
             )
 
     # Record overall cycle evaluation log for process tracking
