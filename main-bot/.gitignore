@@ -27,11 +27,9 @@ credentials.json
 *.lock
 database.db
 daemon.lock
-src/backend/database.db
 src/daemon.lock
 
-# Test & Debug Scripts (Non-production / Scratch)
-src/test_*.py
+# Test & Debug Scratch Scripts
 src/capture_*.py
 src/generate_simulation.py
 src/open_*.py
@@ -46,7 +44,6 @@ src/debug_*.py
 
 # Legacy / Non-production Directories
 API/
-src/API/
 src/backups/
 src/baseline/
 src/monthly/
@@ -56,13 +53,8 @@ src/logs/
 src/skill/
 utils/
 
-# Data Cache & Profiles
+# Ignore All Chrome Profile & Session Data by default
+data/chrome_profile*
 src/data/chrome_profile*
 src/data/session*.json
-!src/data/chrome_profile_auto7313
-!src/data/chrome_profile_auto7313/**
-!src/data/session_auto7313.json
-src/data/output/
-src/data/reports/
-src/data/debug/
-src/data/warmer_stats.json
+

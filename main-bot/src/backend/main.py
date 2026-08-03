@@ -13,12 +13,14 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from fastapi import FastAPI, HTTPException, Query, status
+import os
+from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from backend import db, worker
+import db
+import worker
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
@@ -30,6 +32,27 @@ from backend.models import (
     UserLoginRequest,
     UserPauseRequest
 )
+
+# ── ENVIRONMENT-AWARE ROUTE RESOLUTION ─────────────────────────────────────
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+PORT = os.getenv("PORT", "8080")
+PROD_HOST = os.getenv("PROD_HOST", "168.144.143.203")
+
+def get_app_base_url(request: Request = None) -> str:
+    """
+    Determines base URL dynamically:
+    - Local Development: http://localhost:{PORT}
+    - Production Mode : http://168.144.143.203:{PORT}
+    Can infer directly from incoming Request host header if available.
+    """
+    if request and request.headers.get("host"):
+        host = request.headers.get("host")
+        scheme = request.headers.get("x-forwarded-proto", "http")
+        return f"{scheme}://{host}"
+    
+    if ENVIRONMENT == "production":
+        return f"http://{PROD_HOST}:{PORT}"
+    return f"http://localhost:{PORT}"
 
 # Initialize Database Schema
 db.init_db()
@@ -60,29 +83,37 @@ if STATIC_DIR.exists():
 
 @app.get("/", response_class=HTMLResponse, summary="Admin Console Homepage")
 @app.get("/admin", response_class=HTMLResponse, summary="Admin Desktop Console Web Page")
-def admin_page():
+def admin_page(request: Request):
     admin_html = TEMPLATES_DIR / "admin_dashboard.html"
     if not admin_html.exists():
         raise HTTPException(status_code=404, detail="Admin template not found.")
-    return HTMLResponse(content=admin_html.read_text(encoding="utf-8"))
+    content = admin_html.read_text(encoding="utf-8")
+    base_url = get_app_base_url(request)
+    content = content.replace("{{ BASE_URL }}", base_url)
+    return HTMLResponse(content=content)
 
 
 @app.get("/app", response_class=HTMLResponse, summary="User Link Mobile Dashboard Web Page")
 @app.get("/mitra/{slug}", response_class=HTMLResponse, summary="User Link Mobile Dashboard Web Page")
-def user_page(slug: Optional[str] = None):
+def user_page(request: Request, slug: Optional[str] = None):
     user_html = TEMPLATES_DIR / "user_dashboard.html"
     if not user_html.exists():
         raise HTTPException(status_code=404, detail="User template not found.")
-    return HTMLResponse(content=user_html.read_text(encoding="utf-8"))
+    content = user_html.read_text(encoding="utf-8")
+    base_url = get_app_base_url(request)
+    content = content.replace("{{ BASE_URL }}", base_url)
+    return HTMLResponse(content=content)
 
 
 # ── SERVICE HEALTHCHECK ────────────────────────────────────────────────────────
 
 @app.get("/api/v1/health", summary="Service Health Check")
-def health_check():
+def health_check(request: Request):
     return {
         "status": "healthy",
         "service": "FoodMaster Integrated Web App & API",
+        "environment": ENVIRONMENT,
+        "base_url": get_app_base_url(request),
         "version": "2.2.0",
         "timestamp": datetime.now().isoformat()
     }
@@ -102,8 +133,9 @@ def admin_list_users():
 
 
 @app.post("/api/v1/admin/generate-link", summary="Admin: Generate Unique User Link")
-def admin_generate_link(req: AdminGenerateLinkRequest):
-    result = db.admin_generate_user_link(req.nama_pemilik, req.passcode)
+def admin_generate_link(req: AdminGenerateLinkRequest, request: Request):
+    base_url = get_app_base_url(request)
+    result = db.admin_generate_user_link(req.nama_pemilik, req.passcode, base_url=base_url)
     db.record_log(
         store_id="ADMIN",
         store_name="ADMIN_SYSTEM",
@@ -112,6 +144,47 @@ def admin_generate_link(req: AdminGenerateLinkRequest):
         reason=f"Generated Vercel link for '{req.nama_pemilik}' (Passcode: {result['passcode']})"
     )
     return {"success": True, "data": result}
+
+
+# ── INTER-SERVICE BOT CONTROL & TRACE ENDPOINTS ─────────────────────────────
+BOT_API_URL = os.getenv("BOT_API_URL", "http://localhost:8081")
+
+@app.get("/api/v1/admin/bot/status", summary="Admin: Fetch Bot Trace & Live Status")
+def admin_bot_status():
+    try:
+        resp = requests.get(f"{BOT_API_URL}/health", timeout=3)
+        if resp.status_code == 200:
+            return {"success": True, "bot_online": True, "data": resp.json()}
+    except Exception:
+        pass
+    return {
+        "success": False,
+        "bot_online": False,
+        "data": {
+            "bot_status": "offline",
+            "message": "Bot Automation Engine (port 8081) is currently unreachable."
+        }
+    }
+
+@app.post("/api/v1/admin/bot/control", summary="Admin: Trigger Bot Command (start/pause/sync)")
+def admin_bot_control(command: str = Query(..., description="Command: start, pause, or sync")):
+    cmd = command.lower().strip()
+    if cmd not in ("start", "pause", "sync"):
+        raise HTTPException(status_code=400, detail="Invalid command. Use 'start', 'pause', or 'sync'.")
+    try:
+        url = f"{BOT_API_URL}/bot/{cmd}"
+        resp = requests.post(url, timeout=10)
+        if resp.status_code == 200:
+            db.record_log(
+                store_id="ADMIN",
+                store_name="ADMIN_SYSTEM",
+                action=f"BOT_CONTROL_{cmd.upper()}",
+                target_state=cmd.upper(),
+                reason=f"Admin sent '{cmd}' command to Bot Automation Engine via Port 8081."
+            )
+            return {"success": True, "data": resp.json()}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Bot Engine (port 8081) unreachable: {e}")
 
 
 @app.post("/api/v1/admin/suspend", summary="Admin: Toggle User/Store Suspension")

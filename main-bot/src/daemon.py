@@ -23,8 +23,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from core.logger import get_logger
-from backend import db, worker
+from logger import get_logger
+import db
+import worker
 
 log = get_logger("daemon")
 
@@ -90,6 +91,14 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
     # Initialize DB
     db.init_db()
 
+    # Launch HTTP Control & Trace API Server on Port 8081
+    try:
+        import bot_api
+        bot_api.start_bot_api_server_background()
+        log.info("📡 Inter-service Control & Trace API Server started on port 8081.")
+    except Exception as api_err:
+        log.warning(f"⚠️ Could not start Bot Control API: {api_err}")
+
     # ── SERVICE STARTUP WARMUP & SHOPEE DASHBOARD LOGIN ──────────
     if not dry_run:
         log.info("🚀 [SERVICE STARTUP] Performing initial Shopee Dashboard session login & warmup...")
@@ -101,6 +110,16 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
     cycle_count = 0
 
     while RUNNING:
+        # Check if bot is paused via API
+        try:
+            import bot_api
+            if bot_api.BOT_STATE["status"] == "paused":
+                log.info("⏸️ [DAEMON] Bot patrol is currently PAUSED via API. Waiting for START command...")
+                time.sleep(3)
+                continue
+        except Exception:
+            pass
+
         cycle_count += 1
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log.info(f"\n🔄 [CYCLE #{cycle_count}] Running sync evaluation at {now_str}...")
@@ -109,6 +128,15 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             result = worker.sync_all_stores(execute_actions=not dry_run)
             log.info(f"  ✅ Cycle #{cycle_count} Finished. Stores Processed: {result['total_stores_processed']}")
             
+            try:
+                import bot_api
+                bot_api.BOT_STATE["cycle_count"] = cycle_count
+                bot_api.BOT_STATE["last_cycle_at"] = now_str
+                bot_api.BOT_STATE["total_stores_processed"] = result.get("total_stores_processed", 0)
+                bot_api.BOT_STATE["last_actions"] = result.get("actions_taken", [])
+            except Exception:
+                pass
+
             if result["actions_taken"]:
                 log.info(f"  ⚡ Actions Taken in Cycle #{cycle_count} ({len(result['actions_taken'])}):")
                 for act in result["actions_taken"]:
