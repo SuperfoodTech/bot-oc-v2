@@ -29,6 +29,12 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_pendek_outlet})...")
 
+    # Set session file according to outlet username
+    if outlet.username:
+        account_session_file = SCRIPT_DIR.parent / "data" / f"session_{outlet.username}.json"
+        if account_session_file.exists():
+            browser.set_session_file(account_session_file)
+
     # 1. Fast path: try saved session token
     saved_session = browser.load_session()
     if saved_session and saved_session.get("shopee_tob_token") and saved_session.get("shopee_tob_entity_id"):
