@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#141413">
+  <title>FoodMaster Admin Console | ShopeeFood Auto-Open</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <script src="/static/theme.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+  <div class="desktop-wrapper">
+    <header class="admin-nav flex-column flex-sm-row align-items-stretch align-items-sm-center">
+      <div class="brand-badge">
+        <img class="brand-icon" src="/static/favicon.svg" alt="">
+        <div>
+          <div class="admin-brand-title">FoodMaster Admin Console</div>
+          <div class="admin-brand-subtitle">Operasional & Log Bot</div>
+        </div>
+      </div>
+
+      <div class="admin-actions d-grid d-sm-flex">
+        <button class="btn-outline btn-compact" type="button" data-theme-toggle onclick="toggleTheme()">
+          Mode terang
+        </button>
+        <button class="btn-outline btn-compact" onclick="triggerManualSync()">
+          Sinkronkan
+        </button>
+        <button class="btn-primary btn-compact" onclick="openGenerateModal()">
+          Tambah mitra
+        </button>
+      </div>
+    </header>
+
+    <section class="admin-intro">
+      <div>
+        <div class="eyebrow">Ringkasan Operasional</div>
+        <h1 class="page-title">Konsol Kontrol Bot</h1>
+        <p class="page-description">Kelola outlet mitra dan pantau proses eksekusi bot secara real-time.</p>
+      </div>
+    </section>
+
+    <!-- NAV TABS -->
+    <nav class="admin-tab-nav" aria-label="Navigasi Tab Admin">
+      <button class="tab-btn active" id="tabBtnOutlets" onclick="switchTab('outlets')">
+        <span>Operasional Outlet</span>
+        <span class="tab-badge" id="tabOutletCount">0</span>
+      </button>
+      <button class="tab-btn" id="tabBtnLogs" onclick="switchTab('logs')">
+        <span>Log Proses Bot</span>
+        <span class="tab-badge" id="tabLogBadge">Live</span>
+      </button>
+    </nav>
+
+    <!-- TAB PANE 1: OPERASIONAL OUTLET -->
+    <div class="tab-pane active" id="paneOutlets">
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100 stat-card-primary">
+            <div class="stat-label">Total outlet</div>
+            <div class="stat-val" id="totalOutletsVal">0</div>
+            <div class="stat-detail">Outlet terdaftar</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100">
+            <div class="stat-label">Layanan aktif</div>
+            <div class="stat-val" id="activeSubVal">0</div>
+            <div class="stat-detail">Auto-open berjalan</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100">
+            <div class="stat-label">Akun ditangguhkan</div>
+            <div class="stat-val" id="suspendVal">0</div>
+            <div class="stat-detail">Perlu tindakan admin</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100">
+            <div class="stat-label">Sistem auto-open</div>
+            <div class="stat-val" id="daemonStatusVal">Online</div>
+            <div class="stat-detail">Sinkronisasi aktif</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card outlet-section">
+        <div class="table-heading">
+          <h2>Daftar outlet</h2>
+          <input type="text" id="searchInput" class="form-input table-search" placeholder="Cari mitra, outlet, atau Store ID" onkeyup="filterTable()">
+        </div>
+
+        <div class="table-scroll d-none d-md-block">
+          <table class="data-table" id="adminTable">
+            <thead>
+              <tr>
+                <th>Mitra</th>
+                <th>Portal</th>
+                <th>Store ID</th>
+                <th>Nama Outlet</th>
+                <th>Link User Vercel</th>
+                <th>Auto-open outlet</th>
+                <th>Status di ShopeeFood</th>
+                <th>Berlaku sampai</th>
+                <th>Status akun</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="10" class="table-loading-state">Memuat data outlet...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="mobileOutletList" class="mobile-outlet-list d-md-none">
+          <div class="mobile-empty-state">Memuat data outlet...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PANE 2: LOG PROSES BOT -->
+    <div class="tab-pane" id="paneLogs">
+      <div class="bot-monitor-card">
+        <div class="bot-status-bar">
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Monitoring Daemon Engine</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--ink); margin-top: 2px;">Status Eksekusi Bot Real-time</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;" id="botLastSyncText">Proses terakhir: Memuat data...</div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div class="bot-status-pill">
+              <span class="status-indicator-dot" id="botStatusDot"></span>
+              <span id="botStatusLabel">DAEMON ONLINE 24/7</span>
+            </div>
+
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="autoRefreshCheckbox" onchange="toggleAutoRefreshLogs(this)">
+              <span>Auto-refresh (5s)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-heading flex-column flex-sm-row gap-2">
+          <h2>Log Aktivitas & Keputusan Bot</h2>
+          <div class="log-filter-controls">
+            <select id="logActionFilter" class="form-input" style="width: auto; min-width: 150px;" onchange="loadFullBotLogs()">
+              <option value="">Semua Aksi</option>
+              <option value="ACTION_OPEN">Auto Open (Buka)</option>
+              <option value="ACTION_CLOSE">Auto Close (Tutup)</option>
+              <option value="ADMIN">Tindakan Admin</option>
+              <option value="USER">Tindakan Mitra</option>
+              <option value="SYNC_CYCLE">Evaluasi Sistem</option>
+            </select>
+            <input type="text" id="logSearchInput" class="form-input table-search" placeholder="Cari Store ID, outlet, alasan..." onkeyup="loadFullBotLogs()">
+            <button class="btn-outline btn-compact" onclick="loadFullBotLogs()">Muat Ulang</button>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 160px;">Timestamp</th>
+                <th style="width: 110px;">Store ID</th>
+                <th style="width: 180px;">Nama Outlet</th>
+                <th style="width: 140px;">Aksi Bot</th>
+                <th style="width: 120px;">Target State</th>
+                <th>Alasan & Keputusan Sistem</th>
+              </tr>
+            </thead>
+            <tbody id="fullLogsTableBody">
+              <tr><td colspan="6" class="table-loading-state">Memuat log aktivitas bot...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL 1: GENERATE USER LINK -->
+  <div class="modal-overlay" id="generateModal">
+    <div class="modal-card">
+      <div class="step-indicator">Admin Action</div>
+      <h3 class="card-title">Generate Link User Baru</h3>
+      <p class="card-subtitle">Buat Vercel Link Unik dan Kata Sandi untuk mitra pemilik toko.</p>
+
+      <div style="margin-top: 16px;">
+        <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra</label>
+        <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+
+        <label style="font-size: 12px; font-weight: 700; margin-top: 12px; display: block;">Vercel Kata Sandi (Passcode)</label>
+        <input type="text" id="genPasscode" class="form-input" placeholder="Passcode (default: Master@00@)" value="Master@00@">
+
+        <div id="genResultBox" style="display: none; margin-top: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--ink);">Link Berhasil Dibuat:</div>
+          <input type="text" id="genUrlInput" class="form-input" readonly style="font-size: 12px; margin-top: 4px;">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn-primary" onclick="submitGenerateLink()">Generate Link</button>
+          <button class="btn-outline" onclick="closeAdminModal('generateModal')">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SUSPENSION CONTROL -->
+  <div class="modal-overlay" id="suspendModal">
+    <div class="modal-card">
+      <div class="step-indicator">Admin Action</div>
+      <h3 class="card-title">Pengaturan Penangguhan Outlet</h3>
+      <p class="card-subtitle" id="suspendStoreTitle">Store ID: -</p>
+
+      <div style="margin-top: 16px;">
+        <label style="font-size: 12px; font-weight: 700;">Status Penangguhan</label>
+        <select id="suspendSelect" class="form-input">
+          <option value="Ya">Ya (Tangguhkan Bot)</option>
+          <option value="Tidak">Tidak (Aktifkan Bot)</option>
+        </select>
+
+        <label style="font-size: 12px; font-weight: 700; margin-top: 12px; display: block;">Alasan Penangguhan</label>
+        <input type="text" id="suspendReasonInput" class="form-input" placeholder="cth: Menunggak tagihan 3x">
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn-primary" onclick="submitSuspend()">Simpan Penangguhan</button>
+          <button class="btn-outline" onclick="closeAdminModal('suspendModal')">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: RENEW EXPIRY DATE -->
+  <div class="modal-overlay" id="renewModal">
+    <div class="modal-card">
+      <div class="step-indicator">Admin Action</div>
+      <h3 class="card-title">Perbarui Masa Aktif Layanan</h3>
+      <p class="card-subtitle" id="renewStoreTitle">Store ID: -</p>
+
+      <div style="margin-top: 16px;">
+        <label style="font-size: 12px; font-weight: 700;">Tanggal Berakhir Layanan Baru</label>
+        <input type="date" id="renewDateInput" class="form-input" value="2026-12-31">
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn-primary" onclick="submitRenew()">Perbarui Masa Aktif</button>
+          <button class="btn-outline" onclick="closeAdminModal('renewModal')">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT ADMIN APP LOGIC -->
+  <script>
+    let allStores = [];
+    let selectedStoreForAction = null;
+    let currentTab = 'outlets';
+    let autoRefreshTimer = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadStoresData();
+      loadFullBotLogs();
+    });
+
+    function switchTab(tabName) {
+      currentTab = tabName;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+      if (tabName === 'outlets') {
+        document.getElementById('tabBtnOutlets').classList.add('active');
+        document.getElementById('paneOutlets').classList.add('active');
+        loadStoresData();
+      } else if (tabName === 'logs') {
+        document.getElementById('tabBtnLogs').classList.add('active');
+        document.getElementById('paneLogs').classList.add('active');
+        loadFullBotLogs();
+      }
+    }
+
+    async function loadStoresData() {
+      try {
+        const res = await fetch('/api/v1/stores');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        allStores = await res.json();
+        renderAdminTable(allStores);
+        updateMetrics(allStores);
+      } catch (err) {
+        console.error("Error loading stores:", err);
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="table-loading-state">Data outlet gagal dimuat. Coba sinkronkan kembali.</td></tr>';
+        document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Tekan Sinkronkan untuk mencoba kembali.</div>';
+      }
+    }
+
+    function updateMetrics(stores) {
+      document.getElementById('totalOutletsVal').innerText = stores.length;
+      document.getElementById('tabOutletCount').innerText = stores.length;
+      const activeCount = stores.filter(s => s.subscription_status === 'Aktif' && !s.is_suspended).length;
+      const susCount = stores.filter(s => s.is_suspended).length;
+      document.getElementById('activeSubVal').innerText = activeCount;
+      document.getElementById('suspendVal').innerText = susCount;
+    }
+
+    function renderAdminTable(stores) {
+      const tbody = document.getElementById('tableBody');
+      const mobileList = document.getElementById('mobileOutletList');
+      tbody.innerHTML = '';
+      mobileList.innerHTML = '';
+
+      if (!stores.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="table-loading-state">Tidak ada outlet yang sesuai.</td></tr>';
+        mobileList.innerHTML = '<div class="mobile-empty-state">Tidak ada outlet yang sesuai dengan pencarian.</div>';
+        return;
+      }
+
+      stores.forEach(s => {
+        const isVercelOn = s.vercel_status === 'ON';
+        const isShopeeOpen = s.shopee_status === 'OPEN' || s.shopee_status === 'ON';
+        const ownerName = s.nama_pemilik || 'Fando';
+        const linkUrl = s.vercel_link || `/mitra/${ownerName.toLowerCase().replace(/ /g, '-')}`;
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td><strong>${ownerName}</strong></td>
+          <td>${s.merchant_name}</td>
+          <td><code>${s.store_id}</code></td>
+          <td>${s.store_name}</td>
+          <td><a href="${linkUrl}" target="_blank" class="table-link">Buka dashboard</a></td>
+          <td>
+            <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Auto-open aktif' : 'Auto-open dijeda'}</span>
+            <small class="table-cell-note">${isVercelOn ? 'Otomatisasi berjalan' : 'Perlu dibuka manual'}</small>
+          </td>
+          <td><span class="table-status ${isShopeeOpen ? 'is-success' : 'is-warning'}">${isShopeeOpen ? 'Outlet buka' : 'Outlet tutup'}</span></td>
+          <td><strong>${s.tanggal_berakhir_layanan || '2026-11-01'}</strong></td>
+          <td>
+            <span class="table-status ${s.is_suspended ? 'is-danger' : 'is-success'}">${s.is_suspended ? 'Akun ditangguhkan' : 'Akun aktif'}</span>
+            ${s.is_suspended ? `<small class="table-cell-note">${s.alasan_penangguhan || 'Perlu ditinjau admin'}</small>` : ''}
+          </td>
+          <td>
+            <div class="row-actions">
+              <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">
+                Atur akun
+              </button>
+              <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">
+                Perpanjang
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        const mobileCard = document.createElement('article');
+        mobileCard.className = 'mobile-outlet-card';
+        mobileCard.innerHTML = `
+          <div class="mobile-outlet-head">
+            <div>
+              <div class="step-indicator">${s.merchant_name}</div>
+              <h3>${s.store_name}</h3>
+              <div class="mobile-store-id">Store ID ${s.store_id}</div>
+            </div>
+            <span class="badge ${isShopeeOpen ? 'badge-open' : 'badge-closed'}">ShopeeFood ${isShopeeOpen ? 'buka' : 'tutup'}</span>
+          </div>
+
+          <dl class="mobile-detail-list">
+            <div><dt>Pemilik outlet</dt><dd>${ownerName}</dd></div>
+            <div><dt>Auto-open outlet</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Aktif' : 'Dijeda'}</span></dd></div>
+            <div><dt>Langganan berlaku sampai</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
+            <div><dt>Status akun</dt><dd><span class="status-text ${s.is_suspended ? '' : 'is-active'}">${s.is_suspended ? 'Ditangguhkan' : 'Aktif'}</span></dd></div>
+            <div class="mobile-detail-wide"><dt>Dashboard mitra</dt><dd><a href="${linkUrl}" target="_blank" class="mobile-dashboard-link">Buka dashboard mitra</a></dd></div>
+          </dl>
+
+          ${s.is_suspended && s.alasan_penangguhan ? `<div class="suspension-note"><strong>Alasan penangguhan</strong><span>${s.alasan_penangguhan}</span></div>` : ''}
+
+          <div class="mobile-card-actions d-grid gap-2">
+            <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur status akun</button>
+            <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang layanan</button>
+          </div>
+        `;
+        mobileList.appendChild(mobileCard);
+      });
+    }
+
+    function filterTable() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = allStores.filter(s => 
+        (s.nama_pemilik || '').toLowerCase().includes(q) ||
+        (s.store_name || '').toLowerCase().includes(q) ||
+        (s.store_id || '').toLowerCase().includes(q) ||
+        (s.merchant_name || '').toLowerCase().includes(q)
+      );
+      renderAdminTable(filtered);
+    }
+
+    async function loadFullBotLogs() {
+      const actionFilter = document.getElementById('logActionFilter') ? document.getElementById('logActionFilter').value : '';
+      const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value : '';
+
+      let url = `/api/v1/logs?limit=150`;
+      if (actionFilter) url += `&action=${encodeURIComponent(actionFilter)}`;
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+      try {
+        const res = await fetch(url);
+        const logs = await res.json();
+        renderFullBotLogsTable(logs);
+        if (logs.length > 0) {
+          document.getElementById('botLastSyncText').innerText = `Proses terakhir: ${logs[0].timestamp} (${logs.length} catatan terdaftar)`;
+        }
+      } catch (err) {
+        console.error("Gagal memuat log bot:", err);
+      }
+    }
+
+    function renderFullBotLogsTable(logs) {
+      const tbody = document.getElementById('fullLogsTableBody');
+      const badge = document.getElementById('tabLogBadge');
+      if (badge) badge.innerText = `${logs.length}`;
+
+      tbody.innerHTML = '';
+      if (!logs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="table-loading-state">Tidak ada catatan log aktivitas bot yang sesuai.</td></tr>';
+        return;
+      }
+
+      logs.forEach(l => {
+        const tr = document.createElement('tr');
+        let badgeClass = 'badge-action-sync';
+        let actionLabel = l.action;
+
+        if (l.action === 'ACTION_OPEN') {
+          badgeClass = 'badge-action-open';
+          actionLabel = 'Auto-open';
+        } else if (l.action === 'ACTION_CLOSE') {
+          badgeClass = 'badge-action-close';
+          actionLabel = 'Auto-close';
+        } else if (l.action.includes('SUSPEND')) {
+          badgeClass = 'badge-action-suspend';
+          actionLabel = 'Penangguhan';
+        } else if (l.action.includes('USER') || l.action.includes('PAUSE') || l.action.includes('RESUME')) {
+          badgeClass = 'badge-action-user';
+          actionLabel = l.action.replace('USER_', '');
+        } else if (l.action === 'SYNC_CYCLE') {
+          badgeClass = 'badge-action-sync';
+          actionLabel = 'Evaluasi sistem';
+        }
+
+        tr.innerHTML = `
+          <td><small style="font-family: monospace; font-size: 12px; color: var(--muted);">${l.timestamp}</small></td>
+          <td><code>${l.store_id}</code></td>
+          <td><strong>${l.store_name}</strong></td>
+          <td><span class="log-action-badge ${badgeClass}">${actionLabel}</span></td>
+          <td><span class="table-status ${l.target_state === 'OPEN' ? 'is-success' : (l.target_state === 'CLOSED' || l.target_state === 'SUSPENDED' ? 'is-warning' : 'is-success')}">${l.target_state}</span></td>
+          <td style="font-size: 13px; color: var(--ink);">${l.reason}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleAutoRefreshLogs(cb) {
+      if (cb.checked) {
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(() => {
+          if (currentTab === 'logs') {
+            loadFullBotLogs();
+          } else {
+            loadStoresData();
+          }
+        }, 5000);
+      } else {
+        if (autoRefreshTimer) {
+          clearInterval(autoRefreshTimer);
+          autoRefreshTimer = null;
+        }
+      }
+    }
+
+    function openGenerateModal() {
+      document.getElementById('genResultBox').style.display = 'none';
+      document.getElementById('generateModal').classList.add('active');
+    }
+
+    async function submitGenerateLink() {
+      const owner = document.getElementById('genOwnerName').value || 'Mitra Baru';
+      const pass = document.getElementById('genPasscode').value || 'Master@00@';
+
+      try {
+        const res = await fetch('/api/v1/admin/generate-link', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({nama_pemilik: owner, passcode: pass})
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('genUrlInput').value = `${data.data.full_url} (Passcode: ${data.data.passcode})`;
+          document.getElementById('genResultBox').style.display = 'block';
+        }
+      } catch (err) {
+        alert('Gagal generate link.');
+      }
+    }
+
+    function openSuspendModal(storeId, storeName, isSus, reason) {
+      selectedStoreForAction = storeId;
+      document.getElementById('suspendStoreTitle').innerText = `${storeName} (ID: ${storeId})`;
+      document.getElementById('suspendSelect').value = isSus ? 'Ya' : 'Tidak';
+      document.getElementById('suspendReasonInput').value = reason || '';
+      document.getElementById('suspendModal').classList.add('active');
+    }
+
+    async function submitSuspend() {
+      if (!selectedStoreForAction) return;
+      const pen = document.getElementById('suspendSelect').value;
+      const alasan = document.getElementById('suspendReasonInput').value;
+
+      try {
+        const res = await fetch('/api/v1/admin/suspend', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({store_id: selectedStoreForAction, penangguhan: pen, alasan_penangguhan: alasan})
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAdminModal('suspendModal');
+          loadStoresData();
+          loadFullBotLogs();
+        }
+      } catch (err) {
+        alert('Gagal update penangguhan.');
+      }
+    }
+
+    function openRenewModal(storeId, storeName) {
+      selectedStoreForAction = storeId;
+      document.getElementById('renewStoreTitle').innerText = `${storeName} (ID: ${storeId})`;
+      document.getElementById('renewModal').classList.add('active');
+    }
+
+    async function submitRenew() {
+      if (!selectedStoreForAction) return;
+      const newDate = document.getElementById('renewDateInput').value;
+
+      try {
+        const res = await fetch('/api/v1/admin/renew', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({store_id: selectedStoreForAction, new_expiry_date: newDate})
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAdminModal('renewModal');
+          loadStoresData();
+          loadFullBotLogs();
+        }
+      } catch (err) {
+        alert('Gagal memperbarui masa aktif.');
+      }
+    }
+
+    async function triggerManualSync() {
+      try {
+        const res = await fetch('/api/v1/sync?execute=true', {method: 'POST'});
+        const data = await res.json();
+        alert(`Sync selesai! Status ${data.total_stores_processed} toko di-refresh.`);
+        loadStoresData();
+        loadFullBotLogs();
+      } catch (err) {
+        alert('Gagal manual sync.');
+      }
+    }
+
+    function closeAdminModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+  </script>
+</body>
+</html>
