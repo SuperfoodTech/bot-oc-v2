@@ -5,6 +5,7 @@ Backend Worker Engine that syncs store states, evaluates PRD rules, and triggers
 """
 
 import sys
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -22,13 +23,18 @@ from backend import db
 
 log = get_logger("backend_worker")
 
+# Filter account usernames allowed for bot execution (Default: auto7313 only)
+ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
+ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
+
 
 def warmup_all_account_sessions():
     """
     On service startup, iterates over registered merchant accounts and ensures
     each account is logged in to the Shopee Partner Dashboard, saving active sessions.
+    Only processes accounts matching ALLOWED_USERNAMES (e.g. auto7313).
     """
-    log.info("🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for all registered accounts...")
+    log.info(f"🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for whitelisted accounts {ALLOWED_USERNAMES}...")
     try:
         outlets = fetch_merchant_outlets()
     except Exception as e:
@@ -40,6 +46,12 @@ def warmup_all_account_sessions():
         username = (outlet.username or "").strip()
         if not username or username in processed_accounts:
             continue
+
+        # Exclude usernames not in whitelist (username != auto7313)
+        if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+            log.info(f"  ⏭️ [STARTUP WARMUP] Excluding account '{username}' (username != auto7313).")
+            continue
+
         processed_accounts.add(username)
 
         session_file = SCRIPT_DIR.parent / "data" / f"session_{username}.json"
@@ -72,7 +84,13 @@ def warmup_all_account_sessions():
 def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
+    Excludes execution if outlet.username != auto7313.
     """
+    # Exclude accounts not in ALLOWED_USERNAMES whitelist
+    if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
+        log.info(f"  ⏭️ [SHOPEE EXECUTION] Excluding Store {outlet.store_id} - username '{outlet.username}' != auto7313.")
+        return False
+
     log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_pendek_outlet})...")
 
     # Set session file according to outlet username
@@ -132,6 +150,11 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
     actions_taken = []
 
     for outlet in outlets:
+        # Exclude stores where username != auto7313 (if whitelist active)
+        if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
+            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_pendek_outlet}) - username '{outlet.username}' != auto7313")
+            continue
+
         # 1. Update / seed store in DB
         db.save_or_update_store(
             store_id=outlet.store_id,
@@ -184,12 +207,12 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
         store_name="BOT_DAEMON",
         action="SYNC_CYCLE",
         target_state="SYNCED",
-        reason=f"Evaluasi bot selesai untuk {len(outlets)} outlet ({len(actions_taken)} aksi dijalankan)"
+        reason=f"Evaluasi bot selesai untuk {len(actions_taken)} aksi dijalankan (Filtered: username == auto7313)"
     )
 
     return {
         "success": True,
         "total_stores_processed": len(outlets),
         "actions_taken": actions_taken,
-        "message": f"Successfully processed {len(outlets)} stores."
+        "message": f"Successfully processed stores for allowed usernames {ALLOWED_USERNAMES}."
     }
