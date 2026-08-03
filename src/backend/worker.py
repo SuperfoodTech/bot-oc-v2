@@ -73,6 +73,15 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 reason=decision.reason
             )
 
+    # Record overall cycle evaluation log for process tracking
+    db.record_log(
+        store_id="SYSTEM",
+        store_name="BOT_DAEMON",
+        action="SYNC_CYCLE",
+        target_state="SYNCED",
+        reason=f"Evaluasi bot selesai untuk {len(outlets)} outlet ({len(actions_taken)} aksi dijalankan)"
+    )
+
     return {
         "success": True,
         "total_stores_processed": len(outlets),

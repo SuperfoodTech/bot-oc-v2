@@ -317,8 +317,21 @@ def trigger_sync(execute: bool = Query(default=True, description="Whether to exe
 
 
 @app.get("/api/v1/logs", response_model=List[AutomationLogResponse], summary="Get Automation Audit Logs")
-def get_logs(limit: int = Query(default=50, ge=1, le=200)):
+def get_logs(
+    limit: int = Query(default=100, ge=1, le=500),
+    action: Optional[str] = Query(default=None, description="Filter by action name"),
+    search: Optional[str] = Query(default=None, description="Search keyword in store_id, name, or reason")
+):
     logs = db.get_recent_logs(limit=limit)
+    if action and action.strip():
+        act_q = action.strip().upper()
+        logs = [l for l in logs if act_q in l["action"].upper()]
+    if search and search.strip():
+        sq = search.strip().lower()
+        logs = [
+            l for l in logs
+            if sq in l["store_id"].lower() or sq in l["store_name"].lower() or sq in l["reason"].lower() or sq in l["action"].lower()
+        ]
     return [
         AutomationLogResponse(
             id=l["id"],

@@ -1084,3 +1084,155 @@ input:checked + .slider::before {
     flex-direction: column;
   }
 }
+
+/* ── TAB NAVIGATION SYSTEM ── */
+.admin-tab-nav {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+  padding-bottom: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+  background: var(--subtle);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.tab-btn.active {
+  color: var(--ink);
+  background: var(--surface);
+  border-bottom-color: var(--accent);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.tab-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--subtle);
+  color: var(--muted);
+}
+
+.tab-btn.active .tab-badge {
+  background: var(--active-bg);
+  color: var(--active-text);
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+/* ── BOT LOG MONITOR VIEW ── */
+.bot-monitor-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.bot-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.bot-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--subtle);
+  border: 1px solid var(--line);
+}
+
+.status-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.status-indicator-dot.syncing {
+  background: var(--warning);
+}
+
+.log-filter-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.log-action-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.badge-action-open {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border: 1px solid var(--active-border);
+}
+
+.badge-action-close {
+  background: var(--inactive-bg);
+  color: var(--inactive-text);
+  border: 1px solid var(--inactive-border);
+}
+
+.badge-action-suspend {
+  background: var(--danger-panel);
+  color: var(--danger-panel-text);
+  border: 1px solid var(--danger-panel-border);
+}
+
+.badge-action-user {
+  background: var(--subtle);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.badge-action-sync {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
