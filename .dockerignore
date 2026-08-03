@@ -56,7 +56,7 @@ utils/
 
 # ── Local database & locks ────────
 *.db
-*.lock
+!uv.lock
 src/backend/database.db
 src/daemon.lock
 
