@@ -36,7 +36,7 @@ services:
     container_name: fm-bot-dev
     volumes:
       - ./src:/app/src            # Hot reload daemon code
-      - bot-data:/app/src/data    # Persist pulled hours, session data
+      - ./src/data:/app/src/data  # Bind mount host data (chrome profile, session)
     environment:
       - PYTHONPATH=/app/src
       - ENV=development
@@ -46,9 +46,6 @@ services:
     networks:
       - fm-net
     restart: unless-stopped
-
-volumes:
-  bot-data:
 
 networks:
   fm-net:

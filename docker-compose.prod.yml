@@ -34,7 +34,7 @@ services:
       dockerfile: Dockerfile.bot
     container_name: fm-bot-prod
     volumes:
-      - bot-data:/app/src/data    # Persist runtime data across restarts
+      - ./src/data:/app/src/data  # Bind mount host data (chrome profile, session)
     environment:
       - PYTHONPATH=/app/src
       - ENV=production
@@ -45,9 +45,6 @@ services:
     networks:
       - fm-net
     restart: always
-
-volumes:
-  bot-data:
 
 networks:
   fm-net:
