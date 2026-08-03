@@ -1,13 +1,5 @@
-# ============================================================
-# Dockerfile.bot  –  Daemon Engine + Selenium + Chromium
-# ============================================================
-# Heavy layer (Chromium ~300MB) installed first and cached.
-# Source code is the last layer → rebuilds are instant.
-# ============================================================
+FROM docker.io/library/python:3.12-slim
 
-FROM python:3.12-slim AS base
-
-# ── 1. System deps + Chromium (heaviest layer, cached) ───────
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         chromium chromium-driver \
@@ -22,19 +14,13 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# ── 2. Dependency manifests only (cache-friendly) ────────────
 COPY pyproject.toml uv.lock ./
-
-# ── 3. Install Python deps (cached until deps change) ────────
 RUN uv sync --frozen --no-dev --no-install-project
 
-# ── 4. Copy source code last (instant on code-only changes) ──
 COPY src/ ./src/
 
-ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
-ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV CHROME_BIN=/usr/bin/chromium
 
-# Default: run daemon with 60-second interval
-CMD ["uv", "run", "python", "-m", "daemon", "--interval-seconds", "60"]
+CMD ["uv", "run", "python", "-m", "daemon"]

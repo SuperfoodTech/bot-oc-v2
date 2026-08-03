@@ -22,6 +22,9 @@ __pycache__/
 # Credentials & Sensitive Files
 credentials.json
 
+# Separate Local Bot Repository Folder (Untracked in Dashboard Repo)
+main-bot/
+
 # Local Runtime Databases & Locks
 *.db
 *.lock
@@ -30,8 +33,7 @@ daemon.lock
 src/backend/database.db
 src/daemon.lock
 
-# Test & Debug Scripts (Non-production / Scratch)
-src/test_*.py
+# Test & Debug Scratch Scripts
 src/capture_*.py
 src/generate_simulation.py
 src/open_*.py
@@ -57,12 +59,4 @@ src/skill/
 utils/
 
 # Data Cache & Profiles
-src/data/chrome_profile*
-src/data/session*.json
-!src/data/chrome_profile_auto7313
-!src/data/chrome_profile_auto7313/**
-!src/data/session_auto7313.json
-src/data/output/
-src/data/reports/
-src/data/debug/
-src/data/warmer_stats.json
+src/data/
