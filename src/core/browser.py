@@ -519,7 +519,7 @@ def _deliberate_logout_and_relogin(
             # --- DEBUG SCREENSHOT JIKA KLIK GAGAL ---
             try:
                 import os
-                debug_dir = os.path.join("src", "shopee-omzet-automation", "data", "debug")
+                debug_dir = os.path.join("src", "utils", "data", "debug")
                 os.makedirs(debug_dir, exist_ok=True)
                 ss_fail_path = os.path.join(debug_dir, "modal_fail_server.png")
                 driver.save_screenshot(ss_fail_path)

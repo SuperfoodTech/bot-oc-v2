@@ -52,7 +52,7 @@ src/scratch/
 src/sessions/
 src/logs/
 src/skill/
-shopee-omzet-automation/
+utils/
 
 # Data Cache & Profiles
 src/data/chrome_profile*

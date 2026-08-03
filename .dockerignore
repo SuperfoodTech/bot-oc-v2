@@ -49,7 +49,7 @@ src/scratch/
 src/sessions/
 src/logs/
 src/skill/
-shopee-omzet-automation/
+utils/
 
 # ── Local database & locks ────────
 *.db
