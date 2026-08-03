@@ -125,16 +125,29 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
             headless=True
         )
 
-        if session and session.get("shopee_tob_token") and session.get("shopee_tob_entity_id"):
-            tob_token = session["shopee_tob_token"]
-            entity_id = session["shopee_tob_entity_id"]
-            if action == ACTION_OPEN:
-                success = browser.open_store_api(tob_token, entity_id)
-            else:
-                success = browser.pause_store_api(tob_token, entity_id)
-            if success:
-                log.info(f"  ✅ [SELENIUM BROWSER SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
-                return True
+        if session:
+            driver = session.get("driver")
+            tob_token = session.get("shopee_tob_token")
+            entity_id = session.get("shopee_tob_entity_id")
+            
+            # Try API call first
+            success = False
+            if tob_token and entity_id:
+                if action == ACTION_OPEN:
+                    success = browser.open_store_api(tob_token, entity_id)
+                else:
+                    success = browser.pause_store_api(tob_token, entity_id)
+                if success:
+                    log.info(f"  ✅ [SELENIUM BROWSER API SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                    return True
+
+            # If API fails or returns need to select store, use UI Button fallback!
+            if driver:
+                log.info(f"  🖱️ Triggering UI Action fallback for Store {outlet.store_id} ({action})...")
+                success = browser.execute_store_action_ui(driver, outlet.store_id, action)
+                if success:
+                    log.info(f"  ✅ [SELENIUM BROWSER UI SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                    return True
     except Exception as e:
         log.error(f"  ❌ Selenium browser login error for Store {outlet.store_id}: {e}")
 

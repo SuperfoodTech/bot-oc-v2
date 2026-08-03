@@ -710,6 +710,65 @@ def open_store_api(tob_token: str, entity_id: str) -> bool:
         log.error(f"❌ [API] Failed to open store: {e}")
     return False
 
+def execute_store_action_ui(driver, store_id: str, action: str) -> bool:
+    """
+    Fallback UI action executor: Navigates directly to store settings page
+    (https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id})
+    and clicks 'Tutup Outlet Sementara' or 'Buka Outlet' button in the UI.
+    """
+    log.info(f"🖱️ [UI FALLBACK] Executing {action} via UI for Store {store_id}...")
+    try:
+        target_url = f"https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}"
+        if store_id and store_id not in driver.current_url:
+            driver.get(target_url)
+            time.sleep(3)
+
+        # Check button target text based on action
+        btn_target = "Tutup Outlet Sementara" if action == "ACTION_CLOSE" else "Buka Outlet"
+        
+        click_res = driver.execute_script("""
+            var targetText = arguments[0];
+            var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
+            for (var btn of btns) {
+                var txt = (btn.innerText || btn.textContent || '').trim();
+                if (txt === targetText || txt.includes(targetText)) {
+                    var clickable = btn.closest('button, a, div[role="button"]') || btn;
+                    clickable.scrollIntoView({block: 'center'});
+                    clickable.click();
+                    return txt;
+                }
+            }
+            return null;
+        """, btn_target)
+
+        if not click_res:
+            log.warning(f"  ⚠️ UI button '{btn_target}' not found on store page.")
+            return False
+
+        log.info(f"  👉 UI button clicked: '{click_res}'")
+        time.sleep(2)
+
+        # Handle modal confirmation if closing
+        if action == "ACTION_CLOSE":
+            modal_confirm = driver.execute_script("""
+                var primaryBtn = document.querySelector('.ant-modal button.ant-btn-primary, .ant-modal-footer button, .ant-dialog button');
+                if (primaryBtn) {
+                    primaryBtn.click();
+                    return 'CLICKED_CONFIRM';
+                }
+                return 'NO_CONFIRM_BTN';
+            """)
+            log.info(f"  -> Close modal confirm result: {modal_confirm}")
+            time.sleep(3)
+
+        log.info(f"✅ [UI FALLBACK SUCCESS] {action} executed successfully for Store {store_id}.")
+        return True
+
+    except Exception as e:
+        log.error(f"❌ [UI FALLBACK ERROR] Failed to execute {action} via UI: {e}")
+        return False
+
+
 
 
 
