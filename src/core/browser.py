@@ -657,29 +657,33 @@ def get_actual_store_status_api(tob_token: str, entity_id: str) -> dict | None:
         log.warning(f"⚠️ Failed to query store status API: {e}")
     return None
 
-def pause_store_api(tob_token: str, entity_id: str, pause_duration_minutes: int = 1440) -> bool:
+def pause_store_api(tob_token: str, entity_id: str, store_id: str = None, pause_duration_minutes: int = 1440) -> bool:
     """
     Triggers store pause (Auto Close) via internal API (POST /api/seller/store/opening-status/action/pause).
     Default pause duration is 1440 minutes (24 hours).
+    Injects active store_id in cookies and headers to set active store context.
     """
-    url = "https://foody.shopee.co.id/api/seller/store/opening-status/action/pause"
+    target_id = store_id or entity_id
+    url = f"https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={target_id}"
     headers = {
-        "Cookie": f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}; shopee_foody_mid={entity_id}",
+        "Cookie": f"shopee_tob_entity_id={target_id}; shopee_tob_token={tob_token}; shopee_foody_mid={entity_id}; shopee_foody_store_id={target_id}",
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        "shopee_tob_entity_id": str(target_id),
     }
     now_ms = int(time.time() * 1000)
     end_ms = now_ms + (pause_duration_minutes * 60 * 1000)
     payload = {
         "pause_start_time": now_ms,
-        "pause_end_time": end_ms
+        "pause_end_time": end_ms,
+        "store_id": int(target_id) if str(target_id).isdigit() else target_id
     }
     try:
         resp = requests.post(url, json=payload, headers=headers, timeout=8)
         data = resp.json()
         if data.get("code") == 0:
-            log.info(f"✅ [API] Store {entity_id} paused successfully (Auto Close).")
+            log.info(f"✅ [API] Store {target_id} paused successfully (Auto Close).")
             return True
         else:
             log.warning(f"⚠️ [API] Pause store failed response: {data}")
@@ -687,22 +691,28 @@ def pause_store_api(tob_token: str, entity_id: str, pause_duration_minutes: int 
         log.error(f"❌ [API] Failed to pause store: {e}")
     return False
 
-def open_store_api(tob_token: str, entity_id: str) -> bool:
+def open_store_api(tob_token: str, entity_id: str, store_id: str = None) -> bool:
     """
     Triggers store reopen (Auto Open) via internal API (POST /api/seller/store/opening-status/action/open).
+    Injects active store_id in cookies and headers to set active store context.
     """
-    url = "https://foody.shopee.co.id/api/seller/store/opening-status/action/open"
+    target_id = store_id or entity_id
+    url = f"https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={target_id}"
     headers = {
-        "Cookie": f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}; shopee_foody_mid={entity_id}",
+        "Cookie": f"shopee_tob_entity_id={target_id}; shopee_tob_token={tob_token}; shopee_foody_mid={entity_id}; shopee_foody_store_id={target_id}",
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+        "shopee_tob_entity_id": str(target_id),
+    }
+    payload = {
+        "store_id": int(target_id) if str(target_id).isdigit() else target_id
     }
     try:
-        resp = requests.post(url, json={}, headers=headers, timeout=8)
+        resp = requests.post(url, json=payload, headers=headers, timeout=8)
         data = resp.json()
         if data.get("code") == 0:
-            log.info(f"✅ [API] Store {entity_id} reopened successfully (Auto Open).")
+            log.info(f"✅ [API] Store {target_id} reopened successfully (Auto Open).")
             return True
         else:
             log.warning(f"⚠️ [API] Open store failed response: {data}")

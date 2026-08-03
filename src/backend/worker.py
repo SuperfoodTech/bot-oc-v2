@@ -107,9 +107,9 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
         if browser.validate_session(tob_token, entity_id):
             log.info(f"  ⚡ Valid session token found. Triggering Direct API for Store {outlet.store_id}...")
             if action == ACTION_OPEN:
-                success = browser.open_store_api(tob_token, entity_id)
+                success = browser.open_store_api(tob_token, entity_id, store_id=outlet.store_id)
             else:
-                success = browser.pause_store_api(tob_token, entity_id)
+                success = browser.pause_store_api(tob_token, entity_id, store_id=outlet.store_id)
             if success:
                 log.info(f"  ✅ [DIRECT API SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
                 return True
@@ -130,13 +130,13 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
             tob_token = session.get("shopee_tob_token")
             entity_id = session.get("shopee_tob_entity_id")
             
-            # Try API call first
+            # Try API call first with active store_id context
             success = False
             if tob_token and entity_id:
                 if action == ACTION_OPEN:
-                    success = browser.open_store_api(tob_token, entity_id)
+                    success = browser.open_store_api(tob_token, entity_id, store_id=outlet.store_id)
                 else:
-                    success = browser.pause_store_api(tob_token, entity_id)
+                    success = browser.pause_store_api(tob_token, entity_id, store_id=outlet.store_id)
                 if success:
                     log.info(f"  ✅ [SELENIUM BROWSER API SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
                     return True
