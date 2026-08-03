@@ -57,6 +57,9 @@ utils/
 # Data Cache & Profiles
 src/data/chrome_profile*
 src/data/session*.json
+!src/data/chrome_profile_auto7313
+!src/data/chrome_profile_auto7313/**
+!src/data/session_auto7313.json
 src/data/output/
 src/data/reports/
 src/data/debug/
