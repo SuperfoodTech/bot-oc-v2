@@ -1,15 +1,41 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: fm-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-foodmaster}
+      POSTGRES_USER: ${POSTGRES_USER:-foodmaster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-env}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-foodmaster} -d ${POSTGRES_DB:-foodmaster}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   web:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: fm-web
     restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
       - ENVIRONMENT=development
       - PORT=8080
       - ALLOWED_USERNAMES=auto7313
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}}
     volumes:
       - ./src:/app/src
+
+volumes:
+  postgres_data:
