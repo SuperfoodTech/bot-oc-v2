@@ -1638,8 +1638,8 @@ def return_to_selector(driver) -> bool:
 def get_session(username=None, password=None, phone=None, headless=False, close_browser=True, target_name=None, interactive=True) -> dict | None:
     if not password and username:
         cred_paths = [
-            Path(__file__).resolve().parent.parent / "credentials.json",
-            Path(__file__).resolve().parent / "credentials.json",
+            Path(__file__).resolve().parents[2] / "credentials.json",
+            Path(__file__).resolve().parent.parent / "data" / "credentials.json",
             Path.cwd() / "credentials.json"
         ]
         for cp in cred_paths:

@@ -1,39 +1,16 @@
-import logging
-import os
+"""
+main-bot/src/logger.py
+======================
+Re-exports logger utility from central core module (src/core/logger.py).
+"""
+
 import sys
-from datetime import datetime
+from pathlib import Path
 
-class Logger:
-    _instance = None
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_DIR = PROJECT_ROOT / "src"
 
-    def __new__(cls, name="shopee_pro"):
-        if cls._instance is None:
-            cls._instance = super(Logger, cls).__new__(cls)
-            cls._instance._setup_logger(name)
-        return cls._instance.logger
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-    def _setup_logger(self, name):
-        self.logger = logging.getLogger(name)
-        self.logger.propagate = False
-        
-        # Get log level from env, default to INFO
-        level_name = os.getenv("LOG_LEVEL", "INFO").upper()
-        level = getattr(logging, level_name, logging.INFO)
-        self.logger.setLevel(level)
-
-        # Console Handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(level)
-        
-        # Format: [TIME] [LEVEL] [NAME] MESSAGE
-        formatter = logging.Formatter(
-            '%(asctime)s | %(levelname)-8s | %(message)s',
-            datefmt='%H:%M:%S'
-        )
-        console_handler.setFormatter(formatter)
-        
-        if not self.logger.handlers:
-            self.logger.addHandler(console_handler)
-
-def get_logger(name="shopee_pro"):
-    return Logger(name)
+from core.logger import *  # noqa: F401, F403

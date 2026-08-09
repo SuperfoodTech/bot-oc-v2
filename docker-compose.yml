@@ -50,7 +50,7 @@ services:
       - ALLOWED_USERNAMES=auto7313
       - HEADLESS=true
     volumes:
-      - ./main-bot/data:/app/main-bot/data
+      - ./src/data:/app/src/data
       - ./src:/app/src
 
 volumes:
