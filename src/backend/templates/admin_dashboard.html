@@ -3,21 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#141413">
+  <meta name="theme-color" content="#f8f2ef">
   <title>FoodMaster Admin Console | ShopeeFood Auto-Open</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260807-palette">
 </head>
 <body>
 
   <div class="desktop-wrapper">
     <header class="admin-nav flex-column flex-sm-row align-items-stretch align-items-sm-center">
       <div class="brand-badge">
-        <img class="brand-icon" src="/static/favicon.svg" alt="">
         <div>
           <div class="admin-brand-title">FoodMaster Admin Console</div>
           <div class="admin-brand-subtitle">Operasional & Log Bot</div>
@@ -28,22 +27,11 @@
         <button class="btn-outline btn-compact" type="button" data-theme-toggle onclick="toggleTheme()">
           Mode terang
         </button>
-        <button class="btn-outline btn-compact" onclick="triggerManualSync()">
-          Sinkronkan
-        </button>
         <button class="btn-primary btn-compact" onclick="openGenerateModal()">
           Tambah mitra
         </button>
       </div>
     </header>
-
-    <section class="admin-intro">
-      <div>
-        <div class="eyebrow">Ringkasan Operasional</div>
-        <h1 class="page-title">Konsol Kontrol Bot</h1>
-        <p class="page-description">Kelola outlet mitra dan pantau proses eksekusi bot secara real-time.</p>
-      </div>
-    </section>
 
     <!-- NAV TABS -->
     <nav class="admin-tab-nav" aria-label="Navigasi Tab Admin">
@@ -53,7 +41,10 @@
       </button>
       <button class="tab-btn" id="tabBtnLogs" onclick="switchTab('logs')">
         <span>Log Proses Bot</span>
-        <span class="tab-badge" id="tabLogBadge">Live</span>
+        <span class="tab-badge" id="tabLogBadge">0</span>
+      </button>
+      <button class="tab-btn" id="tabBtnSettings" onclick="switchTab('settings')">
+        <span>Settings</span>
       </button>
     </nav>
 
@@ -101,12 +92,11 @@
             <thead>
               <tr>
                 <th>Mitra</th>
-                <th>Portal</th>
+                <th>Merchant</th>
                 <th>Store ID</th>
                 <th>Nama Outlet</th>
                 <th>Link User Vercel</th>
-                <th>Auto-open outlet</th>
-                <th>Status di ShopeeFood</th>
+                <th>Status utama</th>
                 <th>Berlaku sampai</th>
                 <th>Status akun</th>
                 <th>Aksi</th>
@@ -124,27 +114,59 @@
       </div>
     </div>
 
+    <!-- TAB PANE 3: SETTINGS -->
+    <div class="tab-pane" id="paneSettings">
+      <div class="settings-card">
+        <div class="step-indicator">Admin account</div>
+        <h2>Pengaturan admin</h2>
+        <p class="card-subtitle">Kelola sesi akses untuk dashboard operasional FoodMaster.</p>
+        <div class="settings-account-row">
+          <div>
+            <span class="settings-label">Login sebagai</span>
+            <strong id="currentAdminUsername">Memuat akun...</strong>
+          </div>
+          <span class="settings-role">ADMIN</span>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Akun saya</div>
+          <div class="settings-form-grid">
+            <div class="settings-field"><label for="settingsUsername">Username baru</label><input id="settingsUsername" class="form-input" aria-label="Username baru" autocomplete="username"></div>
+            <div class="settings-field"><label for="settingsPassword">Password baru</label><input id="settingsPassword" class="form-input" type="password" aria-label="Password baru" autocomplete="new-password" placeholder="Biarkan kosong jika tidak diubah"></div>
+          </div>
+          <button class="btn-primary" type="button" onclick="updateAdminAccount()">Simpan perubahan</button>
+          <p id="settingsAccountMessage" class="settings-message" role="status"></p>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Tambahkan admin</div>
+          <div class="settings-form-grid">
+            <div class="settings-field"><label for="newAdminUsername">Username</label><input id="newAdminUsername" class="form-input" aria-label="Username admin baru" autocomplete="off"></div>
+            <div class="settings-field"><label for="newAdminPassword">Password</label><input id="newAdminPassword" class="form-input" type="password" aria-label="Password admin baru" autocomplete="new-password"></div>
+          </div>
+          <button class="btn-outline" type="button" onclick="createAdminAccount()">Tambahkan role admin</button>
+          <p id="newAdminMessage" class="settings-message" role="status"></p>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Admin terdaftar</div>
+          <div id="adminAccountList" class="admin-account-list">Memuat akun admin...</div>
+        </div>
+        <button class="btn-primary" type="button" onclick="logoutAdmin()">Keluar dari dashboard</button>
+      </div>
+    </div>
+
     <!-- TAB PANE 2: LOG PROSES BOT -->
     <div class="tab-pane" id="paneLogs">
       <div class="bot-monitor-card">
         <div class="bot-status-bar">
           <div>
-            <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Monitoring Daemon Engine</div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--ink); margin-top: 2px;">Status Eksekusi Bot Real-time</div>
-            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;" id="botLastSyncText">Proses terakhir: Memuat data...</div>
+            <div class="bot-log-eyebrow">Riwayat otomasi</div>
+            <div class="bot-log-title">Log proses bot</div>
+            <div class="bot-log-meta" id="botLastSyncText">Memuat catatan aktivitas...</div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <div class="bot-status-pill">
-              <span class="status-indicator-dot" id="botStatusDot"></span>
-              <span id="botStatusLabel">DAEMON ONLINE 24/7</span>
-            </div>
-
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none;">
-              <input type="checkbox" id="autoRefreshCheckbox" onchange="toggleAutoRefreshLogs(this)">
-              <span>Auto-refresh (5s)</span>
-            </label>
-          </div>
+          <label class="bot-refresh-control">
+              <input type="checkbox" id="autoRefreshCheckbox" checked onchange="toggleAutoRefreshLogs(this)">
+              <span>Terima log baru (5s)</span>
+          </label>
         </div>
       </div>
 
@@ -166,19 +188,18 @@
         </div>
 
         <div class="table-scroll">
-          <table class="data-table">
+          <table class="data-table" id="logsTable">
             <thead>
               <tr>
                 <th style="width: 160px;">Timestamp</th>
                 <th style="width: 110px;">Store ID</th>
                 <th style="width: 180px;">Nama Outlet</th>
-                <th style="width: 140px;">Aksi Bot</th>
+                <th style="width: 160px;">Action</th>
                 <th style="width: 120px;">Target State</th>
-                <th>Alasan & Keputusan Sistem</th>
               </tr>
             </thead>
             <tbody id="fullLogsTableBody">
-              <tr><td colspan="6" class="table-loading-state">Memuat log aktivitas bot...</td></tr>
+              <tr><td colspan="5" class="table-loading-state">Memuat log aktivitas bot...</td></tr>
             </tbody>
           </table>
         </div>
@@ -239,7 +260,7 @@
     </div>
   </div>
 
-  <!-- MODAL 3: RENEW EXPIRY DATE -->
+  <!-- MODAL 3: RENEW SUBSCRIPTION PACKAGE -->
   <div class="modal-overlay" id="renewModal">
     <div class="modal-card">
       <div class="step-indicator">Admin Action</div>
@@ -247,8 +268,13 @@
       <p class="card-subtitle" id="renewStoreTitle">Store ID: -</p>
 
       <div style="margin-top: 16px;">
-        <label style="font-size: 12px; font-weight: 700;">Tanggal Berakhir Layanan Baru</label>
-        <input type="date" id="renewDateInput" class="form-input" value="2026-12-31">
+        <label style="font-size: 12px; font-weight: 700;">Pilih paket perpanjangan</label>
+        <select id="renewPlanSelect" class="form-input" onchange="updateRenewPreview()">
+          <option value="3">Paket 3 Bulan</option>
+          <option value="6">Paket 6 Bulan</option>
+          <option value="12">Paket 12 Bulan</option>
+        </select>
+        <div id="renewPreview" class="renew-preview">Berlaku sampai -</div>
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">
           <button class="btn-primary" onclick="submitRenew()">Perbarui Masa Aktif</button>
@@ -266,8 +292,13 @@
     let autoRefreshTimer = null;
 
     document.addEventListener("DOMContentLoaded", () => {
+      setKpiLoading(true);
+      showTableSkeleton();
+      showLogsSkeleton();
       loadStoresData();
       loadFullBotLogs();
+      loadAdminProfile();
+      toggleAutoRefreshLogs(document.getElementById('autoRefreshCheckbox'));
     });
 
     function switchTab(tabName) {
@@ -283,10 +314,16 @@
         document.getElementById('tabBtnLogs').classList.add('active');
         document.getElementById('paneLogs').classList.add('active');
         loadFullBotLogs();
+      } else if (tabName === 'settings') {
+        document.getElementById('tabBtnSettings').classList.add('active');
+        document.getElementById('paneSettings').classList.add('active');
+        loadAdminProfile();
       }
     }
 
     async function loadStoresData() {
+      setKpiLoading(true);
+      showTableSkeleton();
       try {
         const res = await fetch('/api/v1/stores');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -295,9 +332,43 @@
         updateMetrics(allStores);
       } catch (err) {
         console.error("Error loading stores:", err);
-        document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="table-loading-state">Data outlet gagal dimuat. Coba sinkronkan kembali.</td></tr>';
-        document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Tekan Sinkronkan untuk mencoba kembali.</div>';
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
+        document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
+      } finally {
+        setKpiLoading(false);
       }
+    }
+
+    function setKpiLoading(isLoading) {
+      document.querySelectorAll('.stat-val, .stat-detail').forEach(element => {
+        element.classList.toggle('is-skeleton-loading', isLoading);
+      });
+    }
+
+    function showTableSkeleton() {
+      const row = '<tr class="skeleton-table-row">' + Array.from({length: 9}, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
+      document.getElementById('tableBody').innerHTML = row.repeat(5);
+      document.getElementById('mobileOutletList').innerHTML = Array.from({length: 3}, () => `
+        <article class="mobile-outlet-card skeleton-mobile-card">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-line"></span>
+          <span class="skeleton skeleton-line skeleton-line-short"></span>
+        </article>`).join('');
+    }
+
+    function showLogsSkeleton() {
+      const row = '<tr class="skeleton-table-row">' + Array.from({length: 5}, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
+      document.getElementById('fullLogsTableBody').innerHTML = row.repeat(6);
+    }
+
+    function formatLogTimestamp(value) {
+      const raw = String(value || '');
+      const normalized = raw.replace(/([+-]\d{2})$/, '$1:00');
+      const parsed = new Date(normalized.includes('T') ? normalized : normalized.replace(' ', 'T'));
+      if (Number.isNaN(parsed.getTime())) return raw || '-';
+      return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      }).format(parsed);
     }
 
     function updateMetrics(stores) {
@@ -309,36 +380,60 @@
       document.getElementById('suspendVal').innerText = susCount;
     }
 
+    function getPauseDetail(pauseUntil) {
+      if (!pauseUntil) return 'hingga dibuka manual';
+
+      const pauseDate = new Date(String(pauseUntil).replace(' ', 'T'));
+      if (Number.isNaN(pauseDate.getTime())) return `hingga ${pauseUntil}`;
+
+      const remainingMinutes = Math.max(0, Math.ceil((pauseDate.getTime() - Date.now()) / 60000));
+      if (!remainingMinutes) return 'pause selesai';
+
+      const hours = Math.floor(remainingMinutes / 60);
+      const minutes = remainingMinutes % 60;
+      return hours ? `sisa ${hours}j ${minutes}m` : `sisa ${minutes}m`;
+    }
+
     function renderAdminTable(stores) {
       const tbody = document.getElementById('tableBody');
       const mobileList = document.getElementById('mobileOutletList');
+      const sortedStores = [...stores].sort((a, b) => {
+        const ownerCompare = (a.nama_pemilik || '').localeCompare(b.nama_pemilik || '', 'id', {sensitivity: 'base'});
+        if (ownerCompare !== 0) return ownerCompare;
+        return (a.store_name || '').localeCompare(b.store_name || '', 'id', {sensitivity: 'base'});
+      });
       tbody.innerHTML = '';
       mobileList.innerHTML = '';
 
-      if (!stores.length) {
+      if (!sortedStores.length) {
         tbody.innerHTML = '<tr><td colspan="10" class="table-loading-state">Tidak ada outlet yang sesuai.</td></tr>';
         mobileList.innerHTML = '<div class="mobile-empty-state">Tidak ada outlet yang sesuai dengan pencarian.</div>';
         return;
       }
 
-      stores.forEach(s => {
+      sortedStores.forEach(s => {
         const isVercelOn = s.vercel_status === 'ON';
-        const isShopeeOpen = s.shopee_status === 'OPEN' || s.shopee_status === 'ON';
         const ownerName = s.nama_pemilik || 'Fando';
         const linkUrl = s.vercel_link || `/mitra/${ownerName.toLowerCase().replace(/ /g, '-')}`;
         const tr = document.createElement('tr');
 
         tr.innerHTML = `
-          <td><strong>${ownerName}</strong></td>
+          <td>
+            <strong>${ownerName}</strong>
+            <small class="compact-meta compact-meta-merchant">${s.merchant_name}</small>
+          </td>
           <td>${s.merchant_name}</td>
           <td><code>${s.store_id}</code></td>
-          <td>${s.store_name}</td>
-          <td><a href="${linkUrl}" target="_blank" class="table-link">Buka dashboard</a></td>
           <td>
-            <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Auto-open aktif' : 'Auto-open dijeda'}</span>
-            <small class="table-cell-note">${isVercelOn ? 'Otomatisasi berjalan' : 'Perlu dibuka manual'}</small>
+            ${s.store_name}
+            <a href="${linkUrl}" target="_blank" class="compact-meta compact-meta-link">${linkUrl}</a>
+            <small class="compact-meta compact-meta-expiry">Berlaku sampai ${s.tanggal_berakhir_layanan || '2026-11-01'}</small>
           </td>
-          <td><span class="table-status ${isShopeeOpen ? 'is-success' : 'is-warning'}">${isShopeeOpen ? 'Outlet buka' : 'Outlet tutup'}</span></td>
+          <td><a href="${linkUrl}" target="_blank" class="table-link">${linkUrl}</a></td>
+          <td>
+            <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Buka' : 'Paused'}</span>
+            ${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}
+          </td>
           <td><strong>${s.tanggal_berakhir_layanan || '2026-11-01'}</strong></td>
           <td>
             <span class="table-status ${s.is_suspended ? 'is-danger' : 'is-success'}">${s.is_suspended ? 'Akun ditangguhkan' : 'Akun aktif'}</span>
@@ -346,16 +441,34 @@
           </td>
           <td>
             <div class="row-actions">
-              <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">
-                Atur akun
-              </button>
-              <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">
-                Perpanjang
+              <button class="btn-detail" aria-expanded="false" aria-controls="detail-${s.store_id}" onclick="toggleStoreDetail('${s.store_id}', this)">
+                Detail
               </button>
             </div>
           </td>
         `;
         tbody.appendChild(tr);
+
+        const detailRow = document.createElement('tr');
+        detailRow.className = 'detail-row';
+        detailRow.id = `detail-${s.store_id}`;
+        detailRow.setAttribute('aria-hidden', 'true');
+        detailRow.inert = true;
+        detailRow.innerHTML = `
+          <td colspan="9">
+            <div class="detail-shell">
+              <div class="detail-inner">
+                <div class="detail-layout">
+                  <dl class="detail-grid">${getStoreDetailMarkup(s)}</dl>
+                  <div class="detail-actions">
+                    <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur akun</button>
+                    <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>`;
+        tbody.appendChild(detailRow);
 
         const mobileCard = document.createElement('article');
         mobileCard.className = 'mobile-outlet-card';
@@ -366,12 +479,12 @@
               <h3>${s.store_name}</h3>
               <div class="mobile-store-id">Store ID ${s.store_id}</div>
             </div>
-            <span class="badge ${isShopeeOpen ? 'badge-open' : 'badge-closed'}">ShopeeFood ${isShopeeOpen ? 'buka' : 'tutup'}</span>
+            <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Buka' : 'Paused'}</span>
           </div>
 
           <dl class="mobile-detail-list">
             <div><dt>Pemilik outlet</dt><dd>${ownerName}</dd></div>
-            <div><dt>Auto-open outlet</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Aktif' : 'Dijeda'}</span></dd></div>
+            <div><dt>Status utama</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
             <div><dt>Langganan berlaku sampai</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
             <div><dt>Status akun</dt><dd><span class="status-text ${s.is_suspended ? '' : 'is-active'}">${s.is_suspended ? 'Ditangguhkan' : 'Aktif'}</span></dd></div>
             <div class="mobile-detail-wide"><dt>Dashboard mitra</dt><dd><a href="${linkUrl}" target="_blank" class="mobile-dashboard-link">Buka dashboard mitra</a></dd></div>
@@ -388,6 +501,56 @@
       });
     }
 
+    function detailValue(value, fallback = '-') {
+      return value === undefined || value === null || value === '' ? fallback : value;
+    }
+
+    function getStoreDetailMarkup(store) {
+      const isVercelOn = store.vercel_status === 'ON';
+      const detailRows = [
+        ['Pause', isVercelOn ? 'Tidak sedang pause' : getPauseDetail(store.pause_until)],
+        ['Paket', store.paket],
+        ['Status akun', store.is_suspended ? 'Ditangguhkan' : 'Aktif'],
+        ['Alasan penangguhan', store.alasan_penangguhan],
+        ['Password dashboard mitra', store.vercel_password],
+        ['Aktivitas terakhir', `Pemeriksaan: ${detailValue(store.last_synced_at)} · Aksi: ${detailValue(store.last_action_at)}`]
+      ];
+
+      return detailRows.map(([label, value]) => `
+        <div class="detail-item">
+          <dt>${label}</dt>
+          <dd>${detailValue(value)}</dd>
+        </div>
+      `).join('');
+    }
+
+    function toggleStoreDetail(storeId, button) {
+      const detailRow = document.getElementById(`detail-${storeId}`);
+      if (!detailRow) return;
+
+      document.querySelectorAll('.detail-row.is-open').forEach(row => {
+        if (row !== detailRow) {
+          row.classList.remove('is-open');
+          row.setAttribute('aria-hidden', 'true');
+          row.inert = true;
+        }
+      });
+      document.querySelectorAll('.btn-detail.is-open').forEach(toggle => {
+        if (toggle !== button) {
+          toggle.classList.remove('is-open');
+          toggle.innerText = 'Detail';
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      const isOpen = detailRow.classList.toggle('is-open');
+      button.classList.toggle('is-open', isOpen);
+      button.innerText = isOpen ? 'Tutup detail' : 'Detail';
+      button.setAttribute('aria-expanded', String(isOpen));
+      detailRow.setAttribute('aria-hidden', String(!isOpen));
+      detailRow.inert = !isOpen;
+    }
+
     function filterTable() {
       const q = document.getElementById('searchInput').value.toLowerCase();
       const filtered = allStores.filter(s => 
@@ -400,6 +563,7 @@
     }
 
     async function loadFullBotLogs() {
+      showLogsSkeleton();
       const actionFilter = document.getElementById('logActionFilter') ? document.getElementById('logActionFilter').value : '';
       const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value : '';
 
@@ -412,10 +576,14 @@
         const logs = await res.json();
         renderFullBotLogsTable(logs);
         if (logs.length > 0) {
-          document.getElementById('botLastSyncText').innerText = `Proses terakhir: ${logs[0].timestamp} (${logs.length} catatan terdaftar)`;
+          document.getElementById('botLastSyncText').innerText = `Catatan terakhir: ${formatLogTimestamp(logs[0].timestamp)} · ${logs.length} catatan`;
+        } else {
+          document.getElementById('botLastSyncText').innerText = 'Belum ada catatan aktivitas untuk filter ini.';
         }
       } catch (err) {
         console.error("Gagal memuat log bot:", err);
+        document.getElementById('botLastSyncText').innerText = 'Log aktivitas gagal dimuat.';
+        document.getElementById('fullLogsTableBody').innerHTML = '<tr><td colspan="5" class="table-loading-state">Log aktivitas gagal dimuat. Coba muat ulang halaman.</td></tr>';
       }
     }
 
@@ -426,7 +594,7 @@
 
       tbody.innerHTML = '';
       if (!logs.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="table-loading-state">Tidak ada catatan log aktivitas bot yang sesuai.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="table-loading-state">Tidak ada catatan log aktivitas bot yang sesuai.</td></tr>';
         return;
       }
 
@@ -446,19 +614,20 @@
           actionLabel = 'Penangguhan';
         } else if (l.action.includes('USER') || l.action.includes('PAUSE') || l.action.includes('RESUME')) {
           badgeClass = 'badge-action-user';
-          actionLabel = l.action.replace('USER_', '');
+          if (l.action.includes('RESUME')) actionLabel = 'Buka mitra';
+          else if (l.action.includes('PAUSE')) actionLabel = 'Pause mitra';
+          else actionLabel = l.action.replace('USER_', '');
         } else if (l.action === 'SYNC_CYCLE') {
           badgeClass = 'badge-action-sync';
           actionLabel = 'Evaluasi sistem';
         }
 
         tr.innerHTML = `
-          <td><small style="font-family: monospace; font-size: 12px; color: var(--muted);">${l.timestamp}</small></td>
+          <td><small class="log-timestamp">${formatLogTimestamp(l.timestamp)}</small></td>
           <td><code>${l.store_id}</code></td>
           <td><strong>${l.store_name}</strong></td>
           <td><span class="log-action-badge ${badgeClass}">${actionLabel}</span></td>
           <td><span class="table-status ${l.target_state === 'OPEN' ? 'is-success' : (l.target_state === 'CLOSED' || l.target_state === 'SUSPENDED' ? 'is-warning' : 'is-success')}">${l.target_state}</span></td>
-          <td style="font-size: 13px; color: var(--ink);">${l.reason}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -540,12 +709,30 @@
     function openRenewModal(storeId, storeName) {
       selectedStoreForAction = storeId;
       document.getElementById('renewStoreTitle').innerText = `${storeName} (ID: ${storeId})`;
+      document.getElementById('renewPlanSelect').value = '3';
+      updateRenewPreview();
       document.getElementById('renewModal').classList.add('active');
+    }
+
+    function getRenewalDate(months) {
+      const store = allStores.find(item => item.store_id === selectedStoreForAction);
+      const currentExpiry = store && store.tanggal_berakhir_layanan ? new Date(`${store.tanggal_berakhir_layanan}T00:00:00`) : new Date();
+      const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+      const renewalDate = new Date(baseDate);
+      renewalDate.setMonth(renewalDate.getMonth() + Number(months));
+      return renewalDate.toISOString().slice(0, 10);
+    }
+
+    function updateRenewPreview() {
+      const months = document.getElementById('renewPlanSelect').value;
+      const renewalDate = getRenewalDate(months);
+      document.getElementById('renewPreview').innerText = `Berlaku sampai ${renewalDate}`;
     }
 
     async function submitRenew() {
       if (!selectedStoreForAction) return;
-      const newDate = document.getElementById('renewDateInput').value;
+      const months = document.getElementById('renewPlanSelect').value;
+      const newDate = getRenewalDate(months);
 
       try {
         const res = await fetch('/api/v1/admin/renew', {
@@ -574,6 +761,79 @@
       } catch (err) {
         alert('Gagal manual sync.');
       }
+    }
+
+    async function loadAdminProfile() {
+      try {
+        const res = await fetch('/api/v1/admin/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('currentAdminUsername').innerText = data.username;
+        document.getElementById('settingsUsername').value = data.username;
+        loadAdminAccounts();
+      } catch (err) {
+        console.error('Gagal memuat profil admin:', err);
+      }
+    }
+
+    async function loadAdminAccounts() {
+      const list = document.getElementById('adminAccountList');
+      try {
+        const res = await fetch('/api/v1/admin/accounts');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Gagal memuat akun admin.');
+        list.innerHTML = data.accounts.map(account => `
+          <div class="admin-account-item">
+            <strong>${account.username}</strong>
+            <span>${account.is_active ? 'Aktif' : 'Nonaktif'}</span>
+          </div>`).join('') || '<span>Belum ada akun admin.</span>';
+      } catch (err) {
+        list.innerText = err.message;
+      }
+    }
+
+    async function updateAdminAccount() {
+      const message = document.getElementById('settingsAccountMessage');
+      const username = document.getElementById('settingsUsername').value.trim();
+      const password = document.getElementById('settingsPassword').value;
+      message.textContent = '';
+      try {
+        const body = {username};
+        if (password) body.password = password;
+        const res = await fetch('/api/v1/admin/account', {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Gagal menyimpan perubahan akun.');
+        document.getElementById('settingsPassword').value = '';
+        document.getElementById('currentAdminUsername').innerText = data.account.username;
+        message.textContent = 'Perubahan akun tersimpan.';
+        loadAdminAccounts();
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    }
+
+    async function createAdminAccount() {
+      const message = document.getElementById('newAdminMessage');
+      message.textContent = '';
+      try {
+        const res = await fetch('/api/v1/admin/accounts', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+          username: document.getElementById('newAdminUsername').value.trim(),
+          password: document.getElementById('newAdminPassword').value
+        })});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Gagal menambahkan akun admin.');
+        document.getElementById('newAdminUsername').value = '';
+        document.getElementById('newAdminPassword').value = '';
+        message.textContent = 'Akun admin berhasil ditambahkan.';
+        loadAdminAccounts();
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    }
+
+    async function logoutAdmin() {
+      await fetch('/api/v1/admin/logout', {method: 'POST'});
+      window.location.href = '/admin/login';
     }
 
     function closeAdminModal(modalId) {

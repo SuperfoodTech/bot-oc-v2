@@ -65,3 +65,5 @@ docker-compose.yml
 Dockerfile*
 *.md
 !src/backend/templates/*.html
+data/
+

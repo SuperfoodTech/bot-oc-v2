@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from backend.main import app
 from core.logger import get_logger
@@ -30,6 +30,10 @@ def run_full_backend_tests():
     r = client.get("/api/v1/health")
     assert r.status_code == 200
     log.info(f"   -> Result: PASSED ({r.json()['service']} v{r.json()['version']})")
+
+    # Admin Login
+    login_r = client.post("/api/v1/admin/login", json={"username": "admin", "password": "Admin@123"})
+    assert login_r.status_code == 200
 
     # 2. Admin: List All Users & Outlets
     log.info("\n2️⃣ Testing GET /api/v1/admin/users...")
@@ -74,8 +78,8 @@ def run_full_backend_tests():
     log.info(f"   -> Result: PASSED (Subscription renewed until 2026-12-31)")
 
     # 6. User Link: Login by Passcode
-    log.info("\n6️⃣ Testing POST /api/v1/user/login (Passcode: Master@00@)...")
-    r = client.post("/api/v1/user/login", json={"passcode": "Master@00@"})
+    log.info("\n6️⃣ Testing POST /api/v1/user/login (Passcode: Budi@123)...")
+    r = client.post("/api/v1/user/login", json={"passcode": "Budi@123"})
     assert r.status_code == 200
     login_res = r.json()
     assert login_res["success"] is True
@@ -101,6 +105,7 @@ def run_full_backend_tests():
     log.info(f"   -> Result: PASSED (Paused Label: {pause_res['duration_label']}, Until: {pause_res['pause_until']})")
 
     # 9. User Link: Resume / Open Store
+    client.post("/api/v1/admin/suspend", json={"store_id": target_store, "penangguhan": "Tidak", "alasan_penangguhan": "Aktif kembali"})
     log.info(f"\n9️⃣ Testing POST /api/v1/user/resume...")
     r = client.post(f"/api/v1/user/resume?store_id={target_store}")
     assert r.status_code == 200

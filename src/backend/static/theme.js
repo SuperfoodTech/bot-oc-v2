@@ -2,7 +2,7 @@
   const storageKey = 'foodmaster-theme';
 
   function getTheme() {
-    return localStorage.getItem(storageKey) || 'dark';
+    return localStorage.getItem(storageKey) || 'light';
   }
 
   function updateControls(theme) {
@@ -17,7 +17,7 @@
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#F2E8C6' : '#141413');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#F5F7FA' : '#111827');
     updateControls(theme);
   }
 

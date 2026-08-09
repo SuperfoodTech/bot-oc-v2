@@ -19,7 +19,7 @@ from core.logger import get_logger
 from core.sheets import fetch_merchant_outlets, MerchantOutlet
 from core.decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_NO_CHANGE
 from core import browser
-from backend import db
+from backend import state
 
 log = get_logger("backend_worker")
 
@@ -156,42 +156,49 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
 
 
 def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
-    log.info("🔄 [BACKEND WORKER] Starting store synchronization...")
+    log.info("🔄 [BACKEND WORKER] Starting store synchronization from PostgreSQL...")
 
-    # Fetch merchant outlets from control source (Google Sheets)
-    outlets = fetch_merchant_outlets()
+    # Fetch merchant outlets directly from PostgreSQL database (runtime source of truth)
+    db_stores = state.get_all_stores()
     actions_taken = []
 
-    for outlet in outlets:
+    for store in db_stores:
+        account_username = store.get("account_username") or "auto7313"
         # Exclude stores where username != auto7313 (if whitelist active)
-        if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
-            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_pendek_outlet}) - username '{outlet.username}' != auto7313")
+        if ALLOWED_USERNAMES and account_username not in ALLOWED_USERNAMES:
+            log.debug(f"  ⏭️ Excluding store {store['store_id']} ({store['store_name']}) - username '{account_username}' != auto7313")
             continue
 
-        # 1. Update / seed store in DB
-        db.save_or_update_store(
-            store_id=outlet.store_id,
-            store_name=outlet.nama_pendek_outlet,
-            merchant_name=outlet.nama_portal,
-            account_username=outlet.username,
-            nama_pemilik=outlet.nama_pemilik,
-            paket=outlet.paket,
-            tanggal_mulai_layanan=outlet.tanggal_mulai_layanan,
-            tanggal_berakhir_layanan=outlet.tanggal_berakhir_layanan,
-            vercel_link=outlet.vercel_link,
-            vercel_password=outlet.vercel_password,
-            vercel_status=outlet.status_utama.upper(),
-            shopee_status=outlet.status_aktual.upper(),
-            subscription_status=outlet.status_langganan,
-            is_suspended=(outlet.penangguhan.lower() == "ya"),
-            alasan_penangguhan=outlet.alasan_penangguhan
+        outlet = MerchantOutlet(
+            kepemilikan=store.get("nama_pemilik", ""),
+            paket=store.get("paket", "3 Bulan"),
+            tanggal_mulai_layanan=store.get("tanggal_mulai_layanan", ""),
+            tanggal_berakhir_layanan=store.get("tanggal_berakhir_layanan", ""),
+            hp="",
+            username=account_username,
+            password=store.get("vercel_password", ""),
+            nama_pemilik=store.get("nama_pemilik", ""),
+            nama_portal=store.get("merchant_name", ""),
+            merchant_id="",
+            store_id=store["store_id"],
+            nama_panjang_outlet=store["store_name"],
+            nama_pendek_outlet=store["store_name"],
+            status_utama=store.get("vercel_status", "OFF"),
+            status_aktual=store.get("shopee_status", "UNKNOWN"),
+            vercel_link=store.get("vercel_link", ""),
+            vercel_password=store.get("vercel_password", ""),
+            regular_hours=store.get("regular_hours", {}),
+            special_hours=store.get("special_hours", ""),
+            status_langganan=store.get("subscription_status", "Aktif"),
+            penangguhan="Ya" if store.get("is_suspended") else "Tidak",
+            alasan_penangguhan=store.get("alasan_penangguhan", "") or "",
         )
 
-        # 2. Evaluate decision engine rules
+        # Evaluate decision engine rules
         decision = evaluate_outlet_status(outlet)
         log.info(f"  🏪 Store {outlet.store_id} ({outlet.nama_pendek_outlet}) -> Decision: {decision.action} ({decision.reason})")
 
-        # 3. If action needed and execute_actions is True
+        # If action needed and execute_actions is True
         if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
             log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id}...")
             exec_ok = execute_outlet_shopee_action(outlet, decision.action)
@@ -205,8 +212,8 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 "reason": reason_text
             })
 
-            # Record in SQLite audit log
-            db.record_log(
+            # Record in PostgreSQL audit log
+            state.record_log(
                 store_id=outlet.store_id,
                 store_name=outlet.nama_pendek_outlet,
                 action=decision.action,
@@ -215,17 +222,17 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             )
 
     # Record overall cycle evaluation log for process tracking
-    db.record_log(
+    state.record_log(
         store_id="SYSTEM",
         store_name="BOT_DAEMON",
         action="SYNC_CYCLE",
         target_state="SYNCED",
-        reason=f"Evaluasi bot selesai untuk {len(actions_taken)} aksi dijalankan (Filtered: username == auto7313)"
+        reason=f"Evaluasi bot selesai dari PostgreSQL: {len(actions_taken)} aksi dijalankan (Filtered: username == auto7313)"
     )
 
     return {
         "success": True,
-        "total_stores_processed": len(outlets),
+        "total_stores_processed": len(db_stores),
         "actions_taken": actions_taken,
-        "message": f"Successfully processed stores for allowed usernames {ALLOWED_USERNAMES}."
+        "message": f"Successfully processed {len(db_stores)} store(s) from PostgreSQL for allowed usernames {ALLOWED_USERNAMES}."
     }

@@ -1,333 +1,235 @@
-"""
-db.py
-=====
-SQLite Database Manager for store state persistence, user authentication, and audit logging.
-"""
+"""PostgreSQL operational store for the monolith dashboard and bot."""
 
-import sqlite3
+import os
+import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-DB_PATH = Path(__file__).resolve().parent / "database.db"
+import psycopg
+from psycopg.rows import dict_row
 
-
-def get_db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # 1. Users table (for User Link authentication & ownership)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT UNIQUE,
-        nama_pemilik TEXT UNIQUE,
-        passcode TEXT,
-        link_slug TEXT UNIQUE,
-        created_at TEXT
-    )
-    """)
-
-    # 2. Stores table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS stores (
-        store_id TEXT PRIMARY KEY,
-        store_name TEXT,
-        merchant_name TEXT,
-        account_username TEXT,
-        nama_pemilik TEXT,
-        paket TEXT DEFAULT '3 Bulan',
-        tanggal_mulai_layanan TEXT,
-        tanggal_berakhir_layanan TEXT,
-        vercel_link TEXT DEFAULT '',
-        vercel_password TEXT DEFAULT '',
-        vercel_status TEXT DEFAULT 'ON',
-        shopee_status TEXT DEFAULT 'UNKNOWN',
-        subscription_status TEXT DEFAULT 'Aktif',
-        is_suspended INTEGER DEFAULT 0,
-        alasan_penangguhan TEXT DEFAULT '',
-        pause_until TEXT,
-        last_synced_at TEXT
-    )
-    """)
-
-    # Ensure columns exist if database file pre-existed
-    existing_cols = [r[1] for r in cursor.execute("PRAGMA table_info(stores)").fetchall()]
-    new_cols = {
-        "nama_pemilik": "TEXT DEFAULT ''",
-        "paket": "TEXT DEFAULT '3 Bulan'",
-        "tanggal_mulai_layanan": "TEXT DEFAULT ''",
-        "tanggal_berakhir_layanan": "TEXT DEFAULT ''",
-        "vercel_link": "TEXT DEFAULT ''",
-        "vercel_password": "TEXT DEFAULT ''",
-        "alasan_penangguhan": "TEXT DEFAULT ''"
-    }
-
-    for col, col_type in new_cols.items():
-        if col not in existing_cols:
-            try:
-                cursor.execute(f"ALTER TABLE stores ADD COLUMN {col} {col_type}")
-            except Exception:
-                pass
-
-    # 3. Audit logs table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS automation_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT,
-        store_id TEXT,
-        store_name TEXT,
-        action TEXT,
-        target_state TEXT,
-        reason TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://foodmaster:change-me-in-env@localhost:5435/foodmaster")
+BOT_USERNAME = os.getenv("SHOPEE_BOT_USERNAME", "auto7313")
+BOT_PASSWORD = os.getenv("SHOPEE_BOT_PASSWORD", "Auto@7313")
 
 
-def save_or_update_store(
-    store_id: str,
-    store_name: str,
-    merchant_name: str,
-    account_username: str,
-    nama_pemilik: str = "",
-    paket: str = "3 Bulan",
-    tanggal_mulai_layanan: str = "",
-    tanggal_berakhir_layanan: str = "",
-    vercel_link: str = "",
-    vercel_password: str = "",
-    vercel_status: str = "ON",
-    shopee_status: str = "UNKNOWN",
-    subscription_status: str = "Aktif",
-    is_suspended: bool = False,
-    alasan_penangguhan: str = "",
-    pause_until: Optional[str] = None
-):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("""
-    INSERT INTO stores (
-        store_id, store_name, merchant_name, account_username, nama_pemilik,
-        paket, tanggal_mulai_layanan, tanggal_berakhir_layanan, vercel_link, vercel_password,
-        vercel_status, shopee_status, subscription_status, is_suspended, alasan_penangguhan, pause_until, last_synced_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(store_id) DO UPDATE SET
-        store_name=excluded.store_name,
-        merchant_name=excluded.merchant_name,
-        account_username=excluded.account_username,
-        nama_pemilik=excluded.nama_pemilik,
-        paket=excluded.paket,
-        tanggal_mulai_layanan=excluded.tanggal_mulai_layanan,
-        tanggal_berakhir_layanan=excluded.tanggal_berakhir_layanan,
-        vercel_link=excluded.vercel_link,
-        vercel_password=excluded.vercel_password,
-        shopee_status=excluded.shopee_status,
-        subscription_status=excluded.subscription_status,
-        is_suspended=excluded.is_suspended,
-        alasan_penangguhan=excluded.alasan_penangguhan,
-        last_synced_at=excluded.last_synced_at
-    """, (
-        store_id, store_name, merchant_name, account_username, nama_pemilik,
-        paket, tanggal_mulai_layanan, tanggal_berakhir_layanan, vercel_link, vercel_password,
-        vercel_status, shopee_status, subscription_status, 1 if is_suspended else 0,
-        alasan_penangguhan, pause_until, now_str
-    ))
-
-    conn.commit()
-    conn.close()
+def get_db_connection():
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
-# ── ADMIN DATABASE OPERATIONS ─────────────────────────────────────────────────
-
-def admin_get_all_users_with_stores() -> List[Dict]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM stores ORDER BY nama_pemilik ASC, store_id ASC")
-    stores = [dict(r) for r in cursor.fetchall()]
-
-    # Group stores by nama_pemilik
-    users_map = {}
-    for s in stores:
-        pemilik = s["nama_pemilik"] or "Unassigned"
-        if pemilik not in users_map:
-            users_map[pemilik] = {
-                "nama_pemilik": pemilik,
-                "total_outlets": 0,
-                "outlets": []
-            }
-        users_map[pemilik]["outlets"].append(s)
-        users_map[pemilik]["total_outlets"] += 1
-
-    conn.close()
-    return list(users_map.values())
-
-
-def admin_generate_user_link(nama_pemilik: str, passcode: Optional[str] = None) -> Dict:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    slug = nama_pemilik.lower().replace(" ", "-") + "-" + str(uuid.uuid4())[:6]
-    pass_code = passcode or "Master@00@"
-
-    cursor.execute("""
-    INSERT INTO users (user_id, nama_pemilik, passcode, link_slug, created_at)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(nama_pemilik) DO UPDATE SET
-        passcode=excluded.passcode,
-        link_slug=excluded.link_slug
-    """, (str(uuid.uuid4()), nama_pemilik, pass_code, slug, now_str))
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "nama_pemilik": nama_pemilik,
-        "passcode": pass_code,
-        "link_slug": slug,
-        "full_url": f"https://foodmaster-oc.vercel.app/mitra/{slug}"
-    }
+def init_db() -> None:
+    schema_path = Path(__file__).resolve().parents[2] / "database" / "migrations" / "001_initial_schema.sql"
+    with get_db_connection() as conn:
+        conn.execute(schema_path.read_text(encoding="utf-8"))
+        # Upgrade databases created by the earlier draft without deleting data.
+        conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
+        conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
+        conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS dashboard_url text")
+        conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS role varchar(20) DEFAULT 'MERCHANT'")
+        conn.execute("UPDATE dashboard_accounts SET password_plain=COALESCE(password_plain, 'Master@123') WHERE password_plain IS NULL")
+        conn.execute("ALTER TABLE dashboard_accounts DROP COLUMN IF EXISTS password_hash")
+        conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS password_plain text")
+        conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS merchant_id_external varchar(100) DEFAULT ''")
+        conn.execute("UPDATE shopee_accounts SET password_plain=COALESCE(password_plain, '') WHERE password_plain IS NULL")
+        conn.execute("ALTER TABLE outlets DROP COLUMN IF EXISTS short_name")
+        conn.execute("ALTER TABLE dashboard_accounts ALTER COLUMN password_plain SET NOT NULL")
+        admin_username = os.getenv("ADMIN_USERNAME", "admin")
+        admin_password = os.getenv("ADMIN_PASSWORD", "Admin@123")
+        conn.execute(
+            "INSERT INTO dashboard_accounts (username,password_plain,role,is_active) VALUES (%s,%s,'ADMIN',true) ON CONFLICT (username) DO NOTHING",
+            (admin_username, admin_password),
+        )
+        conn.execute("INSERT INTO bot_accounts (username,password_plain,name) VALUES (%s,%s,%s) ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,updated_at=now()", (BOT_USERNAME, BOT_PASSWORD, "Bot Satpam Utama"))
 
 
-def admin_set_suspension(store_id: str, penangguhan: str, alasan: str = ""):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    is_sus = 1 if penangguhan.lower() == "ya" else 0
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("""
-    UPDATE stores
-    SET is_suspended = ?, alasan_penangguhan = ?, last_synced_at = ?
-    WHERE store_id = ?
-    """, (is_sus, alasan, now_str, store_id))
-
-    conn.commit()
-    conn.close()
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (value or "mitra").lower()).strip("-") or "mitra"
 
 
-def admin_renew_subscription(store_id: str, new_expiry_date: str):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("""
-    UPDATE stores
-    SET tanggal_berakhir_layanan = ?, subscription_status = 'Aktif', last_synced_at = ?
-    WHERE store_id = ?
-    """, (new_expiry_date, now_str, store_id))
-
-    conn.commit()
-    conn.close()
-
-
-# ── USER DATABASE OPERATIONS ──────────────────────────────────────────────────
-
-def user_authenticate(passcode: str) -> Optional[Dict]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Check in users table or stores
-    cursor.execute("SELECT * FROM users WHERE passcode = ?", (passcode,))
-    user_row = cursor.fetchone()
-
-    if user_row:
-        conn.close()
-        return dict(user_row)
-
-    # Fallback check by default passcode Master@00@
-    if passcode in ("Master@00@", "Auto@7313"):
-        conn.close()
-        return {"nama_pemilik": "Fando", "passcode": passcode, "link_slug": "fando-demo"}
-
-    conn.close()
-    return None
+def _context(conn, owner: str, merchant_name: str, dashboard_password: str = ""):
+    merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (owner or "Unassigned",)).fetchone()
+    if not merchant:
+        merchant = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (owner or "Unassigned",)).fetchone()
+    merchant_id = merchant["id"]
+    portal = conn.execute("INSERT INTO portals (merchant_id,name) VALUES (%s,%s) ON CONFLICT (merchant_id,name) DO UPDATE SET updated_at=now() RETURNING id", (merchant_id, merchant_name or "Unknown Merchant")).fetchone()
+    base = os.getenv("APP_BASE_URL", "http://localhost:3001")
+    account = conn.execute("SELECT * FROM dashboard_accounts WHERE username=%s", (owner or "Unassigned",)).fetchone()
+    if not account:
+        slug = f"{_slug(owner)}-{str(uuid.uuid4())[:6]}"
+        account = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') RETURNING *", (merchant_id, owner or "Unassigned", dashboard_password or "Master@123", slug, f"{base}/mitra/{slug}")).fetchone()
+    elif dashboard_password:
+        conn.execute("UPDATE dashboard_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (dashboard_password, account["id"]))
+    bot = conn.execute("SELECT id FROM bot_accounts WHERE username=%s", (BOT_USERNAME,)).fetchone()
+    conn.execute("INSERT INTO bot_merchant_assignments (bot_account_id,merchant_id) VALUES (%s,%s) ON CONFLICT (bot_account_id,merchant_id) DO UPDATE SET is_active=true", (bot["id"], merchant_id))
+    return merchant_id, portal["id"], account
 
 
-def user_get_outlets(nama_pemilik: str) -> List[Dict]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM stores WHERE nama_pemilik = ? OR nama_pemilik LIKE ? ORDER BY store_id ASC", (nama_pemilik, f"%{nama_pemilik}%"))
-    rows = cursor.fetchall()
-    conn.close()
-    
-    # If empty, return all stores for demo user
-    if not rows:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM stores ORDER BY store_id ASC LIMIT 4")
-        rows = cursor.fetchall()
-        conn.close()
-        
-    return [dict(r) for r in rows]
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", **_ignored) -> None:
+    with get_db_connection() as conn:
+        merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password)
+        existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
+        if existing_account:
+            shopee_account_id = existing_account["id"]
+            conn.execute("UPDATE shopee_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (vercel_password or BOT_PASSWORD, shopee_account_id))
+        else:
+            shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, vercel_password or BOT_PASSWORD)).fetchone()["id"]
+        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,long_name,special_hours) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, store_name or store_id, special_hours)).fetchone()
+        outlet_id = outlet["id"]
+        conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET shopee_actual_status=EXCLUDED.shopee_actual_status,updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), (shopee_status or "UNKNOWN").upper(), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
+        code = (paket or "3_MONTHS").upper().replace(" ", "_")
+        code = code if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"} else "3_MONTHS"
+        plan = conn.execute("SELECT id FROM subscription_plans WHERE code=%s", (code,)).fetchone()
+        if plan and tanggal_mulai_layanan and tanggal_berakhir_layanan:
+            conn.execute("DELETE FROM subscriptions WHERE outlet_id=%s", (outlet_id,))
+            conn.execute("INSERT INTO subscriptions (outlet_id,plan_id,start_date,end_date,status) VALUES (%s,%s,%s,%s,%s)", (outlet_id, plan["id"], tanggal_mulai_layanan, tanggal_berakhir_layanan, "ACTIVE" if (subscription_status or "").lower() == "aktif" else "EXPIRED"))
+        if regular_hours:
+            names = ("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
+            for weekday, name in enumerate(names):
+                value = regular_hours.get(name, "") or ""
+                opened, closed = value.split("-", 1) if "-" in value else (None, None)
+                conn.execute("INSERT INTO operating_hours (outlet_id,weekday,open_time,close_time,is_closed) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (outlet_id,weekday) DO UPDATE SET open_time=EXCLUDED.open_time,close_time=EXCLUDED.close_time,is_closed=EXCLUDED.is_closed", (outlet_id, weekday, opened or None, closed or None, not bool(value)))
 
 
-def update_vercel_toggle(store_id: str, status: str, pause_until: Optional[str] = None):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("""
-    UPDATE stores
-    SET vercel_status = ?, pause_until = ?, last_synced_at = ?
-    WHERE store_id = ?
-    """, (status, pause_until, now_str, store_id))
-
-    conn.commit()
-    conn.close()
-
-
-def record_log(store_id: str, store_name: str, action: str, target_state: str, reason: str):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("""
-    INSERT INTO automation_logs (timestamp, store_id, store_name, action, target_state, reason)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (now_str, store_id, store_name, action, target_state, reason))
-
-    conn.commit()
-    conn.close()
-
-
-def get_all_stores() -> List[Dict]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM stores ORDER BY store_id ASC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+def _store_query(where: str = "", params=()) -> List[Dict]:
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.special_hours,p.name AS merchant_name,m.name AS nama_pemilik,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until,os.last_checked_at AS last_synced_at,COALESCE(s.status,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    if where: query += " WHERE " + where
+    query += " ORDER BY p.name,o.store_id"
+    with get_db_connection() as conn:
+        rows = [dict(row) for row in conn.execute(query, (BOT_USERNAME, *params)).fetchall()]
+        if not rows:
+            return []
+        outlet_ids = [r["outlet_uuid"] for r in rows]
+        hours_rows = conn.execute(
+            "SELECT outlet_id, weekday, open_time::text, close_time::text, is_closed FROM operating_hours WHERE outlet_id = ANY(%s)",
+            (outlet_ids,)
+        ).fetchall()
+        hours_map = {}
+        names = ("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
+        for hr in hours_rows:
+            oid = hr["outlet_id"]
+            if oid not in hours_map:
+                hours_map[oid] = {}
+            if not hr["is_closed"] and hr["open_time"] and hr["close_time"]:
+                ot = hr["open_time"][:5]
+                ct = hr["close_time"][:5]
+                hours_map[oid][names[hr["weekday"]]] = f"{ot}-{ct}"
+            else:
+                hours_map[oid][names[hr["weekday"]]] = ""
+        for r in rows:
+            r["regular_hours"] = hours_map.get(r["outlet_uuid"], {})
+            r["special_hours"] = r.get("special_hours") or ""
+        return rows
 
 
-def get_store_by_id(store_id: str) -> Optional[Dict]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM stores WHERE store_id = ?", (store_id,))
-    row = cursor.fetchone()
-    conn.close()
+def get_all_stores(): return _store_query()
+def get_store_by_id(store_id):
+    rows = _store_query("o.store_id=%s", (store_id,)); return rows[0] if rows else None
+def _public_store(store):
+    item = dict(store); item.update({"account_username": BOT_USERNAME, "merchant_name": store.get("merchant_name", ""), "is_suspended": store.get("suspension_status") == "SUSPENDED"}); return item
+def admin_get_all_users_with_stores():
+    grouped = {}
+    for store in _store_query():
+        owner = store.get("nama_pemilik") or "Unassigned"
+        grouped.setdefault(owner, {"nama_pemilik": owner, "total_outlets": 0, "outlets": []})
+        grouped[owner]["outlets"].append(_public_store(store)); grouped[owner]["total_outlets"] += 1
+    return list(grouped.values())
+def user_get_outlets(nama_pemilik): return [_public_store(row) for row in _store_query("m.name=%s", (nama_pemilik,))]
+
+def admin_generate_user_link(nama_pemilik, passcode=None, base_url=None):
+    with get_db_connection() as conn:
+        merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()
+        if not merchant: merchant = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (nama_pemilik,)).fetchone()
+        password = passcode or "Master@123"; slug = f"{_slug(nama_pemilik)}-{str(uuid.uuid4())[:6]}"; base = base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")
+        row = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,link_slug=EXCLUDED.link_slug,dashboard_url=EXCLUDED.dashboard_url RETURNING link_slug,dashboard_url", (merchant["id"], nama_pemilik, password, slug, f"{base}/mitra/{slug}")).fetchone()
+    return {"nama_pemilik": nama_pemilik, "passcode": password, "link_slug": row["link_slug"], "full_url": row["dashboard_url"]}
+def user_authenticate(passcode):
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT username AS nama_pemilik,password_plain AS password,link_slug FROM dashboard_accounts WHERE password_plain=%s AND is_active=true LIMIT 1", (passcode,)).fetchone()
     return dict(row) if row else None
 
 
-def get_recent_logs(limit: int = 50, store_ids: Optional[List[str]] = None) -> List[Dict]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
+def admin_authenticate(username, password):
+    with get_db_connection() as conn:
+        row = conn.execute(
+            "SELECT id,username,role FROM dashboard_accounts WHERE username=%s AND password_plain=%s AND role='ADMIN' AND is_active=true LIMIT 1",
+            (username, password),
+        ).fetchone()
+        if row:
+            conn.execute("UPDATE dashboard_accounts SET last_login_at=now(),updated_at=now() WHERE id=%s", (row["id"],))
+    return dict(row) if row else None
+
+
+def admin_list_accounts():
+    with get_db_connection() as conn:
+        return [dict(row) for row in conn.execute("SELECT id,username,role,is_active,last_login_at,created_at FROM dashboard_accounts WHERE role='ADMIN' ORDER BY username").fetchall()]
+
+
+def admin_update_account(account_id, username=None, password=None):
+    with get_db_connection() as conn:
+        account = conn.execute("SELECT id,username,role,is_active FROM dashboard_accounts WHERE id=%s AND role='ADMIN'", (account_id,)).fetchone()
+        if not account:
+            return None
+        next_username = username.strip() if username is not None else account["username"]
+        if not next_username:
+            raise ValueError("Username tidak boleh kosong.")
+        duplicate = conn.execute("SELECT id FROM dashboard_accounts WHERE username=%s AND id<>%s", (next_username, account_id)).fetchone()
+        if duplicate:
+            raise ValueError("Username sudah digunakan akun lain.")
+        if password is not None:
+            conn.execute("UPDATE dashboard_accounts SET username=%s,password_plain=%s,updated_at=now() WHERE id=%s", (next_username, password, account_id))
+        else:
+            conn.execute("UPDATE dashboard_accounts SET username=%s,updated_at=now() WHERE id=%s", (next_username, account_id))
+        row = conn.execute("SELECT id,username,role,is_active FROM dashboard_accounts WHERE id=%s", (account_id,)).fetchone()
+    return dict(row)
+
+
+def admin_create_account(username, password):
+    username = username.strip()
+    if not username or not password:
+        raise ValueError("Username dan password wajib diisi.")
+    with get_db_connection() as conn:
+        if conn.execute("SELECT id FROM dashboard_accounts WHERE username=%s", (username,)).fetchone():
+            raise ValueError("Username sudah digunakan akun lain.")
+        row = conn.execute("INSERT INTO dashboard_accounts (username,password_plain,role,is_active) VALUES (%s,%s,'ADMIN',true) RETURNING id,username,role,is_active", (username, password)).fetchone()
+    return dict(row)
+def update_vercel_toggle(store_id, status, pause_until=None):
+    with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_until, store_id))
+def admin_set_suspension(store_id, penangguhan, alasan=""):
+    suspended = penangguhan.lower() == "ya"
+    with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET suspension_status=%s,suspension_reason=%s,vercel_status=CASE WHEN %s THEN 'OFF' ELSE vercel_status END,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", ("SUSPENDED" if suspended else "ACTIVE", alasan, suspended, store_id))
+def admin_renew_subscription(store_id, new_expiry_date):
+    with get_db_connection() as conn: conn.execute("UPDATE subscriptions s SET end_date=%s,status='ACTIVE',updated_at=now() FROM outlets o WHERE o.id=s.outlet_id AND o.store_id=%s", (new_expiry_date, store_id))
+def record_log(store_id, store_name, action, target_state, reason):
+    with get_db_connection() as conn:
+        outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
+        if not outlet: return
+        row = conn.execute("SELECT vercel_status,shopee_actual_status,suspension_status FROM outlet_states WHERE outlet_id=%s", (outlet["id"],)).fetchone() or {}
+        conn.execute("INSERT INTO automation_logs (outlet_id,suspension_status,subscription_status,vercel_status_before,shopee_status_before,target_status,action,success,reason) VALUES (%s,%s,'ACTIVE',%s,%s,%s,%s,true,%s)", (outlet["id"], row.get("suspension_status", "ACTIVE"), row.get("vercel_status", "OFF"), row.get("shopee_actual_status", "UNKNOWN"), target_state, action, reason))
+def get_recent_logs(limit=50, store_ids=None):
+    query = """
+        SELECT
+            al.id,
+            al.checked_at::text AS timestamp,
+            COALESCE(o.store_id, 'SYSTEM') AS store_id,
+            COALESCE(o.long_name, 'Bot system') AS store_name,
+            al.action,
+            al.target_status AS target_state,
+            COALESCE(al.reason, '') AS reason
+        FROM automation_logs al
+        LEFT JOIN outlets o ON o.id = al.outlet_id
+    """
+    params = []
     if store_ids:
-        placeholders = ",".join(["?"] * len(store_ids))
-        cursor.execute(f"SELECT * FROM automation_logs WHERE store_id IN ({placeholders}) ORDER BY id DESC LIMIT ?", (*store_ids, limit))
-    else:
-        cursor.execute("SELECT * FROM automation_logs ORDER BY id DESC LIMIT ?", (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+        query += " WHERE o.store_id = ANY(%s)"
+        params.append(list(store_ids))
+    query += " ORDER BY al.id DESC LIMIT %s"
+    params.append(limit)
+    with get_db_connection() as conn:
+        return [dict(r) for r in conn.execute(query, params).fetchall()]
+def fetch_merchant_outlets_from_db():
+    from core.sheets import fetch_merchant_outlets
+    return fetch_merchant_outlets()
+
+init_state = init_db

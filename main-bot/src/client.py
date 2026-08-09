@@ -36,6 +36,10 @@ class ShopeeClient:
         else:
             log.warning("[API] ShopeeClient: entity_id is empty. API calls may fail.")
         self.session = requests.Session()
+        proxy_url = os.getenv("PROXY_SERVER") or os.getenv("ALL_PROXY")
+        if proxy_url:
+            self.session.proxies = {"http": proxy_url, "https": proxy_url}
+            log.info(f"⚡ [PROXY] Configured HTTP client proxy: {proxy_url}")
         self.user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
 
     # ── Header builders ────────────────────────────────────────────────────────

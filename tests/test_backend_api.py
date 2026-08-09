@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from backend.main import app
 from core.logger import get_logger
@@ -33,6 +33,10 @@ def test_backend_endpoints():
     data = resp.json()
     assert data["status"] == "healthy"
     log.info(f"   -> Result: PASSED (Service: {data['service']})")
+
+    # Admin Login
+    login_resp = client.post("/api/v1/admin/login", json={"username": "admin", "password": "Admin@123"})
+    assert login_resp.status_code == 200
 
     # 2. Test Stores List Endpoint
     log.info("\n2️⃣ Testing GET /api/v1/stores...")

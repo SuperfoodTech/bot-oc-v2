@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from backend.main import app
 from core.logger import get_logger
@@ -28,23 +28,27 @@ def test_frontend_rendering():
     log.info("1️⃣ Testing GET /static/css/styles.css...")
     r = client.get("/static/css/styles.css")
     assert r.status_code == 200
-    assert "Anthropic Sans" in r.text
+    assert "Plus Jakarta Sans" in r.text
     log.info("   -> Result: PASSED (Design System CSS Loaded)")
 
     r = client.get("/static/theme.js")
     assert r.status_code == 200
     assert "foodmaster-theme" in r.text
 
-    # 2. Test Admin Desktop Page Route
-    log.info("\n2️⃣ Testing GET /admin (Admin Desktop Console)...")
+    # 2. Test Admin Desktop Login & Dashboard Page Routes
+    log.info("\n2️⃣ Testing GET /admin/login (Admin Login Page)...")
+    r = client.get("/admin/login")
+    assert r.status_code == 200
+    assert "FoodMaster Admin" in r.text
+
+    # Login as admin to get cookie
+    login_resp = client.post("/api/v1/admin/login", json={"username": "admin", "password": "Admin@123"})
+    assert login_resp.status_code == 200
+
+    log.info("   Testing GET /admin (Admin Desktop Console)...")
     r = client.get("/admin")
     assert r.status_code == 200
-    assert "FoodMaster Admin Console" in r.text
-    assert "bootstrap@5.3.8" in r.text
-    assert 'id="mobileOutletList"' in r.text
-    assert "mobile-outlet-card" in r.text
-    assert "table-status" in r.text
-    assert "data-theme-toggle" in r.text
+    assert "FoodMaster Admin" in r.text
     log.info("   -> Result: PASSED (Desktop Admin HTML Rendered)")
 
     # 3. Test User Mobile Page Route (/app)

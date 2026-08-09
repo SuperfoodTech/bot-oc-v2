@@ -14,19 +14,20 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
 import os
+import requests
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 import db
-import worker
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
     SyncResponse,
     AutomationLogResponse,
     AdminGenerateLinkRequest,
+    AdminCreateOutletRequest,
     AdminSuspendRequest,
     AdminRenewRequest,
     UserLoginRequest,
@@ -54,8 +55,8 @@ def get_app_base_url(request: Request = None) -> str:
         return f"http://{PROD_HOST}:{PORT}"
     return f"http://localhost:{PORT}"
 
-# Initialize Database Schema
-db.init_db()
+# Unified spreadsheet-backed state has no database startup step.
+db.init_state()
 
 app = FastAPI(
     title="FoodMaster ShopeeFood Automation Backend & Web Apps",
@@ -65,7 +66,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex="https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -119,15 +120,10 @@ def health_check(request: Request):
     }
 
 
-# ── ADMIN DASHBOARD ENDPOINTS (Fetches Directly from Google Sheets CSV) ────────
+# ── ADMIN DASHBOARD ENDPOINTS (Google Sheets) ───────────────────────────────
 
 @app.get("/api/v1/admin/users", summary="Admin: List All Users & Outlets Status from Sheets")
 def admin_list_users():
-    # Sync live data from Google Sheets CSV every time Admin fetches
-    try:
-        worker.sync_all_stores(execute_actions=False)
-    except Exception as e:
-        pass
     users_data = db.admin_get_all_users_with_stores()
     return {"success": True, "users": users_data}
 
@@ -144,6 +140,48 @@ def admin_generate_link(req: AdminGenerateLinkRequest, request: Request):
         reason=f"Generated Vercel link for '{req.nama_pemilik}' (Passcode: {result['passcode']})"
     )
     return {"success": True, "data": result}
+
+
+@app.post("/api/v1/admin/outlets", summary="Admin: Create Merchant and Outlet")
+def admin_create_outlet(req: AdminCreateOutletRequest):
+    try:
+        start_date = datetime.strptime(req.tanggal_mulai_layanan, "%Y-%m-%d").date()
+        end_date = datetime.strptime(req.tanggal_berakhir_layanan, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Format tanggal harus YYYY-MM-DD.")
+    if end_date < start_date:
+        raise HTTPException(status_code=400, detail="Tanggal berakhir tidak boleh sebelum tanggal mulai.")
+    if db.get_store_by_id(req.store_id):
+        raise HTTPException(status_code=409, detail=f"Store ID '{req.store_id}' sudah terdaftar.")
+
+    db.save_or_update_store(
+        store_id=req.store_id,
+        store_name=req.nama_panjang_outlet,
+        long_name=req.nama_panjang_outlet,
+        merchant_name=req.nama_portal,
+        account_username=req.username,
+        account_phone=req.phone,
+        account_password=req.password,
+        merchant_id=req.merchant_id,
+        nama_pemilik=req.nama_pemilik,
+        ownership_type=req.ownership_type,
+        paket=req.paket,
+        tanggal_mulai_layanan=req.tanggal_mulai_layanan,
+        tanggal_berakhir_layanan=req.tanggal_berakhir_layanan,
+        vercel_password=req.dashboard_password,
+        vercel_status="OFF",
+        shopee_status="UNKNOWN",
+        special_hours=req.special_hours,
+        regular_hours=req.operating_hours,
+    )
+    db.record_log(
+        store_id=req.store_id,
+        store_name=req.nama_panjang_outlet,
+        action="ADMIN_CREATE_OUTLET",
+        target_state="CREATED",
+        reason=f"Outlet dibuat oleh admin untuk mitra '{req.nama_pemilik}'.",
+    )
+    return {"success": True, "data": db.get_store_by_id(req.store_id)}
 
 
 # ── INTER-SERVICE BOT CONTROL & TRACE ENDPOINTS ─────────────────────────────
@@ -348,10 +386,6 @@ def user_get_history(store_ids: str = Query(..., description="Comma-separated st
 
 @app.get("/api/v1/stores", response_model=List[StoreStatusResponse], summary="Get All Store Statuses")
 def list_stores():
-    try:
-        worker.sync_all_stores(execute_actions=False)
-    except Exception:
-        pass
     stores = db.get_all_stores()
 
     response = []
@@ -380,7 +414,16 @@ def list_stores():
 
 @app.post("/api/v1/sync", response_model=SyncResponse, summary="Trigger Manual Synchronization Loop")
 def trigger_sync(execute: bool = Query(default=True, description="Whether to execute Shopee API actions if mismatch detected")):
-    result = worker.sync_all_stores(execute_actions=execute)
+    try:
+        response = requests.post(
+            f"{BOT_API_URL}/bot/sync",
+            params={"execute_actions": execute},
+            timeout=30,
+        )
+        response.raise_for_status()
+        result = response.json().get("data", {})
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail=f"Bot service tidak tersedia: {exc}")
     return SyncResponse(
         success=result["success"],
         total_stores_processed=result["total_stores_processed"],
@@ -416,3 +459,17 @@ def get_logs(
             reason=l["reason"]
         ) for l in logs
     ]
+
+
+def start_backend_api_server_background():
+    """
+    Launches the FastAPI backend server in a separate background thread.
+    """
+    import threading
+    import uvicorn
+    def run_server():
+        uvicorn.run(app, host="0.0.0.0", port=int(PORT), log_level="warning")
+
+    t = threading.Thread(target=run_server, daemon=True)
+    t.start()
+    return t

@@ -60,6 +60,22 @@ class AdminGenerateLinkRequest(BaseModel):
     passcode: Optional[str] = Field(default="Master@00@", description="Passcode untuk autentikasi user link")
 
 
+class AdminCreateOutletRequest(BaseModel):
+    nama_pemilik: str = Field(..., min_length=1)
+    nama_portal: str = Field(..., min_length=1)
+    store_id: str = Field(..., min_length=1)
+    nama_panjang_outlet: str = Field(..., min_length=1)
+    username: str = "auto7313"
+    phone: str = ""
+    password: str = "Auto@7313"
+    dashboard_password: str = "Master@123"
+    paket: str = "3_MONTHS"
+    tanggal_mulai_layanan: str = ""
+    tanggal_berakhir_layanan: str = ""
+    operating_hours: Dict[str, str] = Field(default_factory=dict)
+    special_hours: str = ""
+
+
 class AdminSuspendRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
     penangguhan: str = Field(..., description="'Ya' atau 'Tidak'")
@@ -69,6 +85,21 @@ class AdminSuspendRequest(BaseModel):
 class AdminRenewRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
     new_expiry_date: str = Field(..., description="Tanggal berakhir layanan baru (YYYY-MM-DD)")
+
+
+class AdminLoginRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+class AdminAccountUpdateRequest(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=1)
+    password: Optional[str] = Field(default=None, min_length=1)
+
+
+class AdminAccountCreateRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
 
 
 # ── USER LINK / DASHBOARD MODELS ──────────────────────────────────────────────

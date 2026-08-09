@@ -30,8 +30,7 @@ WEEKDAY_MAP = {
 
 @dataclass
 class MerchantOutlet:
-    aplikator: str                  # Col A (0)
-    kepemilikan: str                # Col B (1)
+    kepemilikan: str                # Col B (1); all rows are ShopeeFood
     paket: str                      # Col C (2)
     tanggal_mulai_layanan: str      # Col D (3)
     tanggal_berakhir_layanan: str  # Col E (4)
@@ -43,7 +42,6 @@ class MerchantOutlet:
     merchant_id: str                # Col K (10)
     store_id: str                   # Col L (11)
     nama_panjang_outlet: str        # Col M (12)
-    nama_pendek_outlet: str         # Col N (13)
     status_utama: str               # Col O (14) - On / Off (Vercel Toggle - Source of Truth)
     status_aktual: str = "On"       # Live Shopee Status (On/Pause/Close)
     vercel_link: str = ""           # Col P (15)
@@ -82,9 +80,8 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
         def get_col(idx: int) -> str:
             return row[idx].strip() if idx < len(row) else ""
 
-        aplikator = get_col(0)
-        if not aplikator or "shopee" not in aplikator.lower():
-            # Skip non-Shopee or empty rows
+        if not get_col(11):
+            # Store ID is required for the Shopee-only service.
             continue
 
         # Column E (4): Tanggal Berakhir Layanan
@@ -101,7 +98,6 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
             status_langganan_calc = "Aktif"
 
         outlet = MerchantOutlet(
-            aplikator=aplikator,                        # Col A (0)
             kepemilikan=get_col(1),                     # Col B (1)
             paket=get_col(2),                           # Col C (2)
             tanggal_mulai_layanan=get_col(3),           # Col D (3)
@@ -114,7 +110,6 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
             merchant_id=get_col(10),                    # Col K (10)
             store_id=get_col(11),                       # Col L (11)
             nama_panjang_outlet=get_col(12),            # Col M (12)
-            nama_pendek_outlet=get_col(13),             # Col N (13)
             status_utama=get_col(14),                   # Col O (14) Status Utama (On/Off)
             status_aktual="On",                         # Live Shopee status
             vercel_link=get_col(15),                    # Col P (15)

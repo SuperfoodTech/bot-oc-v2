@@ -8,7 +8,7 @@
 set -euo pipefail
 
 PROJECT="fm"
-COMPOSE_FILE="docker-compose.prod.yml"
+COMPOSE_FILE="docker-compose.yml"
 
 echo "══════════════════════════════════════════════"
 echo "  FoodMaster PROD  –  Build & Deploy"
@@ -34,7 +34,7 @@ docker compose -f "$COMPOSE_FILE" -p "$PROJECT" up -d
 echo ""
 echo "══════════════════════════════════════════════"
 echo "  PROD deployed!"
-echo "  Web dashboard : http://localhost:8080"
-echo "  Health check  : curl http://localhost:8080/api/v1/health"
+echo "  Monolith app  : http://localhost:3001"
+echo "  Health check  : curl http://localhost:3001/api/v1/health"
 echo "  Logs          : docker compose -f $COMPOSE_FILE -p $PROJECT logs -f"
 echo "══════════════════════════════════════════════"

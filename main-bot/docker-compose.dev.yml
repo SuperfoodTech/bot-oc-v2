@@ -1,0 +1,12 @@
+# Local development override.
+# Keep production defaults in docker-compose.yml unchanged.
+services:
+  bot:
+    environment:
+      HEADLESS: "true"
+      TZ: Asia/Jakarta
+      PROXY_SERVER: socks5://warp:1080
+
+  backend:
+    environment:
+      TZ: Asia/Jakarta

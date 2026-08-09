@@ -15,17 +15,21 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from core.logger import get_logger
-from core.sheets import fetch_merchant_outlets, MerchantOutlet
-from core.decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_NO_CHANGE
-from core import browser
-from backend import db
+from logger import get_logger
+from sheets import MerchantOutlet
+from decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_NO_CHANGE
+import browser
+import db
 
 log = get_logger("backend_worker")
 
 # Filter account usernames allowed for bot execution (Default: auto7313 only)
 ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
+HEADLESS = os.getenv("HEADLESS", "true").strip().lower() not in {"0", "false", "no", "off"}
+# One long-lived browser per Shopee bot account. Merchant switching happens in
+# this browser; the bot does not close/reopen Chrome for every outlet action.
+ACTIVE_SESSIONS = {}
 
 
 def warmup_all_account_sessions():
@@ -36,7 +40,7 @@ def warmup_all_account_sessions():
     """
     log.info(f"🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for whitelisted accounts {ALLOWED_USERNAMES}...")
     try:
-        outlets = fetch_merchant_outlets()
+        outlets = db.fetch_merchant_outlets_from_db()
     except Exception as e:
         log.warning(f"⚠️ [STARTUP WARMUP] Could not fetch control source outlets for warmup: {e}")
         return
@@ -71,9 +75,11 @@ def warmup_all_account_sessions():
                 password=outlet.password,
                 phone=outlet.hp,
                 target_name=outlet.nama_portal,
-                headless=True
+                headless=HEADLESS,
+                close_browser=False,
             )
             if session and session.get("shopee_tob_token"):
+                ACTIVE_SESSIONS[username] = session
                 log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' successfully logged in & session saved.")
             else:
                 log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' login completed, session pending.")
@@ -91,13 +97,29 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
         log.info(f"  ⏭️ [SHOPEE EXECUTION] Excluding Store {outlet.store_id} - username '{outlet.username}' != auto7313.")
         return False
 
-    log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_pendek_outlet})...")
+    log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
 
     # Set session file according to outlet username
     if outlet.username:
         account_session_file = SCRIPT_DIR.parent / "data" / f"session_{outlet.username}.json"
         if account_session_file.exists():
             browser.set_session_file(account_session_file)
+
+    cached = ACTIVE_SESSIONS.get(outlet.username)
+    if cached and cached.get("driver"):
+        try:
+            driver = cached["driver"]
+            if browser.auto_switch_merchant(driver, outlet.nama_portal):
+                refreshed = browser.refresh_tokens(driver, cached.get("shopee_tob_entity_id"))
+                cached.update(refreshed)
+                if action == ACTION_OPEN:
+                    if browser.open_store_api(refreshed["shopee_tob_token"], refreshed["shopee_tob_entity_id"], store_id=outlet.store_id):
+                        return True
+                elif browser.pause_store_api(refreshed["shopee_tob_token"], refreshed["shopee_tob_entity_id"], store_id=outlet.store_id):
+                    return True
+        except Exception as exc:
+            log.warning(f"  ⚠️ Persistent browser session unavailable; recreating it: {exc}")
+            ACTIVE_SESSIONS.pop(outlet.username, None)
 
     # 1. Fast path: try saved session token
     saved_session = browser.load_session()
@@ -122,13 +144,15 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
             password=outlet.password,
             phone=outlet.hp,
             target_name=outlet.nama_portal,
-            headless=True
+            headless=HEADLESS,
+            close_browser=False,
         )
 
         if session:
             driver = session.get("driver")
             tob_token = session.get("shopee_tob_token")
             entity_id = session.get("shopee_tob_entity_id")
+            ACTIVE_SESSIONS[outlet.username] = session
             
             # Try API call first with active store_id context
             success = False
@@ -158,38 +182,19 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
 def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
     log.info("🔄 [BACKEND WORKER] Starting store synchronization...")
 
-    # Fetch merchant outlets from control source (Google Sheets)
-    outlets = fetch_merchant_outlets()
+    # Runtime source of truth: PostgreSQL. Spreadsheet is import-only.
+    outlets = db.fetch_merchant_outlets_from_db()
     actions_taken = []
 
     for outlet in outlets:
         # Exclude stores where username != auto7313 (if whitelist active)
         if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
-            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_pendek_outlet}) - username '{outlet.username}' != auto7313")
+            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - username '{outlet.username}' != auto7313")
             continue
 
-        # 1. Update / seed store in DB
-        db.save_or_update_store(
-            store_id=outlet.store_id,
-            store_name=outlet.nama_pendek_outlet,
-            merchant_name=outlet.nama_portal,
-            account_username=outlet.username,
-            nama_pemilik=outlet.nama_pemilik,
-            paket=outlet.paket,
-            tanggal_mulai_layanan=outlet.tanggal_mulai_layanan,
-            tanggal_berakhir_layanan=outlet.tanggal_berakhir_layanan,
-            vercel_link=outlet.vercel_link,
-            vercel_password=outlet.vercel_password,
-            vercel_status=outlet.status_utama.upper(),
-            shopee_status=outlet.status_aktual.upper(),
-            subscription_status=outlet.status_langganan,
-            is_suspended=(outlet.penangguhan.lower() == "ya"),
-            alasan_penangguhan=outlet.alasan_penangguhan
-        )
-
-        # 2. Evaluate decision engine rules
+        # Evaluate decision engine rules from spreadsheet-backed state.
         decision = evaluate_outlet_status(outlet)
-        log.info(f"  🏪 Store {outlet.store_id} ({outlet.nama_pendek_outlet}) -> Decision: {decision.action} ({decision.reason})")
+        log.info(f"  🏪 Store {outlet.store_id} ({outlet.nama_panjang_outlet}) -> Decision: {decision.action} ({decision.reason})")
 
         # 3. If action needed and execute_actions is True
         if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
@@ -199,16 +204,16 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             reason_text = f"{decision.reason} | Shopee Action: {'SUCCESS' if exec_ok else 'FAILED'}"
             actions_taken.append({
                 "store_id": outlet.store_id,
-                "store_name": outlet.nama_pendek_outlet,
+                "store_name": outlet.nama_panjang_outlet,
                 "action": decision.action,
                 "target_state": decision.target_state,
                 "reason": reason_text
             })
 
-            # Record in SQLite audit log
+            # Record in the in-memory runtime audit log
             db.record_log(
                 store_id=outlet.store_id,
-                store_name=outlet.nama_pendek_outlet,
+                store_name=outlet.nama_panjang_outlet,
                 action=decision.action,
                 target_state=decision.target_state,
                 reason=reason_text

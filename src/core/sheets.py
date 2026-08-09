@@ -7,15 +7,17 @@ Strictly parses Columns A through Y (indices 0 to 24).
 
 import csv
 import io
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 import requests
 
-GOOGLE_SHEETS_CSV_URL = (
+GOOGLE_SHEETS_CSV_URL = os.getenv(
+    "GOOGLE_SHEETS_CSV_URL",
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/"
-    "pub?gid=0&single=true&output=csv"
+    "pub?gid=0&single=true&output=csv",
 )
 
 WEEKDAY_MAP = {
@@ -30,7 +32,6 @@ WEEKDAY_MAP = {
 
 @dataclass
 class MerchantOutlet:
-    aplikator: str                  # Col A (0)
     kepemilikan: str                # Col B (1)
     paket: str                      # Col C (2)
     tanggal_mulai_layanan: str      # Col D (3)
@@ -82,11 +83,6 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
         def get_col(idx: int) -> str:
             return row[idx].strip() if idx < len(row) else ""
 
-        aplikator = get_col(0)
-        if not aplikator or "shopee" not in aplikator.lower():
-            # Skip non-Shopee or empty rows
-            continue
-
         # Column E (4): Tanggal Berakhir Layanan
         tgl_berakhir = get_col(4)
         
@@ -101,7 +97,6 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
             status_langganan_calc = "Aktif"
 
         outlet = MerchantOutlet(
-            aplikator=aplikator,                        # Col A (0)
             kepemilikan=get_col(1),                     # Col B (1)
             paket=get_col(2),                           # Col C (2)
             tanggal_mulai_layanan=get_col(3),           # Col D (3)

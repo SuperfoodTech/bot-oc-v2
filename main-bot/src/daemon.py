@@ -89,7 +89,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
     log.info("=" * 80)
 
     # Initialize DB
-    db.init_db()
+    db.init_state()
 
     # Launch HTTP Control & Trace API Server on Port 8081
     try:

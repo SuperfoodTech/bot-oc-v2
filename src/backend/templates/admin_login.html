@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Masuk | FoodMaster Admin</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260807-auth">
+</head>
+<body class="admin-login-page">
+  <main class="admin-login-shell">
+    <section class="admin-login-card">
+      <div class="step-indicator">FoodMaster Admin</div>
+      <h1>Masuk ke dashboard</h1>
+      <p class="card-subtitle">Gunakan akun admin untuk membuka data operasional dan pengaturan mitra.</p>
+      <form id="adminLoginForm">
+        <label for="adminUsername">Username</label>
+        <input id="adminUsername" class="form-input" autocomplete="username" required>
+        <label for="adminPassword">Password</label>
+        <div class="password-field">
+          <input id="adminPassword" class="form-input" type="password" autocomplete="current-password" required>
+          <button id="toggleAdminPassword" class="password-visibility-toggle" type="button" aria-label="Tampilkan password" aria-pressed="false">
+            <svg class="password-icon password-icon-show" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-5 9.5-5 9.5 5 9.5 5-3.4 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+            <svg class="password-icon password-icon-hide is-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 6.9A10.9 10.9 0 0 1 12 7c6.1 0 9.5 5 9.5 5a17 17 0 0 1-3.1 3.3M6.2 6.2C3.9 7.8 2.5 12 2.5 12s3.4 5 9.5 5c1.2 0 2.3-.2 3.2-.6"/></svg>
+          </button>
+        </div>
+        <p id="adminLoginError" class="admin-login-error" role="alert"></p>
+        <button class="btn-primary admin-login-submit" type="submit">Masuk</button>
+      </form>
+    </section>
+  </main>
+  <script>
+    const adminPasswordInput = document.getElementById('adminPassword');
+    const toggleAdminPassword = document.getElementById('toggleAdminPassword');
+    toggleAdminPassword.addEventListener('click', () => {
+      const isVisible = adminPasswordInput.type === 'text';
+      adminPasswordInput.type = isVisible ? 'password' : 'text';
+      toggleAdminPassword.setAttribute('aria-pressed', String(!isVisible));
+      toggleAdminPassword.setAttribute('aria-label', isVisible ? 'Tampilkan password' : 'Sembunyikan password');
+      document.querySelector('.password-icon-show').classList.toggle('is-hidden', !isVisible);
+      document.querySelector('.password-icon-hide').classList.toggle('is-hidden', isVisible);
+    });
+
+    document.getElementById('adminLoginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const error = document.getElementById('adminLoginError');
+      error.textContent = '';
+      const response = await fetch('/api/v1/admin/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          username: document.getElementById('adminUsername').value,
+          password: document.getElementById('adminPassword').value
+        })
+      });
+      if (response.ok) {
+        window.location.href = '/admin';
+        return;
+      }
+      const data = await response.json().catch(() => ({}));
+      error.textContent = data.detail || 'Login gagal. Periksa kembali username dan password.';
+    });
+  </script>
+</body>
+</html>

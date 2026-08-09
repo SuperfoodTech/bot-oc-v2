@@ -7,7 +7,7 @@ Evaluates priority logic to determine target store state (OPEN/CLOSE) and requir
 from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Tuple, Optional
-from core.sheets import MerchantOutlet, WEEKDAY_MAP
+from sheets import MerchantOutlet, WEEKDAY_MAP
 
 ACTION_NO_CHANGE = "NO_CHANGE"
 ACTION_OPEN = "ACTION_OPEN"

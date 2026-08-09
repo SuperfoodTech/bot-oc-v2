@@ -60,6 +60,26 @@ class AdminGenerateLinkRequest(BaseModel):
     passcode: Optional[str] = Field(default="Master@00@", description="Passcode untuk autentikasi user link")
 
 
+class AdminCreateOutletRequest(BaseModel):
+    nama_pemilik: str = Field(..., min_length=1)
+    nama_portal: str = Field(..., min_length=1)
+    # Merchant ID eksternal tidak lagi diinput saat onboarding.
+    # Nilai lama tetap kompatibel dan akan disimpan kosong bila tidak tersedia.
+    merchant_id: str = ""
+    store_id: str = Field(..., min_length=1)
+    nama_panjang_outlet: str = Field(..., min_length=1)
+    ownership_type: str = ""
+    phone: str = ""
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    dashboard_password: str = Field(..., min_length=8)
+    paket: str = Field(default="3_MONTHS")
+    tanggal_mulai_layanan: str = Field(..., description="YYYY-MM-DD")
+    tanggal_berakhir_layanan: str = Field(..., description="YYYY-MM-DD")
+    operating_hours: Dict[str, str] = Field(default_factory=dict)
+    special_hours: str = ""
+
+
 class AdminSuspendRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
     penangguhan: str = Field(..., description="'Ya' atau 'Tidak'")

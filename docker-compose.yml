@@ -2,39 +2,55 @@ services:
   db:
     image: postgres:16-alpine
     container_name: fm-postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-foodmaster}
       POSTGRES_USER: ${POSTGRES_USER:-foodmaster}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-env}
     ports:
-      - "127.0.0.1:5434:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-foodmaster} -d ${POSTGRES_DB:-foodmaster}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fm-web
+    container_name: fm-backend
     restart: always
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_started
     ports:
-      - "8080:8080"
+      - "3001:3001"
     environment:
       - ENVIRONMENT=development
-      - PORT=8080
+      - PORT=3001
+      - APP_BASE_URL=http://localhost:3001
       - ALLOWED_USERNAMES=auto7313
-      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
+      - SHOPEE_BOT_USERNAME=auto7313
+      - SHOPEE_BOT_PASSWORD=Auto@7313
     volumes:
+      - ./src:/app/src
+
+  bot:
+    build:
+      context: .
+      dockerfile: main-bot/Dockerfile
+    container_name: fm-bot
+    restart: always
+    depends_on:
+      db:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
+      - SHOPEE_BOT_USERNAME=auto7313
+      - SHOPEE_BOT_PASSWORD=Auto@7313
+      - ALLOWED_USERNAMES=auto7313
+      - HEADLESS=true
+    volumes:
+      - ./main-bot/data:/app/main-bot/data
       - ./src:/app/src
 
 volumes:

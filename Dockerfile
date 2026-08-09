@@ -27,12 +27,15 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # ── 4. Copy source code (fast layer, no dep reinstall) ───────
 COPY src/ ./src/
+COPY database/ ./database/
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
 
-EXPOSE 8080
+COPY web/src/backend/ ./web/src/backend/
+
+EXPOSE 3001
 
 # Production: single-worker, no reload
 CMD ["uv", "run", "uvicorn", "backend.main:app", \
-     "--host", "0.0.0.0", "--port", "8080"]
+     "--host", "0.0.0.0", "--port", "3001"]
