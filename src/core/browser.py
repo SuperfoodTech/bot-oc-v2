@@ -31,13 +31,16 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-from core.logger import get_logger
+try:
+    from core.logger import get_logger
+except ImportError:
+    from logger import get_logger
 
 
 log = get_logger("browser")
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-SESSION_FILE    = Path(__file__).resolve().parent.parent / "data" / "session.json"
+SESSION_FILE    = Path(__file__).resolve().parent / "data" / "session.json"
 import sys
 import threading
 from pathlib import Path
@@ -680,7 +683,7 @@ def pause_store_api(tob_token: str, entity_id: str, store_id: str = None, pause_
         "store_id": int(target_id) if str(target_id).isdigit() else target_id
     }
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=8)
+        resp = requests.post(url, json=payload, headers=headers, timeout=20)
         data = resp.json()
         if data.get("code") == 0:
             log.info(f"✅ [API] Store {target_id} paused successfully (Auto Close).")
@@ -709,7 +712,7 @@ def open_store_api(tob_token: str, entity_id: str, store_id: str = None) -> bool
         "store_id": int(target_id) if str(target_id).isdigit() else target_id
     }
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=8)
+        resp = requests.post(url, json=payload, headers=headers, timeout=20)
         data = resp.json()
         if data.get("code") == 0:
             log.info(f"✅ [API] Store {target_id} reopened successfully (Auto Open).")
@@ -720,6 +723,45 @@ def open_store_api(tob_token: str, entity_id: str, store_id: str = None) -> bool
         log.error(f"❌ [API] Failed to open store: {e}")
     return False
 
+def sync_store_session_cdp(driver, store_id: str) -> None:
+    """
+    Synchronizes browser session to target store ID using CDP (Chrome DevTools Protocol)
+    cookie injection and navigates to Business Hours page to force Shopee SGW Gateway session sync.
+    Reference: project/menu-prod/shopee/docs/shopee_store_switching.md
+    """
+    try:
+        curr_url = driver.current_url.lower()
+        if "partner.shopee.co.id" not in curr_url:
+            log.info("  🌐 Navigating to partner domain for CDP cookie injection...")
+            driver.get("https://partner.shopee.co.id/")
+            time.sleep(2)
+            
+        log.info(f"  ⚡ Injecting cookie shopee_tob_entity_id = {store_id} via CDP...")
+        def set_cdp_cookie(name, val, domain):
+            try:
+                driver.execute_cdp_cmd('Network.setCookie', {
+                    'name': name,
+                    'value': str(val),
+                    'domain': domain,
+                    'path': '/',
+                    'secure': True,
+                    'httpOnly': False
+                })
+            except Exception as _err:
+                log.warning(f"  ⚠️ CDP setCookie failed for {domain}: {_err}")
+
+        for domain in [".shopee.co.id", "partner.shopee.co.id"]:
+            set_cdp_cookie("shopee_tob_entity_id", store_id, domain)
+        time.sleep(1)
+        
+        business_hours_url = "https://partner.shopee.co.id/settings/shopee-food/business-hours-settings"
+        log.info("  🔄 Navigating to Business Hours settings page to trigger server session sync...")
+        driver.get(business_hours_url)
+        time.sleep(5)
+        
+    except Exception as e:
+        log.warning(f"  ⚠️ Failed to sync store session via CDP: {e}")
+
 def execute_store_action_ui(driver, store_id: str, action: str) -> bool:
     """
     Fallback UI action executor: Navigates directly to store settings page
@@ -728,6 +770,9 @@ def execute_store_action_ui(driver, store_id: str, action: str) -> bool:
     """
     log.info(f"🖱️ [UI FALLBACK] Executing {action} via UI for Store {store_id}...")
     try:
+        if store_id:
+            sync_store_session_cdp(driver, store_id)
+
         target_url = f"https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}"
         if store_id and store_id not in driver.current_url:
             driver.get(target_url)
@@ -873,6 +918,11 @@ def _init_driver(headless: bool):
         options.add_argument("--window-size=1920,1080")
     else:
         options.add_argument("--start-maximized")
+
+    proxy_url = os.getenv("PROXY_SERVER") or os.getenv("ALL_PROXY")
+    if proxy_url:
+        options.add_argument(f"--proxy-server={proxy_url}")
+        log.info(f"🌐 [PROXY] Configured Chromium proxy: {proxy_url}")
     
     script_dir = Path(__file__).parent.parent
     if SESSION_FILE.stem == "session":
@@ -884,23 +934,57 @@ def _init_driver(headless: bool):
         profile_dir = script_dir / "data" / f"chrome_profile_{account_name}"
         options.add_argument(f"--user-data-dir={profile_dir.resolve()}")
         options.add_argument(f"--profile-directory=profile_{account_name}")
+        log.info(f"📂 [CHROME PROFILE] Loaded Profile Directory: {profile_dir.resolve()} (profile_{account_name})")
 
-    # Delete SingletonLock if it exists to avoid SessionNotCreatedException on Linux
-    singleton_lock = profile_dir / "SingletonLock"
-    if singleton_lock.exists() or singleton_lock.is_symlink():
+    driver = None
+    chromedriver_path = os.getenv("CHROMEDRIVER_PATH") or ("/usr/bin/chromedriver" if os.path.exists("/usr/bin/chromedriver") else None)
+    chrome_bin = os.getenv("CHROME_BIN") or ("/usr/bin/chromium" if os.path.exists("/usr/bin/chromium") else None)
+    if chrome_bin:
+        options.binary_location = chrome_bin
+
+    for init_attempt in range(3):
+        # Clean stale lock files before each launch attempt
+        for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+            lock_file = profile_dir / lock_name
+            if lock_file.exists() or lock_file.is_symlink():
+                try:
+                    lock_file.unlink(missing_ok=True)
+                    log.info(f"🧹 Removed Chrome {lock_name} at {lock_file}")
+                except Exception as e:
+                    log.warning(f"⚠️ Failed to remove {lock_name}: {e}")
         try:
-            singleton_lock.unlink(missing_ok=True)
-            log.info(f"🧹 Removed Chrome SingletonLock at {singleton_lock}")
+            if chromedriver_path and os.path.exists(chromedriver_path):
+                driver = webdriver.Chrome(service=Service(chromedriver_path), options=options)
+            else:
+                driver = webdriver.Chrome(options=options)
+            break
         except Exception as e:
-            log.warning(f"⚠️ Failed to remove SingletonLock: {e}")
+            if init_attempt < 2:
+                log.warning(f"⚠️ Chrome init attempt #{init_attempt+1} encountered lock/profile race ({e}). Waiting 1.5s for OS process lock release...")
+                time.sleep(1.5)
+            else:
+                log.warning(f"⚠️ Native Chrome init failed after retries: {e}. Trying ChromeDriverManager fallback...")
+                try:
+                    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+                except Exception as final_err:
+                    log.error(f"❌ Chrome driver launch failed completely: {final_err}")
+                    raise final_err
+    driver.set_page_load_timeout(60)
 
     try:
-        # Use native Selenium Manager (faster, more stable, avoids ChromeDriverManager network hangs)
-        driver = webdriver.Chrome(options=options)
-    except Exception as e:
-        log.warning(f"⚠️ Native Chrome init failed: {e}. Trying ChromeDriverManager fallback...")
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.set_page_load_timeout(60)
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                """
+            }
+        )
+    except Exception:
+        pass
+
     return driver
 
 
@@ -1203,16 +1287,25 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
                 log.warning(f"  ⚠️ [STALE SESSION] Dropdown profil tidak terbuka setelah klik — sesi kemungkinan kedaluwarsa.")
                 return False
 
-            # Use JS to click the target merchant in the revealed list
+            # Use JS to click the target merchant in the revealed list (with partial token matching support)
             js_switch_script = """
                 var targetName = arguments[0].toLowerCase().trim();
+                var tokens = targetName.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
                 var items = document.querySelectorAll('li.ant-menu-item, li[role="menuitem"], .ant-dropdown-menu-item, [class*="menu-item"]');
                 for (var i = 0; i < items.length; i++) {
                     var text = (items[i].innerText || "").toLowerCase().trim();
-                    if (text === targetName || text.includes(targetName)) {
+                    if (!text) continue;
+                    if (text === targetName || text.includes(targetName) || targetName.includes(text)) {
                         items[i].scrollIntoView({block: 'center'});
                         items[i].click();
                         return true;
+                    }
+                    for (var tok of tokens) {
+                        if (tok.length > 2 && (text.includes(tok) || tok.includes(text))) {
+                            items[i].scrollIntoView({block: 'center'});
+                            items[i].click();
+                            return true;
+                        }
                     }
                 }
                 return false;
@@ -1542,6 +1635,23 @@ def return_to_selector(driver) -> bool:
         return True
 
 def get_session(username=None, password=None, phone=None, headless=True, close_browser=True, target_name=None, interactive=True) -> dict | None:
+    if not password and username:
+        cred_paths = [
+            Path(__file__).resolve().parent.parent / "credentials.json",
+            Path(__file__).resolve().parent / "credentials.json",
+            Path.cwd() / "credentials.json"
+        ]
+        for cp in cred_paths:
+            if cp.exists():
+                try:
+                    cdata = json.loads(cp.read_text())
+                    if username in cdata and cdata[username].get("password"):
+                        password = cdata[username]["password"]
+                        log.info(f"🔑 [AUTH] Auto-loaded password for '{username}' from credentials.json")
+                        break
+                except Exception:
+                    pass
+
     for attempt in range(3):
         log.info(f"🌐 [BROWSER] Launching (headless={headless}, attempt={attempt+1}/3)...")
         driver = _init_driver(headless=headless)
@@ -1562,49 +1672,29 @@ def get_session(username=None, password=None, phone=None, headless=True, close_b
                 log.info("✅ [SESSION] Browser is already logged in.")
                 is_logged_in = True
             
-            # Restore from file only on first attempt if not logged in
-            if not is_logged_in and attempt == 0:
-                saved = load_session()
-                if saved:
-                    log.debug("🔍 Attempting to restore session from saved tokens...")
-                    driver.add_cookie({"name": "shopee_tob_token", "value": saved["shopee_tob_token"]})
-                    if saved.get("shopee_tob_entity_id"):
-                        driver.add_cookie({"name": "shopee_tob_entity_id", "value": saved["shopee_tob_entity_id"]})
-                    for n, v in saved.get("extra_cookies", {}).items():
-                        try: driver.add_cookie({"name": n, "value": v})
-                        except: pass
-                    
-                    driver.refresh()
-                    time.sleep(4)
-                    current_url = driver.current_url.lower()
-                    if "dashboard" in current_url or "merchant-selector" in current_url:
-                        log.info("✅ [SESSION] Restored from saved tokens.")
-                        is_logged_in = True
-
-            # On retry attempts, try injecting saved session tokens BEFORE resorting
-            # to a full fresh login. Chrome may have crashed mid-session (causing
-            # "Connection refused") but the session_{username}.json written by the
-            # previous successful warm cycle is still valid. Injecting those cookies
-            # into a fresh Chrome instance avoids triggering Shopee OTP.
-            if not is_logged_in and attempt > 0:
-                log.info(f"🔄 [SESSION] Attempt {attempt+1}: trying saved tokens before fresh login...")
+            # Restore from file if not logged in
+            if not is_logged_in:
                 saved = load_session()
                 if saved and saved.get("shopee_tob_token"):
+                    log.info("🔍 [SESSION] Attempting to restore session from saved tokens/cookies...")
                     try:
-                        driver.add_cookie({"name": "shopee_tob_token", "value": saved["shopee_tob_token"]})
+                        if saved.get("shopee_tob_token"):
+                            driver.add_cookie({"name": "shopee_tob_token", "value": saved["shopee_tob_token"], "path": "/"})
                         if saved.get("shopee_tob_entity_id"):
-                            driver.add_cookie({"name": "shopee_tob_entity_id", "value": saved["shopee_tob_entity_id"]})
+                            driver.add_cookie({"name": "shopee_tob_entity_id", "value": str(saved["shopee_tob_entity_id"]), "path": "/"})
                         for n, v in saved.get("extra_cookies", {}).items():
-                            try: driver.add_cookie({"name": n, "value": v})
-                            except: pass
-                        driver.refresh()
+                            if v:
+                                try: driver.add_cookie({"name": n, "value": str(v), "path": "/"})
+                                except: pass
+                        
+                        driver.get(PARTNER_DASHBOARD)
                         time.sleep(4)
                         current_url = driver.current_url.lower()
-                        if "dashboard" in current_url or "merchant-selector" in current_url:
-                            log.info(f"✅ [SESSION] Restored from saved tokens on retry {attempt+1} — no fresh login needed.")
+                        if "dashboard" in current_url or "merchant-selector" in current_url or "onboarding" in current_url:
+                            log.info("✅ [SESSION] Restored session from saved tokens/cookies successfully!")
                             is_logged_in = True
                     except Exception as _cookie_err:
-                        log.warning(f"  ⚠️ Cookie injection on retry failed: {_cookie_err}")
+                        log.warning(f"  ⚠️ Cookie injection failed: {_cookie_err}")
 
 
 
