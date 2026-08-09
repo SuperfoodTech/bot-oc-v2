@@ -40,7 +40,8 @@ except ImportError:
 log = get_logger("browser")
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-SESSION_FILE    = Path(__file__).resolve().parent / "data" / "session.json"
+DATA_DIR        = Path(__file__).resolve().parent.parent / "data"
+SESSION_FILE    = DATA_DIR / "session.json"
 import sys
 import threading
 from pathlib import Path
@@ -50,7 +51,7 @@ _thread_local = threading.local()
 
 def get_session_file() -> Path:
     if not hasattr(_thread_local, "session_file"):
-        _thread_local.session_file = Path(__file__).resolve().parent.parent / "data" / "session.json"
+        _thread_local.session_file = DATA_DIR / "session.json"
     return _thread_local.session_file
 
 def get_otp_code(username: str, phone: str) -> str:
@@ -903,7 +904,7 @@ def _trigger_and_extract_tokens(driver) -> tuple:
 
 # ── Driver Initialization ──────────────────────────────────────────────────────
 
-def _init_driver(headless: bool):
+def _init_driver(headless: bool = False):
     options = Options()
     options.add_argument("--log-level=3")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -924,14 +925,14 @@ def _init_driver(headless: bool):
         options.add_argument(f"--proxy-server={proxy_url}")
         log.info(f"🌐 [PROXY] Configured Chromium proxy: {proxy_url}")
     
-    script_dir = Path(__file__).parent.parent
-    if SESSION_FILE.stem == "session":
-        profile_dir = script_dir / "data" / "chrome_profile"
+    current_session = get_session_file()
+    if current_session.stem == "session":
+        profile_dir = DATA_DIR / "chrome_profile"
         options.add_argument(f"--user-data-dir={profile_dir.resolve()}")
         options.add_argument("--profile-directory=shopee_profile")
     else:
-        account_name = SESSION_FILE.stem.replace("session_", "")
-        profile_dir = script_dir / "data" / f"chrome_profile_{account_name}"
+        account_name = current_session.stem.replace("session_", "")
+        profile_dir = DATA_DIR / f"chrome_profile_{account_name}"
         options.add_argument(f"--user-data-dir={profile_dir.resolve()}")
         options.add_argument(f"--profile-directory=profile_{account_name}")
         log.info(f"📂 [CHROME PROFILE] Loaded Profile Directory: {profile_dir.resolve()} (profile_{account_name})")
@@ -1634,7 +1635,7 @@ def return_to_selector(driver) -> bool:
             pass
         return True
 
-def get_session(username=None, password=None, phone=None, headless=True, close_browser=True, target_name=None, interactive=True) -> dict | None:
+def get_session(username=None, password=None, phone=None, headless=False, close_browser=True, target_name=None, interactive=True) -> dict | None:
     if not password and username:
         cred_paths = [
             Path(__file__).resolve().parent.parent / "credentials.json",

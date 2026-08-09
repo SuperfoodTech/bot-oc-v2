@@ -26,7 +26,7 @@ log = get_logger("backend_worker")
 # Filter account usernames allowed for bot execution (Default: auto7313 only)
 ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
-HEADLESS = os.getenv("HEADLESS", "true").strip().lower() not in {"0", "false", "no", "off"}
+HEADLESS = os.getenv("HEADLESS", "false").strip().lower() in {"1", "true", "yes", "on"}
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
 ACTIVE_SESSIONS = {}

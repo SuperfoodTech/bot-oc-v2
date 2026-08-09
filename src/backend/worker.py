@@ -71,7 +71,7 @@ def warmup_all_account_sessions():
                 password=outlet.password,
                 phone=outlet.hp,
                 target_name=outlet.nama_portal,
-                headless=True
+                headless=False
             )
             if session and session.get("shopee_tob_token"):
                 log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' successfully logged in & session saved.")
@@ -122,7 +122,7 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
             password=outlet.password,
             phone=outlet.hp,
             target_name=outlet.nama_portal,
-            headless=True
+            headless=False
         )
 
         if session:
