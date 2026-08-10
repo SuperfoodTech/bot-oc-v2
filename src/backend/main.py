@@ -515,3 +515,83 @@ def get_logs(
             reason=l["reason"]
         ) for l in logs
     ]
+
+
+import urllib.request
+from datetime import timezone
+
+def fetch_dynamic_bot_status() -> dict:
+    """
+    Checks real-time bot daemon status dynamically without hardcoding:
+    1. HTTP check on http://127.0.0.1:8081/api/v1/bot/status (or /health)
+    2. Fallback: check recent PostgreSQL automation_logs activity
+    """
+    # 1. Try bot HTTP API
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8081/api/v1/bot/status", headers={"User-Agent": "FoodMaster-Backend"})
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode())
+                bot_state = data.get("bot_state", data)
+                status_str = bot_state.get("status", "running")
+                cycle_count = bot_state.get("cycle_count", 0)
+                last_cycle_at = bot_state.get("last_cycle_at", "")
+                
+                if status_str == "paused":
+                    return {
+                        "is_online": False,
+                        "status_text": "Di-pause",
+                        "status_class": "badge-suspended",
+                        "detail_text": "Patroli bot dihentikan sementara",
+                        "cycle_count": cycle_count,
+                        "last_cycle_at": last_cycle_at
+                    }
+                
+                return {
+                    "is_online": True,
+                    "status_text": "Online",
+                    "status_class": "badge-open",
+                    "detail_text": f"Patroli aktif (Siklus #{cycle_count})" if cycle_count else "Sinkronisasi aktif 24/7",
+                    "cycle_count": cycle_count,
+                    "last_cycle_at": last_cycle_at
+                }
+    except Exception:
+        pass
+
+    # 2. Fallback: check DB for recent automation logs
+    try:
+        logs = state.get_recent_logs(limit=1)
+        if logs and logs[0].get("timestamp"):
+            log_time_str = str(logs[0]["timestamp"])
+            parsed_time = datetime.fromisoformat(log_time_str.replace("Z", "+00:00").replace(" ", "T"))
+            now_utc = datetime.now(timezone.utc)
+            if parsed_time.tzinfo is None:
+                parsed_time = parsed_time.replace(tzinfo=timezone.utc)
+            seconds_ago = (now_utc - parsed_time.astimezone(timezone.utc)).total_seconds()
+            
+            if seconds_ago <= 300:  # Active within 5 minutes
+                mins_ago = max(0, int(seconds_ago // 60))
+                detail = "Sinkronisasi aktif" if mins_ago == 0 else f"Patroli aktif ({mins_ago}m lalu)"
+                return {
+                    "is_online": True,
+                    "status_text": "Online",
+                    "status_class": "badge-open",
+                    "detail_text": detail,
+                    "seconds_ago": int(seconds_ago)
+                }
+    except Exception:
+        pass
+
+    return {
+        "is_online": False,
+        "status_text": "Offline",
+        "status_class": "badge-closed",
+        "detail_text": "Bot patroli tidak aktif",
+        "seconds_ago": None
+    }
+
+
+@app.get("/api/v1/admin/bot-status", summary="Get dynamic real-time bot daemon status")
+def get_bot_status_endpoint(admin: dict = Depends(require_admin)):
+    return fetch_dynamic_bot_status()
+

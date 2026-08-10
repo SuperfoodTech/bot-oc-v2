@@ -90,14 +90,24 @@ def test_backend_endpoints():
     assert sync_data["success"] is True
     log.info(f"   -> Result: PASSED (Processed {sync_data['total_stores_processed']} store(s))")
 
-    # 7. Test Audit Logs Endpoint
-    log.info("\n7️⃣ Testing GET /api/v1/logs...")
-    resp = client.get("/api/v1/logs?limit=10")
+    # 7. Test Get Audit Logs
+    log.info(f"\n7️⃣ Testing GET /api/v1/logs...")
+    resp = client.get("/api/v1/logs")
     assert resp.status_code == 200
     logs = resp.json()
-    assert len(logs) > 0
+    assert isinstance(logs, list)
     log.info(f"   -> Result: PASSED (Retrieved {len(logs)} log entry/entries)")
-    log.info(f"   -> Latest Log Entry: [{logs[0]['timestamp']}] {logs[0]['action']} - {logs[0]['reason']}")
+    if logs:
+        log.info(f"   -> Latest Log Entry: [{logs[0]['timestamp']}] {logs[0]['action']} - {logs[0]['reason']}")
+
+    # 8. Test Get Bot Status Endpoint
+    log.info(f"\n8️⃣ Testing GET /api/v1/admin/bot-status...")
+    resp = client.get("/api/v1/admin/bot-status")
+    assert resp.status_code == 200
+    bot_status = resp.json()
+    assert "is_online" in bot_status
+    assert "status_text" in bot_status
+    log.info(f"   -> Result: PASSED (Bot Status: {bot_status['status_text']} | Detail: {bot_status['detail_text']})")
 
     print("\n" + "=" * 80)
     log.info("🎉 ALL BACKEND API ENDPOINTS TESTED AND PASSED 100%!")

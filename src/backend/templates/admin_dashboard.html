@@ -75,8 +75,8 @@
         <div class="col-6 col-lg-3">
           <div class="stat-card h-100">
             <div class="stat-label">Sistem auto-open</div>
-            <div class="stat-val" id="daemonStatusVal">Online</div>
-            <div class="stat-detail">Sinkronisasi aktif</div>
+            <div class="stat-val" id="daemonStatusVal" style="transition: color 0.3s ease;">Memuat...</div>
+            <div class="stat-detail" id="daemonStatusDetail">Checking status...</div>
           </div>
         </div>
       </div>
@@ -298,6 +298,8 @@
       loadStoresData();
       loadFullBotLogs();
       loadAdminProfile();
+      fetchBotStatus();
+      setInterval(fetchBotStatus, 15000);
       toggleAutoRefreshLogs(document.getElementById('autoRefreshCheckbox'));
     });
 
@@ -336,6 +338,25 @@
         document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
       } finally {
         setKpiLoading(false);
+      }
+    }
+
+    async function fetchBotStatus() {
+      try {
+        const res = await fetch('/api/v1/admin/bot-status');
+        if (!res.ok) return;
+        const bot = await res.json();
+        const valEl = document.getElementById('daemonStatusVal');
+        const detailEl = document.getElementById('daemonStatusDetail');
+        if (valEl) {
+          valEl.innerText = bot.status_text || (bot.is_online ? 'Online' : 'Offline');
+          valEl.style.color = bot.is_online ? 'var(--color-success, #10b981)' : (bot.status_text === 'Di-pause' ? '#f59e0b' : '#ef4444');
+        }
+        if (detailEl) {
+          detailEl.innerText = bot.detail_text || (bot.is_online ? 'Sinkronisasi aktif' : 'Bot tidak aktif');
+        }
+      } catch (err) {
+        console.warn("Error fetching bot status:", err);
       }
     }
 

@@ -1,2 +1,3 @@
-2026/08/03-12:06:05.210 25cbf Creating DB /home/akbarhann/project/bot-oc/src/data/chrome_profile_auto7313/profile_auto7313/Service Worker/Database since it was missing.
-2026/08/03-12:06:05.222 25cbf Reusing MANIFEST /home/akbarhann/project/bot-oc/src/data/chrome_profile_auto7313/profile_auto7313/Service Worker/Database/MANIFEST-000001
+2026/08/10-07:41:23.677 14b697 Reusing MANIFEST /home/akbarhann/project/bot-oc/src/data/chrome_profile_auto7313/profile_auto7313/Service Worker/Database/MANIFEST-000001
+2026/08/10-07:41:23.678 14b697 Recovering log #3
+2026/08/10-07:41:23.678 14b697 Reusing old log /home/akbarhann/project/bot-oc/src/data/chrome_profile_auto7313/profile_auto7313/Service Worker/Database/000003.log 
