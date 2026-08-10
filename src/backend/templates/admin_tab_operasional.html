@@ -1,0 +1,65 @@
+    {# ── TAB PANE 1: OPERASIONAL OUTLET ── #}
+    <div class="tab-pane" :class="{ 'active': currentTab === 'outlets' }" id="paneOutlets">
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100 stat-card-primary">
+            <div class="stat-label">Total outlet</div>
+            <div class="stat-val" id="totalOutletsVal" x-text="allStores.length">0</div>
+            <div class="stat-detail">Outlet terdaftar</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100">
+            <div class="stat-label">Layanan aktif</div>
+            <div class="stat-val" id="activeSubVal" x-text="activeSubCount">0</div>
+            <div class="stat-detail">Auto-open berjalan</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100">
+            <div class="stat-label">Akun ditangguhkan</div>
+            <div class="stat-val" id="suspendVal" x-text="suspendCount">0</div>
+            <div class="stat-detail">Perlu tindakan admin</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card h-100">
+            <div class="stat-label">Status bot patroli</div>
+            <div class="stat-val" id="daemonStatusVal" :style="{ color: daemonStatus.is_online ? '#16a34a' : (daemonStatus.status_text === 'Di-pause' ? '#d97706' : '#dc2626') }" x-text="daemonStatus.status_text">Memuat...</div>
+            <div class="stat-detail" id="daemonStatusDetail" x-text="daemonStatus.detail_text">Checking status...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card outlet-section">
+        <div class="table-heading">
+          <h2>Daftar outlet</h2>
+          <input type="text" id="searchInput" class="form-input table-search" placeholder="Cari mitra, outlet, atau Store ID" onkeyup="filterTable()">
+        </div>
+
+        <div class="table-scroll d-none d-md-block">
+          <table class="data-table" id="adminTable">
+            <thead>
+              <tr>
+                <th>Mitra</th>
+                <th>Merchant</th>
+                <th>Store ID</th>
+                <th>Nama Outlet</th>
+                <th>Link User Vercel</th>
+                <th>Status utama</th>
+                <th>Berlaku sampai</th>
+                <th>Status akun</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="10" class="table-loading-state">Memuat data outlet...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="mobileOutletList" class="mobile-outlet-list d-md-none">
+          <div class="mobile-empty-state">Memuat data outlet...</div>
+        </div>
+      </div>
+    </div>

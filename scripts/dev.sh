@@ -16,4 +16,4 @@ echo
 APP_BASE_URL="${APP_BASE_URL:-http://localhost:3001}" \
 PORT=3001 \
 PYTHONPATH="$ROOT_DIR/src" \
-exec "$PYTHON_BIN" -m uvicorn backend.main:app --host 0.0.0.0 --port 3001
+exec "$PYTHON_BIN" -m uvicorn backend.main:app --host 0.0.0.0 --port 3001 --reload

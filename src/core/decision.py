@@ -78,7 +78,7 @@ def evaluate_outlet_status(outlet: MerchantOutlet, current_time: Optional[dateti
         return DecisionResult(target_state=target, action=action, reason=reason)
 
     # 2. Check Subscription Status
-    if outlet.status_langganan.strip().lower() != "aktif":
+    if outlet.status_langganan.strip().lower() not in ["aktif", "active"]:
         target = TARGET_CLOSE
         reason = "Masa langganan Auto Open telah kedaluwarsa"
         action = ACTION_CLOSE if is_currently_open else ACTION_NO_CHANGE

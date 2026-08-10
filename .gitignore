@@ -25,11 +25,15 @@ main-bot/credentials.json
 
 # Session data, tokens, runtime locks & dynamic bot logs
 data/
+src/data/
 main-bot/data/
 *.log
 daemon.lock
 otp_request_*.json
 session_*.json
+bot_state.json
+main-bot/src/bot_state.json
+
 
 # IDEs and Editors
 .vscode/

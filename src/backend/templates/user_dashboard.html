@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#f8f2ef">
+  <meta name="theme-color" content="#BE1A1A">
   <title>FoodMaster Auto-Open | Mitra Dashboard</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260807-palette">
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260810-purewhitekpi">
 </head>
-<body>
+<body x-data="userApp()">
 
   <div class="mobile-wrapper">
     <header class="app-header">
@@ -19,24 +20,31 @@
         <span>FoodMaster</span>
       </div>
       <div class="header-actions">
-        <button class="theme-toggle" type="button" data-theme-toggle onclick="toggleTheme()">Mode terang</button>
         <a href="#" class="help-link" onclick="alert('Hubungi Customer Service: 0851-8315-1531'); return false;">Bantuan</a>
       </div>
     </header>
 
     <div class="content-body" id="mainContent">
-      <div id="loginSection" class="card-box" style="display: none;">
+      <div id="loginSection" class="card-box" style="display: block;">
         <div class="step-indicator">Akses mitra</div>
         <h2 class="card-title">Masukkan kata sandi</h2>
         <p class="card-subtitle">Gunakan kata sandi dari admin untuk membuka dashboard.</p>
         
         <div style="margin-top: 14px;">
-          <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" value="Master@00@">
-          <button class="btn-primary" style="margin-top: 12px;" onclick="doLogin()">Masuk</button>
+          <div class="password-input-wrapper">
+            <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" value="Master@00@" onkeydown="if(event.key==='Enter') doLogin()">
+            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+          <button class="btn-primary" style="margin-top: 12px; width: 100%;" onclick="doLogin()">Masuk</button>
         </div>
       </div>
 
-      <div id="dashboardSection" class="dashboard-stack">
+      <div id="dashboardSection" class="dashboard-stack" style="display: none;">
         <section class="page-intro">
           <div class="eyebrow">Dashboard mitra</div>
           <h1 class="page-title">Kelola outlet</h1>
@@ -124,9 +132,20 @@
 
   <!-- JAVASCRIPT APP LOGIC -->
   <script>
-    let activePasscode = "Master@00@";
+    let activePasscode = "";
     let currentUserOutlets = [];
     let selectedStoreId = null;
+
+    function userApp() {
+      return {
+        activePasscode: "",
+        outlets: [],
+        historyLogs: [],
+        init() {
+          window._appData = this;
+        }
+      };
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll('input[name="pauseDuration"]').forEach(radio => {
@@ -142,11 +161,24 @@
         });
       });
 
-      doLogin();
+      const savedPasscode = sessionStorage.getItem('user_passcode');
+      if (savedPasscode) {
+        doLogin(savedPasscode, true);
+      } else {
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('dashboardSection').style.display = 'none';
+      }
     });
 
-    async function doLogin() {
-      const passcode = document.getElementById('passcodeInput').value || activePasscode;
+    async function doLogin(providedPasscode = null, isAuto = false) {
+      const passcode = providedPasscode || document.getElementById('passcodeInput').value.trim();
+      if (!passcode) {
+        if (!isAuto) alert('Mohon masukkan kata sandi mitra!');
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('dashboardSection').style.display = 'none';
+        return;
+      }
+
       try {
         const res = await fetch('/api/v1/user/login', {
           method: 'POST',
@@ -156,7 +188,11 @@
         const data = await res.json();
         if (data.success) {
           activePasscode = passcode;
+          sessionStorage.setItem('user_passcode', passcode);
           currentUserOutlets = data.outlets;
+          if (window._appData) {
+            window._appData.outlets = data.outlets;
+          }
           document.getElementById('loginSection').style.display = 'none';
           document.getElementById('dashboardSection').style.display = 'flex';
           document.getElementById('mitraName').innerText = `Mitra ${data.nama_pemilik}`;
@@ -164,11 +200,61 @@
           renderOutlets(data.outlets);
           fetchHistory();
         } else {
+          sessionStorage.removeItem('user_passcode');
           document.getElementById('loginSection').style.display = 'block';
-          alert('Kata sandi tidak valid!');
+          document.getElementById('dashboardSection').style.display = 'none';
+          if (!isAuto) {
+            alert('Kata sandi tidak valid!');
+          }
         }
       } catch (err) {
         document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('dashboardSection').style.display = 'none';
+      }
+    }
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const isPass = input.type === 'password';
+      input.type = isPass ? 'text' : 'password';
+
+      const svgOpen = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+      const svgOff = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+
+      btn.innerHTML = isPass ? svgOff : svgOpen;
+      btn.setAttribute('aria-label', isPass ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
+    }
+
+    function formatIndonesianTime(isoStr, includeDateIfToday = true) {
+      if (!isoStr) return '';
+      try {
+        let str = String(isoStr).trim();
+        // If SQL string format without T e.g. "2026-08-10 13:43:59" or "2026-08-10 13:43:59+00:00"
+        if (!str.includes('T') && str.includes(' ')) {
+          str = str.replace(' ', 'T');
+        }
+        let d = new Date(str);
+        if (isNaN(d.getTime())) return isoStr;
+
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        
+        const now = new Date();
+        const isToday = d.toDateString() === now.toDateString();
+        
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+        const day = d.getDate();
+        const monthStr = months[d.getMonth()];
+        const year = d.getFullYear();
+
+        if (isToday) {
+          return includeDateIfToday ? `pkl ${hours}:${mins} WIB (Hari ini)` : `pkl ${hours}:${mins} WIB`;
+        } else {
+          return `${day} ${monthStr} ${year}, pkl ${hours}:${mins} WIB`;
+        }
+      } catch (e) {
+        return isoStr;
       }
     }
 
@@ -179,6 +265,7 @@
       outlets.forEach(out => {
         const isVercelOn = out.vercel_status === 'ON';
         const isShopeeOpen = out.shopee_status === 'OPEN' || out.shopee_status === 'ON';
+        const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
         
         const card = document.createElement('div');
         card.className = 'card-box';
@@ -194,18 +281,30 @@
             </span>
           </div>
 
+          ${isSuspended ? `
+            <div style="margin-top: 12px; padding: 10px 12px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; font-size: 12px; color: #be123c; font-weight: 600;">
+              ⚠️ Outlet Ditangguhkan Admin: ${out.alasan_penangguhan || 'Tindakan Admin'}
+            </div>
+          ` : ''}
+
           <div class="outlet-control">
             <div>
               <div class="control-title">Buka otomatis</div>
-              <div class="control-detail">${isVercelOn ? 'Otomatisasi aktif' : ('Jeda hingga ' + (out.pause_until || 'dibuka manual'))}</div>
+              <div class="control-detail">
+                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isVercelOn ? 'Otomatisasi aktif (24/7)' : (out.pause_until ? ('Dijeda s/d ' + formatIndonesianTime(out.pause_until)) : 'Dijeda (sampai dibuka manual)'))}
+              </div>
             </div>
-            <label class="switch-toggle">
-              <input type="checkbox" ${isVercelOn ? 'checked' : ''} onchange="toggleVercel('${out.store_id}', this.checked)">
+            <label class="switch-toggle" ${isSuspended ? 'style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+              <input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isSuspended ? 'disabled' : ''} onchange="toggleVercel('${out.store_id}', this.checked)">
               <span class="slider"></span>
             </label>
           </div>
 
-          ${isVercelOn ? `
+          ${isSuspended ? `
+            <button class="btn-primary" onclick="alert('Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${out.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.')" style="opacity: 0.7; cursor: pointer;">
+              Buka sekarang
+            </button>
+          ` : (isVercelOn ? `
             <button class="btn-danger" onclick="openPauseModal('${out.store_id}', '${out.store_name}')">
               Tutup sementara
             </button>
@@ -213,15 +312,20 @@
             <button class="btn-primary" onclick="resumeStore('${out.store_id}')">
               Buka sekarang
             </button>
-          `}
+          `)}
         `;
         container.appendChild(card);
       });
     }
 
     function toggleVercel(storeId, isChecked) {
+      const store = currentUserOutlets.find(s => s.store_id === storeId);
+      if (store && (store.is_suspended || store.suspension_status === 'SUSPENDED')) {
+        alert(`Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${store.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`);
+        renderOutlets(currentUserOutlets);
+        return;
+      }
       if (!isChecked) {
-        const store = currentUserOutlets.find(s => s.store_id === storeId);
         openPauseModal(storeId, store ? store.store_name : storeId);
       } else {
         resumeStore(storeId);
@@ -256,12 +360,16 @@
           })
         });
         const data = await res.json();
-        if (data.success) {
+        if (res.ok && data.success) {
           closeModal();
           doLogin();
+        } else {
+          alert(data.detail || 'Gagal menutup outlet.');
+          closeModal();
         }
       } catch (err) {
         alert('Gagal menutup outlet.');
+        closeModal();
       }
     }
 
@@ -269,17 +377,30 @@
       try {
         const res = await fetch(`/api/v1/user/resume?store_id=${storeId}`, {method: 'POST'});
         const data = await res.json();
-        if (data.success) {
+        if (res.ok && data.success) {
           doLogin();
+        } else {
+          alert(data.detail || 'Gagal membuka outlet.');
+          renderOutlets(currentUserOutlets);
         }
       } catch (err) {
         alert('Gagal membuka outlet.');
+        renderOutlets(currentUserOutlets);
       }
     }
 
     async function fetchHistory() {
       if (!currentUserOutlets.length) return;
       const ids = currentUserOutlets.map(o => o.store_id).join(',');
+      const ACTION_LABELS = {
+        'USER_PAUSE_STORE': 'Toko Ditutup Sementara',
+        'USER_RESUME_STORE': 'Toko Dibuka Kembali',
+        'ADMIN_SUSPEND_UPDATE': 'Update Penangguhan Admin',
+        'ADMIN_RENEW_SUBSCRIPTION': 'Perpanjangan Layanan',
+        'ACTION_OPEN': 'Buka Otomatis (Bot)',
+        'ACTION_CLOSE': 'Tutup Otomatis (Bot)'
+      };
+
       try {
         const res = await fetch(`/api/v1/user/history?store_ids=${ids}`);
         const data = await res.json();
@@ -288,11 +409,30 @@
 
         if (data.logs && data.logs.length) {
           data.logs.slice(0, 5).forEach(l => {
+            const friendlyAction = ACTION_LABELS[l.action] || l.action;
+            const timeText = formatIndonesianTime(l.timestamp, false);
+
+            let friendlyReason = l.reason || '';
+            if (friendlyReason.includes('User set store OFF with duration:')) {
+              const match = friendlyReason.match(/duration:\s*([^(]+)/);
+              const durLabel = match ? match[1].trim() : 'Sementara';
+              friendlyReason = `Ditutup mitra selama ${durLabel}`;
+            } else if (friendlyReason.includes('User manually turned Vercel Toggle ON')) {
+              friendlyReason = 'Dibuka manual dari dashboard';
+            } else if (friendlyReason.includes('Subscription renewed until')) {
+              const parts = friendlyReason.split('until');
+              friendlyReason = `Masa aktif diperpanjang s/d ${parts[1] ? parts[1].trim() : ''}`;
+            } else if (friendlyReason.includes("Admin updated suspension to 'Tidak'")) {
+              friendlyReason = 'Penangguhan dicabut Admin';
+            } else if (friendlyReason.includes("Admin updated suspension to 'Ya'")) {
+              friendlyReason = 'Ditangguhkan Admin';
+            }
+
             const item = document.createElement('div');
             item.className = 'history-item';
             item.innerHTML = `
-              <strong>${l.action} · ${l.store_name}</strong>
-              <span>${l.timestamp} · ${l.reason}</span>
+              <strong>${friendlyAction} · ${l.store_name}</strong>
+              <span>${timeText} · ${friendlyReason}</span>
             `;
             container.appendChild(item);
           });

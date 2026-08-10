@@ -10,9 +10,11 @@ import hashlib
 import hmac
 import json
 import os
+import subprocess
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -22,6 +24,7 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request, Res
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 from backend import state, worker
 from backend.models import (
@@ -61,6 +64,7 @@ app.add_middleware(
 FRONTEND_DIR = SCRIPT_DIR
 STATIC_DIR = FRONTEND_DIR / "static"
 TEMPLATES_DIR = FRONTEND_DIR / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 ADMIN_SESSION_COOKIE = "foodmaster_admin_session"
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "dev-only-change-me")
 ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12
@@ -99,17 +103,26 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-# ── FRONTEND HTML ROUTES (Direct Serving on / and /admin and /app) ─────────────
+# ── FRONTEND HTML ROUTES (Serving /admin/dashboard, /admin/bot, /app) ─────────
 
-@app.get("/", response_class=HTMLResponse, summary="Admin Console Homepage")
-@app.get("/admin", response_class=HTMLResponse, summary="Admin Desktop Console Web Page")
-def admin_page(admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE)):
+@app.get("/", summary="Admin Console Homepage Redirect")
+@app.get("/admin", summary="Admin Desktop Console Redirect")
+def admin_redirect():
+    return RedirectResponse(url="/admin/dashboard", status_code=303)
+
+
+@app.get("/admin/dashboard", response_class=HTMLResponse, summary="Admin Dashboard (Operasional & Settings)")
+def admin_dashboard_page(request: Request, admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE)):
     if not _read_admin_session(admin_session):
         return RedirectResponse(url="/admin/login", status_code=303)
-    admin_html = TEMPLATES_DIR / "admin_dashboard.html"
-    if not admin_html.exists():
-        raise HTTPException(status_code=404, detail="Admin template not found.")
-    return HTMLResponse(content=admin_html.read_text(encoding="utf-8"))
+    return templates.TemplateResponse(request=request, name="admin_dashboard.html", context={"active_page": "dashboard"})
+
+
+@app.get("/admin/bot", response_class=HTMLResponse, summary="Admin Bot Patrol Monitor Page")
+def admin_bot_page(request: Request, admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE)):
+    if not _read_admin_session(admin_session):
+        return RedirectResponse(url="/admin/login", status_code=303)
+    return templates.TemplateResponse(request=request, name="admin_bot.html", context={"active_page": "bot"})
 
 
 @app.get("/admin/login", response_class=HTMLResponse, summary="Admin Login Page")
@@ -323,6 +336,10 @@ def user_pause_store(req: UserPauseRequest):
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
 
+    if store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED":
+        reason = store.get("alasan_penangguhan") or "Tindakan admin"
+        raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
+
     dtype = req.duration_type.lower()
     now_dt = datetime.now()
 
@@ -372,6 +389,10 @@ def user_resume_store(store_id: str = Query(..., description="Target Store ID"))
     store = state.get_store_by_id(store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{store_id}' not found.")
+
+    if store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED":
+        reason = store.get("alasan_penangguhan") or "Tindakan admin"
+        raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
     state.update_vercel_toggle(store_id, "ON", None)
     actual_store = state.get_store_by_id(store_id)
@@ -520,65 +541,109 @@ def get_logs(
 import urllib.request
 from datetime import timezone
 
+# Path to bot_state.json written by main-bot/src/bot_api.py
+BOT_STATE_FILE = PROJECT_ROOT / "main-bot" / "src" / "bot_state.json"
+
+
+def _read_persisted_bot_state() -> str:
+    """Read persisted bot status from bot_state.json. Returns 'running', 'paused', or 'unknown'."""
+    try:
+        if BOT_STATE_FILE.exists():
+            data = json.loads(BOT_STATE_FILE.read_text())
+            return data.get("status", "unknown")
+    except Exception:
+        pass
+    return "unknown"
+
+
 def fetch_dynamic_bot_status() -> dict:
     """
     Checks real-time bot daemon status dynamically without hardcoding:
-    1. HTTP check on http://127.0.0.1:8081/api/v1/bot/status (or /health)
-    2. Fallback: check recent PostgreSQL automation_logs activity
+    1. HTTP check on http://127.0.0.1:8081/health or /bot/status
+    2. Fallback: read persisted bot_state.json (survives restarts)
+    3. Fallback: check recent PostgreSQL automation_logs activity for HEALTHY non-error logs
     """
     # 1. Try bot HTTP API
-    try:
-        req = urllib.request.Request("http://127.0.0.1:8081/api/v1/bot/status", headers={"User-Agent": "FoodMaster-Backend"})
-        with urllib.request.urlopen(req, timeout=1.5) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode())
-                bot_state = data.get("bot_state", data)
-                status_str = bot_state.get("status", "running")
-                cycle_count = bot_state.get("cycle_count", 0)
-                last_cycle_at = bot_state.get("last_cycle_at", "")
-                
-                if status_str == "paused":
+    for endpoint in ["http://127.0.0.1:8081/health", "http://127.0.0.1:8081/bot/status", "http://127.0.0.1:8081/api/v1/bot/status"]:
+        try:
+            req = urllib.request.Request(endpoint, headers={"User-Agent": "FoodMaster-Backend"})
+            with urllib.request.urlopen(req, timeout=1.2) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode())
+                    bot_status = data.get("bot_status", data.get("status", "running"))
+                    cycle_count = data.get("cycle_count", 0)
+                    last_cycle_at = data.get("last_cycle_at", "")
+
+                    if bot_status == "paused":
+                        return {
+                            "is_online": False,
+                            "status_text": "Di-pause",
+                            "status_class": "badge-suspended",
+                            "detail_text": "Patroli bot dihentikan sementara",
+                            "cycle_count": cycle_count,
+                            "last_cycle_at": last_cycle_at
+                        }
+
                     return {
-                        "is_online": False,
-                        "status_text": "Di-pause",
-                        "status_class": "badge-suspended",
-                        "detail_text": "Patroli bot dihentikan sementara",
+                        "is_online": True,
+                        "status_text": "Online",
+                        "status_class": "badge-open",
+                        "detail_text": f"Patroli aktif (Siklus #{cycle_count})" if cycle_count else "Sinkronisasi aktif 24/7",
                         "cycle_count": cycle_count,
                         "last_cycle_at": last_cycle_at
                     }
-                
-                return {
-                    "is_online": True,
-                    "status_text": "Online",
-                    "status_class": "badge-open",
-                    "detail_text": f"Patroli aktif (Siklus #{cycle_count})" if cycle_count else "Sinkronisasi aktif 24/7",
-                    "cycle_count": cycle_count,
-                    "last_cycle_at": last_cycle_at
-                }
-    except Exception:
-        pass
+        except Exception:
+            pass
 
-    # 2. Fallback: check DB for recent automation logs
+    # 2. Fallback: read persisted bot_state.json (handles case where daemon is paused but port 8081 is down)
+    persisted_status = _read_persisted_bot_state()
+    if persisted_status == "paused":
+        return {
+            "is_online": False,
+            "status_text": "Di-pause",
+            "status_class": "badge-suspended",
+            "detail_text": "Patroli bot dihentikan sementara (dari state terakhir)",
+            "seconds_ago": None
+        }
+
+    # 3. Fallback: check DB for recent successful automation logs (excluding 404/Error logs)
     try:
-        logs = state.get_recent_logs(limit=1)
-        if logs and logs[0].get("timestamp"):
-            log_time_str = str(logs[0]["timestamp"])
-            parsed_time = datetime.fromisoformat(log_time_str.replace("Z", "+00:00").replace(" ", "T"))
-            now_utc = datetime.now(timezone.utc)
-            if parsed_time.tzinfo is None:
-                parsed_time = parsed_time.replace(tzinfo=timezone.utc)
-            seconds_ago = (now_utc - parsed_time.astimezone(timezone.utc)).total_seconds()
-            
-            if seconds_ago <= 300:  # Active within 5 minutes
-                mins_ago = max(0, int(seconds_ago // 60))
-                detail = "Sinkronisasi aktif" if mins_ago == 0 else f"Patroli aktif ({mins_ago}m lalu)"
+        logs = state.get_recent_logs(limit=5)
+        if logs:
+            latest_log = logs[0]
+            action = str(latest_log.get("action", "")).upper()
+            details = str(latest_log.get("details", "")).upper()
+            status_field = str(latest_log.get("status", "")).upper()
+            log_time_str = str(latest_log.get("timestamp", ""))
+
+            # If the latest log is an explicit 404, ERROR, or FAILED status
+            if "404" in action or "404" in details or "ERROR" in status_field or "FAILED" in status_field or "CRITICAL" in status_field:
                 return {
-                    "is_online": True,
-                    "status_text": "Online",
-                    "status_class": "badge-open",
-                    "detail_text": detail,
-                    "seconds_ago": int(seconds_ago)
+                    "is_online": False,
+                    "status_text": "Offline",
+                    "status_class": "badge-closed",
+                    "detail_text": "Kendala sistem (404 / Error)",
+                    "seconds_ago": None
                 }
+
+            if log_time_str:
+                parsed_time = datetime.fromisoformat(log_time_str.replace("Z", "+00:00").replace(" ", "T"))
+                now_utc = datetime.now(timezone.utc)
+                if parsed_time.tzinfo is None:
+                    parsed_time = parsed_time.replace(tzinfo=timezone.utc)
+                seconds_ago = (now_utc - parsed_time.astimezone(timezone.utc)).total_seconds()
+
+                # Must be recent (within 3 minutes / 180 seconds)
+                if seconds_ago <= 180:
+                    mins_ago = max(0, int(seconds_ago // 60))
+                    detail = "Sinkronisasi aktif" if mins_ago == 0 else f"Patroli aktif ({mins_ago}m lalu)"
+                    return {
+                        "is_online": True,
+                        "status_text": "Online",
+                        "status_class": "badge-open",
+                        "detail_text": detail,
+                        "seconds_ago": int(seconds_ago)
+                    }
     except Exception:
         pass
 
@@ -594,4 +659,135 @@ def fetch_dynamic_bot_status() -> dict:
 @app.get("/api/v1/admin/bot-status", summary="Get dynamic real-time bot daemon status")
 def get_bot_status_endpoint(admin: dict = Depends(require_admin)):
     return fetch_dynamic_bot_status()
+
+
+@app.get("/api/v1/admin/bot/activity", summary="Get bot activity evidence — last cycle, actions taken")
+def get_bot_activity_endpoint(admin: dict = Depends(require_admin)):
+    """Proxy to bot_api /bot/activity. Falls back to DB logs if bot is offline."""
+    # Try live bot API first
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8081/bot/activity", headers={"User-Agent": "FoodMaster-Backend"})
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode())
+    except Exception:
+        pass
+
+    # Fallback: build activity from DB logs
+    try:
+        db_logs = state.get_recent_logs(limit=15)
+        last_actions = [
+            {
+                "store_id": str(l.get("store_id", "")),
+                "store_name": l.get("store_name", ""),
+                "action": l.get("action", ""),
+                "reason": l.get("reason", ""),
+                "at": str(l.get("timestamp", ""))[:19]
+            }
+            for l in db_logs
+            if str(l.get("action", "")).startswith("ACTION_")
+        ][:5]
+        return {
+            "bot_status": _read_persisted_bot_state(),
+            "last_cycle_at": None,
+            "seconds_since_last_cycle": None,
+            "cycle_count": 0,
+            "total_stores_processed": 0,
+            "next_cycle_in_seconds": None,
+            "last_actions_taken": last_actions,
+            "source": "db_fallback"
+        }
+    except Exception:
+        return {
+            "bot_status": "unknown",
+            "last_cycle_at": None,
+            "seconds_since_last_cycle": None,
+            "cycle_count": 0,
+            "total_stores_processed": 0,
+            "next_cycle_in_seconds": None,
+            "last_actions_taken": [],
+            "source": "error"
+        }
+
+
+class BotControlRequest(BaseModel):
+    action: str
+
+
+@app.post("/api/v1/admin/bot/control", summary="Control Bot Patrol Daemon (Start, Pause, Sync)")
+def control_bot_endpoint(req: BotControlRequest, admin: dict = Depends(require_admin)):
+    action = req.action.lower()
+    
+    if action not in ["start", "pause", "sync"]:
+        raise HTTPException(status_code=400, detail="Aksi tidak valid. Gunakan 'start', 'pause', atau 'sync'.")
+    
+    # 1. Action: START
+    if action == "start":
+        # Try contacting HTTP API on port 8081 first
+        try:
+            r = urllib.request.Request("http://127.0.0.1:8081/bot/start", method="POST", headers={"User-Agent": "FoodMaster-Backend"})
+            with urllib.request.urlopen(r, timeout=2.0) as resp:
+                if resp.status == 200:
+                    state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_START_BOT", target_state="OPEN", reason=f"Admin {admin.get('username')} mengaktifkan patroli bot via Dashboard")
+                    return {"success": True, "message": "Patroli bot berhasil diaktifkan kembali.", "status": "running"}
+        except Exception:
+            pass
+            
+        # Fallback: Process is dead / unreachable -> clean stale lock and launch daemon process
+        try:
+            lock_path = PROJECT_ROOT / "main-bot" / "src" / "daemon.lock"
+            if lock_path.exists():
+                try:
+                    content = lock_path.read_text().strip()
+                    if content.isdigit():
+                        pid = int(content)
+                        try:
+                            os.kill(pid, 0)
+                        except (OSError, ProcessLookupError):
+                            lock_path.unlink(missing_ok=True)
+                    else:
+                        lock_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            cmd = [sys.executable, "main-bot/src/daemon.py"]
+            subprocess.Popen(cmd, cwd=str(PROJECT_ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_START_BOT", target_state="OPEN", reason=f"Admin {admin.get('username')} menjalankan proses daemon bot via Dashboard")
+            return {"success": True, "message": "Proses daemon bot berhasil dijalankan.", "status": "running"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Gagal menyalakan proses bot: {e}")
+
+    # 2. Action: PAUSE
+    elif action == "pause":
+        try:
+            r = urllib.request.Request("http://127.0.0.1:8081/bot/pause", method="POST", headers={"User-Agent": "FoodMaster-Backend"})
+            with urllib.request.urlopen(r, timeout=2.0) as resp:
+                if resp.status == 200:
+                    state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_PAUSE_BOT", target_state="CLOSED", reason=f"Admin {admin.get('username')} menghentikan sementara bot via Dashboard")
+                    return {"success": True, "message": "Patroli bot berhasil di-pause.", "status": "paused"}
+        except Exception:
+            pass
+        
+        state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_PAUSE_BOT", target_state="CLOSED", reason=f"Admin {admin.get('username')} menghentikan sementara bot via Dashboard")
+        return {"success": True, "message": "Status bot diset ke paused.", "status": "paused"}
+
+    # 3. Action: SYNC
+    elif action == "sync":
+        try:
+            r = urllib.request.Request("http://127.0.0.1:8081/bot/sync?execute_actions=false", method="POST", headers={"User-Agent": "FoodMaster-Backend"})
+            with urllib.request.urlopen(r, timeout=5.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode())
+                    state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_TRIGGER_SYNC", target_state="SYNC", reason=f"Admin {admin.get('username')} memicu instant sync via Dashboard")
+                    return {"success": True, "message": "Siklus sinkronisasi instan berhasil dieksekusi.", "data": data}
+        except Exception:
+            pass
+            
+        try:
+            res = worker.sync_all_stores(execute_actions=False)
+            processed_count = res.get("total_stores_processed", len(res) if isinstance(res, list) else 0)
+            state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_TRIGGER_SYNC", target_state="SYNC", reason=f"Admin {admin.get('username')} memicu local sync loop via Dashboard")
+            return {"success": True, "message": f"Sync selesai! Status toko di-refresh.", "data": {"processed": processed_count}}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Gagal eksekusi sync: {e}")
 

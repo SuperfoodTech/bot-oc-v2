@@ -45,11 +45,17 @@ def test_frontend_rendering():
     login_resp = client.post("/api/v1/admin/login", json={"username": "admin", "password": "Admin@123"})
     assert login_resp.status_code == 200
 
-    log.info("   Testing GET /admin (Admin Desktop Console)...")
-    r = client.get("/admin")
+    log.info("   Testing GET /admin/dashboard (Admin Operasional & Settings)...")
+    r = client.get("/admin/dashboard", follow_redirects=True)
     assert r.status_code == 200
     assert "FoodMaster Admin" in r.text
-    log.info("   -> Result: PASSED (Desktop Admin HTML Rendered)")
+    log.info("   -> Result: PASSED (Desktop Admin Dashboard Rendered)")
+
+    log.info("   Testing GET /admin/bot (Admin Bot Patrol Monitor)...")
+    r = client.get("/admin/bot", follow_redirects=True)
+    assert r.status_code == 200
+    assert "Monitor Bot Patroli" in r.text
+    log.info("   -> Result: PASSED (Desktop Admin Bot Monitor Rendered)")
 
     # 3. Test User Mobile Page Route (/app)
     log.info("\n3️⃣ Testing GET /app (User Mobile Dashboard)...")

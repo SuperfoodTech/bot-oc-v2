@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Monitor — FoodMaster Admin Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <script src="/static/theme.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260810-activity-panel">
+</head>
+<body x-data="adminBotApp()">
+
+  <div class="desktop-wrapper">
+    {% include "admin_header.html" %}
+
+    <!-- NAV TABS -->
+    <nav class="admin-tab-nav" aria-label="Navigasi Tab Admin">
+      <a href="/admin/dashboard" class="tab-btn">
+        <span>Operasional Outlet</span>
+      </a>
+      <a href="/admin/bot" class="tab-btn active">
+        <span>Bot Patroli</span>
+      </a>
+      <a href="/admin/dashboard?tab=settings" class="tab-btn">
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    {% include "admin_tab_bot.html" %}
+  </div>
+
+  <!-- MODAL 1: GENERATE USER LINK -->
+  <div class="modal-overlay" id="generateModal">
+    <div class="modal-card">
+      <div class="step-indicator">Admin Action</div>
+      <h3 class="card-title">Generate Link User Baru</h3>
+      <p class="card-subtitle">Buat Vercel Link Unik dan Kata Sandi untuk mitra pemilik toko.</p>
+
+      <div style="margin-top: 16px;">
+        <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra</label>
+        <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+
+        <label style="font-size: 12px; font-weight: 700; margin-top: 10px;">Store IDs (Pisahkan dengan Koma)</label>
+        <input type="text" id="genStoreIds" class="form-input" placeholder="cth: 21897166, 22403325">
+
+        <label style="font-size: 12px; font-weight: 700; margin-top: 10px;">Password / Passcode Mitra</label>
+        <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@" value="Master@00@">
+      </div>
+
+      <div id="genResultBox" style="display: none; margin-top: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+        <div style="font-size: 11px; font-weight: 800; color: #166534; text-transform: uppercase;">Link Berhasil Dibuat!</div>
+        <div style="font-size: 13px; font-weight: 700; word-break: break-all; margin-top: 4px;" id="genLinkUrl"></div>
+        <div style="font-size: 12px; color: #475569; margin-top: 2px;">Passcode: <strong id="genLinkPasscode"></strong></div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2" style="margin-top: 20px;">
+        <button class="btn-outline" onclick="closeAdminModal('generateModal')">Tutup</button>
+        <button class="btn-primary" onclick="submitGenerateLink()">Generate Link</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ERROR & SYSTEM EXCEPTION DIALOG -->
+  <div class="modal-overlay" id="errorModal">
+    <div class="modal-card error-modal-card">
+      <div class="error-modal-header">
+        <h3 class="error-modal-title" x-text="errorModalTitle || 'Kendala Sistem'">Kendala Sistem</h3>
+      </div>
+      <div class="error-modal-body" x-text="errorModalMsg">
+        Terjadi kesalahan saat memproses permintaan.
+      </div>
+      <div class="d-flex justify-content-end">
+        <button class="btn-primary btn-compact" onclick="closeAdminModal('errorModal')">Mengerti</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container-custom">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="toast-custom" :class="'toast-' + t.type">
+        <span x-text="t.message"></span>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    let fullLogs = [];
+    let autoRefreshTimer = null;
+
+    function adminBotApp() {
+      return {
+        fullLogs: [],
+        daemonStatus: { is_online: false, status_text: 'Memuat...', detail_text: 'Checking status...' },
+        toasts: [],
+        errorModalTitle: '',
+        errorModalMsg: '',
+        init() {
+          window._appData = this;
+        },
+        showToast(message, type = 'success') {
+          const id = Date.now() + Math.random();
+          this.toasts.push({id, message, type});
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3500);
+        },
+        showErrorModal(title, msg) {
+          this.errorModalTitle = title;
+          this.errorModalMsg = msg;
+          document.getElementById('errorModal').classList.add('active');
+        }
+      };
+    }
+
+    function showToast(message, type = 'success') {
+      if (window._appData) {
+        window._appData.showToast(message, type);
+        return;
+      }
+      alert(message);
+    }
+
+    function showErrorModal(title, msg) {
+      if (window._appData) {
+        window._appData.showErrorModal(title, msg);
+        return;
+      }
+      alert(title + ': ' + msg);
+    }
+
+    function closeAdminModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.classList.remove('active');
+    }
+
+    function openGenerateModal() {
+      document.getElementById('genOwnerName').value = '';
+      document.getElementById('genStoreIds').value = '';
+      document.getElementById('genPasscode').value = '';
+      document.getElementById('genResultBox').style.display = 'none';
+      document.getElementById('generateModal').classList.add('active');
+    }
+
+    async function submitGenerateLink() {
+      const ownerName = document.getElementById('genOwnerName').value.trim();
+      const passcode = document.getElementById('genPasscode').value.trim() || 'Master@00@';
+
+      if (!ownerName) {
+        showErrorModal('Input Kurang Lengkap', 'Mohon isi Nama Pemilik / Mitra.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v1/admin/generate-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nama_pemilik: ownerName,
+            passcode: passcode
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const info = data.data || data;
+          document.getElementById('genLinkUrl').innerText = info.full_url || info.generated_link || '';
+          document.getElementById('genLinkPasscode').innerText = info.passcode || passcode;
+          document.getElementById('genResultBox').style.display = 'block';
+          showToast('Link Mitra berhasil dibuat!');
+        } else {
+          showErrorModal('Gagal Generate Link', data.detail || 'Terjadi kesalahan sistem.');
+        }
+      } catch (err) {
+        showErrorModal('Koneksi Gagal', 'Gagal menghubungi server backend.');
+      }
+    }
+
+    async function logoutAdmin() {
+      try {
+        await fetch('/api/v1/admin/logout', { method: 'POST' });
+      } catch (e) {}
+      window.location.href = '/admin/login';
+    }
+
+    function formatLogTimestamp(raw) {
+      if (!raw) return '-';
+      const normalized = raw.replace(/([+-]\d{2})$/, '$1:00');
+      const parsed = new Date(normalized.includes('T') ? normalized : normalized.replace(' ', 'T'));
+      if (Number.isNaN(parsed.getTime())) return raw || '-';
+      return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      }).format(parsed);
+    }
+
+    function showLogsSkeleton() {
+      const tbody = document.getElementById('fullLogsTableBody');
+      if (!tbody) return;
+      let rows = '';
+      for (let i = 0; i < 5; i++) {
+        rows += `
+          <tr>
+            <td><div class="skeleton-line" style="width: 110px;"></div></td>
+            <td><div class="skeleton-line" style="width: 70px;"></div></td>
+            <td><div class="skeleton-line" style="width: 140px;"></div></td>
+            <td><div class="skeleton-line" style="width: 90px;"></div></td>
+            <td><div class="skeleton-line" style="width: 80px;"></div></td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = rows;
+    }
+
+    async function fetchBotStatus() {
+      try {
+        const res = await fetch('/api/v1/admin/bot-status');
+        if (!res.ok) return;
+        const bot = await res.json();
+        if (window._appData) window._appData.daemonStatus = bot;
+      } catch (err) {
+        console.warn("Error fetching bot status:", err);
+      }
+    }
+
+    function humanTimeSince(isoStr) {
+      if (!isoStr) return null;
+      try {
+        const past = new Date(isoStr);
+        const seconds = Math.floor((Date.now() - past.getTime()) / 1000);
+        if (seconds < 60) return `${seconds} detik lalu`;
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} menit lalu`;
+        return `${Math.floor(seconds / 3600)} jam lalu`;
+      } catch { return null; }
+    }
+
+    function actionLabel(action) {
+      if (action === 'ACTION_OPEN') return '<span class="act-badge act-open">Buka</span>';
+      if (action === 'ACTION_CLOSE') return '<span class="act-badge act-close">Tutup</span>';
+      return `<span class="act-badge act-other">${action}</span>`;
+    }
+
+    async function fetchBotActivity() {
+      try {
+        const res = await fetch('/api/v1/admin/bot/activity');
+        if (!res.ok) return;
+        const d = await res.json();
+
+        const lastCycleEl = document.getElementById('actLastCycle');
+        const cycleCountEl = document.getElementById('actCycleCount');
+        if (lastCycleEl) {
+          const ago = humanTimeSince(d.last_cycle_at);
+          lastCycleEl.textContent = ago || '—';
+        }
+        if (cycleCountEl) {
+          cycleCountEl.textContent = d.cycle_count > 0 ? `Siklus #${d.cycle_count}` : 'Belum ada siklus';
+        }
+
+        const storesEl = document.getElementById('actStoresProcessed');
+        const nextCycleEl = document.getElementById('actNextCycle');
+        if (storesEl) {
+          storesEl.textContent = d.total_stores_processed > 0 ? `${d.total_stores_processed} toko` : '—';
+        }
+        if (nextCycleEl) {
+          if (d.next_cycle_in_seconds !== null && d.next_cycle_in_seconds !== undefined && d.next_cycle_in_seconds > 0) {
+            nextCycleEl.textContent = `Siklus berikut: ${d.next_cycle_in_seconds}s lagi`;
+          } else if (d.cycle_count > 0) {
+            nextCycleEl.textContent = 'Siklus berjalan...';
+          } else {
+            nextCycleEl.textContent = 'Belum ada data';
+          }
+        }
+
+        const listEl = document.getElementById('actLastActionsList');
+        if (listEl) {
+          const actions = d.last_actions_taken || [];
+          if (actions.length === 0) {
+            listEl.innerHTML = '<span class="bot-act-empty">Bot belum mengambil aksi apapun sejak terakhir aktif.</span>';
+          } else {
+            listEl.innerHTML = actions.map(a => `
+              <div class="act-item">
+                ${actionLabel(a.action)}
+                <span class="act-store-name">${a.store_name || a.store_id}</span>
+                <span class="act-reason">${a.reason || ''}</span>
+                <span class="act-time">${(a.at || '').substring(11, 16)}</span>
+              </div>
+            `).join('');
+          }
+        }
+      } catch (err) {
+        console.warn('fetchBotActivity error:', err);
+      }
+    }
+
+    function renderFullBotLogsTable(logs) {
+      const tbody = document.getElementById('fullLogsTableBody');
+      if (!tbody) return;
+
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="table-loading-state">Tidak ada catatan aktivitas bot yang ditemukan.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        const actionUpper = (l.action || '').toUpperCase();
+        let actionBadgeClass = 'badge-closed';
+        let actionText = l.action;
+
+        if (actionUpper.includes('OPEN') || actionUpper.includes('START') || actionUpper.includes('RESUME')) {
+          actionBadgeClass = 'badge-open';
+        } else if (actionUpper.includes('PAUSE') || actionUpper.includes('SUSPEND')) {
+          actionBadgeClass = 'badge-suspended';
+        } else if (actionUpper.includes('SYNC')) {
+          actionBadgeClass = 'badge-other';
+        }
+
+        if (actionUpper === 'ACTION_OPEN') actionText = 'Auto Open';
+        else if (actionUpper === 'ACTION_CLOSE') actionText = 'Auto Close';
+        else if (actionUpper === 'ADMIN_START_BOT') actionText = 'Start bot';
+        else if (actionUpper === 'ADMIN_PAUSE_BOT') actionText = 'Pause bot';
+        else if (actionUpper === 'ADMIN_TRIGGER_SYNC') actionText = 'Sync manual';
+        else if (actionUpper === 'USER_PAUSE_STORE') actionText = 'Pause mitra';
+        else if (actionUpper === 'USER_RESUME_STORE') actionText = 'Buka mitra';
+        else if (actionUpper === 'ADMIN_SUSPEND_STORE') actionText = 'Penangguhan';
+
+        return `
+          <tr>
+            <td style="font-size: 12px; color: #64748b; font-weight: 500;">${formatLogTimestamp(l.timestamp)}</td>
+            <td><code style="font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${l.store_id || '-'}</code></td>
+            <td style="font-weight: 600; color: #1e293b;">${l.store_name || '-'}</td>
+            <td><span class="status-badge ${actionBadgeClass}">${actionText}</span></td>
+            <td><strong style="font-size: 12px; color: ${l.target_state === 'OPEN' ? '#16a34a' : (l.target_state === 'CLOSED' ? '#dc2626' : '#475569')}">● ${l.target_state || '-'}</strong></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function loadFullBotLogs(isSilent = false) {
+      if (!isSilent) showLogsSkeleton();
+
+      const actionFilter = document.getElementById('logActionFilter')?.value || '';
+      const searchQuery = document.getElementById('logSearchInput')?.value || '';
+
+      let url = `/api/v1/logs?limit=150`;
+      if (actionFilter) url += `&action=${encodeURIComponent(actionFilter)}`;
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+      try {
+        const res = await fetch(url);
+        const logs = await res.json();
+        if (window._appData) window._appData.fullLogs = logs;
+        renderFullBotLogsTable(logs);
+        if (logs.length > 0) {
+          document.getElementById('botLastSyncText').innerText = `Catatan terakhir: ${formatLogTimestamp(logs[0].timestamp)} · ${logs.length} catatan`;
+        } else {
+          document.getElementById('botLastSyncText').innerText = 'Belum ada catatan aktivitas untuk filter ini.';
+        }
+      } catch (err) {
+        console.error("Gagal memuat log bot:", err);
+        if (!isSilent) {
+          document.getElementById('botLastSyncText').innerText = 'Log aktivitas gagal dimuat.';
+          document.getElementById('fullLogsTableBody').innerHTML = '<tr><td colspan="5" class="table-loading-state">Log aktivitas gagal dimuat. Coba muat ulang halaman.</td></tr>';
+        }
+      }
+    }
+
+    async function controlBot(action) {
+      try {
+        const res = await fetch('/api/v1/admin/bot/control', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: action})
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(data.message || 'Aksi bot berhasil dieksekusi.', 'success');
+          fetchBotStatus();
+          fetchBotActivity();
+          loadFullBotLogs(true);
+        } else {
+          const errMsg = data.detail || 'Gagal mengeksekusi aksi bot.';
+          if (res.status === 404) {
+            showErrorModal('Endpoint Belum Siap (404)', 'Server backend sedang memperbarui endpoint baru.');
+          } else {
+            showErrorModal('Gagal Mengontrol Bot', errMsg);
+          }
+        }
+      } catch (err) {
+        console.error('Bot control error:', err);
+        showErrorModal('Koneksi Gagal', 'Gagal menghubungi server backend.');
+      }
+    }
+
+    function toggleAutoRefreshLogs(cb) {
+      if (cb && cb.checked) {
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(() => {
+          loadFullBotLogs(true);
+          fetchBotActivity();
+        }, 5000);
+      } else {
+        if (autoRefreshTimer) {
+          clearInterval(autoRefreshTimer);
+          autoRefreshTimer = null;
+        }
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      showLogsSkeleton();
+      loadFullBotLogs();
+      setInterval(fetchBotStatus, 15000);
+      setInterval(fetchBotActivity, 30000);
+      toggleAutoRefreshLogs(document.getElementById('autoRefreshCheckbox'));
+    });
+
+    document.addEventListener("alpine:initialized", () => {
+      fetchBotStatus();
+      fetchBotActivity();
+    });
+  </script>
+</body>
+</html>

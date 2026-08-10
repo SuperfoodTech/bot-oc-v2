@@ -38,10 +38,37 @@ LOCK_FILE_PATH = Path(__file__).resolve().parent / "daemon.lock"
 _lock_file_handle = None
 
 
+def is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def cleanup_stale_lock():
+    if LOCK_FILE_PATH.exists():
+        try:
+            content = LOCK_FILE_PATH.read_text().strip()
+            if content.isdigit():
+                pid = int(content)
+                if not is_pid_alive(pid):
+                    LOCK_FILE_PATH.unlink(missing_ok=True)
+            else:
+                LOCK_FILE_PATH.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 def acquire_single_instance_lock() -> bool:
     global _lock_file_handle
     if _lock_file_handle is not None:
         return False
+    
+    cleanup_stale_lock()
+
     try:
         f = open(LOCK_FILE_PATH, "w")
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -110,11 +137,20 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
     cycle_count = 0
 
     while RUNNING:
-        # Check if bot is paused via API
+        # Check if bot is paused — check both in-memory state AND persisted file state
         try:
             import bot_api
+            # Re-read persisted file state on every loop iteration
+            persisted = bot_api._load_persisted_state()
+            persisted_status = persisted.get("status", "running")
+            if persisted_status == "paused":
+                bot_api.BOT_STATE["status"] = "paused"
+            elif persisted_status == "running" and bot_api.BOT_STATE["status"] == "paused":
+                # Admin resumed via API — sync back in-memory state
+                bot_api.BOT_STATE["status"] = "running"
+
             if bot_api.BOT_STATE["status"] == "paused":
-                log.info("⏸️ [DAEMON] Bot patrol is currently PAUSED via API. Waiting for START command...")
+                log.info("[DAEMON] Bot patrol is currently PAUSED. Waiting for START command...")
                 time.sleep(3)
                 continue
         except Exception:
@@ -152,11 +188,21 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             break
 
         log.info(f"⏳ Waiting {interval_seconds} seconds until next cycle...")
-        # Sleep in 1-second chunks for responsive SIGINT handling
-        for _ in range(interval_seconds):
+        # Sleep in 1-second chunks for responsive SIGINT handling + countdown tracking
+        for remaining in range(interval_seconds, 0, -1):
             if not RUNNING:
                 break
+            try:
+                import bot_api
+                bot_api.BOT_STATE["next_cycle_in_seconds"] = remaining
+            except Exception:
+                pass
             time.sleep(1)
+        try:
+            import bot_api
+            bot_api.BOT_STATE["next_cycle_in_seconds"] = 0
+        except Exception:
+            pass
 
     release_single_instance_lock()
     log.info("👋 Daemon Engine stopped gracefully.")

@@ -16,10 +16,10 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
 from core.logger import get_logger
-from core.sheets import fetch_merchant_outlets, MerchantOutlet
+from core.sheets import MerchantOutlet
 from core.decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_NO_CHANGE
 from core import browser
-from backend import state
+from backend import state, db
 
 log = get_logger("backend_worker")
 
@@ -36,9 +36,9 @@ def warmup_all_account_sessions():
     """
     log.info(f"🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for whitelisted accounts {ALLOWED_USERNAMES}...")
     try:
-        outlets = fetch_merchant_outlets()
+        outlets = db.fetch_merchant_outlets_from_db()
     except Exception as e:
-        log.warning(f"⚠️ [STARTUP WARMUP] Could not fetch control source outlets for warmup: {e}")
+        log.warning(f"⚠️ [STARTUP WARMUP] Could not fetch database outlets for warmup: {e}")
         return
 
     processed_accounts = set()

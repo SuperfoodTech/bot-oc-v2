@@ -5,7 +5,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import psycopg
 from psycopg.rows import dict_row
@@ -28,7 +28,7 @@ def init_db() -> None:
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS dashboard_url text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS role varchar(20) DEFAULT 'MERCHANT'")
-        conn.execute("UPDATE dashboard_accounts SET password_plain=COALESCE(password_plain, 'Master@123') WHERE password_plain IS NULL")
+        conn.execute("UPDATE dashboard_accounts SET password_plain='Master@00@' WHERE role='MERCHANT' OR role IS NULL")
         conn.execute("ALTER TABLE dashboard_accounts DROP COLUMN IF EXISTS password_hash")
         conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS merchant_id_external varchar(100) DEFAULT ''")
@@ -58,7 +58,7 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "")
     account = conn.execute("SELECT * FROM dashboard_accounts WHERE username=%s", (owner or "Unassigned",)).fetchone()
     if not account:
         slug = f"{_slug(owner)}-{str(uuid.uuid4())[:6]}"
-        account = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') RETURNING *", (merchant_id, owner or "Unassigned", dashboard_password or "Master@123", slug, f"{base}/mitra/{slug}")).fetchone()
+        account = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') RETURNING *", (merchant_id, owner or "Unassigned", dashboard_password or "Master@00@", slug, f"{base}/mitra/{slug}")).fetchone()
     elif dashboard_password:
         conn.execute("UPDATE dashboard_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (dashboard_password, account["id"]))
     bot = conn.execute("SELECT id FROM bot_accounts WHERE username=%s", (BOT_USERNAME,)).fetchone()
@@ -93,7 +93,7 @@ def save_or_update_store(store_id: str, store_name: str, merchant_name: str, acc
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.special_hours,p.name AS merchant_name,m.name AS nama_pemilik,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until,os.last_checked_at AS last_synced_at,COALESCE(s.status,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.special_hours,p.name AS merchant_name,m.name AS nama_pemilik,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at AS last_synced_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     query += " ORDER BY p.name,o.store_id"
     with get_db_connection() as conn:
@@ -141,7 +141,7 @@ def admin_generate_user_link(nama_pemilik, passcode=None, base_url=None):
     with get_db_connection() as conn:
         merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()
         if not merchant: merchant = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (nama_pemilik,)).fetchone()
-        password = passcode or "Master@123"; slug = f"{_slug(nama_pemilik)}-{str(uuid.uuid4())[:6]}"; base = base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")
+        password = passcode or "Master@00@"; slug = f"{_slug(nama_pemilik)}-{str(uuid.uuid4())[:6]}"; base = base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")
         row = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,link_slug=EXCLUDED.link_slug,dashboard_url=EXCLUDED.dashboard_url RETURNING link_slug,dashboard_url", (merchant["id"], nama_pemilik, password, slug, f"{base}/mitra/{slug}")).fetchone()
     return {"nama_pemilik": nama_pemilik, "passcode": password, "link_slug": row["link_slug"], "full_url": row["dashboard_url"]}
 def user_authenticate(passcode):
@@ -228,8 +228,38 @@ def get_recent_logs(limit=50, store_ids=None):
     params.append(limit)
     with get_db_connection() as conn:
         return [dict(r) for r in conn.execute(query, params).fetchall()]
-def fetch_merchant_outlets_from_db():
-    from core.sheets import fetch_merchant_outlets
-    return fetch_merchant_outlets()
+
+
+def fetch_merchant_outlets_from_db() -> List[Any]:
+    from core.sheets import MerchantOutlet
+    stores = _store_query()
+    outlets = []
+    for s in stores:
+        outlets.append(MerchantOutlet(
+            kepemilikan=s.get("nama_pemilik", ""),
+            paket=s.get("paket", "3 Bulan"),
+            tanggal_mulai_layanan=s.get("tanggal_mulai_layanan", ""),
+            tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
+            hp="",
+            username=s.get("account_username", "auto7313"),
+            password="",
+            nama_pemilik=s.get("nama_pemilik", ""),
+            nama_portal=s.get("merchant_name", ""),
+            merchant_id=str(s.get("store_id", "")),
+            store_id=str(s.get("store_id", "")),
+            nama_panjang_outlet=s.get("store_name", ""),
+            nama_pendek_outlet=s.get("store_name", ""),
+            status_utama="On" if s.get("vercel_status") == "ON" else "Off",
+            status_aktual=s.get("shopee_status", "UNKNOWN"),
+            vercel_link=s.get("vercel_link", ""),
+            vercel_password=s.get("vercel_password", ""),
+            regular_hours=s.get("regular_hours", {}),
+            special_hours=s.get("special_hours", ""),
+            status_langganan=s.get("subscription_status", "Aktif"),
+            penangguhan="Ya" if s.get("is_suspended") else "Tidak",
+            alasan_penangguhan=s.get("alasan_penangguhan", "")
+        ))
+    return outlets
 
 init_state = init_db
+

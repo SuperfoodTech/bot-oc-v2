@@ -49,6 +49,9 @@ def test_backend_endpoints():
     target_store = stores[0]["store_id"]
     log.info(f"   -> Selected target store for testing: Store ID {target_store} ({stores[0]['store_name']})")
 
+    # Reset suspension status for test target store
+    client.post("/api/v1/admin/suspend", json={"store_id": target_store, "penangguhan": "Tidak", "alasan_penangguhan": "Aktif kembali"})
+
     # 3. Test Detail Store Endpoint
     log.info(f"\n3️⃣ Testing GET /api/v1/stores/{target_store}...")
     resp = client.get(f"/api/v1/stores/{target_store}")
@@ -108,6 +111,23 @@ def test_backend_endpoints():
     assert "is_online" in bot_status
     assert "status_text" in bot_status
     log.info(f"   -> Result: PASSED (Bot Status: {bot_status['status_text']} | Detail: {bot_status['detail_text']})")
+
+    # 9. Test POST /api/v1/admin/bot/control (Start, Pause, Sync)
+    log.info(f"\n9️⃣ Testing POST /api/v1/admin/bot/control (Start, Pause, Sync)...")
+    ctrl_pause = client.post("/api/v1/admin/bot/control", json={"action": "pause"})
+    assert ctrl_pause.status_code == 200
+    assert ctrl_pause.json()["success"] is True
+    log.info(f"   -> Pause Action: PASSED ({ctrl_pause.json()['message']})")
+
+    ctrl_start = client.post("/api/v1/admin/bot/control", json={"action": "start"})
+    assert ctrl_start.status_code == 200
+    assert ctrl_start.json()["success"] is True
+    log.info(f"   -> Start Action: PASSED ({ctrl_start.json()['message']})")
+
+    ctrl_sync = client.post("/api/v1/admin/bot/control", json={"action": "sync"})
+    assert ctrl_sync.status_code == 200
+    assert ctrl_sync.json()["success"] is True
+    log.info(f"   -> Sync Action: PASSED ({ctrl_sync.json()['message']})")
 
     print("\n" + "=" * 80)
     log.info("🎉 ALL BACKEND API ENDPOINTS TESTED AND PASSED 100%!")

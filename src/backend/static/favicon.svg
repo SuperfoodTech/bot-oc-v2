@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
   <title id="title">FoodMaster</title>
-  <rect width="64" height="64" rx="16" fill="#c95757"/>
+  <rect width="64" height="64" rx="16" fill="#BE1A1A"/>
   <path fill="#fffaf8" d="M19 16h27v7H27v9h16v7H27v15h-8V16Z"/>
   <circle cx="47" cy="17" r="4" fill="#f9e4e1"/>
 </svg>

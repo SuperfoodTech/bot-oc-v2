@@ -93,6 +93,7 @@ def run_full_backend_tests():
     log.info(f"   -> Result: PASSED (Loaded {len(outlets_res)} outlet(s) for Fando)")
 
     # 8. User Link: Pause Store with Selected Durations (30m, 60m, rest_of_day, custom)
+    client.post("/api/v1/admin/suspend", json={"store_id": target_store, "penangguhan": "Tidak", "alasan_penangguhan": "Aktif kembali"})
     log.info(f"\n8️⃣ Testing POST /api/v1/user/pause (Duration: 60 Menit)...")
     pause_payload = {
         "store_id": target_store,
@@ -105,7 +106,6 @@ def run_full_backend_tests():
     log.info(f"   -> Result: PASSED (Paused Label: {pause_res['duration_label']}, Until: {pause_res['pause_until']})")
 
     # 9. User Link: Resume / Open Store
-    client.post("/api/v1/admin/suspend", json={"store_id": target_store, "penangguhan": "Tidak", "alasan_penangguhan": "Aktif kembali"})
     log.info(f"\n9️⃣ Testing POST /api/v1/user/resume...")
     r = client.post(f"/api/v1/user/resume?store_id={target_store}")
     assert r.status_code == 200
