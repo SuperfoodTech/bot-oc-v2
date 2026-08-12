@@ -30,6 +30,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # ── 3. Install deps (Cached until pyproject/lock changes) ────
+ENV UV_CONCURRENT_DOWNLOADS=1
 RUN uv sync --frozen --no-dev --no-install-project
 
 # ── 4. Copy source code (Instant < 2s rebuild layer) ──────────
