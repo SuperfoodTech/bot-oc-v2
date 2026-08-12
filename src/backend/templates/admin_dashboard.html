@@ -579,8 +579,8 @@
                   <div class="detail-actions">
                     <button class="btn-outline" onclick="openEditModal('${s.store_id}')">Edit data</button>
                     <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur akun</button>
-                    <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang</button>
-                    <button class="btn-outline" style="border-color: #dc2626; color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus</button>
+                    <button class="btn-outline" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang</button>
+                    <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
                   </div>
                 </div>
               </div>
@@ -614,8 +614,8 @@
           <div class="mobile-card-actions d-grid gap-2">
             <button class="btn-outline" onclick="openEditModal('${s.store_id}')">Edit data outlet</button>
             <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur status akun</button>
-            <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang layanan</button>
-            <button class="btn-outline" style="border-color: #dc2626; color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus data</button>
+            <button class="btn-outline" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang layanan</button>
+            <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
           </div>
         `;
         mobileList.appendChild(mobileCard);
