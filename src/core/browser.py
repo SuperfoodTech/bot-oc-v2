@@ -678,7 +678,7 @@ def _init_driver(headless: bool):
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-component-update")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-    if headless or not os.environ.get("DISPLAY"):
+    if headless or not os.environ.get("DISPLAY") or os.getenv("HEADLESS", "true").strip().lower() in ("true", "1", "yes", "on"):
         options.add_argument("--headless=new")
         options.add_argument("--window-size=1920,1080")
     else:
@@ -1398,8 +1398,9 @@ def get_session(username=None, password=None, phone=None, headless=True, close_b
                     pass
 
     for attempt in range(3):
-        log.info(f"🌐 [BROWSER] Launching (headless={headless}, attempt={attempt+1}/3)...")
-        driver = _init_driver(headless=headless)
+        is_headless = headless or not os.environ.get("DISPLAY") or os.getenv("HEADLESS", "true").lower() in ("true", "1", "yes")
+        log.info(f"🌐 [BROWSER] Launching (headless={is_headless}, attempt={attempt+1}/3)...")
+        driver = _init_driver(headless=is_headless)
         wait = WebDriverWait(driver, 30)
         session_success = False
 
