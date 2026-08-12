@@ -89,6 +89,16 @@ class AdminRenewRequest(BaseModel):
     new_expiry_date: str = Field(..., description="Tanggal berakhir layanan baru (YYYY-MM-DD)")
 
 
+class AdminEditOutletRequest(BaseModel):
+    store_id: str = Field(..., description="Target Store ID")
+    nama_pemilik: Optional[str] = Field(default=None, description="Nama pemilik/mitra")
+    nama_portal: Optional[str] = Field(default=None, description="Nama merchant/portal Shopee")
+    nama_panjang_outlet: Optional[str] = Field(default=None, description="Nama outlet")
+    ownership_type: Optional[str] = Field(default=None, description="Kepemilikan: VB atau Agency")
+    paket: Optional[str] = Field(default=None, description="Paket: 3_MONTHS, 6_MONTHS, 12_MONTHS")
+    dashboard_password: Optional[str] = Field(default=None, description="Passcode dashboard")
+
+
 class AdminLoginRequest(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)

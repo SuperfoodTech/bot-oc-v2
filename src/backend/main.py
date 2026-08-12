@@ -36,6 +36,7 @@ from backend.models import (
     AdminCreateOutletRequest,
     AdminSuspendRequest,
     AdminRenewRequest,
+    AdminEditOutletRequest,
     AdminLoginRequest,
     AdminAccountUpdateRequest,
     AdminAccountCreateRequest,
@@ -306,6 +307,36 @@ def admin_renew(req: AdminRenewRequest, admin: dict = Depends(require_admin)):
         "new_expiry_date": req.new_expiry_date,
         "message": f"Store {req.store_id} subscription renewed until {req.new_expiry_date}."
     }
+
+
+@app.post("/api/v1/admin/outlets/edit", summary="Admin: Edit merchant, portal, and outlet fields")
+def admin_edit_outlet(req: AdminEditOutletRequest, admin: dict = Depends(require_admin)):
+    store = state.get_store_by_id(req.store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' tidak ditemukan.")
+
+    success = state.admin_edit_outlet(
+        store_id=req.store_id,
+        nama_pemilik=req.nama_pemilik,
+        nama_portal=req.nama_portal,
+        nama_panjang_outlet=req.nama_panjang_outlet,
+        ownership_type=req.ownership_type,
+        paket=req.paket,
+        dashboard_password=req.dashboard_password
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail="Gagal memperbarui data outlet.")
+
+    updated_store = state.get_store_by_id(req.store_id)
+    state.record_log(
+        store_id=req.store_id,
+        store_name=updated_store.get("store_name", req.store_id) if updated_store else req.store_id,
+        action="ADMIN_EDIT_OUTLET",
+        target_state="UPDATED",
+        reason=f"Admin updated outlet details (Pemilik: {req.nama_pemilik}, Portal: {req.nama_portal}, Outlet: {req.nama_panjang_outlet})"
+    )
+
+    return {"success": True, "data": updated_store}
 
 
 @app.delete("/api/v1/admin/outlets/{store_id}", summary="Admin: Delete Store Outlet")

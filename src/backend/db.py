@@ -238,6 +238,35 @@ def admin_set_suspension(store_id, penangguhan, alasan=""):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET suspension_status=%s,suspension_reason=%s,vercel_status=CASE WHEN %s THEN 'OFF' ELSE vercel_status END,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", ("SUSPENDED" if suspended else "ACTIVE", alasan, suspended, store_id))
 def admin_renew_subscription(store_id, new_expiry_date):
     with get_db_connection() as conn: conn.execute("UPDATE subscriptions s SET end_date=%s,status='ACTIVE',updated_at=now() FROM outlets o WHERE o.id=s.outlet_id AND o.store_id=%s", (new_expiry_date, store_id))
+def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_portal: Optional[str] = None, nama_panjang_outlet: Optional[str] = None, ownership_type: Optional[str] = None, paket: Optional[str] = None, dashboard_password: Optional[str] = None) -> bool:
+    with get_db_connection() as conn:
+        outlet = conn.execute("SELECT id, merchant_id, portal_id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
+        if not outlet:
+            return False
+        oid = outlet["id"]
+        mid = outlet["merchant_id"]
+        pid = outlet["portal_id"]
+        if nama_panjang_outlet is not None and nama_panjang_outlet.strip():
+            conn.execute("UPDATE outlets SET long_name=%s, updated_at=now() WHERE id=%s", (nama_panjang_outlet.strip(), oid))
+        if ownership_type is not None and ownership_type.strip():
+            conn.execute("UPDATE outlets SET ownership_type=%s, updated_at=now() WHERE id=%s", (ownership_type.strip(), oid))
+        if nama_pemilik is not None and nama_pemilik.strip():
+            new_owner = nama_pemilik.strip()
+            conn.execute("UPDATE merchants SET name=%s, updated_at=now() WHERE id=%s", (new_owner, mid))
+            conn.execute("UPDATE dashboard_accounts SET username=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (new_owner, mid))
+        if nama_portal is not None and nama_portal.strip():
+            new_portal = nama_portal.strip()
+            conn.execute("UPDATE portals SET name=%s, updated_at=now() WHERE id=%s", (new_portal, pid))
+        if dashboard_password is not None and dashboard_password.strip():
+            conn.execute("UPDATE dashboard_accounts SET password_plain=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (dashboard_password.strip(), mid))
+        if paket is not None and paket.strip():
+            code = paket.strip().upper().replace(" ", "_")
+            if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"}:
+                plan = conn.execute("SELECT id FROM subscription_plans WHERE code=%s", (code,)).fetchone()
+                if plan:
+                    conn.execute("UPDATE subscriptions SET plan_id=%s, updated_at=now() WHERE outlet_id=%s", (plan["id"], oid))
+        return True
+
 def update_shopee_actual_status(store_id, status):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET shopee_actual_status=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (status.upper(), store_id))
 def record_log(store_id, store_name, action, target_state, reason):

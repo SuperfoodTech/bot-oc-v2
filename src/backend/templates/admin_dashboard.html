@@ -212,6 +212,62 @@
     </div>
   </div>
 
+  <!-- MODAL 5: EDIT DATA OUTLET & MITRA -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="step-indicator">Admin Action</div>
+      <h3 class="card-title">Edit Data Outlet & Mitra</h3>
+      <p class="card-subtitle" id="editModalStoreSubtitle">Store ID: -</p>
+
+      <div style="margin-top: 16px;">
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Mitra *</label>
+            <input type="text" id="editOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
+            <select id="editKepemilikan" class="form-input">
+              <option value="VB">VB</option>
+              <option value="Agency">Agency</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Merchant / Portal (Shopee) *</label>
+            <input type="text" id="editPortalName" class="form-input" placeholder="cth: Warmindo Berkah">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Panjang Outlet *</label>
+            <input type="text" id="editStoreName" class="form-input" placeholder="cth: Warmindo Berkah - Merdeka">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Pilihan Paket Layanan *</label>
+            <select id="editPaket" class="form-input">
+              <option value="3_MONTHS">Paket 3 Bulan</option>
+              <option value="6_MONTHS">Paket 6 Bulan (+1 Bln Bonus)</option>
+              <option value="12_MONTHS">Paket 12 Bulan (+4 Bln Bonus)</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Passcode Mitra</label>
+            <input type="text" id="editPasscode" class="form-input" placeholder="Master@00@">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn-primary" onclick="submitEditOutlet()">Simpan Perubahan</button>
+          <button class="btn-outline" onclick="closeAdminModal('editModal')">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL 4: ERROR & SYSTEM EXCEPTION DIALOG -->
   <div class="modal-overlay" id="errorModal">
     <div class="modal-card modal-card-error">
@@ -521,6 +577,7 @@
                 <div class="detail-layout">
                   <dl class="detail-grid">${getStoreDetailMarkup(s)}</dl>
                   <div class="detail-actions">
+                    <button class="btn-outline" onclick="openEditModal('${s.store_id}')">Edit data</button>
                     <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur akun</button>
                     <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang</button>
                     <button class="btn-outline" style="border-color: #dc2626; color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus</button>
@@ -555,6 +612,7 @@
           ${s.is_suspended && s.alasan_penangguhan ? `<div class="suspension-note"><strong>Alasan penangguhan</strong><span>${s.alasan_penangguhan}</span></div>` : ''}
 
           <div class="mobile-card-actions d-grid gap-2">
+            <button class="btn-outline" onclick="openEditModal('${s.store_id}')">Edit data outlet</button>
             <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur status akun</button>
             <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang layanan</button>
             <button class="btn-outline" style="border-color: #dc2626; color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus data</button>
@@ -696,6 +754,69 @@
         }
       } catch (err) {
         alert('Gagal menambahkan mitra: ' + err.message);
+      }
+    }
+
+    function openEditModal(storeId) {
+      selectedStoreForAction = storeId;
+      const store = allStores.find(s => s.store_id === storeId);
+      if (!store) return;
+
+      document.getElementById('editModalStoreSubtitle').innerText = `${store.store_name} (ID: ${store.store_id})`;
+      document.getElementById('editOwnerName').value = store.nama_pemilik || '';
+      document.getElementById('editKepemilikan').value = store.kepemilikan || 'VB';
+      document.getElementById('editPortalName').value = store.nama_portal || store.merchant_name || '';
+      document.getElementById('editStoreName').value = store.store_name || store.long_name || '';
+
+      let planCode = '3_MONTHS';
+      const pkt = (store.paket || '').toUpperCase();
+      if (pkt.includes('6')) planCode = '6_MONTHS';
+      else if (pkt.includes('12')) planCode = '12_MONTHS';
+      document.getElementById('editPaket').value = planCode;
+
+      document.getElementById('editPasscode').value = store.vercel_password || 'Master@00@';
+      document.getElementById('editModal').classList.add('active');
+    }
+
+    async function submitEditOutlet() {
+      if (!selectedStoreForAction) return;
+
+      const owner = document.getElementById('editOwnerName').value.trim();
+      const kepemilikan = document.getElementById('editKepemilikan').value;
+      const portalName = document.getElementById('editPortalName').value.trim();
+      const storeName = document.getElementById('editStoreName').value.trim();
+      const paket = document.getElementById('editPaket').value;
+      const passcode = document.getElementById('editPasscode').value.trim() || 'Master@00@';
+
+      if (!owner || !portalName || !storeName) {
+        alert('Mohon isi Nama Pemilik, Nama Merchant/Portal, dan Nama Outlet.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v1/admin/outlets/edit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store_id: selectedStoreForAction,
+            nama_pemilik: owner,
+            ownership_type: kepemilikan,
+            nama_portal: portalName,
+            nama_panjang_outlet: storeName,
+            paket: paket,
+            dashboard_password: passcode
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          closeAdminModal('editModal');
+          if (typeof showToast === 'function') showToast('Data outlet berhasil diperbarui!', 'success');
+          if (typeof loadStoresData === 'function') loadStoresData();
+        } else {
+          alert(data.detail || 'Gagal memperbarui data outlet.');
+        }
+      } catch (err) {
+        alert('Gagal memperbarui data outlet: ' + err.message);
       }
     }
 
