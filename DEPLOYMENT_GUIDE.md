@@ -84,6 +84,16 @@ Pastikan 3 container berstatus **Up / Running**:
 - `fm-backend`
 - `fm-bot`
 
+### ⚡ Step 3: Zero-Downtime Update Khusus Backend/Frontend Web (Non-Bot Updates)
+Jika perubahan kode hanya berada di `src/backend/`, template HTML, CSS/JS static, atau route REST API web (tidak merubah core bot), **wajib** menggunakan perintah berikut agar container bot (`fm-bot`) **tidak ikut terhenti / terputus**:
+
+```bash
+# Rebuild & restart HANYA service web tanpa mengganggu container bot & postgres
+docker compose build web
+docker compose up -d --no-deps web
+```
+*Catatan: Parameter `--no-deps` memastikan container bot dan database tetap aktif berjalan 24/7.*
+
 ---
 
 ## 🖥️ 5. Opsi Deployment Alternatif: Bare-Metal (Tanpa Docker / Systemd)

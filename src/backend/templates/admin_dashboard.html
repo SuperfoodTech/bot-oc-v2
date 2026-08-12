@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,9 +11,11 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
   <link rel="stylesheet" href="/static/css/styles.css?v=20260812-detail-type">
 </head>
+
 <body x-data="adminApp()">
 
   <div class="desktop-wrapper">
@@ -33,14 +36,16 @@
 
     <!-- NAV TABS -->
     <nav class="admin-tab-nav" aria-label="Navigasi Tab Admin">
-      <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets" onclick="switchTab('outlets')">
+      <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets"
+        onclick="switchTab('outlets')">
         <span>Operasional Outlet</span>
         <span class="tab-badge" id="tabOutletCount" x-text="allStores.length">0</span>
       </button>
       <a href="/admin/bot" class="tab-btn">
         <span>Bot</span>
       </a>
-      <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings" onclick="switchTab('settings')">
+      <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings"
+        onclick="switchTab('settings')">
         <span>Settings</span>
       </button>
     </nav>
@@ -63,7 +68,7 @@
       <div style="margin-top: 16px;">
         <div style="display: flex; gap: 10px;">
           <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra *</label>
+            <label style="font-size: 12px; font-weight: 700;">Nama Mitra *</label>
             <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
           </div>
           <div style="flex: 1;">
@@ -77,16 +82,20 @@
 
         <div style="display: flex; gap: 10px; margin-top: 10px;">
           <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Store ID (ID Shopee) *</label>
-            <input type="text" id="genStoreId" class="form-input" placeholder="cth: 21897166">
+            <label style="font-size: 12px; font-weight: 700;">Nama Merchant *</label>
+            <input type="text" id="genPortalName" class="form-input" placeholder="cth: Warmindo Berkah">
           </div>
           <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Nama Outlet / Merchant *</label>
-            <input type="text" id="genStoreName" class="form-input" placeholder="cth: Warung Budi Merdeka">
+            <label style="font-size: 12px; font-weight: 700;">Nama Outlet *</label>
+            <input type="text" id="genStoreName" class="form-input" placeholder="cth: Warmindo Berkah - Merdeka">
           </div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Store ID *</label>
+            <input type="text" id="genStoreId" class="form-input" placeholder="cth: 21897166">
+          </div>
           <div style="flex: 1;">
             <label style="font-size: 12px; font-weight: 700;">Pilihan Paket Layanan *</label>
             <select id="genPaket" class="form-input" onchange="updateAddMitraExpiryPreview()">
@@ -94,10 +103,6 @@
               <option value="6_MONTHS">Paket 6 Bulan (+1 Bln Bonus)</option>
               <option value="12_MONTHS">Paket 12 Bulan (+4 Bln Bonus)</option>
             </select>
-          </div>
-          <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Passcode Mitra</label>
-            <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@" value="Master@00@">
           </div>
         </div>
 
@@ -108,11 +113,13 @@
           </div>
           <div style="flex: 1;">
             <label style="font-size: 12px; font-weight: 700;">Tanggal Berakhir Layanan (Otomatis)</label>
-            <input type="date" id="genEndDate" class="form-input" readonly style="background-color: var(--surface); color: var(--ink);">
+            <input type="date" id="genEndDate" class="form-input" readonly
+              style="background-color: var(--surface); color: var(--ink);">
           </div>
         </div>
 
-        <div id="genResultBox" style="display: none; margin-top: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;">
+        <div id="genResultBox"
+          style="display: none; margin-top: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;">
           <div style="font-size: 12px; font-weight: 700; color: var(--ink);">Mitra & Outlet Berhasil Dibuat!</div>
           <div style="font-size: 11px; color: var(--ink-light); margin-top: 4px;">Link Dashboard Mitra:</div>
           <input type="text" id="genUrlInput" class="form-input" readonly style="font-size: 12px; margin-top: 4px;">
@@ -183,8 +190,10 @@
       <p class="card-subtitle" id="deleteStoreSubtitle">Store ID: -</p>
 
       <div style="margin-top: 16px;">
-        <div style="padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; color: #991b1b;">
-          ⚠️ <strong>Peringatan:</strong> Data outlet dan seluruh riwayat langganan yang dihapus tidak dapat dikembalikan.
+        <div
+          style="padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; color: #991b1b;">
+          ⚠️ <strong>Peringatan:</strong> Data outlet dan seluruh riwayat langganan yang dihapus tidak dapat
+          dikembalikan.
         </div>
 
         <div style="margin-top: 14px;">
@@ -195,7 +204,8 @@
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">
-          <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="submitDeleteStore()">Ya, Hapus Data</button>
+          <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;"
+            onclick="submitDeleteStore()">Ya, Hapus Data</button>
           <button class="btn-outline" onclick="closeAdminModal('deleteModal')">Batal</button>
         </div>
       </div>
@@ -257,7 +267,7 @@
         },
         showToast(message, type = 'success') {
           const id = Date.now() + Math.random();
-          this.toasts.push({id, message, type});
+          this.toasts.push({ id, message, type });
           setTimeout(() => {
             this.toasts = this.toasts.filter(t => t.id !== id);
           }, 3500);
@@ -385,9 +395,9 @@
     }
 
     function showTableSkeleton() {
-      const row = '<tr class="skeleton-table-row">' + Array.from({length: 9}, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
+      const row = '<tr class="skeleton-table-row">' + Array.from({ length: 9 }, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
       document.getElementById('tableBody').innerHTML = row.repeat(5);
-      document.getElementById('mobileOutletList').innerHTML = Array.from({length: 3}, () => `
+      document.getElementById('mobileOutletList').innerHTML = Array.from({ length: 3 }, () => `
         <article class="mobile-outlet-card skeleton-mobile-card">
           <span class="skeleton skeleton-title"></span>
           <span class="skeleton skeleton-line"></span>
@@ -435,9 +445,9 @@
       const tbody = document.getElementById('tableBody');
       const mobileList = document.getElementById('mobileOutletList');
       const sortedStores = [...stores].sort((a, b) => {
-        const ownerCompare = (a.nama_pemilik || '').localeCompare(b.nama_pemilik || '', 'id', {sensitivity: 'base'});
+        const ownerCompare = (a.nama_pemilik || '').localeCompare(b.nama_pemilik || '', 'id', { sensitivity: 'base' });
         if (ownerCompare !== 0) return ownerCompare;
-        return (a.store_name || '').localeCompare(b.store_name || '', 'id', {sensitivity: 'base'});
+        return (a.store_name || '').localeCompare(b.store_name || '', 'id', { sensitivity: 'base' });
       });
       tbody.innerHTML = '';
       mobileList.innerHTML = '';
@@ -594,7 +604,7 @@
 
     function filterTable() {
       const q = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = allStores.filter(s => 
+      const filtered = allStores.filter(s =>
         (s.nama_pemilik || '').toLowerCase().includes(q) ||
         (s.store_name || '').toLowerCase().includes(q) ||
         (s.store_id || '').toLowerCase().includes(q) ||
@@ -628,28 +638,31 @@
     async function submitGenerateLink() {
       const owner = document.getElementById('genOwnerName').value.trim();
       const kepemilikan = document.getElementById('genKepemilikan') ? document.getElementById('genKepemilikan').value : 'VB';
+      const portalNameInput = document.getElementById('genPortalName');
+      const portalName = portalNameInput ? portalNameInput.value.trim() : '';
       const storeId = document.getElementById('genStoreId').value.trim();
       const storeName = document.getElementById('genStoreName').value.trim();
       const paket = document.getElementById('genPaket').value;
-      const passcode = document.getElementById('genPasscode').value || 'Master@00@';
+      const passcodeEl = document.getElementById('genPasscode');
+      const passcode = passcodeEl ? passcodeEl.value : 'Master@00@';
       const startDate = document.getElementById('genStartDate').value;
       const endDate = document.getElementById('genEndDate').value;
 
-      if (!owner || !storeId || !storeName) {
-        alert('Mohon isi Nama Pemilik, Store ID, dan Nama Outlet.');
+      if (!owner || !storeId || !storeName || !portalName) {
+        alert('Mohon isi Nama Pemilik, Nama Merchant/Portal, Store ID, dan Nama Outlet.');
         return;
       }
 
       try {
         const res = await fetch('/api/v1/admin/outlets', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nama_pemilik: owner,
             ownership_type: kepemilikan,
             store_id: storeId,
             nama_panjang_outlet: storeName,
-            nama_portal: storeName,
+            nama_portal: portalName,
             username: 'auto7313',
             password: 'Auto@7313',
             dashboard_password: passcode,
@@ -689,8 +702,8 @@
       try {
         const res = await fetch('/api/v1/admin/suspend', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({store_id: selectedStoreForAction, penangguhan: pen, alasan_penangguhan: alasan})
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ store_id: selectedStoreForAction, penangguhan: pen, alasan_penangguhan: alasan })
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -736,8 +749,8 @@
       try {
         const res = await fetch('/api/v1/admin/renew', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({store_id: selectedStoreForAction, new_expiry_date: newDate})
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ store_id: selectedStoreForAction, new_expiry_date: newDate })
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -805,8 +818,8 @@
 
         const res = await fetch('/api/v1/admin/bot/control', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({action: action})
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action })
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -942,9 +955,9 @@
       const password = document.getElementById('settingsPassword').value;
       message.textContent = '';
       try {
-        const body = {username};
+        const body = { username };
         if (password) body.password = password;
-        const res = await fetch('/api/v1/admin/account', {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        const res = await fetch('/api/v1/admin/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal menyimpan perubahan akun.');
         document.getElementById('settingsPassword').value = '';
@@ -960,10 +973,12 @@
       const message = document.getElementById('newAdminMessage');
       message.textContent = '';
       try {
-        const res = await fetch('/api/v1/admin/accounts', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
-          username: document.getElementById('newAdminUsername').value.trim(),
-          password: document.getElementById('newAdminPassword').value
-        })});
+        const res = await fetch('/api/v1/admin/accounts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+            username: document.getElementById('newAdminUsername').value.trim(),
+            password: document.getElementById('newAdminPassword').value
+          })
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal menambahkan akun admin.');
         document.getElementById('newAdminUsername').value = '';
@@ -976,7 +991,7 @@
     }
 
     async function logoutAdmin() {
-      await fetch('/api/v1/admin/logout', {method: 'POST'});
+      await fetch('/api/v1/admin/logout', { method: 'POST' });
       window.location.href = '/admin/login';
     }
 
@@ -985,4 +1000,5 @@
     }
   </script>
 </body>
+
 </html>

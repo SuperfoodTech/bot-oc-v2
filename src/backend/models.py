@@ -20,6 +20,7 @@ class StoreStatusResponse(BaseModel):
     store_id: str
     store_name: str
     merchant_name: str
+    nama_portal: Optional[str] = ""
     account_username: str
     nama_pemilik: Optional[str] = ""
     paket: Optional[str] = "3 Bulan"

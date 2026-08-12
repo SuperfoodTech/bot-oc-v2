@@ -32,6 +32,11 @@ Repository **bot-oc** menggunakan **FastAPI Monolith Architecture** yang menyatu
    - Bot berjalan 24/7 membaca database PostgreSQL.
    - Menggunakan 1 browser persistent session dengan akun Shopee `auto7313`.
 
+4. **Aturan Update Non-Bot (Zero-Downtime)**:
+   - Untuk setiap update frontend/backend web (`src/backend/`, HTML, CSS, REST API), **wajib** menggunakan:
+     `docker compose build web && docker compose up -d --no-deps web`
+   - Dilarang menggunakan `docker compose down` / `prod.sh` jika tidak ada perubahan pada core bot atau skema database, agar `fm-bot` tetap aktif tanpa terputus.
+
 ---
 
 ## Menjalankan Service
