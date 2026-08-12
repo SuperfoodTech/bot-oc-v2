@@ -31,7 +31,7 @@ ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.st
 # Filter store IDs allowed for bot execution (Default: 21897166 only)
 ALLOWED_STORE_IDS_ENV = os.getenv("ALLOWED_STORE_IDS", "21897166")
 ALLOWED_STORE_IDS = {s.strip() for s in ALLOWED_STORE_IDS_ENV.split(",") if s.strip()}
-HEADLESS = os.getenv("HEADLESS", "false").strip().lower() in {"1", "true", "yes", "on"}
+HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"}
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
 ACTIVE_SESSIONS = {}
