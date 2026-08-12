@@ -700,9 +700,13 @@ def _init_driver(headless: bool):
         except Exception as e:
             log.warning(f"⚠️ Failed to remove SingletonLock: {e}")
 
+    chromedriver_bin = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
     try:
-        # Use native Selenium Manager (faster, more stable, avoids ChromeDriverManager network hangs)
-        driver = webdriver.Chrome(options=options)
+        if Path(chromedriver_bin).exists():
+            log.info(f"🔧 Using system ChromeDriver binary: {chromedriver_bin}")
+            driver = webdriver.Chrome(service=Service(chromedriver_bin), options=options)
+        else:
+            driver = webdriver.Chrome(options=options)
     except Exception as e:
         log.warning(f"⚠️ Native Chrome init failed: {e}. Trying ChromeDriverManager fallback...")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
