@@ -930,10 +930,17 @@ input:checked + .slider::before {
 
 /* Keep the desktop accordion informative without creating a tall second table. */
 .detail-row.is-open .detail-layout { margin-top: 8px; }
-.detail-item { padding: 8px 10px; }
-.detail-item dt { font-size: 9px; line-height: 1.15; }
-.detail-item dd { margin-top: 3px; font-size: 11px; line-height: 1.25; }
+.detail-item { padding: 10px 12px; }
+.detail-item dt { font-size: 11px; line-height: 1.25; }
+.detail-item dd { margin-top: 4px; font-size: 13px; line-height: 1.4; }
 .detail-actions { gap: 6px; padding: 10px; }
+
+.detail-actions .btn-outline,
+.detail-actions .btn-primary {
+  min-height: 40px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
 
 .row-actions .btn-outline,
 .row-actions .btn-primary {
@@ -1138,12 +1145,12 @@ input:checked + .slider::before {
   }
 
   .table-scroll {
-    overflow-x: hidden;
+    overflow-x: auto;
   }
 
   .data-table {
     width: 100%;
-    min-width: 0;
+    min-width: 1120px;
     table-layout: fixed;
   }
 
@@ -1182,6 +1189,7 @@ input:checked + .slider::before {
   .data-table td:nth-child(9) { width: 12%; }
 
   .data-table th:nth-child(7),
+  .data-table th:nth-child(8),
   .data-table th:nth-child(9) {
     white-space: nowrap;
     font-size: 10px !important;
@@ -1269,7 +1277,7 @@ input:checked + .slider::before {
 @media (min-width: 768px) and (max-width: 1399px) {
   #adminTable {
     width: 100%;
-    min-width: 0;
+    min-width: 1120px;
     table-layout: fixed;
   }
 
@@ -1288,26 +1296,30 @@ input:checked + .slider::before {
   }
 
   #adminTable th:nth-child(1),
-  #adminTable td:nth-child(1) { width: 10%; }
+  #adminTable td:nth-child(1) { width: 9%; }
   #adminTable th:nth-child(2),
-  #adminTable td:nth-child(2) { width: 12%; }
+  #adminTable td:nth-child(2) { width: 11%; }
   #adminTable th:nth-child(3),
   #adminTable td:nth-child(3) { width: 8%; }
   #adminTable th:nth-child(4),
-  #adminTable td:nth-child(4) { width: 20%; }
+  #adminTable td:nth-child(4) { width: 19%; }
   #adminTable th:nth-child(5),
-  #adminTable td:nth-child(5) { width: 14%; }
+  #adminTable td:nth-child(5) { width: 13%; }
   #adminTable th:nth-child(6),
   #adminTable td:nth-child(6) { width: 16%; }
   #adminTable th:nth-child(7),
-  #adminTable td:nth-child(7) { width: 10%; }
-  #adminTable th:nth-child(8),
-  #adminTable td:nth-child(8) { display: none; }
+  #adminTable td:nth-child(7) { width: 12%; }
   #adminTable th:nth-child(9),
   #adminTable td:nth-child(9) {
-    width: 10%;
+    width: 12%;
     padding-right: 16px !important;
   }
+
+  #adminTable th:nth-child(8),
+  #adminTable td:nth-child(8) {
+    display: none;
+  }
+
 }
 
 :root[data-theme="dark"] #adminTable thead th {
@@ -2848,4 +2860,3 @@ body {
 .password-toggle-btn:active {
   transform: scale(0.94);
 }
-

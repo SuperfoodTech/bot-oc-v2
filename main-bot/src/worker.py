@@ -26,7 +26,7 @@ log = get_logger("backend_worker")
 # Filter account usernames allowed for bot execution (Default: auto7313 only)
 ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
-HEADLESS = os.getenv("HEADLESS", "false").strip().lower() in {"1", "true", "yes", "on"}
+HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"}
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
 ACTIVE_SESSIONS = {}
@@ -192,14 +192,29 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - username '{outlet.username}' != auto7313")
             continue
 
-        # Evaluate decision engine rules from spreadsheet-backed state.
+        # Evaluate decision engine rules from database-backed state.
         decision = evaluate_outlet_status(outlet)
-        log.info(f"  🏪 Store {outlet.store_id} ({outlet.nama_panjang_outlet}) -> Decision: {decision.action} ({decision.reason})")
+        shopee_before = (outlet.status_aktual or "UNKNOWN").upper()
+        vercel_status = (outlet.status_utama or "OFF").upper()
+
+        log.info(
+            f"  🔍 [PRE-CHECK] Store {outlet.store_id} ({outlet.nama_panjang_outlet}) | "
+            f"Shopee Status Sebelum: {shopee_before} | Vercel Toggle: {vercel_status} | "
+            f"Decision: {decision.action} ({decision.reason})"
+        )
 
         # 3. If action needed and execute_actions is True
         if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
-            log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id}...")
+            log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id} (Target: {decision.target_state})...")
             exec_ok = execute_outlet_shopee_action(outlet, decision.action)
+
+            if exec_ok:
+                new_actual_status = "ON" if decision.target_state == "OPEN" else "PAUSE"
+                try:
+                    db.update_shopee_actual_status(outlet.store_id, new_actual_status)
+                    log.info(f"  ✅ [STATUS SYNC] Store {outlet.store_id} shopee_actual_status updated to '{new_actual_status}' in DB.")
+                except Exception as sync_err:
+                    log.warning(f"  ⚠️ Could not update DB shopee_actual_status: {sync_err}")
 
             reason_text = f"{decision.reason} | Shopee Action: {'SUCCESS' if exec_ok else 'FAILED'}"
             actions_taken.append({
@@ -210,7 +225,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 "reason": reason_text
             })
 
-            # Record in the in-memory runtime audit log
+            # Record in the runtime audit log
             db.record_log(
                 store_id=outlet.store_id,
                 store_name=outlet.nama_panjang_outlet,

@@ -66,7 +66,7 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "")
     return merchant_id, portal["id"], account
 
 
-def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", **_ignored) -> None:
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", **_ignored) -> Dict:
     with get_db_connection() as conn:
         merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password)
         existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
@@ -75,25 +75,33 @@ def save_or_update_store(store_id: str, store_name: str, merchant_name: str, acc
             conn.execute("UPDATE shopee_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (vercel_password or BOT_PASSWORD, shopee_account_id))
         else:
             shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, vercel_password or BOT_PASSWORD)).fetchone()["id"]
-        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,long_name,special_hours) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, store_name or store_id, special_hours)).fetchone()
+        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,ownership_type,long_name,special_hours) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,ownership_type=EXCLUDED.ownership_type,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, ownership_type, store_name or store_id, special_hours)).fetchone()
         outlet_id = outlet["id"]
         conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET shopee_actual_status=EXCLUDED.shopee_actual_status,updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), (shopee_status or "UNKNOWN").upper(), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
         code = (paket or "3_MONTHS").upper().replace(" ", "_")
         code = code if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"} else "3_MONTHS"
-        plan = conn.execute("SELECT id FROM subscription_plans WHERE code=%s", (code,)).fetchone()
-        if plan and tanggal_mulai_layanan and tanggal_berakhir_layanan:
+        plan = conn.execute("SELECT id, total_months FROM subscription_plans WHERE code=%s", (code,)).fetchone()
+        if plan:
+            start_dt = tanggal_mulai_layanan or datetime.utcnow().strftime("%Y-%m-%d")
+            if not tanggal_berakhir_layanan:
+                months = plan["total_months"] if plan and "total_months" in plan else 3
+                calc_row = conn.execute("SELECT (%s::date + (%s || ' months')::interval)::date AS end_date", (start_dt, months)).fetchone()
+                end_dt = str(calc_row["end_date"])
+            else:
+                end_dt = tanggal_berakhir_layanan
             conn.execute("DELETE FROM subscriptions WHERE outlet_id=%s", (outlet_id,))
-            conn.execute("INSERT INTO subscriptions (outlet_id,plan_id,start_date,end_date,status) VALUES (%s,%s,%s,%s,%s)", (outlet_id, plan["id"], tanggal_mulai_layanan, tanggal_berakhir_layanan, "ACTIVE" if (subscription_status or "").lower() == "aktif" else "EXPIRED"))
+            conn.execute("INSERT INTO subscriptions (outlet_id,plan_id,start_date,end_date,status) VALUES (%s,%s,%s,%s,%s)", (outlet_id, plan["id"], start_dt, end_dt, "ACTIVE" if (subscription_status or "").lower() == "aktif" else "EXPIRED"))
         if regular_hours:
             names = ("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
             for weekday, name in enumerate(names):
                 value = regular_hours.get(name, "") or ""
                 opened, closed = value.split("-", 1) if "-" in value else (None, None)
                 conn.execute("INSERT INTO operating_hours (outlet_id,weekday,open_time,close_time,is_closed) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (outlet_id,weekday) DO UPDATE SET open_time=EXCLUDED.open_time,close_time=EXCLUDED.close_time,is_closed=EXCLUDED.is_closed", (outlet_id, weekday, opened or None, closed or None, not bool(value)))
+        return dict(account) if account else {}
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.special_hours,p.name AS merchant_name,m.name AS nama_pemilik,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at AS last_synced_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,m.name AS nama_pemilik,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at AS last_synced_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     query += " ORDER BY p.name,o.store_id"
     with get_db_connection() as conn:
@@ -201,6 +209,8 @@ def admin_set_suspension(store_id, penangguhan, alasan=""):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET suspension_status=%s,suspension_reason=%s,vercel_status=CASE WHEN %s THEN 'OFF' ELSE vercel_status END,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", ("SUSPENDED" if suspended else "ACTIVE", alasan, suspended, store_id))
 def admin_renew_subscription(store_id, new_expiry_date):
     with get_db_connection() as conn: conn.execute("UPDATE subscriptions s SET end_date=%s,status='ACTIVE',updated_at=now() FROM outlets o WHERE o.id=s.outlet_id AND o.store_id=%s", (new_expiry_date, store_id))
+def update_shopee_actual_status(store_id, status):
+    with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET shopee_actual_status=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (status.upper(), store_id))
 def record_log(store_id, store_name, action, target_state, reason):
     with get_db_connection() as conn:
         outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
@@ -236,7 +246,7 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
     outlets = []
     for s in stores:
         outlets.append(MerchantOutlet(
-            kepemilikan=s.get("nama_pemilik", ""),
+            kepemilikan=s.get("kepemilikan") or "VB",
             paket=s.get("paket", "3 Bulan"),
             tanggal_mulai_layanan=s.get("tanggal_mulai_layanan", ""),
             tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
@@ -257,9 +267,59 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             special_hours=s.get("special_hours", ""),
             status_langganan=s.get("subscription_status", "Aktif"),
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
-            alasan_penangguhan=s.get("alasan_penangguhan", "")
         ))
     return outlets
+
+
+def delete_store(store_id: str) -> bool:
+    with get_db_connection() as conn:
+        outlet = conn.execute("SELECT id, merchant_id, portal_id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
+        if not outlet:
+            return False
+        oid = outlet["id"]
+        mid = outlet["merchant_id"]
+        pid = outlet["portal_id"]
+
+        conn.execute("DELETE FROM subscriptions WHERE outlet_id=%s", (oid,))
+        conn.execute("DELETE FROM operating_hours WHERE outlet_id=%s", (oid,))
+        conn.execute("DELETE FROM outlet_states WHERE outlet_id=%s", (oid,))
+        conn.execute("DELETE FROM automation_logs WHERE outlet_id=%s", (oid,))
+        conn.execute("DELETE FROM admin_audit_logs WHERE outlet_id=%s", (oid,))
+        conn.execute("DELETE FROM outlets WHERE id=%s", (oid,))
+
+        remaining = conn.execute("SELECT COUNT(*) AS cnt FROM outlets WHERE merchant_id=%s", (mid,)).fetchone()
+        if remaining and remaining["cnt"] == 0:
+            conn.execute("DELETE FROM shopee_accounts WHERE portal_id=%s", (pid,))
+            conn.execute("DELETE FROM portals WHERE merchant_id=%s", (mid,))
+            conn.execute("DELETE FROM bot_merchant_assignments WHERE merchant_id=%s", (mid,))
+            conn.execute("DELETE FROM dashboard_accounts WHERE merchant_id=%s", (mid,))
+            conn.execute("DELETE FROM merchants WHERE id=%s", (mid,))
+        return True
+
+
+def delete_merchant(nama_pemilik: str) -> bool:
+    with get_db_connection() as conn:
+        merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()
+        if not merchant:
+            return False
+        mid = merchant["id"]
+        outlets = conn.execute("SELECT id FROM outlets WHERE merchant_id=%s", (mid,)).fetchall()
+        for o in outlets:
+            oid = o["id"]
+            conn.execute("DELETE FROM subscriptions WHERE outlet_id=%s", (oid,))
+            conn.execute("DELETE FROM operating_hours WHERE outlet_id=%s", (oid,))
+            conn.execute("DELETE FROM outlet_states WHERE outlet_id=%s", (oid,))
+            conn.execute("DELETE FROM automation_logs WHERE outlet_id=%s", (oid,))
+            conn.execute("DELETE FROM admin_audit_logs WHERE outlet_id=%s", (oid,))
+            conn.execute("DELETE FROM outlets WHERE id=%s", (oid,))
+
+        conn.execute("DELETE FROM shopee_accounts WHERE portal_id IN (SELECT id FROM portals WHERE merchant_id=%s)", (mid,))
+        conn.execute("DELETE FROM portals WHERE merchant_id=%s", (mid,))
+        conn.execute("DELETE FROM bot_merchant_assignments WHERE merchant_id=%s", (mid,))
+        conn.execute("DELETE FROM dashboard_accounts WHERE merchant_id=%s", (mid,))
+        conn.execute("DELETE FROM merchants WHERE id=%s", (mid,))
+        return True
+
 
 init_state = init_db
 

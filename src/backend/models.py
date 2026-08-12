@@ -62,6 +62,7 @@ class AdminGenerateLinkRequest(BaseModel):
 
 class AdminCreateOutletRequest(BaseModel):
     nama_pemilik: str = Field(..., min_length=1)
+    ownership_type: str = Field(default="VB", description="Kepemilikan: VB atau Agency")
     nama_portal: str = Field(..., min_length=1)
     store_id: str = Field(..., min_length=1)
     nama_panjang_outlet: str = Field(..., min_length=1)

@@ -904,7 +904,7 @@ def _trigger_and_extract_tokens(driver) -> tuple:
 
 # ── Driver Initialization ──────────────────────────────────────────────────────
 
-def _init_driver(headless: bool = False):
+def _init_driver(headless: bool = True):
     options = Options()
     options.add_argument("--log-level=3")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -1635,7 +1635,7 @@ def return_to_selector(driver) -> bool:
             pass
         return True
 
-def get_session(username=None, password=None, phone=None, headless=False, close_browser=True, target_name=None, interactive=True) -> dict | None:
+def get_session(username=None, password=None, phone=None, headless=True, close_browser=True, target_name=None, interactive=True) -> dict | None:
     if not password and username:
         cred_paths = [
             Path(__file__).resolve().parents[2] / "credentials.json",

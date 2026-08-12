@@ -11,7 +11,7 @@
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260810-activity-panel">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260812-detail-type">
 </head>
 <body x-data="adminApp()">
 
@@ -53,27 +53,73 @@
 
   </div>
 
-  <!-- MODAL 1: GENERATE USER LINK -->
+  <!-- MODAL 1: GENERATE USER LINK & TAMBAH MITRA -->
   <div class="modal-overlay" id="generateModal">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 540px;">
       <div class="step-indicator">Admin Action</div>
-      <h3 class="card-title">Generate Link User Baru</h3>
-      <p class="card-subtitle">Buat Vercel Link Unik dan Kata Sandi untuk mitra pemilik toko.</p>
+      <h3 class="card-title">Tambah Mitra & Outlet Baru</h3>
+      <p class="card-subtitle">Daftarkan mitra baru, store outlet, passcode, dan pilihan paket layanan.</p>
 
       <div style="margin-top: 16px;">
-        <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra</label>
-        <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra *</label>
+            <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
+            <select id="genKepemilikan" class="form-input">
+              <option value="VB">VB</option>
+              <option value="Agency">Agency</option>
+            </select>
+          </div>
+        </div>
 
-        <label style="font-size: 12px; font-weight: 700; margin-top: 12px; display: block;">Vercel Kata Sandi (Passcode)</label>
-        <input type="text" id="genPasscode" class="form-input" placeholder="Passcode (default: Master@00@)" value="Master@00@">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Store ID (ID Shopee) *</label>
+            <input type="text" id="genStoreId" class="form-input" placeholder="cth: 21897166">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Outlet / Merchant *</label>
+            <input type="text" id="genStoreName" class="form-input" placeholder="cth: Warung Budi Merdeka">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Pilihan Paket Layanan *</label>
+            <select id="genPaket" class="form-input" onchange="updateAddMitraExpiryPreview()">
+              <option value="3_MONTHS">Paket 3 Bulan</option>
+              <option value="6_MONTHS">Paket 6 Bulan (+1 Bln Bonus)</option>
+              <option value="12_MONTHS">Paket 12 Bulan (+4 Bln Bonus)</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Passcode Mitra</label>
+            <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@" value="Master@00@">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Tanggal Mulai Layanan</label>
+            <input type="date" id="genStartDate" class="form-input" onchange="updateAddMitraExpiryPreview()">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Tanggal Berakhir Layanan (Otomatis)</label>
+            <input type="date" id="genEndDate" class="form-input" readonly style="background-color: var(--surface); color: var(--ink);">
+          </div>
+        </div>
 
         <div id="genResultBox" style="display: none; margin-top: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;">
-          <div style="font-size: 12px; font-weight: 700; color: var(--ink);">Link Berhasil Dibuat:</div>
+          <div style="font-size: 12px; font-weight: 700; color: var(--ink);">Mitra & Outlet Berhasil Dibuat!</div>
+          <div style="font-size: 11px; color: var(--ink-light); margin-top: 4px;">Link Dashboard Mitra:</div>
           <input type="text" id="genUrlInput" class="form-input" readonly style="font-size: 12px; margin-top: 4px;">
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">
-          <button class="btn-primary" onclick="submitGenerateLink()">Generate Link</button>
+          <button class="btn-primary" onclick="submitGenerateLink()">Simpan & Generate Link</button>
           <button class="btn-outline" onclick="closeAdminModal('generateModal')">Tutup</button>
         </div>
       </div>
@@ -124,6 +170,33 @@
         <div style="display: flex; gap: 10px; margin-top: 20px;">
           <button class="btn-primary" onclick="submitRenew()">Perbarui Masa Aktif</button>
           <button class="btn-outline" onclick="closeAdminModal('renewModal')">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: DELETE CONFIRMATION -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-card">
+      <div class="step-indicator" style="color: #BE1A1A;">Tindakan Admin (Sensitif)</div>
+      <h3 class="card-title" style="color: #BE1A1A;">Hapus Data Mitra / Outlet</h3>
+      <p class="card-subtitle" id="deleteStoreSubtitle">Store ID: -</p>
+
+      <div style="margin-top: 16px;">
+        <div style="padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; color: #991b1b;">
+          ⚠️ <strong>Peringatan:</strong> Data outlet dan seluruh riwayat langganan yang dihapus tidak dapat dikembalikan.
+        </div>
+
+        <div style="margin-top: 14px;">
+          <label style="font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="deleteEntireMerchantCheck" style="width: 16px; height: 16px;">
+            <span>Hapus seluruh data mitra & semua outlet milik <strong id="deleteOwnerNameLabel">-</strong></span>
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="submitDeleteStore()">Ya, Hapus Data</button>
+          <button class="btn-outline" onclick="closeAdminModal('deleteModal')">Batal</button>
         </div>
       </div>
     </div>
@@ -261,7 +334,7 @@
       } catch (err) {
         console.error("Error loading stores:", err);
         if (!isSilent) {
-          document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
+          document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
           document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
         }
       } finally {
@@ -370,7 +443,7 @@
       mobileList.innerHTML = '';
 
       if (!sortedStores.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="table-loading-state">Tidak ada outlet yang sesuai.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="table-loading-state">Tidak ada outlet yang sesuai.</td></tr>';
         mobileList.innerHTML = '<div class="mobile-empty-state">Tidak ada outlet yang sesuai dengan pencarian.</div>';
         return;
       }
@@ -427,6 +500,7 @@
                   <div class="detail-actions">
                     <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur akun</button>
                     <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang</button>
+                    <button class="btn-outline" style="border-color: #dc2626; color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus</button>
                   </div>
                 </div>
               </div>
@@ -448,6 +522,7 @@
 
           <dl class="mobile-detail-list">
             <div><dt>Pemilik outlet</dt><dd>${ownerName}</dd></div>
+            <div><dt>Tipe kepemilikan</dt><dd><span class="status-text">${s.kepemilikan || 'VB'}</span></dd></div>
             <div><dt>Status utama</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
             <div><dt>Langganan berlaku sampai</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
             <div><dt>Status akun</dt><dd><span class="status-text ${s.is_suspended ? '' : 'is-active'}">${s.is_suspended ? 'Ditangguhkan' : 'Aktif'}</span></dd></div>
@@ -459,6 +534,7 @@
           <div class="mobile-card-actions d-grid gap-2">
             <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur status akun</button>
             <button class="btn-primary" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang layanan</button>
+            <button class="btn-outline" style="border-color: #dc2626; color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus data</button>
           </div>
         `;
         mobileList.appendChild(mobileCard);
@@ -472,6 +548,7 @@
     function getStoreDetailMarkup(store) {
       const isVercelOn = store.vercel_status === 'ON';
       const detailRows = [
+        ['Kepemilikan', store.kepemilikan || 'VB'],
         ['Pause', isVercelOn ? 'Tidak sedang pause' : getPauseDetail(store.pause_until)],
         ['Paket', store.paket],
         ['Status akun', store.is_suspended ? 'Ditangguhkan' : 'Aktif'],
@@ -521,7 +598,8 @@
         (s.nama_pemilik || '').toLowerCase().includes(q) ||
         (s.store_name || '').toLowerCase().includes(q) ||
         (s.store_id || '').toLowerCase().includes(q) ||
-        (s.merchant_name || '').toLowerCase().includes(q)
+        (s.merchant_name || '').toLowerCase().includes(q) ||
+        (s.kepemilikan || '').toLowerCase().includes(q)
       );
       renderAdminTable(filtered);
     }
@@ -529,26 +607,69 @@
 
     function openGenerateModal() {
       document.getElementById('genResultBox').style.display = 'none';
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('genStartDate').value = today;
+      updateAddMitraExpiryPreview();
       document.getElementById('generateModal').classList.add('active');
     }
 
+    function updateAddMitraExpiryPreview() {
+      const startVal = document.getElementById('genStartDate').value || new Date().toISOString().slice(0, 10);
+      const paket = document.getElementById('genPaket').value || '3_MONTHS';
+      let monthsToAdd = 3;
+      if (paket === '6_MONTHS') monthsToAdd = 7;
+      else if (paket === '12_MONTHS') monthsToAdd = 16;
+
+      const d = new Date(startVal + 'T00:00:00');
+      d.setMonth(d.getMonth() + monthsToAdd);
+      document.getElementById('genEndDate').value = d.toISOString().slice(0, 10);
+    }
+
     async function submitGenerateLink() {
-      const owner = document.getElementById('genOwnerName').value || 'Mitra Baru';
-      const pass = document.getElementById('genPasscode').value || 'Master@00@';
+      const owner = document.getElementById('genOwnerName').value.trim();
+      const kepemilikan = document.getElementById('genKepemilikan') ? document.getElementById('genKepemilikan').value : 'VB';
+      const storeId = document.getElementById('genStoreId').value.trim();
+      const storeName = document.getElementById('genStoreName').value.trim();
+      const paket = document.getElementById('genPaket').value;
+      const passcode = document.getElementById('genPasscode').value || 'Master@00@';
+      const startDate = document.getElementById('genStartDate').value;
+      const endDate = document.getElementById('genEndDate').value;
+
+      if (!owner || !storeId || !storeName) {
+        alert('Mohon isi Nama Pemilik, Store ID, dan Nama Outlet.');
+        return;
+      }
 
       try {
-        const res = await fetch('/api/v1/admin/generate-link', {
+        const res = await fetch('/api/v1/admin/outlets', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({nama_pemilik: owner, passcode: pass})
+          body: JSON.stringify({
+            nama_pemilik: owner,
+            ownership_type: kepemilikan,
+            store_id: storeId,
+            nama_panjang_outlet: storeName,
+            nama_portal: storeName,
+            username: 'auto7313',
+            password: 'Auto@7313',
+            dashboard_password: passcode,
+            paket: paket,
+            tanggal_mulai_layanan: startDate,
+            tanggal_berakhir_layanan: endDate
+          })
         });
         const data = await res.json();
-        if (data.success) {
-          document.getElementById('genUrlInput').value = `${data.data.full_url} (Passcode: ${data.data.passcode})`;
+        if (res.ok && data.success) {
+          const fullUrl = (data.data && data.data.vercel_link) ? data.data.vercel_link : `${window.location.origin}/mitra/${owner.toLowerCase().replace(/\s+/g, '-')}`;
+          document.getElementById('genUrlInput').value = `${fullUrl} (Passcode: ${passcode})`;
           document.getElementById('genResultBox').style.display = 'block';
+          if (typeof showToast === 'function') showToast('Mitra dan Outlet berhasil ditambahkan!', 'success');
+          if (typeof loadStoresData === 'function') loadStoresData();
+        } else {
+          alert(data.detail || 'Gagal menambahkan mitra.');
         }
       } catch (err) {
-        alert('Gagal generate link.');
+        alert('Gagal menambahkan mitra: ' + err.message);
       }
     }
 
@@ -628,6 +749,39 @@
         }
       } catch (err) {
         alert('Gagal memperbarui masa aktif: ' + err.message);
+      }
+    }
+
+    let selectedOwnerForDelete = '';
+
+    function openDeleteModal(storeId, storeName, ownerName) {
+      selectedStoreForAction = storeId;
+      selectedOwnerForDelete = ownerName;
+      document.getElementById('deleteStoreSubtitle').innerText = `${storeName} (ID: ${storeId})`;
+      document.getElementById('deleteOwnerNameLabel').innerText = ownerName;
+      document.getElementById('deleteEntireMerchantCheck').checked = false;
+      document.getElementById('deleteModal').classList.add('active');
+    }
+
+    async function submitDeleteStore() {
+      if (!selectedStoreForAction) return;
+      const isDeleteMerchant = document.getElementById('deleteEntireMerchantCheck').checked;
+      const url = isDeleteMerchant
+        ? `/api/v1/admin/users/${encodeURIComponent(selectedOwnerForDelete)}`
+        : `/api/v1/admin/outlets/${encodeURIComponent(selectedStoreForAction)}`;
+
+      try {
+        const res = await fetch(url, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          closeAdminModal('deleteModal');
+          if (typeof showToast === 'function') showToast(data.message || 'Data berhasil dihapus!', 'success');
+          if (typeof loadStoresData === 'function') loadStoresData();
+        } else {
+          alert(data.detail || 'Gagal menghapus data.');
+        }
+      } catch (err) {
+        alert('Gagal menghapus data: ' + err.message);
       }
     }
 

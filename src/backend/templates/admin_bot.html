@@ -33,22 +33,64 @@
     {% include "admin_tab_bot.html" %}
   </div>
 
-  <!-- MODAL 1: GENERATE USER LINK -->
+  <!-- MODAL 1: GENERATE USER LINK & TAMBAH MITRA -->
   <div class="modal-overlay" id="generateModal">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 540px;">
       <div class="step-indicator">Admin Action</div>
-      <h3 class="card-title">Generate Link User Baru</h3>
-      <p class="card-subtitle">Buat Vercel Link Unik dan Kata Sandi untuk mitra pemilik toko.</p>
+      <h3 class="card-title">Tambah Mitra & Outlet Baru</h3>
+      <p class="card-subtitle">Buat Vercel Link Unik, outlet toko, dan atur paket layanan mitra.</p>
 
       <div style="margin-top: 16px;">
-        <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra</label>
-        <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Pemilik / Mitra *</label>
+            <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
+            <select id="genKepemilikan" class="form-input">
+              <option value="VB">VB</option>
+              <option value="Agency">Agency</option>
+            </select>
+          </div>
+        </div>
 
-        <label style="font-size: 12px; font-weight: 700; margin-top: 10px;">Store IDs (Pisahkan dengan Koma)</label>
-        <input type="text" id="genStoreIds" class="form-input" placeholder="cth: 21897166, 22403325">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Store ID (ID Shopee) *</label>
+            <input type="text" id="genStoreId" class="form-input" placeholder="cth: 21897166">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Nama Outlet / Merchant *</label>
+            <input type="text" id="genStoreName" class="form-input" placeholder="cth: Warung Budi Merdeka">
+          </div>
+        </div>
 
-        <label style="font-size: 12px; font-weight: 700; margin-top: 10px;">Password / Passcode Mitra</label>
-        <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@" value="Master@00@">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Pilihan Paket Layanan *</label>
+            <select id="genPaket" class="form-input" onchange="updateAddMitraExpiryPreview()">
+              <option value="3_MONTHS">Paket 3 Bulan</option>
+              <option value="6_MONTHS">Paket 6 Bulan (+1 Bln Bonus)</option>
+              <option value="12_MONTHS">Paket 12 Bulan (+4 Bln Bonus)</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Password / Passcode Mitra</label>
+            <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@" value="Master@00@">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Tanggal Mulai Layanan</label>
+            <input type="date" id="genStartDate" class="form-input" onchange="updateAddMitraExpiryPreview()">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Tanggal Berakhir (Otomatis)</label>
+            <input type="date" id="genEndDate" class="form-input" readonly style="background-color: #f8fafc; color: #334155;">
+          </div>
+        </div>
       </div>
 
       <div id="genResultBox" style="display: none; margin-top: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
@@ -59,7 +101,7 @@
 
       <div class="d-flex justify-content-end gap-2" style="margin-top: 20px;">
         <button class="btn-outline" onclick="closeAdminModal('generateModal')">Tutup</button>
-        <button class="btn-primary" onclick="submitGenerateLink()">Generate Link</button>
+        <button class="btn-primary" onclick="submitGenerateLink()">Simpan & Generate Link</button>
       </div>
     </div>
   </div>
@@ -139,44 +181,72 @@
     }
 
     function openGenerateModal() {
-      document.getElementById('genOwnerName').value = '';
-      document.getElementById('genStoreIds').value = '';
-      document.getElementById('genPasscode').value = '';
       document.getElementById('genResultBox').style.display = 'none';
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('genStartDate').value = today;
+      updateAddMitraExpiryPreview();
       document.getElementById('generateModal').classList.add('active');
+    }
+
+    function updateAddMitraExpiryPreview() {
+      const startVal = document.getElementById('genStartDate').value || new Date().toISOString().slice(0, 10);
+      const paket = document.getElementById('genPaket').value || '3_MONTHS';
+      let monthsToAdd = 3;
+      if (paket === '6_MONTHS') monthsToAdd = 7;
+      else if (paket === '12_MONTHS') monthsToAdd = 16;
+
+      const d = new Date(startVal + 'T00:00:00');
+      d.setMonth(d.getMonth() + monthsToAdd);
+      document.getElementById('genEndDate').value = d.toISOString().slice(0, 10);
     }
 
     async function submitGenerateLink() {
       const ownerName = document.getElementById('genOwnerName').value.trim();
+      const kepemilikan = document.getElementById('genKepemilikan') ? document.getElementById('genKepemilikan').value : 'VB';
+      const storeId = document.getElementById('genStoreId').value.trim();
+      const storeName = document.getElementById('genStoreName').value.trim();
+      const paket = document.getElementById('genPaket').value;
       const passcode = document.getElementById('genPasscode').value.trim() || 'Master@00@';
+      const startDate = document.getElementById('genStartDate').value;
+      const endDate = document.getElementById('genEndDate').value;
 
-      if (!ownerName) {
-        showErrorModal('Input Kurang Lengkap', 'Mohon isi Nama Pemilik / Mitra.');
+      if (!ownerName || !storeId || !storeName) {
+        showErrorModal('Input Kurang Lengkap', 'Mohon isi Nama Pemilik, Store ID, dan Nama Outlet.');
         return;
       }
 
       try {
-        const res = await fetch('/api/v1/admin/generate-link', {
+        const res = await fetch('/api/v1/admin/outlets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nama_pemilik: ownerName,
-            passcode: passcode
+            ownership_type: kepemilikan,
+            store_id: storeId,
+            nama_panjang_outlet: storeName,
+            nama_portal: storeName,
+            username: 'auto7313',
+            password: 'Auto@7313',
+            dashboard_password: passcode,
+            paket: paket,
+            tanggal_mulai_layanan: startDate,
+            tanggal_berakhir_layanan: endDate
           })
         });
 
         const data = await res.json();
         if (res.ok && data.success) {
           const info = data.data || data;
-          document.getElementById('genLinkUrl').innerText = info.full_url || info.generated_link || '';
-          document.getElementById('genLinkPasscode').innerText = info.passcode || passcode;
+          const fullUrl = info.vercel_link || `${window.location.origin}/mitra/${ownerName.toLowerCase().replace(/\s+/g, '-')}`;
+          document.getElementById('genLinkUrl').innerText = fullUrl;
+          document.getElementById('genLinkPasscode').innerText = passcode;
           document.getElementById('genResultBox').style.display = 'block';
-          showToast('Link Mitra berhasil dibuat!');
+          showToast('Mitra dan Outlet berhasil ditambahkan!');
         } else {
-          showErrorModal('Gagal Generate Link', data.detail || 'Terjadi kesalahan sistem.');
+          showErrorModal('Gagal Menambahkan Mitra', data.detail || 'Terjadi kesalahan sistem.');
         }
       } catch (err) {
-        showErrorModal('Koneksi Gagal', 'Gagal menghubungi server backend.');
+        showErrorModal('Koneksi Gagal', 'Gagal menghubungi server backend: ' + err.message);
       }
     }
 

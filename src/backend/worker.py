@@ -26,6 +26,7 @@ log = get_logger("backend_worker")
 # Filter account usernames allowed for bot execution (Default: auto7313 only)
 ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
+HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def warmup_all_account_sessions():
@@ -71,7 +72,7 @@ def warmup_all_account_sessions():
                 password=outlet.password,
                 phone=outlet.hp,
                 target_name=outlet.nama_portal,
-                headless=False
+                headless=HEADLESS
             )
             if session and session.get("shopee_tob_token"):
                 log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' successfully logged in & session saved.")
@@ -122,7 +123,7 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
             password=outlet.password,
             phone=outlet.hp,
             target_name=outlet.nama_portal,
-            headless=False
+            headless=HEADLESS
         )
 
         if session:

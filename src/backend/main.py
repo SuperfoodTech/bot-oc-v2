@@ -243,6 +243,7 @@ def admin_create_outlet(req: AdminCreateOutletRequest, admin: dict = Depends(req
         merchant_name=req.nama_portal,
         account_username=req.username,
         nama_pemilik=req.nama_pemilik,
+        ownership_type=req.ownership_type,
         paket=req.paket,
         tanggal_mulai_layanan=req.tanggal_mulai_layanan,
         tanggal_berakhir_layanan=req.tanggal_berakhir_layanan,
@@ -302,6 +303,39 @@ def admin_renew(req: AdminRenewRequest, admin: dict = Depends(require_admin)):
         "new_expiry_date": req.new_expiry_date,
         "message": f"Store {req.store_id} subscription renewed until {req.new_expiry_date}."
     }
+
+
+@app.delete("/api/v1/admin/outlets/{store_id}", summary="Admin: Delete Store Outlet")
+def admin_delete_outlet(store_id: str, admin: dict = Depends(require_admin)):
+    store = state.get_store_by_id(store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail=f"Store ID '{store_id}' tidak ditemukan.")
+    success = state.delete_store(store_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Gagal menghapus outlet dari database.")
+    state.record_log(
+        store_id=store_id,
+        store_name=store.get("store_name", store_id),
+        action="ADMIN_DELETE_STORE",
+        target_state="DELETED",
+        reason=f"Admin deleted outlet '{store_id}' ({store.get('store_name')})"
+    )
+    return {"success": True, "message": f"Outlet '{store_id}' berhasil dihapus."}
+
+
+@app.delete("/api/v1/admin/users/{nama_pemilik}", summary="Admin: Delete Merchant / Partner")
+def admin_delete_merchant(nama_pemilik: str, admin: dict = Depends(require_admin)):
+    success = state.delete_merchant(nama_pemilik)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Mitra '{nama_pemilik}' tidak ditemukan.")
+    state.record_log(
+        store_id="ADMIN",
+        store_name="ADMIN_SYSTEM",
+        action="ADMIN_DELETE_MERCHANT",
+        target_state="DELETED",
+        reason=f"Admin deleted merchant/partner '{nama_pemilik}' and all associated outlets."
+    )
+    return {"success": True, "message": f"Data mitra '{nama_pemilik}' beserta seluruh outlet berhasil dihapus."}
 
 
 # ── USER LINK / DASHBOARD ENDPOINTS ───────────────────────────────────────────
