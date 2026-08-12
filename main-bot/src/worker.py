@@ -27,10 +27,6 @@ log = get_logger("backend_worker")
 # Filter account usernames allowed for bot execution (Default: auto7313 only)
 ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
-
-# Filter store IDs allowed for bot execution (Default: 21897166 only)
-ALLOWED_STORE_IDS_ENV = os.getenv("ALLOWED_STORE_IDS", "21897166")
-ALLOWED_STORE_IDS = {s.strip() for s in ALLOWED_STORE_IDS_ENV.split(",") if s.strip()}
 HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"}
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
@@ -59,10 +55,6 @@ def warmup_all_account_sessions():
         # Exclude usernames not in whitelist (username != auto7313)
         if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
             log.info(f"  ⏭️ [STARTUP WARMUP] Excluding account '{username}' (username != auto7313).")
-            continue
-
-        # Filter to allowed store IDs if specified
-        if ALLOWED_STORE_IDS and str(outlet.store_id) not in ALLOWED_STORE_IDS:
             continue
 
         processed_accounts.add(username)
@@ -149,10 +141,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
     grouped_outlets: Dict[tuple, List[MerchantOutlet]] = {}
     for outlet in outlets:
         if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
-            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - username '{outlet.username}' != auto7313")
-            continue
-        if ALLOWED_STORE_IDS and str(outlet.store_id) not in ALLOWED_STORE_IDS:
-            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - store_id not in ALLOWED_STORE_IDS")
+            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - username '{outlet.username}' not in ALLOWED_USERNAMES")
             continue
         key = (outlet.username, outlet.nama_portal or "")
         if key not in grouped_outlets:
