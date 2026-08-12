@@ -441,6 +441,19 @@
       return hours ? `sisa ${hours}j ${minutes}m` : `sisa ${minutes}m`;
     }
 
+    function getMitraDynamicUrl(rawLink, ownerName) {
+      if (rawLink) {
+        try {
+          const parsed = new URL(rawLink);
+          return window.location.origin + parsed.pathname;
+        } catch (e) {
+          if (rawLink.startsWith('/')) return window.location.origin + rawLink;
+        }
+      }
+      const slug = ownerName ? ownerName.toLowerCase().replace(/\s+/g, '-') : 'mitra';
+      return `${window.location.origin}/mitra/${slug}`;
+    }
+
     function renderAdminTable(stores) {
       const tbody = document.getElementById('tableBody');
       const mobileList = document.getElementById('mobileOutletList');
@@ -461,7 +474,7 @@
       sortedStores.forEach(s => {
         const isVercelOn = s.vercel_status === 'ON';
         const ownerName = s.nama_pemilik || 'Fando';
-        const linkUrl = s.vercel_link || `/mitra/${ownerName.toLowerCase().replace(/ /g, '-')}`;
+        const linkUrl = getMitraDynamicUrl(s.vercel_link, ownerName);
         const tr = document.createElement('tr');
 
         tr.innerHTML = `
@@ -673,7 +686,7 @@
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          const fullUrl = (data.data && data.data.vercel_link) ? data.data.vercel_link : `${window.location.origin}/mitra/${owner.toLowerCase().replace(/\s+/g, '-')}`;
+          const fullUrl = getMitraDynamicUrl(data.data ? data.data.vercel_link : null, owner);
           document.getElementById('genUrlInput').value = `${fullUrl} (Passcode: ${passcode})`;
           document.getElementById('genResultBox').style.display = 'block';
           if (typeof showToast === 'function') showToast('Mitra dan Outlet berhasil ditambahkan!', 'success');

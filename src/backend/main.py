@@ -221,8 +221,9 @@ def admin_sync_source(admin: dict = Depends(require_admin)):
 
 
 @app.post("/api/v1/admin/generate-link", summary="Admin: Generate Unique User Link")
-def admin_generate_link(req: AdminGenerateLinkRequest, admin: dict = Depends(require_admin)):
-    result = state.admin_generate_user_link(req.nama_pemilik, req.passcode)
+def admin_generate_link(req: AdminGenerateLinkRequest, request: Request, admin: dict = Depends(require_admin)):
+    base_url = str(request.base_url).rstrip("/")
+    result = state.admin_generate_user_link(req.nama_pemilik, req.passcode, base_url=base_url)
     state.record_log(
         store_id="ADMIN",
         store_name="ADMIN_SYSTEM",
@@ -234,9 +235,10 @@ def admin_generate_link(req: AdminGenerateLinkRequest, admin: dict = Depends(req
 
 
 @app.post("/api/v1/admin/outlets", summary="Admin: Create or update merchant outlet")
-def admin_create_outlet(req: AdminCreateOutletRequest, admin: dict = Depends(require_admin)):
+def admin_create_outlet(req: AdminCreateOutletRequest, request: Request, admin: dict = Depends(require_admin)):
     if state.get_store_by_id(req.store_id):
         raise HTTPException(status_code=409, detail=f"Store ID '{req.store_id}' sudah terdaftar.")
+    base_url = str(request.base_url).rstrip("/")
     state.save_or_update_store(
         store_id=req.store_id,
         store_name=req.nama_panjang_outlet,
@@ -250,6 +252,7 @@ def admin_create_outlet(req: AdminCreateOutletRequest, admin: dict = Depends(req
         vercel_password=req.dashboard_password,
         regular_hours=req.operating_hours,
         special_hours=req.special_hours,
+        base_url=base_url,
     )
     return {"success": True, "data": state.get_store_by_id(req.store_id)}
 

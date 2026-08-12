@@ -52,7 +52,7 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (value or "mitra").lower()).strip("-") or "mitra"
 
 
-def _context(conn, owner: str, merchant_name: str, dashboard_password: str = ""):
+def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "", base_url: str = ""):
     owner_clean = (owner or "Unassigned").strip()
     portal_clean = (merchant_name or "Unknown Merchant").strip()
 
@@ -66,7 +66,7 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "")
         (merchant_id, portal_clean)
     ).fetchone()
 
-    base = os.getenv("APP_BASE_URL", "http://localhost:3001")
+    base = (base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")).rstrip("/")
     account = conn.execute("SELECT * FROM dashboard_accounts WHERE username=%s", (owner_clean,)).fetchone()
     if not account:
         slug = f"{_slug(owner_clean)}-{str(uuid.uuid4())[:6]}"
@@ -74,8 +74,14 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "")
             "INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') RETURNING *",
             (merchant_id, owner_clean, dashboard_password or "Master@00@", slug, f"{base}/mitra/{slug}")
         ).fetchone()
-    elif dashboard_password:
-        conn.execute("UPDATE dashboard_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (dashboard_password, account["id"]))
+    elif dashboard_password or base_url:
+        target_url = f"{base}/mitra/{account['link_slug']}" if account.get("link_slug") else None
+        if dashboard_password and target_url:
+            conn.execute("UPDATE dashboard_accounts SET password_plain=%s,dashboard_url=%s,updated_at=now() WHERE id=%s", (dashboard_password, target_url, account["id"]))
+        elif dashboard_password:
+            conn.execute("UPDATE dashboard_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (dashboard_password, account["id"]))
+        elif target_url:
+            conn.execute("UPDATE dashboard_accounts SET dashboard_url=%s,updated_at=now() WHERE id=%s", (target_url, account["id"]))
         account = conn.execute("SELECT * FROM dashboard_accounts WHERE id=%s", (account["id"],)).fetchone()
 
     bot = conn.execute("SELECT id FROM bot_accounts WHERE username=%s", (BOT_USERNAME,)).fetchone()
@@ -87,9 +93,9 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "")
     return merchant_id, portal["id"], account
 
 
-def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", **_ignored) -> Dict:
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", **_ignored) -> Dict:
     with get_db_connection() as conn:
-        merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password)
+        merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password, base_url=base_url)
         existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
         if existing_account:
             shopee_account_id = existing_account["id"]
@@ -171,7 +177,7 @@ def admin_generate_user_link(nama_pemilik, passcode=None, base_url=None):
     with get_db_connection() as conn:
         merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()
         if not merchant: merchant = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (nama_pemilik,)).fetchone()
-        password = passcode or "Master@00@"; slug = f"{_slug(nama_pemilik)}-{str(uuid.uuid4())[:6]}"; base = base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")
+        password = passcode or "Master@00@"; slug = f"{_slug(nama_pemilik)}-{str(uuid.uuid4())[:6]}"; base = (base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")).rstrip("/")
         row = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,link_slug=EXCLUDED.link_slug,dashboard_url=EXCLUDED.dashboard_url RETURNING link_slug,dashboard_url", (merchant["id"], nama_pemilik, password, slug, f"{base}/mitra/{slug}")).fetchone()
     return {"nama_pemilik": nama_pemilik, "passcode": password, "link_slug": row["link_slug"], "full_url": row["dashboard_url"]}
 
