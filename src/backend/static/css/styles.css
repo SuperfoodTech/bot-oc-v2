@@ -860,14 +860,21 @@ input:checked + .slider::before {
 .detail-actions {
   grid-column: 4;
   grid-row: 1 / span 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
   gap: 8px;
   min-width: 0;
   padding: 16px;
   background: var(--surface);
   border: 0;
+}
+
+.detail-actions .btn-primary,
+.detail-actions .btn-outline {
+  padding: 8px 10px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .detail-item dt {
