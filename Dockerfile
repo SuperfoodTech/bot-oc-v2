@@ -32,8 +32,6 @@ COPY database/ ./database/
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
 
-COPY web/src/backend/ ./web/src/backend/
-
 EXPOSE 3001
 
 # Production: single-worker, no reload
