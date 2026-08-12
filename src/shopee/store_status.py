@@ -6,13 +6,13 @@ from selenium.webdriver.common.by import By
 
 log = logging.getLogger(__name__)
 
-def ensure_business_hours_page(driver, store_id: str):
+def ensure_business_hours_page(driver, store_id: str) -> bool:
     """
-    Navigates Chrome browser to the exact Business Hours URL for store_id as specified in DOCS/guide-masuk-business-hours.md.
+    Navigates Chrome browser to the exact Business Hours URL for store_id and verifies if the Business Hours menu is fully loaded.
     URL: https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}
     """
     if not driver or not store_id:
-        return
+        return False
 
     target_url = f"https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}"
     current_url = str(driver.current_url or "").lower()
@@ -20,7 +20,34 @@ def ensure_business_hours_page(driver, store_id: str):
     if f"storeid={store_id}".lower() not in current_url:
         log.info(f"🌐 [NAVIGATE BUSINESS HOURS] Navigasi browser ke menu business hours untuk store {store_id}: {target_url}")
         driver.get(target_url)
-        time.sleep(1.0)  # Sleep 1s to allow Shopee React SPA to hydrate store context
+        time.sleep(2.0)
+
+    # Verifikasi langsung keterdeteksian menu Business Hours untuk target store_id
+    is_loaded = False
+    for attempt in range(1, 4):
+        try:
+            check_res = driver.execute_script("""
+                var bodyText = (document.body ? document.body.innerText : '').toLowerCase();
+                var hasKeywords = bodyText.includes('jam operasional') || bodyText.includes('tutup outlet') || bodyText.includes('buka outlet');
+                var currUrl = window.location.href.toLowerCase();
+                return {
+                    url_match: currUrl.includes('business-hours'),
+                    has_keywords: hasKeywords
+                };
+            """)
+            
+            if check_res and check_res.get("url_match") and check_res.get("has_keywords"):
+                is_loaded = True
+                log.info(f"  ✅ [VERIFY BUSINESS HOURS] Outlet Store {store_id} BERHASIL TERDETEKSI & TER-LOAD di menu Business Hours! (URL: {driver.current_url})")
+                break
+            else:
+                log.warning(f"  ⚠️ [VERIFY BUSINESS HOURS] Percobaan {attempt}/3: Halaman Business Hours Store {store_id} belum ter-load sempurna. Menunggu hidrasi React SPA...")
+                time.sleep(2.0)
+        except Exception as e:
+            log.warning(f"  ⚠️ [VERIFY BUSINESS HOURS] Error saat verifikasi hidrasi halaman: {e}")
+            time.sleep(1.5)
+
+    return is_loaded
 
 
 def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:

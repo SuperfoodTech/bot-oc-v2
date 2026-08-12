@@ -206,6 +206,13 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
 
             log.info(f"📌 Memasuki tab Business Hours untuk Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
 
+            # Check and verify if the Business Hours menu for target store_id is detected
+            is_detected = store_status.ensure_business_hours_page(driver, store_id=outlet.store_id)
+            if is_detected:
+                log.info(f"  ✅ [BUSINESS HOURS CONFIRMED] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) TERDETEKSI & TER-LOAD SEMPURNA di menu Business Hours!")
+            else:
+                log.warning(f"  ⚠️ [BUSINESS HOURS WARNING] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) BELUM TERDETEKSI SEMPURNA di menu Business Hours!")
+
             # Single Essential Endpoint: Fetch Realtime Live Store Status via /api/seller/store
             try:
                 live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
