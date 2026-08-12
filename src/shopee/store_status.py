@@ -74,9 +74,11 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 xhr.send(null);
                 return JSON.parse(xhr.responseText);
             } catch(e) {
-                return null;
+                return {code: -1, msg: e.message};
             }
         """)
+
+        log.info(f"  🔍 [LIVE STORE API RAW RESPONSE] Store {store_id} | Raw Res: {res}")
 
         if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
             data = res["data"]
@@ -98,7 +100,7 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
 
             log.info(
                 f"  ✅ [REALTIME LIVE STATE] Store {store_id} | "
-                f"Status: {status_str} (BUKA) | display_opening_status: {display_status} | "
+                f"Status: {status_str} | display_opening_status: {display_status} | "
                 f"order_enabled: {order_enabled} | "
                 f"pause_start_time: {pause_start}"
             )
@@ -112,7 +114,10 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
             }
 
         # Fallback: DOM check matching UI Screenshot
+        log.warning(f"  ⚠️ [LIVE STORE API FALLBACK] Respon API /api/seller/store bukan 0: {res}. Menjalankan pengecekan DOM...")
         body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+        log.info(f"  🔍 [LIVE DOM TEXT SEARCH] Body Text Length: {len(body_text)} | URL: {driver.current_url}")
+
         if "tutup outlet sementara" in body_text:
             log.info("  ✅ [LIVE DOM STATUS] Button 'Tutup Outlet Sementara' detected -> Store is OPEN.")
             return {"opening_status": 2, "order_enabled": 1, "status_str": "OPEN", "raw": {"source": "partner_dom"}}
