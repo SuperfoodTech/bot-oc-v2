@@ -37,6 +37,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src/ ./src/
 COPY main-bot/src/ ./main-bot/src/
 COPY database/ ./database/
+COPY scripts/ ./scripts/
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src

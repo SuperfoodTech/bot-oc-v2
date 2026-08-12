@@ -135,10 +135,8 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
 
 def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pause_duration_minutes: int = 1440) -> bool:
     """
-    Triggers store pause (Auto Close) via exact API endpoint POST https://foody.shopee.co.id/api/seller/store/opening-status/action/pause
-    Matching DOCS/pause outlet/pause-header.txt & DOCS/pause outlet/pause-payload.txt
-    Payload: {"pause_start_time": now, "pause_end_time": end} (65 bytes)
-    Requires xhr.withCredentials = true to pass session cookies across origins.
+    Triggers store pause (Auto Close) for store_id.
+    Executes UI Button Click ('Tutup Outlet Sementara') first, then falls back to XHR POST API.
     """
     if not driver or not store_id:
         return False
@@ -146,37 +144,9 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
     try:
         ensure_business_hours_page(driver, store_id)
 
-        log.info(f"⚡ [ACTION PAUSE API] Triggering POST action/pause API for Store {store_id}...")
+        log.info(f"⚡ [ACTION PAUSE UI] Triggering UI Button Click for Store {store_id}...")
 
-        # Exact API call matching DOCS/pause outlet/
-        target_num = int(store_id) if str(store_id).isdigit() else store_id
-        res = driver.execute_script(f"""
-            try {{
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'https://foody.shopee.co.id/api/seller/store/opening-status/action/pause', false);
-                xhr.withCredentials = true;
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                var now = Date.now();
-                var end = now + ({pause_duration_minutes} * 60 * 1000);
-                xhr.send(JSON.stringify({{
-                    "pause_start_time": now,
-                    "pause_end_time": end
-                }}));
-                return JSON.parse(xhr.responseText);
-            }} catch(e) {{
-                return {{code: -1, msg: e.message}};
-            }}
-        """)
-
-        log.info(f"  🔍 [PAUSE API RESPONSE] Store {store_id} | Response: {res}")
-        if isinstance(res, dict) and res.get("code") == 0:
-            log.info(f"  ✅ [ACTION PAUSE SUCCESS] Store {store_id} berhasil di-pause (Tutup Toko via API).")
-            return True
-        else:
-            log.warning(f"  ⚠️ Pause action returned response: {res}")
-
-        # Fallback: UI Button Click if API returns auth/other error
-        log.info("  👉 Executing UI Button Click fallback...")
+        # 1. UI Button Click (Native React UI trigger on Business Hours page)
         btn_clicked = driver.execute_script("""
             var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
             var targetBtn = btns.find(b => {
@@ -192,16 +162,49 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
         """)
 
         if btn_clicked:
+            log.info("  👉 Clicked 'Tutup Outlet Sementara' button on UI. Confirming modal...")
             time.sleep(1.0)
-            driver.execute_script("""
+            modal_confirm = driver.execute_script("""
                 var modalBtns = Array.from(document.querySelectorAll('.ant-modal-footer button, div[class*="modal"] button, button'));
                 var confirmBtn = modalBtns.find(b => {
                     var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
                     return txt === 'konfirmasi' || txt === 'ya' || txt === 'setuju' || txt === 'ok' || txt.includes('tutup');
                 });
-                if (confirmBtn) confirmBtn.click();
+                if (confirmBtn) {
+                    confirmBtn.click();
+                    return true;
+                }
+                return false;
             """)
-            log.info("  ✅ [UI ACTION PAUSE SUCCESS] Confirmed 'Tutup Outlet' modal successfully.")
+            if modal_confirm:
+                log.info("  ✅ [UI ACTION PAUSE SUCCESS] Confirmed 'Tutup Outlet' modal successfully.")
+                time.sleep(1.0)
+                return True
+
+        # 2. XHR POST API Fallback with explicit store_id query param
+        log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
+        target_num = int(store_id) if str(store_id).isdigit() else store_id
+        res = driver.execute_script(f"""
+            try {{
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', false);
+                xhr.withCredentials = true;
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                var now = Date.now();
+                var end = now + ({pause_duration_minutes} * 60 * 1000);
+                xhr.send(JSON.stringify({{
+                    "pause_start_time": now,
+                    "pause_end_time": end,
+                    "store_id": {target_num}
+                }}));
+                return JSON.parse(xhr.responseText);
+            }} catch(e) {{
+                return {{code: -1, msg: e.message}};
+            }}
+        """)
+        log.info(f"  🔍 [PAUSE API RESPONSE] Store {store_id} | Response: {res}")
+        if isinstance(res, dict) and res.get("code") == 0:
+            log.info(f"  ✅ [ACTION PAUSE SUCCESS] Store {store_id} berhasil di-pause (Tutup Toko via API).")
             return True
 
     except Exception as e:
@@ -212,10 +215,8 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
 
 def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> bool:
     """
-    Triggers store reopen (Auto Open) via exact API endpoint POST https://foody.shopee.co.id/api/seller/store/opening-status/action/open
-    Matching DOCS/open outlet/open-header.txt & DOCS/open outlet/open-payload,txt
-    Payload: {"store_id": "21897166"} (23 bytes)
-    Requires xhr.withCredentials = true to pass session cookies across origins.
+    Triggers store reopen (Auto Open) for store_id.
+    Executes UI Button Click ('Buka Outlet') first, then falls back to XHR POST API.
     """
     if not driver or not store_id:
         return False
@@ -223,32 +224,9 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
     try:
         ensure_business_hours_page(driver, store_id)
 
-        log.info(f"⚡ [ACTION OPEN API] Triggering POST action/open API for Store {store_id}...")
+        log.info(f"⚡ [ACTION OPEN UI] Triggering UI Button Click for Store {store_id}...")
 
-        res = driver.execute_script(f"""
-            try {{
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'https://foody.shopee.co.id/api/seller/store/opening-status/action/open', false);
-                xhr.withCredentials = true;
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(JSON.stringify({{
-                    "store_id": "{store_id}"
-                }}));
-                return JSON.parse(xhr.responseText);
-            }} catch(e) {{
-                return {{code: -1, msg: e.message}};
-            }}
-        """)
-
-        log.info(f"  🔍 [OPEN API RESPONSE] Store {store_id} | Response: {res}")
-        if isinstance(res, dict) and res.get("code") == 0:
-            log.info(f"  ✅ [ACTION OPEN SUCCESS] Store {store_id} berhasil dibuka (Buka Toko via API).")
-            return True
-        else:
-            log.warning(f"  ⚠️ Open action returned response: {res}")
-
-        # Fallback: UI Button Click if API returns auth/other error
-        log.info("  👉 Executing UI Button Click fallback...")
+        # 1. UI Button Click (Native React UI trigger on Business Hours page)
         btn_clicked = driver.execute_script("""
             var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
             var targetBtn = btns.find(b => {
@@ -264,16 +242,45 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
         """)
 
         if btn_clicked:
+            log.info("  👉 Clicked 'Buka Outlet' button on UI. Confirming modal...")
             time.sleep(1.0)
-            driver.execute_script("""
+            modal_confirm = driver.execute_script("""
                 var modalBtns = Array.from(document.querySelectorAll('.ant-modal-footer button, div[class*="modal"] button, button'));
                 var confirmBtn = modalBtns.find(b => {
                     var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
                     return txt === 'konfirmasi' || txt === 'ya' || txt === 'setuju' || txt === 'ok' || txt.includes('buka');
                 });
-                if (confirmBtn) confirmBtn.click();
+                if (confirmBtn) {
+                    confirmBtn.click();
+                    return true;
+                }
+                return false;
             """)
-            log.info("  ✅ [UI ACTION OPEN SUCCESS] Confirmed 'Buka Outlet' modal successfully.")
+            if modal_confirm:
+                log.info("  ✅ [UI ACTION OPEN SUCCESS] Confirmed 'Buka Outlet' modal successfully.")
+                time.sleep(1.0)
+                return True
+
+        # 2. XHR POST API Fallback with explicit store_id query param
+        log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
+        target_num = int(store_id) if str(store_id).isdigit() else store_id
+        res = driver.execute_script(f"""
+            try {{
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={store_id}', false);
+                xhr.withCredentials = true;
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify({{
+                    "store_id": "{store_id}"
+                }}));
+                return JSON.parse(xhr.responseText);
+            }} catch(e) {{
+                return {{code: -1, msg: e.message}};
+            }}
+        """)
+        log.info(f"  🔍 [OPEN API RESPONSE] Store {store_id} | Response: {res}")
+        if isinstance(res, dict) and res.get("code") == 0:
+            log.info(f"  ✅ [ACTION OPEN SUCCESS] Store {store_id} berhasil dibuka (Buka Toko via API).")
             return True
 
     except Exception as e:
