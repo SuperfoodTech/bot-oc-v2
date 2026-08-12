@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """One-time/master import of spreadsheet columns B-Y into PostgreSQL."""
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from backend import db
 from core.sheets import fetch_merchant_outlets
 

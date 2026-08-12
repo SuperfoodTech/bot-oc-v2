@@ -1,0 +1,135 @@
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "store_id": "21897166",
+        "regular_hours": [
+            {
+                "weekday": 1,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            },
+            {
+                "weekday": 2,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            },
+            {
+                "weekday": 3,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            },
+            {
+                "weekday": 4,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            },
+            {
+                "weekday": 5,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            },
+            {
+                "weekday": 6,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            },
+            {
+                "weekday": 7,
+                "config_enabled": 0,
+                "intervals": [
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    },
+                    {
+                        "start_relative_sec": 0,
+                        "end_relative_sec": 0
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 GOOGLE_SHEETS_CSV_URL = os.getenv(
     "GOOGLE_SHEETS_CSV_URL",

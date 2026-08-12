@@ -52,6 +52,7 @@ services:
     volumes:
       - ./src/data:/app/src/data
       - ./src:/app/src
+      - ./credentials.json:/app/credentials.json
 
 volumes:
   postgres_data:

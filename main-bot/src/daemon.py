@@ -213,6 +213,8 @@ if __name__ == "__main__":
     parser.add_argument("--interval-seconds", type=int, default=60, help="Interval between sync cycles in seconds")
     parser.add_argument("--once", action="store_true", help="Run a single cycle then exit")
     parser.add_argument("--dry-run", action="store_true", help="Evaluate decisions without calling live Shopee APIs")
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode (default: False)")
 
     args = parser.parse_args()
+    worker.HEADLESS = args.headless
     run_daemon(interval_seconds=args.interval_seconds, once=args.once, dry_run=args.dry_run)
