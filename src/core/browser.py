@@ -678,7 +678,7 @@ def _init_driver(headless: bool):
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-component-update")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-    if headless:
+    if headless or not os.environ.get("DISPLAY"):
         options.add_argument("--headless=new")
         options.add_argument("--window-size=1920,1080")
     else:
