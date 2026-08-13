@@ -62,14 +62,15 @@ def warmup_all_account_sessions():
         session_file = PROJECT_ROOT / "src" / "data" / f"session_{username}.json"
         browser.set_session_file(session_file)
 
-        # Always launch/verify persistent browser session for the account
-        log.info(f"  🌐 [STARTUP WARMUP] Initializing active browser session for account '{username}' (Target Portal: {outlet.nama_portal})...")
+        # Warmup: verifikasi login saja, tanpa switch ke portal tertentu.
+        # Switch portal dilakukan per-merchant-group saat sync_all_stores berjalan.
+        log.info(f"  🌐 [STARTUP WARMUP] Initializing active browser session for account '{username}'...")
         try:
             session = browser.get_session(
                 username=username,
                 password=outlet.password,
                 phone=outlet.hp,
-                target_name=outlet.nama_portal,
+                target_name=None,  # Jangan paksa switch portal saat warmup
                 headless=HEADLESS,
                 close_browser=False,
             )
