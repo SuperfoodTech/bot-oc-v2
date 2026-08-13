@@ -156,15 +156,55 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
         cached = ACTIVE_SESSIONS.get(username)
         driver = cached.get("driver") if cached else None
 
-        if driver:
+        def _is_session_dead(drv) -> bool:
+            """Return True if the WebDriver session is no longer valid."""
             try:
-                curr_url = str(driver.current_url or "").lower()
-                if "partner.shopee.co.id" in curr_url:
-                    log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}'. Skip switch.")
+                _ = drv.current_url
+                return False
+            except Exception:
+                return True
+
+        def _recover_session(reason: str) -> None:
+            """Clear stale session cache and re-launch a fresh browser session."""
+            nonlocal cached, driver
+            log.warning(f"  🔁 [SESSION RECOVERY] Dead session detected ({reason}). Re-launching browser for account '{username}'...")
+            ACTIVE_SESSIONS.pop(username, None)
+            cached = None
+            driver = None
+            try:
+                first_outlet = merchant_outlets[0]
+                new_session = browser.get_session(
+                    username=username,
+                    password=first_outlet.password,
+                    phone=first_outlet.hp,
+                    target_name=portal_name,
+                    headless=HEADLESS,
+                    close_browser=False,
+                )
+                if new_session and new_session.get("shopee_tob_token"):
+                    ACTIVE_SESSIONS[username] = new_session
+                    cached = new_session
+                    driver = new_session.get("driver")
+                    log.info(f"  ✅ [SESSION RECOVERY] Browser session restored for account '{username}' (Portal: {portal_name}).")
                 else:
-                    browser.auto_switch_merchant(driver, portal_name)
-            except Exception as sw_err:
-                log.warning(f"  ⚠️ Merchant context switch warning: {sw_err}")
+                    log.warning(f"  ⚠️ [SESSION RECOVERY] Re-launch completed but session token missing for '{username}'.")
+            except Exception as rec_err:
+                log.error(f"  ❌ [SESSION RECOVERY] Failed to re-launch browser for '{username}': {rec_err}")
+
+        if driver:
+            if _is_session_dead(driver):
+                _recover_session("invalid session id")
+            else:
+                try:
+                    curr_url = str(driver.current_url or "").lower()
+                    if "partner.shopee.co.id" in curr_url:
+                        log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}'. Skip switch.")
+                    else:
+                        browser.auto_switch_merchant(driver, portal_name)
+                except Exception as sw_err:
+                    log.warning(f"  ⚠️ Merchant context switch warning: {sw_err}")
+                    if _is_session_dead(driver):
+                        _recover_session("switch merchant failed")
         else:
             # Launch/get browser session targeting portal_name
             try:
