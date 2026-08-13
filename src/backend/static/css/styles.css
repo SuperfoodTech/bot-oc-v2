@@ -2396,9 +2396,12 @@ body {
 .admin-login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .admin-login-card { width: min(100%, 420px); padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
 .admin-login-card h1 { margin: 10px 0 6px; color: var(--ink); font-size: clamp(26px, 5vw, 34px); }
-.admin-login-card label { display: block; margin: 18px 0 7px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.admin-login-card .step-indicator { font-size: 12px; }
+.admin-login-card .card-subtitle { font-size: 14px; }
+.admin-login-card label { display: block; margin: 18px 0 7px; color: var(--ink); font-size: 13px; font-weight: 700; }
+.admin-login-card .form-input { font-size: 14px; }
 .admin-login-submit { width: 100%; margin-top: 20px; }
-.admin-login-error { min-height: 18px; margin: 12px 0 0; color: #b45309; font-size: 12px; }
+.admin-login-error { min-height: 18px; margin: 12px 0 0; color: #b45309; font-size: 13px; }
 .password-field { position: relative; }
 .password-field .form-input { padding-right: 48px; }
 .password-visibility-toggle {

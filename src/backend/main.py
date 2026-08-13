@@ -513,7 +513,8 @@ def list_stores(admin: dict = Depends(require_admin)):
             is_suspended=bool(s["is_suspended"]),
             alasan_penangguhan=s.get("alasan_penangguhan", ""),
             pause_until=s["pause_until"],
-            last_synced_at=s["last_synced_at"]
+            last_synced_at=s["last_synced_at"],
+            last_action=s.get("last_action", "no change")
         ))
     return response
 
@@ -541,7 +542,8 @@ def get_store_detail(store_id: str, admin: dict = Depends(require_admin)):
         is_suspended=bool(s["is_suspended"]),
         alasan_penangguhan=s.get("alasan_penangguhan", ""),
         pause_until=s["pause_until"],
-        last_synced_at=s["last_synced_at"]
+        last_synced_at=s["last_synced_at"],
+        last_action=s.get("last_action", "no change")
     )
 
 
@@ -805,6 +807,7 @@ def control_bot_endpoint(req: BotControlRequest, admin: dict = Depends(require_a
             
         # Fallback: Process is dead / unreachable -> clean stale lock and launch daemon process
         try:
+            # Check if another daemon process is already running by checking PID lock
             lock_path = PROJECT_ROOT / "main-bot" / "src" / "daemon.lock"
             if lock_path.exists():
                 try:
@@ -813,6 +816,9 @@ def control_bot_endpoint(req: BotControlRequest, admin: dict = Depends(require_a
                         pid = int(content)
                         try:
                             os.kill(pid, 0)
+                            # PID is alive! Do not spawn a duplicate process.
+                            state.record_log(store_id="SYSTEM", store_name="Bot Patrol Engine", action="ADMIN_START_BOT", target_state="OPEN", reason=f"Admin {admin.get('username')} mengaktifkan kembali daemon yang ada (PID {pid})")
+                            return {"success": True, "message": "Proses daemon bot sudah berjalan.", "status": "running"}
                         except (OSError, ProcessLookupError):
                             lock_path.unlink(missing_ok=True)
                     else:

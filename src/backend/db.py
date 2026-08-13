@@ -128,8 +128,22 @@ def save_or_update_store(store_id: str, store_name: str, merchant_name: str, acc
         return dict(account) if account else {}
 
 
+def format_last_action(raw_action: Optional[str]) -> str:
+    if not raw_action:
+        return "no change"
+    act = str(raw_action).strip().upper()
+    if act in ("ACTION_OPEN", "USER_RESUME_STORE", "OPEN_STORE", "OPEN"):
+        return "action open"
+    elif act in ("ACTION_CLOSE", "USER_PAUSE_STORE", "CLOSE_STORE", "CLOSE", "PAUSE"):
+        return "action close"
+    elif act in ("NO_CHANGE", "NONE"):
+        return "no change"
+    else:
+        return "no change"
+
+
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at AS last_synced_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     query += " ORDER BY m.name,p.name,o.store_id"
     with get_db_connection() as conn:
@@ -156,6 +170,7 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
         for r in rows:
             r["regular_hours"] = hours_map.get(r["outlet_uuid"], {})
             r["special_hours"] = r.get("special_hours") or ""
+            r["last_action"] = format_last_action(r.get("last_action_raw"))
         return rows
 
 
@@ -275,6 +290,7 @@ def record_log(store_id, store_name, action, target_state, reason):
         if not outlet: return
         row = conn.execute("SELECT vercel_status,shopee_actual_status,suspension_status FROM outlet_states WHERE outlet_id=%s", (outlet["id"],)).fetchone() or {}
         conn.execute("INSERT INTO automation_logs (outlet_id,suspension_status,subscription_status,vercel_status_before,shopee_status_before,target_status,action,success,reason) VALUES (%s,%s,'ACTIVE',%s,%s,%s,%s,true,%s)", (outlet["id"], row.get("suspension_status", "ACTIVE"), row.get("vercel_status", "OFF"), row.get("shopee_actual_status", "UNKNOWN"), target_state, action, reason))
+        conn.execute("UPDATE outlet_states SET last_action_at=now(), last_checked_at=now(), updated_at=now() WHERE outlet_id=%s", (outlet["id"],))
 def get_recent_logs(limit=50, store_ids=None):
     query = """
         SELECT

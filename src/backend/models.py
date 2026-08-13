@@ -35,6 +35,7 @@ class StoreStatusResponse(BaseModel):
     alasan_penangguhan: Optional[str] = ""
     pause_until: Optional[str] = None
     last_synced_at: Optional[str] = None
+    last_action: Optional[str] = "no change"
 
 
 class SyncResponse(BaseModel):

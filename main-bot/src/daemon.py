@@ -38,6 +38,18 @@ LOCK_FILE_PATH = Path(__file__).resolve().parent / "daemon.lock"
 _lock_file_handle = None
 
 
+import socket
+
+
+def is_port_in_use(port: int = 8081) -> bool:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            return s.connect_ex(('127.0.0.1', port)) == 0
+    except Exception:
+        return False
+
+
 def is_pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -67,6 +79,11 @@ def acquire_single_instance_lock() -> bool:
     if _lock_file_handle is not None:
         return False
     
+    # 1. Check if port 8081 is already bound by an active daemon
+    if is_port_in_use(8081):
+        log.warning("⚠️ Socket lock check: Port 8081 is already in use by an active daemon.")
+        return False
+
     cleanup_stale_lock()
 
     try:

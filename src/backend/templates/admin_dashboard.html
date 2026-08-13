@@ -606,6 +606,7 @@
             <div><dt>Status utama</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
             <div><dt>Langganan berlaku sampai</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
             <div><dt>Status akun</dt><dd><span class="status-text ${s.is_suspended ? '' : 'is-active'}">${s.is_suspended ? 'Ditangguhkan' : 'Aktif'}</span></dd></div>
+            <div><dt>Action terakhir</dt><dd>${detailValue(s.last_action, 'no change')}</dd></div>
             <div class="mobile-detail-wide"><dt>Dashboard mitra</dt><dd><a href="${linkUrl}" target="_blank" class="mobile-dashboard-link">Buka dashboard mitra</a></dd></div>
           </dl>
 
@@ -635,7 +636,7 @@
         ['Status akun', store.is_suspended ? 'Ditangguhkan' : 'Aktif'],
         ['Alasan penangguhan', store.alasan_penangguhan],
         ['Password dashboard mitra', store.vercel_password],
-        ['Aktivitas terakhir', `Pemeriksaan: ${detailValue(store.last_synced_at)} · Aksi: ${detailValue(store.last_action_at)}`]
+        ['Action terakhir', detailValue(store.last_action, 'no change')]
       ];
 
       return detailRows.map(([label, value]) => `
