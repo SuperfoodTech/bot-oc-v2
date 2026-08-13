@@ -1653,8 +1653,11 @@ def get_session(username=None, password=None, phone=None, headless=True, close_b
                     active_name.lower().strip() == "unknown merchant" or
                     active_name.lower().strip() == "admin"
                 )
-                if active_id and active_id != "None" and not is_invalid_name:
-                    log.info(f"📍 [MERCHANT] Current: {active_name} (ID: {active_id})")
+                if not is_invalid_name:
+                    # Active merchant name is valid — accept it regardless of active_id.
+                    # active_id may be None if response.json cache is stale, but that's OK
+                    # when no specific target_name is required (e.g. warmup mode).
+                    log.info(f"📍 [MERCHANT] Current: {active_name} (ID: {active_id or 'unknown'}). Accepted.")
                     do_switch = False
                 else:
                     log.info(f"📍 [MERCHANT] Invalid active merchant detected (Name: {active_name}, ID: {active_id}). Redirecting/Switching...")
