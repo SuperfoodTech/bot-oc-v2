@@ -73,6 +73,7 @@ def warmup_all_account_sessions():
                 target_name=None,  # Jangan paksa switch portal saat warmup
                 headless=HEADLESS,
                 close_browser=False,
+                interactive=False,
             )
             if session and session.get("shopee_tob_token"):
                 ACTIVE_SESSIONS[username] = session
@@ -109,6 +110,7 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
         target_name=outlet.nama_portal,
         headless=HEADLESS,
         close_browser=False,
+        interactive=False,
     )
 
     if session:
@@ -181,6 +183,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     target_name=portal_name,
                     headless=HEADLESS,
                     close_browser=False,
+                    interactive=False,
                 )
                 if new_session and new_session.get("shopee_tob_token"):
                     ACTIVE_SESSIONS[username] = new_session
@@ -217,6 +220,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     target_name=portal_name,
                     headless=HEADLESS,
                     close_browser=False,
+                    interactive=False,
                 )
                 if session and session.get("shopee_tob_token"):
                     ACTIVE_SESSIONS[username] = session
