@@ -31,6 +31,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
       - SHOPEE_BOT_USERNAME=auto7313
       - SHOPEE_BOT_PASSWORD=Auto@7313
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     volumes:
       - ./src:/app/src
 
@@ -49,6 +50,7 @@ services:
       - SHOPEE_BOT_PASSWORD=Auto@7313
       - ALLOWED_USERNAMES=auto7313
       - HEADLESS=true
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     volumes:
       - ./src/data:/app/src/data
       - ./src:/app/src

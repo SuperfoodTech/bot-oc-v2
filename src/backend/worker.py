@@ -82,6 +82,8 @@ def warmup_all_account_sessions():
             log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' warmup exception: {ex}")
 
 
+from core.notifier import send_discord_success, send_discord_error
+
 def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
@@ -93,6 +95,9 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
         return False
 
     log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_pendek_outlet})...")
+
+    merchant_name = outlet.nama_portal or outlet.nama_pemilik or "Shopee Merchant"
+    outlet_name = outlet.nama_panjang_outlet or outlet.nama_pendek_outlet or outlet.store_id
 
     # Set session file according to outlet username
     if outlet.username:
@@ -113,6 +118,12 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
                 success = browser.pause_store_api(tob_token, entity_id, store_id=outlet.store_id)
             if success:
                 log.info(f"  ✅ [DIRECT API SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                send_discord_success(
+                    merchant=merchant_name,
+                    outlet=outlet_name,
+                    action=action,
+                    store_id=outlet.store_id
+                )
                 return True
 
     # 2. Browser Selenium Fallback (Full Login Sequence)
@@ -140,6 +151,12 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
                     success = browser.pause_store_api(tob_token, entity_id, store_id=outlet.store_id)
                 if success:
                     log.info(f"  ✅ [SELENIUM BROWSER API SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                    send_discord_success(
+                        merchant=merchant_name,
+                        outlet=outlet_name,
+                        action=action,
+                        store_id=outlet.store_id
+                    )
                     return True
 
             # If API fails or returns need to select store, use UI Button fallback!
@@ -148,12 +165,26 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
                 success = browser.execute_store_action_ui(driver, outlet.store_id, action)
                 if success:
                     log.info(f"  ✅ [SELENIUM BROWSER UI SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                    send_discord_success(
+                        merchant=merchant_name,
+                        outlet=outlet_name,
+                        action=action,
+                        store_id=outlet.store_id
+                    )
                     return True
     except Exception as e:
         log.error(f"  ❌ Selenium browser login error for Store {outlet.store_id}: {e}")
 
     log.error(f"  ❌ Gagal mengeksekusi {action} untuk Store {outlet.store_id}.")
+    send_discord_error(
+        platform="Shopee",
+        merchant=merchant_name,
+        outlet=outlet_name,
+        error_type="ACTION_FAILED",
+        message=f"Gagal mengeksekusi aksi {action} untuk Outlet '{outlet_name}' (Store ID: {outlet.store_id})."
+    )
     return False
+
 
 
 def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:

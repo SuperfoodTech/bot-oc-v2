@@ -200,11 +200,39 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 _recover_session("invalid session id")
             else:
                 try:
-                    curr_url = str(driver.current_url or "").lower()
-                    if "partner.shopee.co.id" in curr_url:
-                        log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}'. Skip switch.")
+                    # Ambil nama merchant yang sedang aktif di browser DOM (.merchantName)
+                    current_merchant = ""
+                    try:
+                        current_merchant = driver.execute_script(
+                            "return (document.querySelector('.merchantName')?.innerText || '').trim();"
+                        )
+                    except Exception:
+                        pass
+
+                    already_active = False
+                    if portal_name and current_merchant:
+                        p_norm = portal_name.lower().strip()
+                        c_norm = current_merchant.lower().strip()
+                        if p_norm == c_norm or p_norm in c_norm or c_norm in p_norm:
+                            already_active = True
+
+                    if already_active:
+                        log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}' (Current UI: '{current_merchant}'). Skip switch.")
                     else:
-                        browser.auto_switch_merchant(driver, portal_name)
+                        log.info(f"  🔄 [MERCHANT] Current merchant di browser: '{current_merchant or 'Unknown'}' | Target group: '{portal_name}'. Executing auto_switch_merchant...")
+                        sw_ok = browser.auto_switch_merchant(driver, portal_name)
+                        if sw_ok:
+                            log.info(f"  ✅ [MERCHANT] Switched successfully to portal merchant '{portal_name}'.")
+                            # Perbarui token dan entity_id di session cache setelah merchant switch
+                            tok, eid = browser.extract_tokens_from_driver(driver)
+                            if cached:
+                                if tok:
+                                    cached["shopee_tob_token"] = tok
+                                if eid:
+                                    cached["shopee_tob_entity_id"] = eid
+                        else:
+                            log.warning(f"  ⚠️ [MERCHANT] auto_switch_merchant ke '{portal_name}' gagal. Initiating session recovery...")
+                            _recover_session(f"switch merchant to {portal_name} failed")
                 except Exception as sw_err:
                     log.warning(f"  ⚠️ Merchant context switch warning: {sw_err}")
                     if _is_session_dead(driver):

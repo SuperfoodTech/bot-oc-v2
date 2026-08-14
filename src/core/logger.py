@@ -3,37 +3,64 @@ import os
 import sys
 from datetime import datetime
 
+class DiscordWebhookHandler(logging.Handler):
+    """
+    Handler kustom untuk meneruskan log berlevel ERROR atau CRITICAL ke Discord Webhook.
+    """
+    def __init__(self, level=logging.ERROR):
+        super().__init__(level)
+
+    def emit(self, record):
+        try:
+            from core.notifier import send_discord_error
+            msg = record.getMessage()
+            send_discord_error(
+                message=msg,
+                title="❌ Eror Bot Patroli",
+                logger_name=record.name
+            )
+        except Exception:
+            pass
+
+
+_LOGGERS = {}
+
+
 class Logger:
     _instance = None
 
     def __new__(cls, name="shopee_pro"):
-        if cls._instance is None:
-            cls._instance = super(Logger, cls).__new__(cls)
-            cls._instance._setup_logger(name)
-        return cls._instance.logger
+        return get_logger(name)
 
-    def _setup_logger(self, name):
-        self.logger = logging.getLogger(name)
-        self.logger.propagate = False
-        
-        # Get log level from env, default to INFO
-        level_name = os.getenv("LOG_LEVEL", "INFO").upper()
-        level = getattr(logging, level_name, logging.INFO)
-        self.logger.setLevel(level)
 
+def get_logger(name="shopee_pro"):
+    if name in _LOGGERS:
+        return _LOGGERS[name]
+
+    logger = logging.getLogger(name)
+    logger.propagate = False
+
+    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    logger.setLevel(level)
+
+    if not logger.handlers:
         # Console Handler
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(level)
-        
-        # Format: [TIME] [LEVEL] [NAME] MESSAGE
+
         formatter = logging.Formatter(
             '%(asctime)s | %(levelname)-8s | %(message)s',
             datefmt='%H:%M:%S'
         )
         console_handler.setFormatter(formatter)
-        
-        if not self.logger.handlers:
-            self.logger.addHandler(console_handler)
+        logger.addHandler(console_handler)
 
-def get_logger(name="shopee_pro"):
-    return Logger(name)
+        # Discord Webhook Handler untuk ERROR & CRITICAL
+        if os.getenv("DISCORD_WEBHOOK_URL"):
+            discord_handler = DiscordWebhookHandler(level=logging.ERROR)
+            logger.addHandler(discord_handler)
+
+    _LOGGERS[name] = logger
+    return logger
+
