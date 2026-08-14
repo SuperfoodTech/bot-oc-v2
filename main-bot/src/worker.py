@@ -21,6 +21,7 @@ from decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_N
 import browser
 import db
 from shopee import store_status
+from core.notifier import send_discord_skipped
 
 log = get_logger("backend_worker")
 
@@ -305,18 +306,36 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     log.info(f"  🔍 [POST-EXECUTION VERIFICATION] Memverifikasi ulang status live Shopee setelah {decision.action} untuk Store {outlet.store_id}...")
                     time.sleep(1.5)
                     post_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
+                    expected_st = "ON" if decision.target_state == "OPEN" else "PAUSE"
                     if post_info and post_info.get("status_str") in ("OPEN", "CLOSED"):
                         verified_st = "ON" if post_info["status_str"] == "OPEN" else "PAUSE"
-                        log.info(f"  ✅ [POST-EXECUTION VERIFIED] Status Live Shopee Pasca-{decision.action}: '{verified_st}' (Expected: '{'ON' if decision.target_state == 'OPEN' else 'PAUSE'}').")
+                        log.info(f"  ✅ [POST-EXECUTION VERIFIED] Status Live Shopee Pasca-{decision.action}: '{verified_st}' (Expected: '{expected_st}').")
                         new_actual_status = verified_st
+
+                        if verified_st != expected_st:
+                            merchant_name = outlet.nama_portal or outlet.nama_pemilik or "Shopee Merchant"
+                            outlet_name = outlet.nama_panjang_outlet or outlet.nama_pendek_outlet or outlet.store_id
+                            log.info(
+                                f"  ℹ️ [POST-EXECUTION MISMATCH - SKIPPED] Status Live Shopee ('{verified_st}') berbeda dari ekspektasi ('{expected_st}'). "
+                                f"Outlet '{outlet_name}' ({merchant_name}) di-SKIP (kemungkinan ada Jadwal Khusus / Libur di Shopee)."
+                            )
+                            send_discord_skipped(
+                                merchant=merchant_name,
+                                outlet=outlet_name,
+                                action=decision.action,
+                                live_status=verified_st,
+                                expected_status=expected_st,
+                                store_id=outlet.store_id
+                            )
                     else:
-                        new_actual_status = "ON" if decision.target_state == "OPEN" else "PAUSE"
+                        new_actual_status = expected_st
 
                     try:
                         db.update_shopee_actual_status(outlet.store_id, new_actual_status)
                         log.info(f"  ✅ [DB STATUS SYNC] Status shopee_actual_status Store {outlet.store_id} berhasil diupdate ke '{new_actual_status}' di DB.")
                     except Exception as sync_err:
                         log.warning(f"  ⚠️ Gagal mengupdate DB shopee_actual_status: {sync_err}")
+
 
                 reason_text = f"{decision.reason} | Shopee Action: {'SUCCESS' if exec_ok else 'FAILED'}"
                 actions_taken.append({

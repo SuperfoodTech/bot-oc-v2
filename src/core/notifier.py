@@ -241,3 +241,71 @@ def send_discord_success(
     _send_payload_async(webhook_url, payload)
 
 
+def send_discord_skipped(
+    merchant: str,
+    outlet: str,
+    action: str,
+    live_status: str,
+    expected_status: str,
+    platform: str = "Shopee",
+    store_id: str = None,
+    message: str = None
+):
+    """
+    Mengirim notifikasi informasi (di-SKIP) ketika status live Shopee pasca-aksi
+    berbeda dari ekspektasi (misal karena ada Jadwal Khusus / Libur di Shopee).
+    """
+    webhook_url = _get_webhook_url()
+    if not webhook_url:
+        return
+
+    title = "⚠️ Status Outlet Berbeda (Di-SKIP)"
+    color_orange = 15105570  # Orange #E67E22
+
+    if not message:
+        message = (
+            f"Outlet **{outlet}** pada Merchant **{merchant}** di-SKIP dari paksa status.\n"
+            f"Status Live Shopee pasca-eksekusi adalah **{live_status}**, sedangkan ekspektasi dari aksi **{action}** adalah **{expected_status}**.\n"
+            f"*Kemungkinan toko memiliki Jadwal Khusus / Libur atau belum memiliki jadwal di Shopee.*"
+        )
+
+    sig_raw = f"{title}:{platform}:{merchant}:{outlet}:{action}:{live_status}:{expected_status}"
+    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
+
+    if _is_duplicate(sig_hash):
+        return
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    fields = [
+        {"name": "Platform", "value": f"`{platform}`", "inline": True},
+        {"name": "Merchant Name", "value": f"`{merchant}`", "inline": True},
+        {"name": "Outlet Name", "value": f"`{outlet}`", "inline": True},
+    ]
+
+    if store_id:
+        fields.append({"name": "Store ID", "value": f"`{store_id}`", "inline": True})
+
+    fields.append({"name": "Status Live Shopee", "value": f"`{live_status}`", "inline": True})
+    fields.append({"name": "Ekspektasi Aksi", "value": f"`{expected_status}`", "inline": True})
+    fields.append({"name": "Status Bot", "value": "`DI-SKIP (Jadwal Khusus)`", "inline": True})
+    fields.append({"name": "Waktu", "value": now_str, "inline": True})
+
+    embed = {
+        "title": title,
+        "description": message,
+        "color": color_orange,
+        "fields": fields,
+        "footer": {
+            "text": "FoodMaster Bot Patrol Engine"
+        }
+    }
+
+    payload = {
+        "embeds": [embed]
+    }
+
+    _send_payload_async(webhook_url, payload)
+
+
+
