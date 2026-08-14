@@ -28,6 +28,7 @@ class StoreStatusResponse(BaseModel):
     tanggal_berakhir_layanan: Optional[str] = ""
     vercel_link: Optional[str] = ""
     vercel_password: Optional[str] = ""
+    google_email: Optional[str] = ""
     vercel_status: str
     shopee_status: str
     subscription_status: str
@@ -77,6 +78,7 @@ class AdminCreateOutletRequest(BaseModel):
     tanggal_berakhir_layanan: str = ""
     operating_hours: Dict[str, str] = Field(default_factory=dict)
     special_hours: str = ""
+    google_email: Optional[str] = Field(default=None, description="Email Google Mitra")
 
 
 class AdminSuspendRequest(BaseModel):
@@ -98,6 +100,7 @@ class AdminEditOutletRequest(BaseModel):
     ownership_type: Optional[str] = Field(default=None, description="Kepemilikan: VB atau Agency")
     paket: Optional[str] = Field(default=None, description="Paket: 3_MONTHS, 6_MONTHS, 12_MONTHS")
     dashboard_password: Optional[str] = Field(default=None, description="Passcode dashboard")
+    google_email: Optional[str] = Field(default=None, description="Email Google Mitra")
 
 
 class AdminLoginRequest(BaseModel):
@@ -108,11 +111,13 @@ class AdminLoginRequest(BaseModel):
 class AdminAccountUpdateRequest(BaseModel):
     username: Optional[str] = Field(default=None, min_length=1)
     password: Optional[str] = Field(default=None, min_length=1)
+    google_email: Optional[str] = Field(default=None, description="Email Google Admin")
 
 
 class AdminAccountCreateRequest(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
+    google_email: Optional[str] = Field(default=None, description="Email Google Admin")
 
 
 # ── USER LINK / DASHBOARD MODELS ──────────────────────────────────────────────

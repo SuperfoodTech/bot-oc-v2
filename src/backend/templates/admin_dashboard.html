@@ -118,6 +118,17 @@
           </div>
         </div>
 
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Passcode Mitra</label>
+            <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
+            <input type="email" id="genGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com">
+          </div>
+        </div>
+
         <div id="genResultBox"
           style="display: none; margin-top: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;">
           <div style="font-size: 12px; font-weight: 700; color: var(--ink);">Mitra & Outlet Berhasil Dibuat!</div>
@@ -257,6 +268,13 @@
           <div style="flex: 1;">
             <label style="font-size: 12px; font-weight: 700;">Passcode Mitra</label>
             <input type="text" id="editPasscode" class="form-input" placeholder="Master@00@">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
+            <input type="email" id="editGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com">
           </div>
         </div>
 
@@ -717,6 +735,8 @@
       const paket = document.getElementById('genPaket').value;
       const passcodeEl = document.getElementById('genPasscode');
       const passcode = passcodeEl ? passcodeEl.value : 'Master@00@';
+      const googleEmailEl = document.getElementById('genGoogleEmail');
+      const googleEmail = googleEmailEl ? googleEmailEl.value.trim() : null;
       const startDate = document.getElementById('genStartDate').value;
       const endDate = document.getElementById('genEndDate').value;
 
@@ -740,7 +760,8 @@
             dashboard_password: passcode,
             paket: paket,
             tanggal_mulai_layanan: startDate,
-            tanggal_berakhir_layanan: endDate
+            tanggal_berakhir_layanan: endDate,
+            google_email: googleEmail || null
           })
         });
         const data = await res.json();
@@ -776,6 +797,7 @@
       document.getElementById('editPaket').value = planCode;
 
       document.getElementById('editPasscode').value = store.vercel_password || 'Master@00@';
+      document.getElementById('editGoogleEmail').value = store.google_email || '';
       document.getElementById('editModal').classList.add('active');
     }
 
@@ -788,6 +810,7 @@
       const storeName = document.getElementById('editStoreName').value.trim();
       const paket = document.getElementById('editPaket').value;
       const passcode = document.getElementById('editPasscode').value.trim() || 'Master@00@';
+      const googleEmail = document.getElementById('editGoogleEmail').value.trim() || null;
 
       if (!owner || !portalName || !storeName) {
         alert('Mohon isi Nama Pemilik, Nama Merchant/Portal, dan Nama Outlet.');
@@ -805,7 +828,8 @@
             nama_portal: portalName,
             nama_panjang_outlet: storeName,
             paket: paket,
-            dashboard_password: passcode
+            dashboard_password: passcode,
+            google_email: googleEmail
           })
         });
         const data = await res.json();
@@ -1062,6 +1086,7 @@
         const data = await res.json();
         document.getElementById('currentAdminUsername').innerText = data.username;
         document.getElementById('settingsUsername').value = data.username;
+        document.getElementById('settingsGoogleEmail').value = data.google_email || '';
         loadAdminAccounts();
       } catch (err) {
         console.error('Gagal memuat profil admin:', err);
@@ -1075,9 +1100,12 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal memuat akun admin.');
         list.innerHTML = data.accounts.map(account => `
-          <div class="admin-account-item">
-            <strong>${account.username}</strong>
-            <span>${account.is_active ? 'Aktif' : 'Nonaktif'}</span>
+          <div class="admin-account-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line);">
+            <div>
+              <strong>${account.username}</strong>
+              <div style="font-size: 11px; color: var(--ink-light);">${account.google_email ? account.google_email : 'Tidak ada Google Email'}</div>
+            </div>
+            <span class="settings-role" style="font-size: 10px;">${account.is_active ? 'Aktif' : 'Nonaktif'}</span>
           </div>`).join('') || '<span>Belum ada akun admin.</span>';
       } catch (err) {
         list.innerText = err.message;
@@ -1088,15 +1116,18 @@
       const message = document.getElementById('settingsAccountMessage');
       const username = document.getElementById('settingsUsername').value.trim();
       const password = document.getElementById('settingsPassword').value;
+      const googleEmail = document.getElementById('settingsGoogleEmail').value.trim();
       message.textContent = '';
       try {
         const body = { username };
         if (password) body.password = password;
+        body.google_email = googleEmail || null;
         const res = await fetch('/api/v1/admin/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal menyimpan perubahan akun.');
         document.getElementById('settingsPassword').value = '';
         document.getElementById('currentAdminUsername').innerText = data.account.username;
+        document.getElementById('settingsGoogleEmail').value = data.account.google_email || '';
         message.textContent = 'Perubahan akun tersimpan.';
         loadAdminAccounts();
       } catch (err) {
@@ -1106,18 +1137,23 @@
 
     async function createAdminAccount() {
       const message = document.getElementById('newAdminMessage');
+      const username = document.getElementById('newAdminUsername').value.trim();
+      const password = document.getElementById('newAdminPassword').value;
+      const googleEmail = document.getElementById('newAdminGoogleEmail').value.trim();
       message.textContent = '';
       try {
         const res = await fetch('/api/v1/admin/accounts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-            username: document.getElementById('newAdminUsername').value.trim(),
-            password: document.getElementById('newAdminPassword').value
+            username: username,
+            password: password,
+            google_email: googleEmail || null
           })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal menambahkan akun admin.');
         document.getElementById('newAdminUsername').value = '';
         document.getElementById('newAdminPassword').value = '';
+        document.getElementById('newAdminGoogleEmail').value = '';
         message.textContent = 'Akun admin berhasil ditambahkan.';
         loadAdminAccounts();
       } catch (err) {

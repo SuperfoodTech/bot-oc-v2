@@ -22,6 +22,7 @@ venv.bak/
 .env.*.local
 credentials.json
 main-bot/credentials.json
+src/secrets/
 
 # Session data, tokens, runtime locks & dynamic bot logs
 data/

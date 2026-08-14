@@ -23,10 +23,13 @@ def init_db() -> None:
     base_dir = Path(__file__).resolve().parents[2] / "database" / "migrations"
     schema_path = base_dir / "001_initial_schema.sql"
     migration2_path = base_dir / "002_separate_merchant_outlet.sql"
+    migration3_path = base_dir / "003_add_google_auth.sql"
     with get_db_connection() as conn:
         conn.execute(schema_path.read_text(encoding="utf-8"))
         if migration2_path.exists():
             conn.execute(migration2_path.read_text(encoding="utf-8"))
+        if migration3_path.exists():
+            conn.execute(migration3_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -52,7 +55,7 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (value or "mitra").lower()).strip("-") or "mitra"
 
 
-def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "", base_url: str = ""):
+def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "", base_url: str = "", google_email: Optional[str] = None):
     owner_clean = (owner or "Unassigned").strip()
     portal_clean = (merchant_name or "Unknown Merchant").strip()
 
@@ -71,18 +74,29 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     if not account:
         slug = f"{_slug(owner_clean)}-{str(uuid.uuid4())[:6]}"
         account = conn.execute(
-            "INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') RETURNING *",
-            (merchant_id, owner_clean, dashboard_password or "Master@00@", slug, f"{base}/mitra/{slug}")
+            "INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role,google_email) VALUES (%s,%s,%s,%s,%s,'MERCHANT',%s) RETURNING *",
+            (merchant_id, owner_clean, dashboard_password or "Master@00@", slug, f"{base}/mitra/{slug}", google_email)
         ).fetchone()
-    elif dashboard_password or base_url:
-        target_url = f"{base}/mitra/{account['link_slug']}" if account.get("link_slug") else None
-        if dashboard_password and target_url:
-            conn.execute("UPDATE dashboard_accounts SET password_plain=%s,dashboard_url=%s,updated_at=now() WHERE id=%s", (dashboard_password, target_url, account["id"]))
-        elif dashboard_password:
-            conn.execute("UPDATE dashboard_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (dashboard_password, account["id"]))
-        elif target_url:
-            conn.execute("UPDATE dashboard_accounts SET dashboard_url=%s,updated_at=now() WHERE id=%s", (target_url, account["id"]))
-        account = conn.execute("SELECT * FROM dashboard_accounts WHERE id=%s", (account["id"],)).fetchone()
+    else:
+        updates = []
+        params = []
+        if dashboard_password:
+            updates.append("password_plain=%s")
+            params.append(dashboard_password)
+        if base_url:
+            target_url = f"{base}/mitra/{account['link_slug']}" if account.get("link_slug") else None
+            if target_url:
+                updates.append("dashboard_url=%s")
+                params.append(target_url)
+        if google_email is not None:
+            updates.append("google_email=%s")
+            params.append(google_email.strip() or None)
+        
+        if updates:
+            updates.append("updated_at=now()")
+            query = f"UPDATE dashboard_accounts SET {', '.join(updates)} WHERE id=%s"
+            conn.execute(query, (*params, account["id"]))
+            account = conn.execute("SELECT * FROM dashboard_accounts WHERE id=%s", (account["id"],)).fetchone()
 
     bot = conn.execute("SELECT id FROM bot_accounts WHERE username=%s", (BOT_USERNAME,)).fetchone()
     if bot:
@@ -93,9 +107,9 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     return merchant_id, portal["id"], account
 
 
-def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", **_ignored) -> Dict:
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, **_ignored) -> Dict:
     with get_db_connection() as conn:
-        merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password, base_url=base_url)
+        merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password, base_url=base_url, google_email=google_email)
         existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
         if existing_account:
             shopee_account_id = existing_account["id"]
@@ -143,7 +157,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at::text AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     query += " ORDER BY m.name,p.name,o.store_id"
     with get_db_connection() as conn:
@@ -213,12 +227,30 @@ def admin_authenticate(username, password):
     return dict(row) if row else None
 
 
+def google_authenticate(email: str):
+    with get_db_connection() as conn:
+        row = conn.execute(
+            "SELECT id, username, role, is_active, password_plain FROM dashboard_accounts WHERE LOWER(google_email)=LOWER(%s) AND is_active=true LIMIT 1",
+            (email,),
+        ).fetchone()
+        if row:
+            conn.execute("UPDATE dashboard_accounts SET last_login_at=now(), updated_at=now() WHERE id=%s", (row["id"],))
+            return dict(row)
+    return None
+
+
+def get_dashboard_account_by_id(account_id):
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT id, username, role, is_active, google_email FROM dashboard_accounts WHERE id=%s LIMIT 1", (account_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def admin_list_accounts():
     with get_db_connection() as conn:
-        return [dict(row) for row in conn.execute("SELECT id,username,role,is_active,last_login_at,created_at FROM dashboard_accounts WHERE role='ADMIN' ORDER BY username").fetchall()]
+        return [dict(row) for row in conn.execute("SELECT id,username,role,is_active,google_email,last_login_at,created_at FROM dashboard_accounts WHERE role='ADMIN' ORDER BY username").fetchall()]
 
 
-def admin_update_account(account_id, username=None, password=None):
+def admin_update_account(account_id, username=None, password=None, google_email=None):
     with get_db_connection() as conn:
         account = conn.execute("SELECT id,username,role,is_active FROM dashboard_accounts WHERE id=%s AND role='ADMIN'", (account_id,)).fetchone()
         if not account:
@@ -229,22 +261,33 @@ def admin_update_account(account_id, username=None, password=None):
         duplicate = conn.execute("SELECT id FROM dashboard_accounts WHERE username=%s AND id<>%s", (next_username, account_id)).fetchone()
         if duplicate:
             raise ValueError("Username sudah digunakan akun lain.")
+        
+        email_clean = google_email.strip() if google_email is not None else None
+        if email_clean:
+            duplicate_email = conn.execute("SELECT id FROM dashboard_accounts WHERE LOWER(google_email)=LOWER(%s) AND id<>%s", (email_clean, account_id)).fetchone()
+            if duplicate_email:
+                raise ValueError("Email Google sudah digunakan akun lain.")
+
         if password is not None:
-            conn.execute("UPDATE dashboard_accounts SET username=%s,password_plain=%s,updated_at=now() WHERE id=%s", (next_username, password, account_id))
+            conn.execute("UPDATE dashboard_accounts SET username=%s,password_plain=%s,google_email=%s,updated_at=now() WHERE id=%s", (next_username, password, email_clean, account_id))
         else:
-            conn.execute("UPDATE dashboard_accounts SET username=%s,updated_at=now() WHERE id=%s", (next_username, account_id))
-        row = conn.execute("SELECT id,username,role,is_active FROM dashboard_accounts WHERE id=%s", (account_id,)).fetchone()
+            conn.execute("UPDATE dashboard_accounts SET username=%s,google_email=%s,updated_at=now() WHERE id=%s", (next_username, email_clean, account_id))
+        row = conn.execute("SELECT id,username,role,is_active,google_email FROM dashboard_accounts WHERE id=%s", (account_id,)).fetchone()
     return dict(row)
 
 
-def admin_create_account(username, password):
+def admin_create_account(username, password, google_email=None):
     username = username.strip()
     if not username or not password:
         raise ValueError("Username dan password wajib diisi.")
+    email_clean = google_email.strip() if google_email else None
     with get_db_connection() as conn:
         if conn.execute("SELECT id FROM dashboard_accounts WHERE username=%s", (username,)).fetchone():
             raise ValueError("Username sudah digunakan akun lain.")
-        row = conn.execute("INSERT INTO dashboard_accounts (username,password_plain,role,is_active) VALUES (%s,%s,'ADMIN',true) RETURNING id,username,role,is_active", (username, password)).fetchone()
+        if email_clean:
+            if conn.execute("SELECT id FROM dashboard_accounts WHERE LOWER(google_email)=LOWER(%s)", (email_clean,)).fetchone():
+                raise ValueError("Email Google sudah digunakan akun lain.")
+        row = conn.execute("INSERT INTO dashboard_accounts (username,password_plain,role,is_active,google_email) VALUES (%s,%s,'ADMIN',true,%s) RETURNING id,username,role,is_active,google_email", (username, password, email_clean)).fetchone()
     return dict(row)
 def update_vercel_toggle(store_id, status, pause_until=None):
     with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_until, store_id))
@@ -253,7 +296,7 @@ def admin_set_suspension(store_id, penangguhan, alasan=""):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET suspension_status=%s,suspension_reason=%s,vercel_status=CASE WHEN %s THEN 'OFF' ELSE vercel_status END,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", ("SUSPENDED" if suspended else "ACTIVE", alasan, suspended, store_id))
 def admin_renew_subscription(store_id, new_expiry_date):
     with get_db_connection() as conn: conn.execute("UPDATE subscriptions s SET end_date=%s,status='ACTIVE',updated_at=now() FROM outlets o WHERE o.id=s.outlet_id AND o.store_id=%s", (new_expiry_date, store_id))
-def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_portal: Optional[str] = None, nama_panjang_outlet: Optional[str] = None, ownership_type: Optional[str] = None, paket: Optional[str] = None, dashboard_password: Optional[str] = None) -> bool:
+def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_portal: Optional[str] = None, nama_panjang_outlet: Optional[str] = None, ownership_type: Optional[str] = None, paket: Optional[str] = None, dashboard_password: Optional[str] = None, google_email: Optional[str] = None) -> bool:
     with get_db_connection() as conn:
         outlet = conn.execute("SELECT id, merchant_id, portal_id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
         if not outlet:
@@ -274,6 +317,8 @@ def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_po
             conn.execute("UPDATE portals SET name=%s, updated_at=now() WHERE id=%s", (new_portal, pid))
         if dashboard_password is not None and dashboard_password.strip():
             conn.execute("UPDATE dashboard_accounts SET password_plain=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (dashboard_password.strip(), mid))
+        if google_email is not None:
+            conn.execute("UPDATE dashboard_accounts SET google_email=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (google_email.strip() or None, mid))
         if paket is not None and paket.strip():
             code = paket.strip().upper().replace(" ", "_")
             if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"}:

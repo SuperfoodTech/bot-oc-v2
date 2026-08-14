@@ -150,9 +150,119 @@ def admin_logout(response: Response):
     return {"success": True}
 
 
+@app.get("/api/v1/auth/google/login", summary="Initiate Google OAuth Flow")
+def google_login(role: str = "merchant", state_url: Optional[str] = Query(None, alias="state_url")):
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    if not client_id or not redirect_uri:
+        raise HTTPException(
+            status_code=500,
+            detail="Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI in the environment."
+        )
+    
+    scope = "openid email profile"
+    state_param = f"{role}"
+    if state_url:
+        state_param = f"{role}:{state_url}"
+    
+    import urllib.parse
+    google_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth?"
+        f"response_type=code&"
+        f"client_id={client_id}&"
+        f"redirect_uri={urllib.parse.quote(redirect_uri)}&"
+        f"scope={urllib.parse.quote(scope)}&"
+        f"state={urllib.parse.quote(state_param)}"
+    )
+    return RedirectResponse(url=google_url)
+
+
+@app.get("/api/v1/auth/google/callback", summary="Google OAuth Callback")
+def google_callback(code: str, state_val: Optional[str] = Query(None, alias="state"), response: Response = None):
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    
+    if not client_id or not client_secret or not redirect_uri:
+        raise HTTPException(status_code=500, detail="Google OAuth configuration missing.")
+    
+    role = "merchant"
+    redirect_path = ""
+    if state_val:
+        parts = state_val.split(":", 1)
+        role = parts[0]
+        if len(parts) > 1:
+            redirect_path = parts[1]
+
+    fallback_login_url = "/admin/login" if role == "admin" else "/app"
+    if redirect_path:
+        fallback_login_url = redirect_path
+
+    import requests
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+    
+    try:
+        token_res = requests.post(token_url, data=data, timeout=10)
+        token_res.raise_for_status()
+        token_data = token_res.json()
+    except Exception as e:
+        import urllib.parse
+        return RedirectResponse(url=f"{fallback_login_url}?error=token_exchange_failed&detail={urllib.parse.quote(str(e))}")
+        
+    access_token = token_data.get("access_token")
+    if not access_token:
+        return RedirectResponse(url=f"{fallback_login_url}?error=no_access_token")
+        
+    userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    try:
+        user_res = requests.get(userinfo_url, headers=headers, timeout=10)
+        user_res.raise_for_status()
+        user_info = user_res.json()
+    except Exception as e:
+        import urllib.parse
+        return RedirectResponse(url=f"{fallback_login_url}?error=userinfo_fetch_failed&detail={urllib.parse.quote(str(e))}")
+        
+    email = user_info.get("email")
+    if not email:
+        return RedirectResponse(url=f"{fallback_login_url}?error=email_not_provided")
+        
+    account = state.google_authenticate(email)
+    if not account:
+        import urllib.parse
+        return RedirectResponse(url=f"{fallback_login_url}?error=email_not_registered&email={urllib.parse.quote(email)}")
+
+    if role == "admin":
+        if account.get("role") != "ADMIN":
+            return RedirectResponse(url=f"{fallback_login_url}?error=unauthorized_role")
+        payload = {"sub": str(account["id"]), "username": account["username"], "role": "ADMIN", "exp": int(datetime.now().timestamp()) + ADMIN_SESSION_TTL_SECONDS}
+        signed = _sign_admin_session(payload)
+        resp = RedirectResponse(url="/admin/dashboard", status_code=303)
+        resp.set_cookie(ADMIN_SESSION_COOKIE, signed, httponly=True, max_age=ADMIN_SESSION_TTL_SECONDS, samesite="lax", secure=False, path="/")
+        return resp
+    else:
+        if account.get("role") != "MERCHANT":
+            return RedirectResponse(url=f"{fallback_login_url}?error=unauthorized_role")
+        passcode = account.get("password_plain")
+        import urllib.parse
+        target = redirect_path if redirect_path else "/app"
+        separator = "&" if "?" in target else "?"
+        return RedirectResponse(url=f"{target}{separator}passcode={urllib.parse.quote(passcode)}")
+
+
 @app.get("/api/v1/admin/me", summary="Get Current Admin")
 def admin_me(admin: dict = Depends(require_admin)):
-    return {"success": True, "username": admin["username"], "role": admin["role"]}
+    account = state.get_dashboard_account_by_id(admin["sub"])
+    if not account:
+        raise HTTPException(status_code=404, detail="Akun admin tidak ditemukan.")
+    return {"success": True, "username": account["username"], "role": account["role"], "google_email": account.get("google_email")}
 
 
 @app.get("/api/v1/admin/accounts", summary="List Admin Accounts")
@@ -163,7 +273,7 @@ def admin_accounts(admin: dict = Depends(require_admin)):
 @app.patch("/api/v1/admin/account", summary="Update Current Admin Account")
 def admin_update_current_account(req: AdminAccountUpdateRequest, response: Response, admin: dict = Depends(require_admin)):
     try:
-        account = state.admin_update_account(admin["sub"], req.username, req.password)
+        account = state.admin_update_account(admin["sub"], req.username, req.password, req.google_email)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not account:
@@ -176,7 +286,7 @@ def admin_update_current_account(req: AdminAccountUpdateRequest, response: Respo
 @app.post("/api/v1/admin/accounts", summary="Create Admin Account")
 def admin_create_account(req: AdminAccountCreateRequest, admin: dict = Depends(require_admin)):
     try:
-        account = state.admin_create_account(req.username, req.password)
+        account = state.admin_create_account(req.username, req.password, req.google_email)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"success": True, "account": account}
@@ -254,6 +364,7 @@ def admin_create_outlet(req: AdminCreateOutletRequest, request: Request, admin: 
         regular_hours=req.operating_hours,
         special_hours=req.special_hours,
         base_url=base_url,
+        google_email=req.google_email,
     )
     return {"success": True, "data": state.get_store_by_id(req.store_id)}
 
@@ -322,7 +433,8 @@ def admin_edit_outlet(req: AdminEditOutletRequest, admin: dict = Depends(require
         nama_panjang_outlet=req.nama_panjang_outlet,
         ownership_type=req.ownership_type,
         paket=req.paket,
-        dashboard_password=req.dashboard_password
+        dashboard_password=req.dashboard_password,
+        google_email=req.google_email
     )
     if not success:
         raise HTTPException(status_code=500, detail="Gagal memperbarui data outlet.")

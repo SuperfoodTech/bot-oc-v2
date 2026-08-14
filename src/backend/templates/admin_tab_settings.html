@@ -16,6 +16,7 @@
           <div class="settings-form-grid">
             <div class="settings-field"><label for="settingsUsername">Username baru</label><input id="settingsUsername" class="form-input" aria-label="Username baru" autocomplete="username"></div>
             <div class="settings-field"><label for="settingsPassword">Password baru</label><input id="settingsPassword" class="form-input" type="password" aria-label="Password baru" autocomplete="new-password" placeholder="Biarkan kosong jika tidak diubah"></div>
+            <div class="settings-field"><label for="settingsGoogleEmail">Email Google</label><input id="settingsGoogleEmail" class="form-input" type="email" aria-label="Email Google" placeholder="cth: admin@gmail.com"></div>
           </div>
           <button class="btn-primary" type="button" onclick="updateAdminAccount()">Simpan perubahan</button>
           <p id="settingsAccountMessage" class="settings-message" role="status"></p>
@@ -25,6 +26,7 @@
           <div class="settings-form-grid">
             <div class="settings-field"><label for="newAdminUsername">Username</label><input id="newAdminUsername" class="form-input" aria-label="Username admin baru" autocomplete="off"></div>
             <div class="settings-field"><label for="newAdminPassword">Password</label><input id="newAdminPassword" class="form-input" type="password" aria-label="Password admin baru" autocomplete="new-password"></div>
+            <div class="settings-field"><label for="newAdminGoogleEmail">Email Google</label><input id="newAdminGoogleEmail" class="form-input" type="email" aria-label="Email Google admin baru" placeholder="cth: adminbaru@gmail.com"></div>
           </div>
           <button class="btn-outline" type="button" onclick="createAdminAccount()">Tambahkan role admin</button>
           <p id="newAdminMessage" class="settings-message" role="status"></p>
