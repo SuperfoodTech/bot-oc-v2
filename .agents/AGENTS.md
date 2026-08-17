@@ -28,3 +28,14 @@ Setiap generasi kode atau penambahan fitur baru wajib membuat file dokumentasi r
 - **PATCH/FIX**: Perbaikan bug, optimasi handling error, atau patch stabilitas.
 Setiap file update wajib mencantumkan seksi `Whats New`, `Spesifikasi`, dan `Handling`.
 
+## Aturan Gaya Penulisan & Komunikasi (Copywriting & Dokumentasi)
+
+1. **Penggunaan Emoji**:
+   - Dilarang menggunakan emoji secara berlebihan (*excessive emojis*) pada teks respons, penjelasan, maupun dokumentasi rilis.
+   - Gunakan gaya penulisan yang lugas, profesional, dan langsung pada inti teknis.
+
+2. **Fakta Kode & Relevansi (Strict Project Relevance)**:
+   - Dilarang mengarang fitur, membuat asumsi fiktif, atau menuliskan sesuatu yang tidak ada di dalam codebase project ini.
+   - Seluruh penjelasan, analisis, dan dokumentasi rilis harus 100% akurat dan benar-benar terverifikasi (*strictly related*) dengan kode yang ada.
+
+
