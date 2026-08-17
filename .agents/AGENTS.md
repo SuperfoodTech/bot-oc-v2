@@ -19,3 +19,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
    - Ada perubahan pada modul shared/core: `src/core/` (seperti `browser.py`, `decision.py`) atau `src/shopee/`.
    - Ada migrasi skema tabel/kolom database PostgreSQL baru.
    - Ada penambahan dependensi Python baru di `pyproject.toml` / `uv.lock`.
+
+## Aturan Pencatatan Versi Update (Semantic Versioning)
+
+Setiap generasi kode atau penambahan fitur baru wajib membuat file dokumentasi rilis baru di dalam folder `update/<MAJOR>.<MINOR>.<PATCH>.md` mengikuti standar Semantic Versioning (`MAJOR.MINOR.PATCH`):
+- **MAJOR**: Perubahan arsitektur besar / breaking changes.
+- **MINOR**: Penambahan fitur baru yang kompatibel.
+- **PATCH/FIX**: Perbaikan bug, optimasi handling error, atau patch stabilitas.
+Setiap file update wajib mencantumkan seksi `Whats New`, `Spesifikasi`, dan `Handling`.
+
