@@ -16,6 +16,7 @@ import os
 import json
 import time
 import random
+import signal
 from datetime import datetime
 from pathlib import Path
 
@@ -36,6 +37,37 @@ from core.notifier import send_discord_error, send_discord_success
 
 
 log = get_logger("browser")
+
+
+def cleanup_driver_process(driver) -> None:
+    """
+    Safely closes a Selenium WebDriver instance.
+    If driver.quit() hangs or fails, forcibly terminates the specific ChromeDriver
+    process (PID) bound to this driver instance to prevent zombie processes and memory leaks.
+    """
+    if driver is None:
+        return
+
+    pid = None
+    try:
+        if hasattr(driver, "service") and hasattr(driver.service, "process") and driver.service.process:
+            pid = driver.service.process.pid
+    except Exception:
+        pass
+
+    try:
+        log.info(f"🧹 [BROWSER CLEANUP] Closing Selenium driver instance (PID: {pid})...")
+        driver.quit()
+        log.info("✅ [BROWSER CLEANUP] Selenium driver closed successfully.")
+    except Exception as quit_err:
+        log.warning(f"⚠️ [BROWSER CLEANUP] driver.quit() exception: {quit_err}. Forcibly cleaning PID {pid}...")
+        if pid:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                log.info(f"  👉 Sent SIGTERM to ChromeDriver process PID {pid}.")
+            except Exception as kill_err:
+                log.warning(f"  ⚠️ Could not kill PID {pid}: {kill_err}")
+
 
 # ── Constants & Dynamic Paths ──────────────────────────────────────────────────
 BASE_DIR         = Path(__file__).resolve().parent.parent
@@ -1500,7 +1532,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                     success = _perform_login(driver, wait, username, password, phone, is_retry=(attempt == 2))
                     if not success:
                         log.error("❌ [AUTH] _perform_login failed.")
-                        driver.quit()
+                        cleanup_driver_process(driver)
                         continue
                     
                 # Wait dynamically for either dashboard, onboarding, or merchant-selector URL (up to 15s)
@@ -1725,7 +1757,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                         success = False
                 if not success:
                     log.error("❌ Merchant selection failed.")
-                    driver.quit()
+                    cleanup_driver_process(driver)
                     continue
             else:
                 if "/food/dashboard" not in driver.current_url:
@@ -1740,7 +1772,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                 
             if not t:
                 log.warning("⚠️ Token extraction failed.")
-                driver.quit()
+                cleanup_driver_process(driver)
                 continue
                 
             all_c = get_all_cookies_dict(driver)
@@ -1759,8 +1791,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                 raise e
         finally:
             if (close_browser or not session_success) and driver is not None:
-                try: driver.quit()
-                except: pass
+                cleanup_driver_process(driver)
 
     log.error("❌ Max login retries reached.")
     return None

@@ -21,9 +21,15 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(SCRIPT_DIR))
+SRC_DIR = PROJECT_ROOT / "src"
+
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 from logger import get_logger
+from core.network import is_internet_available
 import db
 import worker
 import browser
@@ -171,6 +177,27 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 log.info("[DAEMON] Bot patrol is currently PAUSED. Waiting for START command...")
                 time.sleep(3)
                 continue
+        except Exception:
+            pass
+
+        # ── Network Health Gate Check ──
+        if not is_internet_available():
+            log.warning("⚠️ [NETWORK OFFLINE] Internet connection is unavailable. Pausing store sync cycle...")
+            try:
+                import bot_api
+                bot_api.BOT_STATE["network_status"] = "offline"
+                bot_api.BOT_STATE["next_cycle_in_seconds"] = 15
+            except Exception:
+                pass
+            for _ in range(15):
+                if not RUNNING:
+                    break
+                time.sleep(1)
+            continue
+
+        try:
+            import bot_api
+            bot_api.BOT_STATE["network_status"] = "online"
         except Exception:
             pass
 
