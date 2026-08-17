@@ -41,7 +41,6 @@ def main():
     session = browser.get_session(
         username=username,
         target_name=target_merchant,
-        headless=True,
         close_browser=False,
     )
 

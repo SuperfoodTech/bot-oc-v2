@@ -29,11 +29,10 @@ def main():
     print(f"🚀 Opening Shopee Dashboard for account '{username}'...")
     print(f"📁 Session file: {session_file_path}")
 
-    # Launch browser session targeting WonderFood merchant (headless=False so browser window stays open)
+    # Launch browser session targeting WonderFood merchant
     session = browser.get_session(
         username=username,
         target_name=target_merchant,
-        headless=False,
         close_browser=False,
     )
 

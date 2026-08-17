@@ -26,6 +26,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from logger import get_logger
 import db
 import worker
+import browser
 
 log = get_logger("daemon")
 
@@ -230,8 +231,10 @@ if __name__ == "__main__":
     parser.add_argument("--interval-seconds", type=int, default=60, help="Interval between sync cycles in seconds")
     parser.add_argument("--once", action="store_true", help="Run a single cycle then exit")
     parser.add_argument("--dry-run", action="store_true", help="Evaluate decisions without calling live Shopee APIs")
-    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode (default: False)")
+    parser.add_argument("--headless", action="store_true", default=None, help="Run browser in headless mode")
+    parser.add_argument("--no-headless", action="store_false", dest="headless", help="Run browser in GUI mode")
 
     args = parser.parse_args()
-    worker.HEADLESS = args.headless
+    if args.headless is not None:
+        os.environ["HEADLESS"] = "true" if args.headless else "false"
     run_daemon(interval_seconds=args.interval_seconds, once=args.once, dry_run=args.dry_run)

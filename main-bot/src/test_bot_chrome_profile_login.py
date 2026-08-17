@@ -43,7 +43,6 @@ def run_test():
     try:
         session = browser.get_session(
             username=username,
-            headless=True,
             close_browser=True
         )
         if session and session.get("shopee_tob_token"):

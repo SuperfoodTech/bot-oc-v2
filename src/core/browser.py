@@ -32,6 +32,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from core.logger import get_logger
+from core.notifier import send_discord_error, send_discord_success
 
 
 log = get_logger("browser")
@@ -667,7 +668,18 @@ def _trigger_and_extract_tokens(driver) -> tuple:
 
 # ── Driver Initialization ──────────────────────────────────────────────────────
 
-def _init_driver(headless: bool):
+def is_headless_enabled() -> bool:
+    """
+    Pusat Kontrol Global Mode Headless Browser.
+    Membaca variabel HEADLESS dari file .env.
+    """
+    val = os.getenv("HEADLESS", "false").strip().lower()
+    return val in ("true", "1", "yes", "on")
+
+
+def _init_driver(headless: bool = None):
+    if headless is None:
+        headless = is_headless_enabled()
     options = Options()
     options.page_load_strategy = "eager"
     options.add_argument("--log-level=3")
@@ -678,9 +690,13 @@ def _init_driver(headless: bool):
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-component-update")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-    if headless or not os.environ.get("DISPLAY") or os.getenv("HEADLESS", "true").strip().lower() in ("true", "1", "yes", "on"):
+    if headless:
         options.add_argument("--headless=new")
         options.add_argument("--window-size=1920,1080")
+        options.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
     else:
         options.add_argument("--start-maximized")
     
@@ -711,6 +727,12 @@ def _init_driver(headless: bool):
         log.warning(f"⚠️ Native Chrome init failed: {e}. Trying ChromeDriverManager fallback...")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     driver.set_page_load_timeout(60)
+    try:
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        })
+    except Exception:
+        pass
     return driver
 
 
@@ -1380,7 +1402,9 @@ def return_to_selector(driver) -> bool:
             pass
         return True
 
-def get_session(username=None, password=None, phone=None, headless=True, close_browser=True, target_name=None, interactive=True) -> dict | None:
+def get_session(username=None, password=None, phone=None, headless=None, close_browser=True, target_name=None, interactive=True) -> dict | None:
+    if headless is None:
+        headless = is_headless_enabled()
     if not password and username:
         cred_paths = [
             CREDENTIALS_FILE,
@@ -1398,7 +1422,7 @@ def get_session(username=None, password=None, phone=None, headless=True, close_b
                     pass
 
     for attempt in range(3):
-        is_headless = headless or not os.environ.get("DISPLAY") or os.getenv("HEADLESS", "true").lower() in ("true", "1", "yes")
+        is_headless = headless if headless is not None else is_headless_enabled()
         log.info(f"🌐 [BROWSER] Launching (headless={is_headless}, attempt={attempt+1}/3)...")
         driver = _init_driver(headless=is_headless)
         wait = WebDriverWait(driver, 30)

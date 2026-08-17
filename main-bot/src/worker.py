@@ -28,7 +28,6 @@ log = get_logger("backend_worker")
 # Filter account usernames allowed for bot execution (Default: auto7313 only)
 ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
-HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes", "on"}
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
 ACTIVE_SESSIONS = {}
@@ -72,7 +71,6 @@ def warmup_all_account_sessions():
                 password=outlet.password,
                 phone=outlet.hp,
                 target_name=None,  # Jangan paksa switch portal saat warmup
-                headless=HEADLESS,
                 close_browser=False,
                 interactive=False,
             )
@@ -109,7 +107,6 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
         password=outlet.password,
         phone=outlet.hp,
         target_name=outlet.nama_portal,
-        headless=HEADLESS,
         close_browser=False,
         interactive=False,
     )
@@ -172,6 +169,11 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             """Clear stale session cache and re-launch a fresh browser session."""
             nonlocal cached, driver
             log.warning(f"  🔁 [SESSION RECOVERY] Dead session detected ({reason}). Re-launching browser for account '{username}'...")
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
             ACTIVE_SESSIONS.pop(username, None)
             cached = None
             driver = None
@@ -182,7 +184,6 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     password=first_outlet.password,
                     phone=first_outlet.hp,
                     target_name=portal_name,
-                    headless=HEADLESS,
                     close_browser=False,
                     interactive=False,
                 )
@@ -247,7 +248,6 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     password=first_outlet.password,
                     phone=first_outlet.hp,
                     target_name=portal_name,
-                    headless=HEADLESS,
                     close_browser=False,
                     interactive=False,
                 )

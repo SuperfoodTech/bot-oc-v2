@@ -66,16 +66,16 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
 
         log.info(f"📊 [LIVE STORE API] Fetching real-time store state via /api/seller/store for Store {store_id}...")
 
-        res = driver.execute_script("""
-            try {
-                var xhr = new XMLHttpRequest();
-                xhr.open('GET', 'https://foody.shopee.co.id/api/seller/store', false);
-                xhr.withCredentials = true;
-                xhr.send(null);
-                return JSON.parse(xhr.responseText);
-            } catch(e) {
-                return {code: -1, msg: e.message};
-            }
+        res = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            fetch('https://foody.shopee.co.id/api/seller/store', {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json, text/plain, */*' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { done(d); })
+            .catch(function(e) { done({code: -1, msg: e.message || String(e)}); });
         """)
 
         log.info(f"  🔍 [LIVE STORE API RAW RESPONSE] Store {store_id} | Raw Res: {res}")
@@ -143,16 +143,16 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
         ensure_business_hours_page(driver, store_id)
 
         log.info(f"🕒 [PULL REGULAR HOURS] Menarik data jadwal reguler Store {store_id}...")
-        res = driver.execute_script("""
-            try {
-                var xhr = new XMLHttpRequest();
-                xhr.open("GET", "https://foody.shopee.co.id/api/seller/store/regular-hours", false);
-                xhr.withCredentials = true;
-                xhr.send(null);
-                return JSON.parse(xhr.responseText);
-            } catch(e) {
-                return null;
-            }
+        res = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            fetch('https://foody.shopee.co.id/api/seller/store/regular-hours', {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json, text/plain, */*' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { done(d); })
+            .catch(function(e) { done({code: -1, msg: e.message || String(e)}); });
         """)
         log.info(f"  🔍 [REGULAR HOURS API RESPONSE] Store {store_id} | Response: {res.get('code') if isinstance(res, dict) else None}")
         if isinstance(res, dict) and res.get("code") == 0:
@@ -216,23 +216,23 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
         # 2. XHR POST API Fallback with explicit store_id query param
         log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
         target_num = int(store_id) if str(store_id).isdigit() else store_id
-        res = driver.execute_script(f"""
-            try {{
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', false);
-                xhr.withCredentials = true;
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                var now = Date.now();
-                var end = now + ({pause_duration_minutes} * 60 * 1000);
-                xhr.send(JSON.stringify({{
+        res = driver.execute_async_script(f"""
+            var done = arguments[arguments.length - 1];
+            var now = Date.now();
+            var end = now + ({pause_duration_minutes} * 60 * 1000);
+            fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
+                method: 'POST',
+                credentials: 'include',
+                headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
+                body: JSON.stringify({{
                     "pause_start_time": now,
                     "pause_end_time": end,
                     "store_id": {target_num}
-                }}));
-                return JSON.parse(xhr.responseText);
-            }} catch(e) {{
-                return {{code: -1, msg: e.message}};
-            }}
+                }})
+            }})
+            .then(function(r) {{ return r.json(); }})
+            .then(function(d) {{ done(d); }})
+            .catch(function(e) {{ done({{code: -1, msg: e.message || String(e)}}); }});
         """)
         log.info(f"  🔍 [PAUSE API RESPONSE] Store {store_id} | Response: {res}")
         if isinstance(res, dict) and res.get("code") == 0:
@@ -296,19 +296,19 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
         # 2. XHR POST API Fallback with explicit store_id query param
         log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
         target_num = int(store_id) if str(store_id).isdigit() else store_id
-        res = driver.execute_script(f"""
-            try {{
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', 'https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={store_id}', false);
-                xhr.withCredentials = true;
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(JSON.stringify({{
+        res = driver.execute_async_script(f"""
+            var done = arguments[arguments.length - 1];
+            fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={store_id}', {{
+                method: 'POST',
+                credentials: 'include',
+                headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
+                body: JSON.stringify({{
                     "store_id": "{store_id}"
-                }}));
-                return JSON.parse(xhr.responseText);
-            }} catch(e) {{
-                return {{code: -1, msg: e.message}};
-            }}
+                }})
+            }})
+            .then(function(r) {{ return r.json(); }})
+            .then(function(d) {{ done(d); }})
+            .catch(function(e) {{ done({{code: -1, msg: e.message || String(e)}}); }});
         """)
         log.info(f"  🔍 [OPEN API RESPONSE] Store {store_id} | Response: {res}")
         if isinstance(res, dict) and res.get("code") == 0:
