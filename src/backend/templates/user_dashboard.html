@@ -32,7 +32,7 @@
         
         <div style="margin-top: 14px;">
           <div class="password-input-wrapper">
-            <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" value="Master@00@" onkeydown="if(event.key==='Enter') doLogin()">
+            <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
             <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -146,6 +146,8 @@
     let activePasscode = "";
     let currentUserOutlets = [];
     let selectedStoreId = null;
+    const currentSlug = window.location.pathname.match(/^\/mitra\/([^/]+)/)?.[1] || '';
+    const userSessionKey = currentSlug ? `user_passcode:${currentSlug}` : 'user_passcode:legacy';
 
     function userApp() {
       return {
@@ -183,7 +185,7 @@
 
       // 1. Google OAuth Success Handler (Passcode parameter detected)
       if (urlPasscode) {
-        sessionStorage.setItem('user_passcode', urlPasscode);
+        sessionStorage.setItem(userSessionKey, urlPasscode);
         // Clear query parameters
         const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
         window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
@@ -208,7 +210,7 @@
       }
 
       // 3. Regular Session Restore
-      const savedPasscode = sessionStorage.getItem('user_passcode');
+      const savedPasscode = sessionStorage.getItem(userSessionKey);
       if (savedPasscode) {
         doLogin(savedPasscode, true);
       } else {
@@ -240,12 +242,12 @@
         const res = await fetch('/api/v1/user/login', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({passcode: passcode})
+          body: JSON.stringify({ passcode: passcode, slug: currentSlug || null })
         });
         const data = await res.json();
         if (data.success) {
           activePasscode = passcode;
-          sessionStorage.setItem('user_passcode', passcode);
+          sessionStorage.setItem(userSessionKey, passcode);
           currentUserOutlets = data.outlets;
           if (window._appData) {
             window._appData.outlets = data.outlets;
@@ -257,7 +259,7 @@
           renderOutlets(data.outlets);
           fetchHistory();
         } else {
-          sessionStorage.removeItem('user_passcode');
+          sessionStorage.removeItem(userSessionKey);
           document.getElementById('loginSection').style.display = 'block';
           document.getElementById('dashboardSection').style.display = 'none';
           if (!isAuto) {

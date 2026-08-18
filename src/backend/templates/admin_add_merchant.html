@@ -158,7 +158,9 @@
               <p>Link dashboard mitra:</p>
               <div class="add-merchant-result-row">
                 <input id="generatedLink" class="form-input" type="text" readonly>
-                <button id="copyGeneratedLink" class="btn-outline" type="button">Salin</button>
+                <button id="copyGeneratedLink" class="add-merchant-copy-button" type="button" aria-label="Salin link dashboard" title="Salin link dashboard">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 1H5a2 2 0 0 0-2 2v13h2V3h11V1Zm3 4H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H9V7h10v14Z"/></svg>
+                </button>
               </div>
               <p>Passcode: <strong id="generatedPasscode"></strong></p>
             </div>
@@ -166,6 +168,10 @@
         </aside>
       </form>
     </main>
+  </div>
+
+  <div id="copyLinkToast" class="add-merchant-copy-toast" role="status" aria-live="polite" hidden>
+    Link dashboard berhasil disalin
   </div>
 
   <div id="leaveConfirmModal" class="leave-confirm-overlay" hidden>
@@ -333,7 +339,7 @@
     }
 
     backToOutlets.addEventListener('click', (event) => {
-      if (!hasFormChanges()) return;
+      if (isLeaving || !hasFormChanges()) return;
       event.preventDefault();
       openLeaveConfirmation();
     });
@@ -384,6 +390,8 @@
         document.getElementById('generatedLink').value = link;
         document.getElementById('generatedPasscode').textContent = payload.dashboard_password;
         successBox.hidden = false;
+        // A successful submit is a completed flow; returning must not ask to discard it.
+        isLeaving = true;
         successBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } catch (error) {
         errorBox.textContent = error.message || 'Gagal menambahkan mitra.';
@@ -398,8 +406,19 @@
       const input = document.getElementById('generatedLink');
       try {
         await navigator.clipboard.writeText(input.value);
-        document.getElementById('copyGeneratedLink').textContent = 'Tersalin';
-        setTimeout(() => { document.getElementById('copyGeneratedLink').textContent = 'Salin'; }, 1800);
+        const copyButton = document.getElementById('copyGeneratedLink');
+        const copyToast = document.getElementById('copyLinkToast');
+        copyButton.setAttribute('aria-label', 'Link dashboard tersalin');
+        copyButton.setAttribute('title', 'Link dashboard tersalin');
+        copyButton.classList.add('is-copied');
+        copyToast.hidden = false;
+        clearTimeout(window.copyToastTimer);
+        window.copyToastTimer = setTimeout(() => { copyToast.hidden = true; }, 1800);
+        setTimeout(() => {
+          copyButton.setAttribute('aria-label', 'Salin link dashboard');
+          copyButton.setAttribute('title', 'Salin link dashboard');
+          copyButton.classList.remove('is-copied');
+        }, 1800);
       } catch (error) {
         input.select();
         document.execCommand('copy');

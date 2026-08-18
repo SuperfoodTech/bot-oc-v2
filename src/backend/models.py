@@ -137,6 +137,7 @@ class AdminAccountCreateRequest(BaseModel):
 
 class UserLoginRequest(BaseModel):
     passcode: str = Field(..., description="Vercel passcode/kata sandi user")
+    slug: Optional[str] = Field(default=None, description="Slug link dashboard mitra")
 
 
 class UserPauseRequest(BaseModel):

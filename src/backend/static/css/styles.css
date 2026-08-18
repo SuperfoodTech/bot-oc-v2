@@ -3347,6 +3347,54 @@ body {
   min-width: 0;
 }
 
+.add-merchant-copy-button {
+  display: grid;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+.add-merchant-copy-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.add-merchant-copy-button:hover,
+.add-merchant-copy-button:focus-visible {
+  color: var(--accent-dark);
+}
+
+.add-merchant-copy-button.is-copied {
+  color: var(--accent-dark);
+}
+
+.add-merchant-copy-toast {
+  position: fixed;
+  z-index: 1200;
+  right: 20px;
+  bottom: 20px;
+  max-width: min(320px, calc(100vw - 40px));
+  padding: 10px 14px;
+  border: 1px solid #171717;
+  border-radius: 10px;
+  background: #171717;
+  box-shadow: var(--shadow);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.add-merchant-copy-toast[hidden] {
+  display: none;
+}
+
 .add-merchant-review {
   position: sticky;
   top: 20px;
@@ -3435,10 +3483,6 @@ body {
   font-size: 11px;
 }
 
-.add-merchant-result-row .btn-outline {
-  flex: 0 0 auto;
-  min-height: 42px;
-}
 
 .leave-confirm-overlay[hidden] {
   display: none;
@@ -3508,5 +3552,13 @@ body {
 
   .add-merchant-form-actions {
     grid-template-columns: 1fr;
+  }
+
+  .add-merchant-copy-toast {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    max-width: none;
+    text-align: center;
   }
 }

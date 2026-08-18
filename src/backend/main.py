@@ -504,9 +504,9 @@ def admin_delete_merchant(nama_pemilik: str, admin: dict = Depends(require_admin
 
 @app.post("/api/v1/user/login", summary="User Link: Login by Passcode")
 def user_login(req: UserLoginRequest):
-    user_info = state.user_authenticate(req.passcode)
+    user_info = state.user_authenticate(req.passcode, req.slug)
     if not user_info:
-        raise HTTPException(status_code=401, detail="Passcode kata sandi Vercel tidak valid.")
+        raise HTTPException(status_code=401, detail="Link atau passcode mitra tidak valid.")
 
     pemilik = user_info.get("nama_pemilik", "Fando")
     outlets = state.user_get_outlets(pemilik)

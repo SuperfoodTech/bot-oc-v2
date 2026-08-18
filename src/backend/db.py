@@ -2,7 +2,7 @@
 
 import os
 import re
-import uuid
+import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -109,6 +109,10 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (value or "mitra").lower()).strip("-") or "mitra"
 
 
+def _new_link_slug(owner: str) -> str:
+    return f"{_slug(owner)}-{secrets.token_urlsafe(16).rstrip('=')[:22]}"
+
+
 def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "", base_url: str = "", google_email: Optional[str] = None):
     owner_clean = (owner or "Unassigned").strip()
     portal_clean = (merchant_name or "Unknown Merchant").strip()
@@ -126,7 +130,7 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     base = (base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")).rstrip("/")
     account = conn.execute("SELECT * FROM dashboard_accounts WHERE username=%s", (owner_clean,)).fetchone()
     if not account:
-        slug = f"{_slug(owner_clean)}-{str(uuid.uuid4())[:6]}"
+        slug = _new_link_slug(owner_clean)
         account = conn.execute(
             "INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role,google_email) VALUES (%s,%s,%s,%s,%s,'MERCHANT',%s) RETURNING *",
             (merchant_id, owner_clean, dashboard_password or "Master@00@", slug, f"{base}/mitra/{slug}", google_email)
@@ -134,6 +138,10 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     else:
         updates = []
         params = []
+        if not account.get("link_slug"):
+            new_slug = _new_link_slug(owner_clean)
+            updates.extend(["link_slug=%s", "dashboard_url=%s"])
+            params.extend([new_slug, f"{base}/mitra/{new_slug}"])
         if dashboard_password:
             updates.append("password_plain=%s")
             params.append(dashboard_password)
@@ -260,13 +268,17 @@ def admin_generate_user_link(nama_pemilik, passcode=None, base_url=None):
     with get_db_connection() as conn:
         merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()
         if not merchant: merchant = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (nama_pemilik,)).fetchone()
-        password = passcode or "Master@00@"; slug = f"{_slug(nama_pemilik)}-{str(uuid.uuid4())[:6]}"; base = (base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")).rstrip("/")
+        password = passcode or "Master@00@"; slug = _new_link_slug(nama_pemilik); base = (base_url or os.getenv("APP_BASE_URL", "http://localhost:3001")).rstrip("/")
         row = conn.execute("INSERT INTO dashboard_accounts (merchant_id,username,password_plain,link_slug,dashboard_url,role) VALUES (%s,%s,%s,%s,%s,'MERCHANT') ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,link_slug=EXCLUDED.link_slug,dashboard_url=EXCLUDED.dashboard_url RETURNING link_slug,dashboard_url", (merchant["id"], nama_pemilik, password, slug, f"{base}/mitra/{slug}")).fetchone()
     return {"nama_pemilik": nama_pemilik, "passcode": password, "link_slug": row["link_slug"], "full_url": row["dashboard_url"]}
 
-def user_authenticate(passcode):
+def user_authenticate(passcode, slug=None):
     with get_db_connection() as conn:
-        row = conn.execute("SELECT username AS nama_pemilik,password_plain AS password,link_slug FROM dashboard_accounts WHERE password_plain=%s AND is_active=true LIMIT 1", (passcode,)).fetchone()
+        if slug:
+            row = conn.execute("SELECT username AS nama_pemilik,password_plain AS password,link_slug FROM dashboard_accounts WHERE link_slug=%s AND password_plain=%s AND role='MERCHANT' AND is_active=true LIMIT 1", (slug, passcode)).fetchone()
+        else:
+            # Keep /app and older integrations working while slug-based links use scoped access.
+            row = conn.execute("SELECT username AS nama_pemilik,password_plain AS password,link_slug FROM dashboard_accounts WHERE password_plain=%s AND role='MERCHANT' AND is_active=true LIMIT 1", (passcode,)).fetchone()
     return dict(row) if row else None
 
 
@@ -462,7 +474,9 @@ def delete_store(store_id: str) -> bool:
 
         remaining = conn.execute("SELECT COUNT(*) AS cnt FROM outlets WHERE merchant_id=%s", (mid,)).fetchone()
         if remaining and remaining["cnt"] == 0:
-            conn.execute("DELETE FROM shopee_accounts WHERE portal_id=%s", (pid,))
+            # Remove every Shopee account attached to the merchant's portals
+            # before deleting the portals themselves.
+            conn.execute("DELETE FROM shopee_accounts WHERE portal_id IN (SELECT id FROM portals WHERE merchant_id=%s)", (mid,))
             conn.execute("DELETE FROM portals WHERE merchant_id=%s", (mid,))
             conn.execute("DELETE FROM bot_merchant_assignments WHERE merchant_id=%s", (mid,))
             conn.execute("DELETE FROM dashboard_accounts WHERE merchant_id=%s", (mid,))
@@ -495,4 +509,3 @@ def delete_merchant(nama_pemilik: str) -> bool:
 
 
 init_state = init_db
-
