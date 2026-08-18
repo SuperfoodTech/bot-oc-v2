@@ -220,7 +220,7 @@
       <div style="margin-top: 16px;">
         <div
           style="padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; color: #991b1b;">
-          ⚠️ <strong>Peringatan:</strong> Data outlet dan seluruh riwayat langganan yang dihapus tidak dapat
+          <strong>Peringatan:</strong> Data outlet dan seluruh riwayat langganan yang dihapus tidak dapat
           dikembalikan.
         </div>
 
@@ -232,7 +232,7 @@
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">
-          <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;"
+          <button id="submitDeleteButton" class="btn-primary" style="background: #dc2626; border-color: #dc2626;"
             onclick="submitDeleteStore()">Ya, Hapus Data</button>
           <button class="btn-outline" onclick="closeAdminModal('deleteModal')">Batal</button>
         </div>
@@ -978,6 +978,7 @@
     }
 
     let selectedOwnerForDelete = '';
+    let isDeletingStore = false;
 
     function openDeleteModal(storeId, storeName, ownerName) {
       selectedStoreForAction = storeId;
@@ -985,11 +986,18 @@
       document.getElementById('deleteStoreSubtitle').innerText = `${storeName} (ID: ${storeId})`;
       document.getElementById('deleteOwnerNameLabel').innerText = ownerName;
       document.getElementById('deleteEntireMerchantCheck').checked = false;
+      const deleteButton = document.getElementById('submitDeleteButton');
+      deleteButton.disabled = false;
+      deleteButton.textContent = 'Ya, Hapus Data';
       document.getElementById('deleteModal').classList.add('active');
     }
 
     async function submitDeleteStore() {
-      if (!selectedStoreForAction) return;
+      if (!selectedStoreForAction || isDeletingStore) return;
+      isDeletingStore = true;
+      const deleteButton = document.getElementById('submitDeleteButton');
+      deleteButton.disabled = true;
+      deleteButton.textContent = 'Menghapus...';
       const isDeleteMerchant = document.getElementById('deleteEntireMerchantCheck').checked;
       const url = isDeleteMerchant
         ? `/api/v1/admin/users/${encodeURIComponent(selectedOwnerForDelete)}`
@@ -1013,6 +1021,10 @@
         }
       } catch (err) {
         alert('Gagal menghapus data: ' + err.message);
+      } finally {
+        isDeletingStore = false;
+        deleteButton.disabled = false;
+        deleteButton.textContent = 'Ya, Hapus Data';
       }
     }
 
