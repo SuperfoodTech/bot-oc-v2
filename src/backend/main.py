@@ -125,6 +125,13 @@ def admin_dashboard_page(request: Request, admin_session: Optional[str] = Cookie
     return templates.TemplateResponse(request=request, name="admin_dashboard.html", context={"active_page": "dashboard"})
 
 
+@app.get("/admin/mitra/tambah", response_class=HTMLResponse, summary="Admin: Add Merchant and Outlet")
+def admin_add_merchant_page(request: Request, admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE)):
+    if not _read_admin_session(admin_session):
+        return RedirectResponse(url="/admin/login")
+    return templates.TemplateResponse(request=request, name="admin_add_merchant.html", context={"active_page": "add-merchant"})
+
+
 @app.get("/admin/bot", summary="Admin Bot Patrol Monitor Page Redirect")
 @app.get("/admin/logs", summary="Admin Logs Page Redirect")
 def admin_logs_page():

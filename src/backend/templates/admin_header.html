@@ -6,9 +6,11 @@
     </div>
   </div>
 
-  <div class="admin-actions d-grid d-sm-flex">
-    <button class="btn-primary btn-compact" onclick="openGenerateModal()">
-      Tambah mitra
-    </button>
-  </div>
+  {% if active_page != 'add-merchant' %}
+    <div class="admin-actions d-grid d-sm-flex">
+      <a class="btn-primary btn-compact" href="/admin/mitra/tambah">
+        Tambah mitra
+      </a>
+    </div>
+  {% endif %}
 </header>

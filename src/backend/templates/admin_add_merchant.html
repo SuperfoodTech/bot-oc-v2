@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#BE1A1A">
+  <title>Tambah Mitra | FoodMaster Admin</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260818-add-merchant-v2">
+</head>
+<body class="admin-add-merchant-page">
+  <div class="desktop-wrapper">
+    <main class="add-merchant-shell">
+      <a id="backToOutlets" class="add-merchant-back" href="/admin/dashboard?tab=outlets" aria-label="Kembali ke operasional outlet" title="Kembali ke operasional outlet">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M10.7 19.4 3.3 12l7.4-7.4 1.4 1.4L7.1 11H21v2H7.1l5 5-1.4 1.4Z"/>
+        </svg>
+      </a>
+      <div class="add-merchant-intro">
+        <div>
+          <div class="eyebrow">Admin / Mitra</div>
+          <h1 class="page-title">Tambah mitra &amp; outlet baru</h1>
+          <p class="page-description">Daftarkan akun mitra, outlet ShopeeFood, paket layanan, dan link dashboard dalam satu proses.</p>
+        </div>
+      </div>
+
+      <form id="addMerchantForm" class="add-merchant-layout" novalidate>
+        <div class="add-merchant-form-column">
+          <section class="add-merchant-card" aria-labelledby="merchantDataTitle">
+            <div class="add-merchant-section-heading">
+              <span class="step-indicator">01</span>
+              <div>
+                <h2 id="merchantDataTitle">Data mitra</h2>
+                <p>Informasi pemilik akun yang akan mengelola outlet.</p>
+              </div>
+            </div>
+            <div class="add-merchant-fields">
+              <div class="add-merchant-field add-merchant-field-full">
+                <label for="addOwnerName">Nama pemilik / mitra <span aria-hidden="true">*</span></label>
+                <input id="addOwnerName" class="form-input" type="text" autocomplete="name" required placeholder="Contoh: Mitra Budi">
+              </div>
+              <div class="add-merchant-field">
+                <label for="addOwnership">Kepemilikan <span aria-hidden="true">*</span></label>
+                <div class="custom-select" data-select="addOwnership">
+                  <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Kepemilikan">
+                    <span class="custom-select-value">VB</span><span class="custom-select-chevron" aria-hidden="true">⌄</span>
+                  </button>
+                  <div class="custom-select-menu" role="listbox" hidden>
+                    <button type="button" role="option" data-value="VB" aria-selected="true">VB</button>
+                    <button type="button" role="option" data-value="Agency" aria-selected="false">Agency</button>
+                  </div>
+                  <select id="addOwnership" class="custom-select-native" tabindex="-1" aria-hidden="true">
+                    <option value="VB">VB</option>
+                    <option value="Agency">Agency</option>
+                  </select>
+                </div>
+              </div>
+              <div class="add-merchant-field">
+                <label for="addGoogleEmail">Email Google mitra</label>
+                <input id="addGoogleEmail" class="form-input" type="email" autocomplete="email" placeholder="mitra@gmail.com">
+              </div>
+              <div class="add-merchant-field add-merchant-field-full">
+                <label for="addPasscode">Passcode dashboard <span aria-hidden="true">*</span></label>
+                <div class="add-merchant-password">
+                  <input id="addPasscode" class="form-input" type="text" autocomplete="off" required value="Master@00@">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="add-merchant-card" aria-labelledby="outletDataTitle">
+            <div class="add-merchant-section-heading">
+              <span class="step-indicator">02</span>
+              <div>
+                <h2 id="outletDataTitle">Data outlet</h2>
+                <p>Identitas merchant dan outlet yang terhubung ke mitra.</p>
+              </div>
+            </div>
+            <div class="add-merchant-fields">
+              <div class="add-merchant-field">
+                <label for="addMerchantName">Nama merchant <span aria-hidden="true">*</span></label>
+                <input id="addMerchantName" class="form-input" type="text" required placeholder="Contoh: Warmindo Berkah">
+              </div>
+              <div class="add-merchant-field">
+                <label for="addOutletName">Nama outlet <span aria-hidden="true">*</span></label>
+                <input id="addOutletName" class="form-input" type="text" required placeholder="Contoh: Warmindo Berkah - Merdeka">
+              </div>
+              <div class="add-merchant-field add-merchant-field-full">
+                <label for="addStoreId">Store ID ShopeeFood <span aria-hidden="true">*</span></label>
+                <input id="addStoreId" class="form-input" type="text" inputmode="numeric" required pattern="[0-9]+" placeholder="Contoh: 21897166" aria-describedby="storeIdHint">
+                <small id="storeIdHint" class="add-merchant-field-hint">Gunakan Store ID numerik dari ShopeeFood.</small>
+              </div>
+            </div>
+          </section>
+
+          <section class="add-merchant-card" aria-labelledby="serviceDataTitle">
+            <div class="add-merchant-section-heading">
+              <span class="step-indicator">03</span>
+              <div>
+                <h2 id="serviceDataTitle">Paket layanan</h2>
+                <p>Tentukan periode layanan dan tanggal mulai berlakunya.</p>
+              </div>
+            </div>
+            <div class="add-merchant-fields">
+              <div class="add-merchant-field add-merchant-field-full">
+                <label for="addPackage">Pilihan paket layanan <span aria-hidden="true">*</span></label>
+                <div class="custom-select" data-select="addPackage">
+                  <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Pilihan paket layanan">
+                    <span class="custom-select-value">Paket 3 Bulan</span><span class="custom-select-chevron" aria-hidden="true">⌄</span>
+                  </button>
+                  <div class="custom-select-menu" role="listbox" hidden>
+                    <button type="button" role="option" data-value="3_MONTHS" aria-selected="true">Paket 3 Bulan</button>
+                    <button type="button" role="option" data-value="6_MONTHS" aria-selected="false">Paket 6 Bulan (+1 Bulan Bonus)</button>
+                    <button type="button" role="option" data-value="12_MONTHS" aria-selected="false">Paket 12 Bulan (+4 Bulan Bonus)</button>
+                  </div>
+                  <select id="addPackage" class="custom-select-native" tabindex="-1" aria-hidden="true">
+                    <option value="3_MONTHS">Paket 3 Bulan</option>
+                    <option value="6_MONTHS">Paket 6 Bulan (+1 Bulan Bonus)</option>
+                    <option value="12_MONTHS">Paket 12 Bulan (+4 Bulan Bonus)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="add-merchant-field">
+                <label for="addStartDate">Tanggal mulai <span aria-hidden="true">*</span></label>
+                <input id="addStartDate" class="form-input" type="date" required>
+              </div>
+              <div class="add-merchant-field">
+                <label for="addEndDate">Tanggal berakhir</label>
+                <input id="addEndDate" class="form-input" type="date" readonly aria-describedby="endDateHint">
+                <small id="endDateHint" class="add-merchant-field-hint">Dihitung otomatis dari paket layanan. Format mengikuti perangkat.</small>
+              </div>
+            </div>
+          </section>
+
+          <div id="addMerchantError" class="add-merchant-feedback is-error" role="alert" hidden></div>
+          <div id="addMerchantSuccess" class="add-merchant-feedback is-success" role="status" hidden>
+            <strong>Mitra dan outlet berhasil dibuat.</strong>
+            <p>Link dashboard mitra:</p>
+            <div class="add-merchant-result-row">
+              <input id="generatedLink" class="form-input" type="text" readonly>
+              <button id="copyGeneratedLink" class="btn-outline" type="button">Salin</button>
+            </div>
+            <p>Passcode: <strong id="generatedPasscode"></strong></p>
+          </div>
+        </div>
+
+        <aside class="add-merchant-review" aria-labelledby="reviewTitle">
+          <div class="add-merchant-review-inner">
+            <div class="step-indicator">Review</div>
+            <h2 id="reviewTitle">Periksa sebelum simpan</h2>
+            <p class="add-merchant-review-copy">Pastikan data utama sudah benar. Link dashboard akan dibuat setelah proses berhasil.</p>
+            <dl class="add-merchant-summary">
+              <div><dt>Mitra</dt><dd id="summaryOwner">Belum diisi</dd></div>
+              <div><dt>Email Google</dt><dd id="summaryGoogleEmail">Belum diisi</dd></div>
+              <div><dt>Passcode</dt><dd id="summaryPasscode">Master@00@</dd></div>
+              <div><dt>Merchant</dt><dd id="summaryMerchant">Belum diisi</dd></div>
+              <div><dt>Outlet</dt><dd id="summaryOutlet">Belum diisi</dd></div>
+              <div><dt>Store ID</dt><dd id="summaryStore">Belum diisi</dd></div>
+              <div><dt>Paket</dt><dd id="summaryPackage">Paket 3 Bulan</dd></div>
+              <div><dt>Mulai</dt><dd id="summaryStart">Belum diisi</dd></div>
+            </dl>
+            <div class="add-merchant-form-actions">
+              <button id="submitAddMerchant" class="btn-primary" type="submit">Simpan &amp; generate link</button>
+            </div>
+          </div>
+        </aside>
+      </form>
+    </main>
+  </div>
+
+  <div id="leaveConfirmModal" class="leave-confirm-overlay" hidden>
+    <div class="leave-confirm-card" role="dialog" aria-modal="true" aria-labelledby="leaveConfirmTitle" aria-describedby="leaveConfirmDescription">
+      <div class="step-indicator">Konfirmasi</div>
+      <h2 id="leaveConfirmTitle">Tinggalkan halaman?</h2>
+      <p id="leaveConfirmDescription">Data yang sudah diisi akan terhapus jika Anda melanjutkan.</p>
+      <div class="leave-confirm-actions">
+        <button id="stayOnForm" class="btn-outline" type="button">Batal</button>
+        <button id="leaveForm" class="btn-primary" type="button">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('addMerchantForm');
+    const startDate = document.getElementById('addStartDate');
+    const packageSelect = document.getElementById('addPackage');
+    const endDate = document.getElementById('addEndDate');
+    const errorBox = document.getElementById('addMerchantError');
+    const successBox = document.getElementById('addMerchantSuccess');
+    const submitButton = document.getElementById('submitAddMerchant');
+    const leaveConfirmModal = document.getElementById('leaveConfirmModal');
+    const backToOutlets = document.getElementById('backToOutlets');
+    let isLeaving = false;
+
+    function todayValue() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function updateExpiryAndSummary() {
+      const start = startDate.value || todayValue();
+      const months = { '3_MONTHS': 3, '6_MONTHS': 7, '12_MONTHS': 16 }[packageSelect.value] || 3;
+      const expiry = new Date(start + 'T00:00:00');
+      expiry.setMonth(expiry.getMonth() + months);
+      endDate.value = expiry.toISOString().slice(0, 10);
+      document.getElementById('summaryOwner').textContent = document.getElementById('addOwnerName').value.trim() || 'Belum diisi';
+      document.getElementById('summaryGoogleEmail').textContent = document.getElementById('addGoogleEmail').value.trim() || 'Belum diisi';
+      const passcode = document.getElementById('addPasscode').value;
+      document.getElementById('summaryPasscode').textContent = passcode || 'Belum diisi';
+      document.getElementById('summaryMerchant').textContent = document.getElementById('addMerchantName').value.trim() || 'Belum diisi';
+      document.getElementById('summaryOutlet').textContent = document.getElementById('addOutletName').value.trim() || 'Belum diisi';
+      document.getElementById('summaryStore').textContent = document.getElementById('addStoreId').value.trim() || 'Belum diisi';
+      document.getElementById('summaryPackage').textContent = packageSelect.options[packageSelect.selectedIndex].text;
+      document.getElementById('summaryStart').textContent = start || 'Belum diisi';
+    }
+
+    function closeCustomSelect(select) {
+      const menu = select.querySelector('.custom-select-menu');
+      const trigger = select.querySelector('.custom-select-trigger');
+      menu.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    document.querySelectorAll('.custom-select').forEach((select) => {
+      const nativeSelect = document.getElementById(select.dataset.select);
+      const trigger = select.querySelector('.custom-select-trigger');
+      const menu = select.querySelector('.custom-select-menu');
+      const valueLabel = select.querySelector('.custom-select-value');
+      const options = [...select.querySelectorAll('[role="option"]')];
+
+      function choose(option) {
+        nativeSelect.value = option.dataset.value;
+        valueLabel.textContent = option.textContent;
+        options.forEach((item) => item.setAttribute('aria-selected', String(item === option)));
+        closeCustomSelect(select);
+        updateExpiryAndSummary();
+      }
+
+      trigger.addEventListener('click', () => {
+        const isOpen = !menu.hidden;
+        document.querySelectorAll('.custom-select-menu').forEach((item) => { item.hidden = true; });
+        document.querySelectorAll('.custom-select-trigger').forEach((item) => item.setAttribute('aria-expanded', 'false'));
+        menu.hidden = isOpen;
+        trigger.setAttribute('aria-expanded', String(!isOpen));
+        if (!isOpen) options[0].focus();
+      });
+
+      trigger.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          trigger.click();
+        }
+      });
+
+      options.forEach((option, index) => {
+        option.addEventListener('click', () => choose(option));
+        option.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            options[(index + 1) % options.length].focus();
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            options[(index - 1 + options.length) % options.length].focus();
+          } else if (event.key === 'Escape') {
+            closeCustomSelect(select);
+            trigger.focus();
+          } else if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            choose(option);
+            trigger.focus();
+          }
+        });
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.custom-select')) {
+        document.querySelectorAll('.custom-select').forEach(closeCustomSelect);
+      }
+    });
+
+    function validateForm() {
+      const fields = [
+        [document.getElementById('addOwnerName'), 'Nama pemilik / mitra wajib diisi.'],
+        [document.getElementById('addPasscode'), 'Passcode dashboard wajib diisi.'],
+        [document.getElementById('addMerchantName'), 'Nama merchant wajib diisi.'],
+        [document.getElementById('addOutletName'), 'Nama outlet wajib diisi.'],
+        [document.getElementById('addStoreId'), 'Store ID wajib diisi dan hanya boleh berisi angka.'],
+        [document.getElementById('addStartDate'), 'Tanggal mulai wajib dipilih.']
+      ];
+      const email = document.getElementById('addGoogleEmail');
+      if (email.value.trim() && !email.validity.valid) {
+        fields.push([email, 'Format email Google belum benar.']);
+      }
+      const invalid = fields.find(([field]) => !field.value.trim() || (field.id === 'addStoreId' && !/^[0-9]+$/.test(field.value.trim())));
+      if (invalid) {
+        errorBox.textContent = invalid[1];
+        errorBox.hidden = false;
+        invalid[0].focus();
+        return false;
+      }
+      return true;
+    }
+
+    startDate.value = todayValue();
+    document.querySelectorAll('#addMerchantForm input, #addMerchantForm select').forEach((field) => {
+      field.addEventListener('input', updateExpiryAndSummary);
+      field.addEventListener('change', updateExpiryAndSummary);
+      field.addEventListener('input', () => { errorBox.hidden = true; });
+    });
+    updateExpiryAndSummary();
+
+    function hasFormChanges() {
+      return Boolean(
+        document.getElementById('addOwnerName').value.trim() ||
+        document.getElementById('addGoogleEmail').value.trim() ||
+        document.getElementById('addPasscode').value !== 'Master@00@' ||
+        document.getElementById('addMerchantName').value.trim() ||
+        document.getElementById('addOutletName').value.trim() ||
+        document.getElementById('addStoreId').value.trim() ||
+        document.getElementById('addOwnership').value !== 'VB' ||
+        document.getElementById('addPackage').value !== '3_MONTHS'
+      );
+    }
+
+    function openLeaveConfirmation() {
+      leaveConfirmModal.hidden = false;
+      document.getElementById('stayOnForm').focus();
+    }
+
+    function closeLeaveConfirmation() {
+      leaveConfirmModal.hidden = true;
+      backToOutlets.focus();
+    }
+
+    backToOutlets.addEventListener('click', (event) => {
+      if (!hasFormChanges()) return;
+      event.preventDefault();
+      openLeaveConfirmation();
+    });
+
+    document.getElementById('stayOnForm').addEventListener('click', closeLeaveConfirmation);
+    document.getElementById('leaveForm').addEventListener('click', () => {
+      isLeaving = true;
+      window.location.href = backToOutlets.href;
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      if (!isLeaving && hasFormChanges()) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      successBox.hidden = true;
+      if (!validateForm()) return;
+      submitButton.disabled = true;
+      submitButton.textContent = 'Menyimpan...';
+
+      const payload = {
+        nama_pemilik: document.getElementById('addOwnerName').value.trim(),
+        ownership_type: document.getElementById('addOwnership').value,
+        nama_portal: document.getElementById('addMerchantName').value.trim(),
+        store_id: document.getElementById('addStoreId').value.trim(),
+        nama_panjang_outlet: document.getElementById('addOutletName').value.trim(),
+        dashboard_password: document.getElementById('addPasscode').value,
+        paket: packageSelect.value,
+        tanggal_mulai_layanan: startDate.value,
+        tanggal_berakhir_layanan: endDate.value,
+        google_email: document.getElementById('addGoogleEmail').value.trim() || null
+      };
+
+      try {
+        const response = await fetch('/api/v1/admin/outlets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) throw new Error(data.detail || 'Gagal menambahkan mitra.');
+        const link = data.data?.vercel_link || `${window.location.origin}/mitra/${payload.nama_pemilik.toLowerCase().replace(/\s+/g, '-')}`;
+        document.getElementById('generatedLink').value = link;
+        document.getElementById('generatedPasscode').textContent = payload.dashboard_password;
+        successBox.hidden = false;
+        successBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (error) {
+        errorBox.textContent = error.message || 'Gagal menambahkan mitra.';
+        errorBox.hidden = false;
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Simpan & generate link';
+      }
+    });
+
+    document.getElementById('copyGeneratedLink').addEventListener('click', async () => {
+      const input = document.getElementById('generatedLink');
+      try {
+        await navigator.clipboard.writeText(input.value);
+        document.getElementById('copyGeneratedLink').textContent = 'Tersalin';
+        setTimeout(() => { document.getElementById('copyGeneratedLink').textContent = 'Salin'; }, 1800);
+      } catch (error) {
+        input.select();
+        document.execCommand('copy');
+      }
+    });
+  </script>
+</body>
+</html>
