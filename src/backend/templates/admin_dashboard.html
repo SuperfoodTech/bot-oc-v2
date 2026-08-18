@@ -9,11 +9,14 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260812-detail-type">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260817-font-fix">
 </head>
 
 <body x-data="adminApp()">
@@ -41,18 +44,32 @@
         <span>Operasional Outlet</span>
         <span class="tab-badge" id="tabOutletCount" x-text="allStores.length">0</span>
       </button>
-      <a href="/admin/bot" class="tab-btn">
-        <span>Bot</span>
-      </a>
+      <button class="tab-btn" :class="{ 'active': currentTab === 'agency' }" id="tabBtnAgency"
+        onclick="switchTab('agency')">
+        <span>Churn Bot</span>
+      </button>
+      <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs"
+        onclick="switchTab('logs')">
+        <span>Logs</span>
+      </button>
       <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings"
         onclick="switchTab('settings')">
         <span>Settings</span>
       </button>
     </nav>
 
+
     {% include "admin_tab_operasional.html" %}
 
+    {% include "admin_tab_agency.html" %}
+
+    {% include "admin_tab_bot.html" %}
+
     {% include "admin_tab_settings.html" %}
+
+
+
+
 
 
 
@@ -319,8 +336,11 @@
     let autoRefreshTimer = null;
 
     function adminApp() {
-      const urlTab = new URLSearchParams(window.location.search).get('tab');
-      const initialTab = (urlTab === 'settings') ? 'settings' : 'outlets';
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashTab = window.location.hash.replace('#', '');
+      const tabParam = urlParams.get('tab') || hashTab;
+      const validTabs = ['outlets', 'agency', 'logs', 'settings'];
+      const initialTab = validTabs.includes(tabParam) ? tabParam : 'outlets';
       return {
         currentTab: initialTab,
         allStores: [],
@@ -376,6 +396,20 @@
       loadStoresData();
       loadAdminProfile();
       setInterval(fetchBotStatus, 15000);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
+      if (tabParam && ['outlets', 'agency', 'logs', 'settings'].includes(tabParam)) {
+        switchTab(tabParam);
+      }
+    });
+
+    window.addEventListener('popstate', (e) => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab') || 'outlets';
+      if (['outlets', 'agency', 'logs', 'settings'].includes(tabParam)) {
+        switchTab(tabParam);
+      }
     });
 
     document.addEventListener("alpine:initialized", () => {
@@ -388,20 +422,41 @@
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
+      try {
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tabName);
+        window.history.pushState({ tab: tabName }, '', url);
+      } catch (e) {}
+
       if (tabName === 'outlets') {
-        document.getElementById('tabBtnOutlets').classList.add('active');
-        document.getElementById('paneOutlets').classList.add('active');
+        const btn = document.getElementById('tabBtnOutlets');
+        const pane = document.getElementById('paneOutlets');
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
         loadStoresData();
-      } else if (tabName === 'logs') {
-        document.getElementById('tabBtnLogs').classList.add('active');
-        document.getElementById('paneLogs').classList.add('active');
+      } else if (tabName === 'logs' || tabName === 'bot') {
+        const btn = document.getElementById('tabBtnLogs');
+        const pane = document.getElementById('paneLogs');
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
         fetchBotActivity();
+        loadFullBotLogs();
       } else if (tabName === 'settings') {
-        document.getElementById('tabBtnSettings').classList.add('active');
-        document.getElementById('paneSettings').classList.add('active');
+        const btn = document.getElementById('tabBtnSettings');
+        const pane = document.getElementById('paneSettings');
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
         loadAdminProfile();
+      } else if (tabName === 'agency') {
+        const btn = document.getElementById('tabBtnAgency');
+        const pane = document.getElementById('paneAgency');
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
       }
     }
+
+
+
 
     async function loadStoresData(isSilent = false) {
       if (!isSilent) {

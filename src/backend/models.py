@@ -81,6 +81,19 @@ class AdminCreateOutletRequest(BaseModel):
     google_email: Optional[str] = Field(default=None, description="Email Google Mitra")
 
 
+class AdminBotControlRequest(BaseModel):
+    action: str = Field(..., description="'start', 'pause', 'sync', 'stop'")
+
+
+class AgencyToggleRequest(BaseModel):
+    enabled: bool = Field(..., description="Status toggle Auto Force Close (true/false)")
+
+
+class AgencyForceCloseRequest(BaseModel):
+    store_id: str = Field(..., description="Target Store ID untuk single force close")
+
+
+
 class AdminSuspendRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
     penangguhan: str = Field(..., description="'Ya' atau 'Tidak'")

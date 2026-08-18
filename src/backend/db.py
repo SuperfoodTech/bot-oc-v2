@@ -24,12 +24,15 @@ def init_db() -> None:
     schema_path = base_dir / "001_initial_schema.sql"
     migration2_path = base_dir / "002_separate_merchant_outlet.sql"
     migration3_path = base_dir / "003_add_google_auth.sql"
+    migration4_path = base_dir / "004_add_agency_outlet_status.sql"
     with get_db_connection() as conn:
         conn.execute(schema_path.read_text(encoding="utf-8"))
         if migration2_path.exists():
             conn.execute(migration2_path.read_text(encoding="utf-8"))
         if migration3_path.exists():
             conn.execute(migration3_path.read_text(encoding="utf-8"))
+        if migration4_path.exists():
+            conn.execute(migration4_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -41,7 +44,8 @@ def init_db() -> None:
         conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS merchant_id_external varchar(100) DEFAULT ''")
         conn.execute("UPDATE shopee_accounts SET password_plain=COALESCE(password_plain, '') WHERE password_plain IS NULL")
         conn.execute("ALTER TABLE outlets DROP COLUMN IF EXISTS short_name")
-        conn.execute("ALTER TABLE dashboard_accounts ALTER COLUMN password_plain SET NOT NULL")
+        conn.execute("CREATE TABLE IF NOT EXISTS system_settings (key varchar(100) PRIMARY KEY, value text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())")
+        conn.execute("INSERT INTO system_settings (key, value) VALUES ('auto_force_close_enabled', 'false') ON CONFLICT (key) DO NOTHING")
         admin_username = os.getenv("ADMIN_USERNAME", "admin")
         admin_password = os.getenv("ADMIN_PASSWORD", "Admin@123")
         conn.execute(
@@ -49,6 +53,56 @@ def init_db() -> None:
             (admin_username, admin_password),
         )
         conn.execute("INSERT INTO bot_accounts (username,password_plain,name) VALUES (%s,%s,%s) ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,updated_at=now()", (BOT_USERNAME, BOT_PASSWORD, "Bot Satpam Utama"))
+
+
+def get_system_setting(key: str, default_val: str = "") -> str:
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT value FROM system_settings WHERE key=%s", (key,)).fetchone()
+        if row:
+            return row["value"]
+        return default_val
+
+
+def set_system_setting(key: str, value: str) -> bool:
+    with get_db_connection() as conn:
+        conn.execute(
+            "INSERT INTO system_settings (key, value, updated_at) VALUES (%s, %s, now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()",
+            (key, value)
+        )
+        return True
+
+
+def get_agency_auto_toggle() -> bool:
+    val = get_system_setting("auto_force_close_enabled", "false")
+    return val.strip().lower() in ["true", "1", "on"]
+
+
+def set_agency_auto_toggle(enabled: bool) -> bool:
+    return set_system_setting("auto_force_close_enabled", "true" if enabled else "false")
+
+
+def get_agency_outlet_statuses() -> Dict[str, Dict]:
+    """
+    Returns all rows from agency_outlet_status as a dict keyed by store_id.
+    Each value: { shopee_status, last_checked, last_action }.
+    Returns empty dict if table is empty or query fails.
+    """
+    try:
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                "SELECT store_id, shopee_status, last_checked, last_action "
+                "FROM agency_outlet_status"
+            ).fetchall()
+        return {
+            row["store_id"]: {
+                "shopee_status": row["shopee_status"],
+                "last_checked": row["last_checked"].isoformat() if row["last_checked"] else None,
+                "last_action": row["last_action"],
+            }
+            for row in rows
+        }
+    except Exception:
+        return {}
 
 
 def _slug(value: str) -> str:

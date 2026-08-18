@@ -18,6 +18,8 @@ __pycache__/
 credentials.json
 
 # ── Data caches & browser profiles ─
+src/data/chrome_profile
+src/data/chrome_profile/**
 src/data/chrome_profile*
 src/data/session*.json
 main-bot/data/chrome_profile*

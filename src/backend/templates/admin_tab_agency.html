@@ -1,0 +1,208 @@
+<!-- admin_tab_agency.html -->
+<div class="tab-pane" :class="{ 'active': currentTab === 'agency' }" id="paneAgency" x-data="agencyApp()" x-init="initAgency()">
+
+  
+  <!-- CONTROL BAR -->
+  <div class="row g-3 mb-4 align-items-center">
+    <div class="col-md-7">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <h5 class="fw-bold mb-0">Churn Bot</h5>
+        <span class="badge bg-danger text-white rounded-pill px-3 py-1 fw-bold" style="font-size: 0.85rem;" x-text="totalChurn + ' Target'">16 Target</span>
+        <button class="btn btn-sm btn-secondary text-white fw-bold px-3" @click="fetchAgencyData()" :disabled="loading">
+          <span x-show="!loading">Refresh</span>
+          <span x-show="loading">Memuat...</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TOGGLE SWITCH CARD -->
+    <div class="col-md-5">
+      <div class="card border-0 shadow-sm p-3 bg-body-tertiary">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="fw-bold text-body me-2">Auto Force Close</span>
+            <span class="small fw-bold" :class="autoForceCloseEnabled ? 'text-danger' : 'text-muted'"
+                  x-text="autoForceCloseEnabled ? 'Otomatis' : 'Manual'">
+              Manual
+            </span>
+          </div>
+          <div class="form-check form-switch form-switch-md mb-0">
+            <input class="form-check-input custom-toggle-lg" type="checkbox" role="switch" id="agencyAutoToggle"
+                   x-model="autoForceCloseEnabled" @change="toggleAutoMode()" style="width: 3em; height: 1.5em; cursor: pointer;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE OUTLET CHURN -->
+  <div class="table-card agency-section">
+    <div class="table-heading d-flex justify-content-between align-items-center gap-2">
+      <h2>Daftar outlet churn</h2>
+      <span class="badge" x-text="agencyOutlets.length + ' Outlet'">16 Outlet</span>
+    </div>
+
+    <div class="agency-table-wrap">
+      <table class="data-table agency-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Brand / Outlet</th>
+            <th>Merchant Name</th>
+            <th>Store ID</th>
+            <th>Status</th>
+            <th>Terakhir Dicek</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-if="loading">
+            <tr>
+              <td colspan="7" class="agency-state">
+                Memuat data...
+              </td>
+            </tr>
+          </template>
+
+          <template x-if="!loading && agencyOutlets.length === 0">
+            <tr>
+              <td colspan="7" class="agency-state">
+                Tidak ada outlet Churn ditemukan.
+              </td>
+            </tr>
+          </template>
+
+          <template x-for="(item, index) in agencyOutlets" :key="item.store_id + '_' + index">
+            <tr>
+              <td x-text="index + 1" class="agency-index" data-label="#">1</td>
+              <td data-label="Brand / Outlet">
+                <strong x-text="item.brand || item.outlet || '-'"></strong>
+              </td>
+              <td x-text="item.merchant_name || '-'" data-label="Merchant Name"></td>
+              <td data-label="Store ID">
+                <code x-text="item.store_id"></code>
+              </td>
+              <td data-label="Status">
+                <span class="table-status"
+                      :class="{
+                        'is-success': item.shopee_status === 'OPEN',
+                        'is-danger': item.shopee_status === 'CLOSED',
+                        'is-warning': item.shopee_status === 'NOT_FOUND'
+                      }"
+                      x-text="item.shopee_status === 'NOT_FOUND' ? 'NOT FOUND' : (item.shopee_status || 'UNKNOWN')">
+                </span>
+              </td>
+              <td class="log-timestamp" data-label="Terakhir Dicek" x-text="formatTime(item.last_checked)"></td>
+              <td class="agency-action-cell" data-label="Aksi">
+                <button class="btn-danger"
+                        :disabled="autoForceCloseEnabled || actionLoading[item.store_id]"
+                        @click="forceCloseSingle(item.store_id)">
+                  <span x-show="!actionLoading[item.store_id]">Close</span>
+                  <span x-show="actionLoading[item.store_id]">...</span>
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function agencyApp() {
+  return {
+    agencyOutlets: [],
+    totalChurn: 0,
+    totalLive: 0,
+    autoForceCloseEnabled: false,
+    patrolRunning: false,
+    loading: false,
+    actionLoading: {},
+
+    initAgency() {
+      this.fetchAgencyData();
+      // Auto-refresh setiap 30 detik saat tab Agency aktif
+      setInterval(() => { this.fetchAgencyData(); }, 30000);
+    },
+
+    formatTime(isoStr) {
+      if (!isoStr) return '-';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+      } catch (e) {
+        return '-';
+      }
+    },
+
+    async fetchAgencyData() {
+      this.loading = true;
+      try {
+        const resp = await fetch('/api/v1/agency/outlets');
+        const data = await resp.json();
+        if (data.success) {
+          this.agencyOutlets = data.outlets || [];
+          this.totalChurn = data.total_churn || 0;
+          this.totalLive = data.total_live || 0;
+          this.autoForceCloseEnabled = !!data.auto_force_close_enabled;
+          this.patrolRunning = !!data.patrol_running;
+        }
+      } catch (err) {
+        console.error('Gagal mengambil data churn bot:', err);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async toggleAutoMode() {
+      try {
+        const resp = await fetch('/api/v1/agency/toggle-auto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: this.autoForceCloseEnabled })
+        });
+        const data = await resp.json();
+        if (!data.success) {
+          this.autoForceCloseEnabled = !this.autoForceCloseEnabled;
+          alert('Gagal mengupdate toggle mode: ' + (data.detail || 'Error'));
+        }
+      } catch (err) {
+        this.autoForceCloseEnabled = !this.autoForceCloseEnabled;
+        alert('Gagal mengupdate toggle mode: ' + err.message);
+      }
+    },
+
+    async forceCloseSingle(storeId) {
+      if (this.autoForceCloseEnabled) {
+        alert('Tombol manual ter-disable saat Auto Force Close aktif.');
+        return;
+      }
+      if (!confirm(`Konfirmasi: Paksa tutup (Force Close) outlet Store ID ${storeId}?`)) {
+        return;
+      }
+
+      this.actionLoading = { ...this.actionLoading, [storeId]: true };
+      try {
+        const resp = await fetch('/api/v1/agency/force-close-single', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ store_id: storeId })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert(`Selesai: ${data.processed} outlet diproses. Ditutup: ${data.closed}, Sudah tutup: ${data.stopped}`);
+          this.fetchAgencyData();
+        } else {
+          alert('Gagal: ' + (data.detail || data.error || 'Terjadi kesalahan'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        this.actionLoading = { ...this.actionLoading, [storeId]: false };
+      }
+    }
+  }
+}
+</script>
