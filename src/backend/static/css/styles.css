@@ -3404,6 +3404,10 @@ body {
   font-size: 12px;
 }
 
+.add-merchant-review .add-merchant-feedback {
+  margin-top: 14px;
+}
+
 .add-merchant-feedback p {
   margin: 7px 0 0;
   line-height: 1.5;

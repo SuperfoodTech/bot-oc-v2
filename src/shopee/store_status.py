@@ -57,6 +57,7 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
     - display_opening_status: 2 (OPEN / BUKA) vs 3 (PAUSE / TUTUP SEMENTARA)
     - order_enabled: 1 (CAN RECEIVE ORDERS) vs 0 (PAUSED / CANNOT RECEIVE ORDERS)
     - pause_time: pause_start_time > 0 indicates active pause
+    Includes 5s AbortController timeout, 3x retries, and DOM badge fallback.
     """
     if not driver or not store_id:
         return None
@@ -66,17 +67,33 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
 
         log.info(f"📊 [LIVE STORE API] Fetching real-time store state via /api/seller/store for Store {store_id}...")
 
-        res = driver.execute_async_script("""
-            var done = arguments[arguments.length - 1];
-            fetch('https://foody.shopee.co.id/api/seller/store', {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Accept': 'application/json, text/plain, */*' }
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(d) { done(d); })
-            .catch(function(e) { done({code: -1, msg: e.message || String(e)}); });
-        """)
+        res = None
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script("""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {
+                        controller.abort();
+                        done({code: -1, msg: 'Client timeout (5s)'});
+                    }, 5000);
+                    fetch('https://foody.shopee.co.id/api/seller/store', {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        signal: controller.signal
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { clearTimeout(timer); done(d); })
+                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                """)
+                if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
+                    break
+                else:
+                    log.warning(f"  ⚠️ [LIVE STORE API] Percobaan {attempt}/2 respon API: {res}")
+            except Exception as async_err:
+                log.warning(f"  ⚠️ [LIVE STORE API] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
 
         log.info(f"  🔍 [LIVE STORE API RAW RESPONSE] Store {store_id} | Raw Res: {res}")
 
@@ -90,9 +107,6 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
             pause_time = op_data.get("pause_time") or {}
             pause_start = pause_time.get("pause_start_time", 0) if isinstance(pause_time, dict) else 0
 
-            # Exact condition matching DOCS/store-response.json & UI Screenshot:
-            # - If (display_status == 2 or order_enabled == 1) and pause_start == 0 -> OPEN (BUKA)
-            # - Otherwise -> CLOSED (PAUSE / TUTUP SEMENTARA)
             if (display_status == 2 or order_enabled == 1) and pause_start == 0:
                 status_str = "OPEN"
             else:
@@ -113,17 +127,40 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 "raw": op_data
             }
 
-        # Fallback: DOM check matching UI Screenshot
-        log.warning(f"  ⚠️ [LIVE STORE API FALLBACK] Respon API /api/seller/store bukan 0: {res}. Menjalankan pengecekan DOM...")
-        body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
-        log.info(f"  🔍 [LIVE DOM TEXT SEARCH] Body Text Length: {len(body_text)} | URL: {driver.current_url}")
+        # Fallback: DOM Check with Badge status text & dot inspection
+        log.warning(f"  ⚠️ [LIVE STORE API FALLBACK] Respon API /api/seller/store bukan 0: {res}. Menjalankan pengecekan DOM Badge...")
+        
+        dom_status = driver.execute_script("""
+            var badgeText = Array.from(document.querySelectorAll('.shopee-food-badge-status-text, .shopee-food-badge-status, .ant-badge'))
+                .map(el => (el.innerText || el.textContent || '').trim().toLowerCase())
+                .join(' ');
 
-        if "tutup outlet sementara" in body_text:
-            log.info("  ✅ [LIVE DOM STATUS] Button 'Tutup Outlet Sementara' detected -> Store is OPEN.")
-            return {"opening_status": 2, "order_enabled": 1, "status_str": "OPEN", "raw": {"source": "partner_dom"}}
-        elif "buka outlet" in body_text or "tutup" in body_text:
-            log.info("  ✅ [LIVE DOM STATUS] Button 'Buka Outlet' detected -> Store is CLOSED.")
-            return {"opening_status": 3, "order_enabled": 0, "status_str": "CLOSED", "raw": {"source": "partner_dom"}}
+            var dots = Array.from(document.querySelectorAll('.shopee-food-badge-status-dot'))
+                .map(el => (el.getAttribute('style') || '').toLowerCase());
+            
+            var bodyText = (document.body ? document.body.innerText : '').toLowerCase();
+
+            var isOpen = badgeText.includes('buka') || badgeText.includes('open') || 
+                         dots.some(d => d.includes('48, 181, 102') || d.includes('#30b566')) ||
+                         bodyText.includes('tutup outlet sementara');
+
+            var isClosed = badgeText.includes('tutup sementara') || badgeText.includes('pause') || badgeText.includes('closed') ||
+                           dots.some(d => d.includes('238, 44, 74') || d.includes('#ee2c4a')) ||
+                           bodyText.includes('buka outlet');
+
+            if (isOpen && !isClosed) return 'OPEN';
+            if (isClosed && !isOpen) return 'CLOSED';
+            if (isOpen) return 'OPEN';
+            if (isClosed) return 'CLOSED';
+            return null;
+        """)
+
+        if dom_status == "OPEN":
+            log.info("  ✅ [LIVE DOM STATUS] Badge/DOM status detected -> Store is OPEN.")
+            return {"opening_status": 2, "order_enabled": 1, "status_str": "OPEN", "raw": {"source": "partner_dom_badge"}}
+        elif dom_status == "CLOSED":
+            log.info("  ✅ [LIVE DOM STATUS] Badge/DOM status detected -> Store is CLOSED.")
+            return {"opening_status": 3, "order_enabled": 0, "status_str": "CLOSED", "raw": {"source": "partner_dom_badge"}}
 
     except Exception as e:
         log.warning(f"⚠️ Pengecekan status toko gagal untuk store {store_id}: {e}")
@@ -143,17 +180,32 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
         ensure_business_hours_page(driver, store_id)
 
         log.info(f"🕒 [PULL REGULAR HOURS] Menarik data jadwal reguler Store {store_id}...")
-        res = driver.execute_async_script("""
-            var done = arguments[arguments.length - 1];
-            fetch('https://foody.shopee.co.id/api/seller/store/regular-hours', {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Accept': 'application/json, text/plain, */*' }
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(d) { done(d); })
-            .catch(function(e) { done({code: -1, msg: e.message || String(e)}); });
-        """)
+        res = None
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script("""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {
+                        controller.abort();
+                        done({code: -1, msg: 'Client timeout (5s)'});
+                    }, 5000);
+                    fetch('https://foody.shopee.co.id/api/seller/store/regular-hours', {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        signal: controller.signal
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { clearTimeout(timer); done(d); })
+                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                """)
+                if isinstance(res, dict) and res.get("code") == 0:
+                    break
+            except Exception as async_err:
+                log.warning(f"  ⚠️ [REGULAR HOURS API] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
+
         log.info(f"  🔍 [REGULAR HOURS API RESPONSE] Store {store_id} | Response: {res.get('code') if isinstance(res, dict) else None}")
         if isinstance(res, dict) and res.get("code") == 0:
             reg_hours = res.get("data", {}).get("regular_hours", [])
@@ -216,28 +268,39 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
         # 2. XHR POST API Fallback with explicit store_id query param
         log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
         target_num = int(store_id) if str(store_id).isdigit() else store_id
-        res = driver.execute_async_script(f"""
-            var done = arguments[arguments.length - 1];
-            var now = Date.now();
-            var end = now + ({pause_duration_minutes} * 60 * 1000);
-            fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
-                method: 'POST',
-                credentials: 'include',
-                headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
-                body: JSON.stringify({{
-                    "pause_start_time": now,
-                    "pause_end_time": end,
-                    "store_id": {target_num}
-                }})
-            }})
-            .then(function(r) {{ return r.json(); }})
-            .then(function(d) {{ done(d); }})
-            .catch(function(e) {{ done({{code: -1, msg: e.message || String(e)}}); }});
-        """)
-        log.info(f"  🔍 [PAUSE API RESPONSE] Store {store_id} | Response: {res}")
-        if isinstance(res, dict) and res.get("code") == 0:
-            log.info(f"  ✅ [ACTION PAUSE SUCCESS] Store {store_id} berhasil di-pause (Tutup Toko via API).")
-            return True
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script(f"""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {{
+                        controller.abort();
+                        done({{code: -1, msg: 'Client timeout (5s)'}});
+                    }}, 5000);
+                    var now = Date.now();
+                    var end = now + ({pause_duration_minutes} * 60 * 1000);
+                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
+                        body: JSON.stringify({{
+                            "pause_start_time": now,
+                            "pause_end_time": end,
+                            "store_id": {target_num}
+                        }}),
+                        signal: controller.signal
+                    }})
+                    .then(function(r) {{ return r.json(); }})
+                    .then(function(d) {{ clearTimeout(timer); done(d); }})
+                    .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
+                """)
+                log.info(f"  🔍 [PAUSE API RESPONSE] Store {store_id} (Attempt {attempt}/2) | Response: {res}")
+                if isinstance(res, dict) and res.get("code") == 0:
+                    log.info(f"  ✅ [ACTION PAUSE SUCCESS] Store {store_id} berhasil di-pause (Tutup Toko via API).")
+                    return True
+            except Exception as async_err:
+                log.warning(f"  ⚠️ [PAUSE API] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
 
     except Exception as e:
         log.error(f"  ❌ Failed to execute pause action for store {store_id}: {e}")
@@ -263,7 +326,7 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
             var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
             var targetBtn = btns.find(b => {
                 var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-                return txt.includes('buka outlet') || txt.includes('buka toko') || txt.includes('buka');
+                return txt.includes('buka outlet') || txt.includes('buka toko') || txt === 'buka';
             });
             if (targetBtn) {
                 targetBtn.scrollIntoView({block: 'center'});
@@ -296,26 +359,38 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
         # 2. XHR POST API Fallback with explicit store_id query param
         log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
         target_num = int(store_id) if str(store_id).isdigit() else store_id
-        res = driver.execute_async_script(f"""
-            var done = arguments[arguments.length - 1];
-            fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={store_id}', {{
-                method: 'POST',
-                credentials: 'include',
-                headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
-                body: JSON.stringify({{
-                    "store_id": "{store_id}"
-                }})
-            }})
-            .then(function(r) {{ return r.json(); }})
-            .then(function(d) {{ done(d); }})
-            .catch(function(e) {{ done({{code: -1, msg: e.message || String(e)}}); }});
-        """)
-        log.info(f"  🔍 [OPEN API RESPONSE] Store {store_id} | Response: {res}")
-        if isinstance(res, dict) and res.get("code") == 0:
-            log.info(f"  ✅ [ACTION OPEN SUCCESS] Store {store_id} berhasil dibuka (Buka Toko via API).")
-            return True
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script(f"""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {{
+                        controller.abort();
+                        done({{code: -1, msg: 'Client timeout (5s)'}});
+                    }}, 5000);
+                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={store_id}', {{
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
+                        body: JSON.stringify({{
+                            "store_id": "{store_id}"
+                        }}),
+                        signal: controller.signal
+                    }})
+                    .then(function(r) {{ return r.json(); }})
+                    .then(function(d) {{ clearTimeout(timer); done(d); }})
+                    .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
+                """)
+                log.info(f"  🔍 [OPEN API RESPONSE] Store {store_id} (Attempt {attempt}/2) | Response: {res}")
+                if isinstance(res, dict) and res.get("code") == 0:
+                    log.info(f"  ✅ [ACTION OPEN SUCCESS] Store {store_id} berhasil dibuka (Buka Toko via API).")
+                    return True
+            except Exception as async_err:
+                log.warning(f"  ⚠️ [OPEN API] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
 
     except Exception as e:
         log.error(f"  ❌ Failed to execute open action for store {store_id}: {e}")
 
     return False
+

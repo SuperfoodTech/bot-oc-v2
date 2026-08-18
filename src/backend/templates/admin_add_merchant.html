@@ -133,15 +133,6 @@
           </section>
 
           <div id="addMerchantError" class="add-merchant-feedback is-error" role="alert" hidden></div>
-          <div id="addMerchantSuccess" class="add-merchant-feedback is-success" role="status" hidden>
-            <strong>Mitra dan outlet berhasil dibuat.</strong>
-            <p>Link dashboard mitra:</p>
-            <div class="add-merchant-result-row">
-              <input id="generatedLink" class="form-input" type="text" readonly>
-              <button id="copyGeneratedLink" class="btn-outline" type="button">Salin</button>
-            </div>
-            <p>Passcode: <strong id="generatedPasscode"></strong></p>
-          </div>
         </div>
 
         <aside class="add-merchant-review" aria-labelledby="reviewTitle">
@@ -161,6 +152,15 @@
             </dl>
             <div class="add-merchant-form-actions">
               <button id="submitAddMerchant" class="btn-primary" type="submit">Simpan &amp; generate link</button>
+            </div>
+            <div id="addMerchantSuccess" class="add-merchant-feedback is-success" role="status" hidden>
+              <strong>Mitra dan outlet berhasil dibuat.</strong>
+              <p>Link dashboard mitra:</p>
+              <div class="add-merchant-result-row">
+                <input id="generatedLink" class="form-input" type="text" readonly>
+                <button id="copyGeneratedLink" class="btn-outline" type="button">Salin</button>
+              </div>
+              <p>Passcode: <strong id="generatedPasscode"></strong></p>
             </div>
           </div>
         </aside>

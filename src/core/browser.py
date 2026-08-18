@@ -1657,7 +1657,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                 .then(j => done(j.data || null))
                 .catch(() => done(null));
                 """
-                driver.set_script_timeout(10)
+                driver.set_script_timeout(15)
                 user_data = driver.execute_async_script(api_js)
                 if user_data:
                     active_id = str(user_data.get("merchantId") or "")

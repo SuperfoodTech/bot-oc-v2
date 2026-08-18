@@ -1644,17 +1644,31 @@ def get_outlet_shopee_status(driver, store_id: str) -> str:
 
         ensure_business_hours_page(driver, store_id)
 
-        res = driver.execute_async_script("""
-            var done = arguments[arguments.length - 1];
-            fetch('https://foody.shopee.co.id/api/seller/store', {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Accept': 'application/json, text/plain, */*' }
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(d) { done(d); })
-            .catch(function(e) { done({code: -1, msg: e.message || String(e)}); });
-        """)
+        res = None
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script("""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {
+                        controller.abort();
+                        done({code: -1, msg: 'Client timeout (5s)'});
+                    }, 5000);
+                    fetch('https://foody.shopee.co.id/api/seller/store', {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        signal: controller.signal
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { clearTimeout(timer); done(d); })
+                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                """)
+                if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
+                    break
+            except Exception as async_err:
+                log.warning(f"⚠️ [AGENCY STORE API] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
 
         if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
             data = res["data"]
@@ -1673,13 +1687,35 @@ def get_outlet_shopee_status(driver, store_id: str) -> str:
                 log.info(f"✅ Store {store_id} live status via API: CLOSED")
                 return "CLOSED"
 
-        body_text = (driver.find_element(By.TAG_NAME, "body").text or "").lower()
-        if "tutup outlet sementara" in body_text:
-            log.info(f"✅ Store {store_id} live status via DOM: OPEN")
-            return "OPEN"
-        elif "buka outlet" in body_text:
-            log.info(f"✅ Store {store_id} live status via DOM: CLOSED")
-            return "CLOSED"
+        # Fallback: DOM Check with Badge status text & dot inspection
+        dom_status = driver.execute_script("""
+            var badgeText = Array.from(document.querySelectorAll('.shopee-food-badge-status-text, .shopee-food-badge-status, .ant-badge'))
+                .map(el => (el.innerText || el.textContent || '').trim().toLowerCase())
+                .join(' ');
+
+            var dots = Array.from(document.querySelectorAll('.shopee-food-badge-status-dot'))
+                .map(el => (el.getAttribute('style') || '').toLowerCase());
+            
+            var bodyText = (document.body ? document.body.innerText : '').toLowerCase();
+
+            var isOpen = badgeText.includes('buka') || badgeText.includes('open') || 
+                         dots.some(d => d.includes('48, 181, 102') || d.includes('#30b566')) ||
+                         bodyText.includes('tutup outlet sementara');
+
+            var isClosed = badgeText.includes('tutup sementara') || badgeText.includes('pause') || badgeText.includes('closed') ||
+                           dots.some(d => d.includes('238, 44, 74') || d.includes('#ee2c4a')) ||
+                           bodyText.includes('buka outlet');
+
+            if (isOpen && !isClosed) return 'OPEN';
+            if (isClosed && !isOpen) return 'CLOSED';
+            if (isOpen) return 'OPEN';
+            if (isClosed) return 'CLOSED';
+            return null;
+        """)
+
+        if dom_status in ("OPEN", "CLOSED"):
+            log.info(f"✅ Store {store_id} live status via DOM Badge: {dom_status}")
+            return dom_status
 
         status_raw = driver.execute_script("""
             var sw = document.querySelector('.ant-switch');
@@ -1745,29 +1781,40 @@ def execute_force_close(driver, store_id: str, pause_duration_minutes: int = 144
 
         log.info(f"🌐 UI button fallback: executing XHR POST action/pause for store {store_id}...")
         target_num = int(store_id) if str(store_id).isdigit() else store_id
-        res = driver.execute_async_script(f"""
-            var done = arguments[arguments.length - 1];
-            var now = Date.now();
-            var end = now + ({pause_duration_minutes} * 60 * 1000);
-            fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
-                method: 'POST',
-                credentials: 'include',
-                headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
-                body: JSON.stringify({{
-                    "pause_start_time": now,
-                    "pause_end_time": end,
-                    "store_id": {target_num}
-                }})
-            }})
-            .then(function(r) {{ return r.json(); }})
-            .then(function(d) {{ done(d); }})
-            .catch(function(e) {{ done({{code: -1, msg: e.message || String(e)}}); }});
-        """)
-
-        log.info(f"🔍 Action pause API response for store {store_id}: {res}")
-        if isinstance(res, dict) and res.get("code") == 0:
-            log.info(f"✅ Store {store_id} successfully force closed via API.")
-            return True
+        res = None
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script(f"""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {{
+                        controller.abort();
+                        done({{code: -1, msg: 'Client timeout (5s)'}});
+                    }}, 5000);
+                    var now = Date.now();
+                    var end = now + ({pause_duration_minutes} * 60 * 1000);
+                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
+                        body: JSON.stringify({{
+                            "pause_start_time": now,
+                            "pause_end_time": end,
+                            "store_id": {target_num}
+                        }}),
+                        signal: controller.signal
+                    }})
+                    .then(function(r) {{ return r.json(); }})
+                    .then(function(d) {{ clearTimeout(timer); done(d); }})
+                    .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
+                """)
+                log.info(f"🔍 Action pause API response (Attempt {attempt}/2) for store {store_id}: {res}")
+                if isinstance(res, dict) and res.get("code") == 0:
+                    log.info(f"✅ Store {store_id} successfully force closed via API.")
+                    return True
+            except Exception as async_err:
+                log.warning(f"⚠️ [AGENCY FORCE CLOSE] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
 
     except Exception as e:
         log.error(f"❌ Force close execution failed for store {store_id}: {e}")
