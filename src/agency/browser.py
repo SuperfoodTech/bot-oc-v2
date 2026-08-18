@@ -957,10 +957,12 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
 
             js_switch_script = """
                 var targetName = arguments[0].toLowerCase().trim();
+                var cleanTarget = targetName.replace(/_+$/, '').trim();
                 var items = document.querySelectorAll('li.ant-menu-item, li[role="menuitem"], .ant-dropdown-menu-item, [class*="menu-item"]');
                 for (var i = 0; i < items.length; i++) {
                     var text = (items[i].innerText || "").toLowerCase().trim();
-                    if (text === targetName || text.includes(targetName)) {
+                    var cleanText = text.replace(/_+$/, '').trim();
+                    if (text === targetName || text.includes(targetName) || cleanText === cleanTarget || (cleanTarget.length >= 3 && cleanText.includes(cleanTarget))) {
                         items[i].scrollIntoView({block: 'center'});
                         items[i].click();
                         return true;
@@ -1005,15 +1007,20 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
                 else:
                     log.error("❌ Failed to accept onboarding invitation.")
                     if switch_attempt == 2:
-                        return False
+                        msg = f"Nama outlet '{target_name}' gagal menerima undangan onboarding."
+                        raise MerchantNotFoundError(msg)
                     continue
 
             try:
                 log.info(f"  ⏳ Menunggu 5 detik melihat pembaruan nama menjadi {target_name} (Attempt {switch_attempt+1}/3)...")
 
+                clean_target = target_name.rstrip('_').strip().lower()
+
                 def is_name_updated(d):
                     try:
-                        return target_name.lower() in d.find_element(By.CSS_SELECTOR, ".merchantName").text.lower()
+                        header_name = d.find_element(By.CSS_SELECTOR, ".merchantName").text.strip().lower()
+                        clean_header = header_name.rstrip('_').strip()
+                        return clean_target in header_name or header_name in clean_target or clean_target in clean_header or clean_header in clean_target
                     except Exception:
                         return False
 
@@ -1024,7 +1031,9 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
                 log.warning(f"⚠️ [MERCHANT] UI name belum berubah ke {target_name}.")
                 if switch_attempt == 2:
                     log.warning(f"❌ [MERCHANT] Gagal melakukan switch ke {target_name} setelah 3x percobaan klik.")
-                    return False
+                    msg = f"Nama outlet '{target_name}' terkonfirmasi gagal di-switch ke header UI Shopee."
+                    raise MerchantNotFoundError(msg)
+
 
     except MerchantNotFoundError:
         raise
