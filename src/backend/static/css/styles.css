@@ -2863,6 +2863,67 @@ body {
   color: #1e3a8a;
 }
 
+.user-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  max-width: min(360px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid #171717;
+  border-radius: 10px;
+  background: #171717;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.user-toast.is-error {
+  border-color: #BE1A1A;
+}
+
+.user-toast[hidden] {
+  display: none;
+}
+
+/* Mitra dashboard: keep repeated outlet cards neutral; color communicates state only. */
+.mobile-wrapper .card-box {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.06);
+}
+
+.mobile-wrapper .outlet-list .card-box {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.06);
+}
+
+.mobile-wrapper .outlet-control {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.mobile-wrapper .subscription-card,
+.mobile-wrapper .dashboard-stack > .card-box:last-child {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.06);
+}
+
+.mobile-wrapper .outlet-list .btn-danger {
+  background: #BE1A1A !important;
+  border: 1px solid #BE1A1A !important;
+  color: #ffffff !important;
+}
+
+.mobile-wrapper .outlet-list .btn-danger:hover {
+  background: #991515 !important;
+  border-color: #991515 !important;
+}
+
 .modal-card.modal-card-error {
   border-top: 4px solid #BE1A1A;
 }
@@ -3560,5 +3621,12 @@ body {
     left: 16px;
     max-width: none;
     text-align: center;
+  }
+
+  .user-toast {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    max-width: none;
   }
 }

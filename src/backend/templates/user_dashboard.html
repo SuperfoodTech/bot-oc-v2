@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260810-purewhitekpi">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260819-neutral-dashboard">
 </head>
 <body x-data="userApp()">
 
@@ -90,6 +90,8 @@
       </div>
     </div>
   </div>
+
+  <div id="userToast" class="user-toast" role="status" aria-live="polite" hidden></div>
 
   <div class="modal-overlay" id="pauseModal">
     <div class="modal-card">
@@ -332,7 +334,6 @@
 
       outlets.forEach(out => {
         const isVercelOn = out.vercel_status === 'ON';
-        const isShopeeOpen = out.shopee_status === 'OPEN' || out.shopee_status === 'ON';
         const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
         
         const card = document.createElement('div');
@@ -344,14 +345,11 @@
               <h3 class="card-title">${out.store_name}</h3>
               <p class="card-subtitle">ID ${out.store_id}</p>
             </div>
-            <span class="badge ${isShopeeOpen ? 'badge-open' : 'badge-closed'}">
-              ${isShopeeOpen ? 'Buka' : 'Tutup'}
-            </span>
           </div>
 
           ${isSuspended ? `
             <div style="margin-top: 12px; padding: 10px 12px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; font-size: 12px; color: #be123c; font-weight: 600;">
-              ⚠️ Outlet Ditangguhkan Admin: ${out.alasan_penangguhan || 'Tindakan Admin'}
+              Outlet Ditangguhkan Admin: ${out.alasan_penangguhan || 'Tindakan Admin'}
             </div>
           ` : ''}
 
@@ -369,7 +367,7 @@
           </div>
 
           ${isSuspended ? `
-            <button class="btn-primary" onclick="alert('Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${out.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.')" style="opacity: 0.7; cursor: pointer;">
+            <button class="btn-primary" onclick="showUserToast('Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${out.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.', 'error')" style="opacity: 0.7; cursor: pointer;">
               Buka sekarang
             </button>
           ` : (isVercelOn ? `
@@ -386,10 +384,21 @@
       });
     }
 
+    let userToastTimer;
+
+    function showUserToast(message, type = 'success') {
+      const toast = document.getElementById('userToast');
+      toast.textContent = message;
+      toast.className = 'user-toast' + (type === 'error' ? ' is-error' : '');
+      toast.hidden = false;
+      clearTimeout(userToastTimer);
+      userToastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
+    }
+
     function toggleVercel(storeId, isChecked) {
       const store = currentUserOutlets.find(s => s.store_id === storeId);
       if (store && (store.is_suspended || store.suspension_status === 'SUSPENDED')) {
-        alert(`Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${store.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`);
+        showUserToast(`Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${store.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`, 'error');
         renderOutlets(currentUserOutlets);
         return;
       }
@@ -432,11 +441,11 @@
           closeModal();
           doLogin();
         } else {
-          alert(data.detail || 'Gagal menutup outlet.');
+          showUserToast(data.detail || 'Gagal menutup outlet.', 'error');
           closeModal();
         }
       } catch (err) {
-        alert('Gagal menutup outlet.');
+        showUserToast('Gagal menutup outlet.', 'error');
         closeModal();
       }
     }
@@ -448,11 +457,11 @@
         if (res.ok && data.success) {
           doLogin();
         } else {
-          alert(data.detail || 'Gagal membuka outlet.');
+          showUserToast(data.detail || 'Gagal membuka outlet.', 'error');
           renderOutlets(currentUserOutlets);
         }
       } catch (err) {
-        alert('Gagal membuka outlet.');
+        showUserToast('Gagal membuka outlet.', 'error');
         renderOutlets(currentUserOutlets);
       }
     }
