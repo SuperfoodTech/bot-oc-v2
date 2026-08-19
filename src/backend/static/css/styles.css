@@ -115,6 +115,22 @@ label {
   letter-spacing: -0.01em;
 }
 
+.brand-logo {
+  display: block;
+  height: auto;
+  object-fit: contain;
+}
+
+.brand-logo-mitra {
+  width: 140px;
+  max-height: 30px;
+}
+
+.brand-logo-admin {
+  width: 190px;
+  max-height: 38px;
+}
+
 .brand-icon {
   display: block;
   width: 27px;
