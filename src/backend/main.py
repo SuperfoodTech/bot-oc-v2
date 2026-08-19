@@ -366,22 +366,25 @@ def admin_create_outlet(req: AdminCreateOutletRequest, request: Request, admin: 
     if state.get_store_by_id(req.store_id):
         raise HTTPException(status_code=409, detail=f"Store ID '{req.store_id}' sudah terdaftar.")
     base_url = str(request.base_url).rstrip("/")
-    state.save_or_update_store(
-        store_id=req.store_id,
-        store_name=req.nama_panjang_outlet,
-        merchant_name=req.nama_portal,
-        account_username=req.username,
-        nama_pemilik=req.nama_pemilik,
-        ownership_type=req.ownership_type,
-        paket=req.paket,
-        tanggal_mulai_layanan=req.tanggal_mulai_layanan,
-        tanggal_berakhir_layanan=req.tanggal_berakhir_layanan,
-        vercel_password=req.dashboard_password,
-        regular_hours=req.operating_hours,
-        special_hours=req.special_hours,
-        base_url=base_url,
-        google_email=req.google_email,
-    )
+    try:
+        state.save_or_update_store(
+            store_id=req.store_id,
+            store_name=req.nama_panjang_outlet,
+            merchant_name=req.nama_portal,
+            account_username=req.username,
+            nama_pemilik=req.nama_pemilik,
+            ownership_type=req.ownership_type,
+            paket=req.paket,
+            tanggal_mulai_layanan=req.tanggal_mulai_layanan,
+            tanggal_berakhir_layanan=req.tanggal_berakhir_layanan,
+            vercel_password=req.dashboard_password,
+            regular_hours=req.operating_hours,
+            special_hours=req.special_hours,
+            base_url=base_url,
+            google_email=req.google_email,
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
     return {"success": True, "data": state.get_store_by_id(req.store_id)}
 
 
@@ -442,16 +445,19 @@ def admin_edit_outlet(req: AdminEditOutletRequest, admin: dict = Depends(require
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' tidak ditemukan.")
 
-    success = state.admin_edit_outlet(
-        store_id=req.store_id,
-        nama_pemilik=req.nama_pemilik,
-        nama_portal=req.nama_portal,
-        nama_panjang_outlet=req.nama_panjang_outlet,
-        ownership_type=req.ownership_type,
-        paket=req.paket,
-        dashboard_password=req.dashboard_password,
-        google_email=req.google_email
-    )
+    try:
+        success = state.admin_edit_outlet(
+            store_id=req.store_id,
+            nama_pemilik=req.nama_pemilik,
+            nama_portal=req.nama_portal,
+            nama_panjang_outlet=req.nama_panjang_outlet,
+            ownership_type=req.ownership_type,
+            paket=req.paket,
+            dashboard_password=req.dashboard_password,
+            google_email=req.google_email
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
     if not success:
         raise HTTPException(status_code=500, detail="Gagal memperbarui data outlet.")
 

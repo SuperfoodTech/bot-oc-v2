@@ -117,6 +117,16 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     owner_clean = (owner or "Unassigned").strip()
     portal_clean = (merchant_name or "Unknown Merchant").strip()
 
+    if google_email:
+        email_clean = google_email.strip()
+        if email_clean:
+            existing = conn.execute(
+                "SELECT username FROM dashboard_accounts WHERE LOWER(google_email) = LOWER(%s) AND LOWER(username) != LOWER(%s)",
+                (email_clean, owner_clean)
+            ).fetchone()
+            if existing:
+                raise ValueError("Email Google sudah terdaftar.")
+
     merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (owner_clean,)).fetchone()
     if not merchant:
         merchant = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (owner_clean,)).fetchone()
@@ -384,7 +394,15 @@ def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_po
         if dashboard_password is not None and dashboard_password.strip():
             conn.execute("UPDATE dashboard_accounts SET password_plain=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (dashboard_password.strip(), mid))
         if google_email is not None:
-            conn.execute("UPDATE dashboard_accounts SET google_email=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (google_email.strip() or None, mid))
+            email_clean = google_email.strip()
+            if email_clean:
+                existing = conn.execute(
+                    "SELECT username FROM dashboard_accounts WHERE LOWER(google_email) = LOWER(%s) AND (merchant_id IS NULL OR merchant_id != %s)",
+                    (email_clean, mid)
+                ).fetchone()
+                if existing:
+                    raise ValueError("Email Google sudah terdaftar.")
+            conn.execute("UPDATE dashboard_accounts SET google_email=%s, updated_at=now() WHERE merchant_id=%s AND role='MERCHANT'", (email_clean or None, mid))
         if paket is not None and paket.strip():
             code = paket.strip().upper().replace(" ", "_")
             if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"}:
