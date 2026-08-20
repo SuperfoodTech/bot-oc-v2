@@ -2,10 +2,6 @@
     <div class="tab-pane" :class="{ 'active': currentTab === 'outlets' }" id="paneOutlets">
       <div class="table-card outlet-section">
         <div class="table-heading">
-          <div class="table-heading-title">
-            <h2>Daftar outlet</h2>
-            <span class="bot-status-badge" id="daemonStatusVal" title="Status sinkronisasi bot">Memuat...</span>
-          </div>
           <div class="table-heading-actions">
             <input type="text" id="searchInput" class="form-input table-search" placeholder="Cari mitra, outlet, atau Store ID" onkeyup="filterTable()">
             <button class="btn-primary btn-compact" type="button" id="fetchSheetButton" onclick="fetchSheetData()">Fetch dari Sheet</button>
