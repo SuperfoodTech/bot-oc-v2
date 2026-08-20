@@ -34,18 +34,18 @@ WEEKDAY_MAP = {
 class MerchantOutlet:
     """A row from the A-L import layout."""
 
-    nama_pemilik: str                 # A
-    import_status: str                # B: Aktif/Nonaktif import gate
-    kepemilikan: str                  # C
-    paket: str                        # D
-    tanggal_mulai_layanan: str        # E
-    tanggal_berakhir_layanan: str     # F
-    username: str                     # G
-    password: str                     # H: Shopee account password
-    nama_portal: str                  # I
-    store_id: str                     # J
-    nama_panjang_outlet: str          # K
-    vercel_password: str              # L: dashboard password
+    nama_pemilik: str = ""                 # A
+    import_status: str = "Aktif"           # B: Aktif/Nonaktif import gate
+    kepemilikan: str = ""                  # C
+    paket: str = ""                        # D
+    tanggal_mulai_layanan: str = ""        # E
+    tanggal_berakhir_layanan: str = ""     # F
+    username: str = ""                     # G
+    password: str = ""                     # H: Shopee account password
+    nama_portal: str = ""                  # I
+    store_id: str = ""                     # J
+    nama_panjang_outlet: str = ""          # K
+    vercel_password: str = ""              # L: dashboard password
     status_utama: str = "ON"          # Database default for new outlets only
     status_aktual: str = "UNKNOWN"
     merchant_id: str = ""
@@ -58,6 +58,7 @@ class MerchantOutlet:
     alasan_penangguhan: str = ""
     tgl_mulai_penangguhan: str = ""
     tgl_berakhir_penangguhan: str = ""
+    hp: str = ""
 
 
 def _subscription_status(end_date: str) -> str:
