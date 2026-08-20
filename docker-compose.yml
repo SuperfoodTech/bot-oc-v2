@@ -37,7 +37,9 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
-      - AGENCY_INTERNAL_URL=http://fm-agency:8082
+      - GOOGLE_SHEETS_CSV_URL=${GOOGLE_SHEETS_CSV_URL}
+      - GOOGLE_SHEETS_APPS_SCRIPT_URL=${GOOGLE_SHEETS_APPS_SCRIPT_URL}
+      - GOOGLE_SHEETS_APPS_SCRIPT_TOKEN=${GOOGLE_SHEETS_APPS_SCRIPT_TOKEN}
     volumes:
       - ./src:/app/src
 
@@ -62,29 +64,6 @@ services:
       - ./src/data:/app/src/data
       - ./src:/app/src
       - ./credentials.json:/app/credentials.json
-
-  agency:
-    build:
-      context: .
-      dockerfile: main-agency/Dockerfile
-    container_name: fm-agency
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_started
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
-      - HEADLESS=true
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - TZ=Asia/Jakarta
-      - AGENCY_PATROL_INTERVAL=300
-    volumes:
-      - ./src/data:/app/src/data
-      - ./src:/app/src
-      - ./database:/app/database
-    # Port 8082 hanya untuk komunikasi internal antar container (tidak di-expose ke host)
-    expose:
-      - "8082"
 
 volumes:
   postgres_data:

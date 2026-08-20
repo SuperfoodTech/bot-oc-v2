@@ -265,21 +265,3 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
         "actions_taken": actions_taken,
         "message": f"Successfully processed {len(db_stores)} store(s) from PostgreSQL for allowed usernames {ALLOWED_USERNAMES}."
     }
-
-
-def check_and_run_agency_force_close() -> Dict[str, Any]:
-    """
-    Checks if auto_force_close_enabled toggle is ON in DB.
-    If ON, triggers agency force close patrol.
-    """
-    if not db.get_agency_auto_toggle():
-        return {"success": True, "executed": False, "reason": "Auto Force Close toggle is OFF"}
-
-    try:
-        from agency import runner as agency_runner
-        res = agency_runner.run_agency_force_close_patrol()
-        return {"success": True, "executed": True, "result": res}
-    except Exception as e:
-        log.error("Error executing Agency auto force close patrol: %s", e)
-        return {"success": False, "executed": False, "error": str(e)}
-

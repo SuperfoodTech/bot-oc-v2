@@ -24,15 +24,12 @@ def init_db() -> None:
     schema_path = base_dir / "001_initial_schema.sql"
     migration2_path = base_dir / "002_separate_merchant_outlet.sql"
     migration3_path = base_dir / "003_add_google_auth.sql"
-    migration4_path = base_dir / "004_add_agency_outlet_status.sql"
     with get_db_connection() as conn:
         conn.execute(schema_path.read_text(encoding="utf-8"))
         if migration2_path.exists():
             conn.execute(migration2_path.read_text(encoding="utf-8"))
         if migration3_path.exists():
             conn.execute(migration3_path.read_text(encoding="utf-8"))
-        if migration4_path.exists():
-            conn.execute(migration4_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -45,7 +42,6 @@ def init_db() -> None:
         conn.execute("UPDATE shopee_accounts SET password_plain=COALESCE(password_plain, '') WHERE password_plain IS NULL")
         conn.execute("ALTER TABLE outlets DROP COLUMN IF EXISTS short_name")
         conn.execute("CREATE TABLE IF NOT EXISTS system_settings (key varchar(100) PRIMARY KEY, value text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())")
-        conn.execute("INSERT INTO system_settings (key, value) VALUES ('auto_force_close_enabled', 'false') ON CONFLICT (key) DO NOTHING")
         admin_username = os.getenv("ADMIN_USERNAME", "admin")
         admin_password = os.getenv("ADMIN_PASSWORD", "Admin@123")
         conn.execute(
@@ -70,39 +66,6 @@ def set_system_setting(key: str, value: str) -> bool:
             (key, value)
         )
         return True
-
-
-def get_agency_auto_toggle() -> bool:
-    val = get_system_setting("auto_force_close_enabled", "false")
-    return val.strip().lower() in ["true", "1", "on"]
-
-
-def set_agency_auto_toggle(enabled: bool) -> bool:
-    return set_system_setting("auto_force_close_enabled", "true" if enabled else "false")
-
-
-def get_agency_outlet_statuses() -> Dict[str, Dict]:
-    """
-    Returns all rows from agency_outlet_status as a dict keyed by store_id.
-    Each value: { shopee_status, last_checked, last_action }.
-    Returns empty dict if table is empty or query fails.
-    """
-    try:
-        with get_db_connection() as conn:
-            rows = conn.execute(
-                "SELECT store_id, shopee_status, last_checked, last_action "
-                "FROM agency_outlet_status"
-            ).fetchall()
-        return {
-            row["store_id"]: {
-                "shopee_status": row["shopee_status"],
-                "last_checked": row["last_checked"].isoformat() if row["last_checked"] else None,
-                "last_action": row["last_action"],
-            }
-            for row in rows
-        }
-    except Exception:
-        return {}
 
 
 def _slug(value: str) -> str:
@@ -179,19 +142,19 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     return merchant_id, portal["id"], account
 
 
-def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, **_ignored) -> Dict:
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", account_password: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, is_active: bool = True, **_ignored) -> Dict:
     with get_db_connection() as conn:
         merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password, base_url=base_url, google_email=google_email)
         existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
         if existing_account:
             shopee_account_id = existing_account["id"]
-            if vercel_password:
-                conn.execute("UPDATE shopee_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (vercel_password or BOT_PASSWORD, shopee_account_id))
+            if account_password:
+                conn.execute("UPDATE shopee_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (account_password, shopee_account_id))
         else:
-            shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, vercel_password or BOT_PASSWORD)).fetchone()["id"]
-        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,ownership_type,long_name,special_hours) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,ownership_type=EXCLUDED.ownership_type,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, ownership_type, store_name or store_id, special_hours)).fetchone()
+            shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, account_password or BOT_PASSWORD)).fetchone()["id"]
+        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,ownership_type,long_name,special_hours,is_active) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,ownership_type=EXCLUDED.ownership_type,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,is_active=EXCLUDED.is_active,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, ownership_type, store_name or store_id, special_hours, is_active)).fetchone()
         outlet_id = outlet["id"]
-        conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET shopee_actual_status=EXCLUDED.shopee_actual_status,updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), (shopee_status or "UNKNOWN").upper(), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
+        conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), (shopee_status or "UNKNOWN").upper(), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
         code = (paket or "3_MONTHS").upper().replace(" ", "_")
         code = code if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"} else "3_MONTHS"
         plan = conn.execute("SELECT id, total_months FROM subscription_plans WHERE code=%s", (code,)).fetchone()
@@ -231,6 +194,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 def _store_query(where: str = "", params=()) -> List[Dict]:
     query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at::text AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
+    query += " AND o.is_active=true" if where else " WHERE o.is_active=true"
     query += " ORDER BY m.name,p.name,o.store_id"
     with get_db_connection() as conn:
         rows = [dict(row) for row in conn.execute(query, (BOT_USERNAME, *params)).fetchall()]
@@ -263,6 +227,12 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
 def get_all_stores(): return _store_query()
 def get_store_by_id(store_id):
     rows = _store_query("o.store_id=%s", (store_id,)); return rows[0] if rows else None
+
+def deactivate_store(store_id: str) -> bool:
+    with get_db_connection() as conn:
+        result = conn.execute("UPDATE outlets SET is_active=false,updated_at=now() WHERE store_id=%s", (store_id,))
+        return result.rowcount > 0
+
 def _public_store(store):
     item = dict(store); item.update({"account_username": BOT_USERNAME, "merchant_name": store.get("merchant_name", ""), "is_suspended": store.get("suspension_status") == "SUSPENDED"}); return item
 def admin_get_all_users_with_stores():

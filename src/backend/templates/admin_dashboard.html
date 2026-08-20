@@ -27,11 +27,6 @@
         <img class="brand-logo brand-logo-admin" src="/static/Logo_FoodMaster.png" alt="FoodMaster">
       </div>
 
-      <div class="admin-actions d-grid d-sm-flex">
-        <a class="btn-primary btn-compact" href="/admin/mitra/tambah">
-          Tambah mitra
-        </a>
-      </div>
     </header>
 
     <!-- NAV TABS -->
@@ -40,10 +35,6 @@
         onclick="switchTab('outlets')">
         <span>Operasional Outlet</span>
         <span class="tab-badge" id="tabOutletCount" x-text="allStores.length">0</span>
-      </button>
-      <button class="tab-btn" :class="{ 'active': currentTab === 'agency' }" id="tabBtnAgency"
-        onclick="switchTab('agency')">
-        <span>Churn Bot</span>
       </button>
       <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs"
         onclick="switchTab('logs')">
@@ -57,8 +48,6 @@
 
 
     {% include "admin_tab_operasional.html" %}
-
-    {% include "admin_tab_agency.html" %}
 
     {% include "admin_tab_bot.html" %}
 
@@ -89,7 +78,6 @@
             <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
             <select id="genKepemilikan" class="form-input">
               <option value="VB">VB</option>
-              <option value="Agency">Agency</option>
             </select>
           </div>
         </div>
@@ -221,13 +209,6 @@
           dikembalikan.
         </div>
 
-        <div style="margin-top: 14px;">
-          <label style="font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="deleteEntireMerchantCheck" style="width: 16px; height: 16px;">
-            <span>Hapus seluruh data mitra & semua outlet milik <strong id="deleteOwnerNameLabel">-</strong></span>
-          </label>
-        </div>
-
         <div style="display: flex; gap: 10px; margin-top: 20px;">
           <button id="submitDeleteButton" class="btn-primary" style="background: #dc2626; border-color: #dc2626;"
             onclick="submitDeleteStore()">Ya, Hapus Data</button>
@@ -254,7 +235,6 @@
             <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
             <select id="editKepemilikan" class="form-input">
               <option value="VB">VB</option>
-              <option value="Agency">Agency</option>
             </select>
           </div>
         </div>
@@ -336,7 +316,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       const hashTab = window.location.hash.replace('#', '');
       const tabParam = urlParams.get('tab') || hashTab;
-      const validTabs = ['outlets', 'agency', 'logs', 'settings'];
+      const validTabs = ['outlets', 'logs', 'settings'];
       const initialTab = validTabs.includes(tabParam) ? tabParam : 'outlets';
       return {
         currentTab: initialTab,
@@ -349,12 +329,6 @@
         init() {
           // Expose Alpine reactive data to non-Alpine JS functions
           window._appData = this;
-        },
-        get activeSubCount() {
-          return this.allStores.filter(s => s.subscription_status === 'Aktif' && !s.is_suspended).length;
-        },
-        get suspendCount() {
-          return this.allStores.filter(s => s.is_suspended).length;
         },
         showToast(message, type = 'success') {
           const id = Date.now() + Math.random();
@@ -388,7 +362,6 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      setKpiLoading(true);
       showTableSkeleton();
       loadStoresData();
       loadAdminProfile();
@@ -396,7 +369,7 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
-      if (tabParam && ['outlets', 'agency', 'logs', 'settings'].includes(tabParam)) {
+      if (tabParam && ['outlets', 'logs', 'settings'].includes(tabParam)) {
         switchTab(tabParam);
       }
     });
@@ -404,7 +377,7 @@
     window.addEventListener('popstate', (e) => {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || 'outlets';
-      if (['outlets', 'agency', 'logs', 'settings'].includes(tabParam)) {
+      if (['outlets', 'logs', 'settings'].includes(tabParam)) {
         switchTab(tabParam);
       }
     });
@@ -444,11 +417,6 @@
         if (btn) btn.classList.add('active');
         if (pane) pane.classList.add('active');
         loadAdminProfile();
-      } else if (tabName === 'agency') {
-        const btn = document.getElementById('tabBtnAgency');
-        const pane = document.getElementById('paneAgency');
-        if (btn) btn.classList.add('active');
-        if (pane) pane.classList.add('active');
       }
     }
 
@@ -457,7 +425,6 @@
 
     async function loadStoresData(isSilent = false) {
       if (!isSilent) {
-        setKpiLoading(true);
         showTableSkeleton();
       }
       try {
@@ -473,16 +440,34 @@
           document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
           document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
         }
+      }
+    }
+
+    async function fetchSheetData() {
+      const button = document.getElementById('fetchSheetButton');
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Fetching...';
+      }
+      try {
+        const res = await fetch('/api/v1/admin/sync-source', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Fetch Google Sheet gagal.');
+        const summary = data.summary || {};
+        showToast(`Fetch selesai: ${summary.imported || 0} aktif, ${summary.deactivated || 0} nonaktif, ${summary.skipped || 0} dilewati.`);
+        await loadStoresData(true);
+      } catch (err) {
+        showErrorModal('Fetch Google Sheet gagal', err.message);
       } finally {
-        if (!isSilent) {
-          setKpiLoading(false);
+        if (button) {
+          button.disabled = false;
+          button.textContent = 'Fetch dari Sheet';
         }
       }
     }
 
     async function fetchBotStatus() {
       const valEl = document.getElementById('daemonStatusVal');
-      const detailEl = document.getElementById('daemonStatusDetail');
       try {
         const res = await fetch('/api/v1/admin/bot-status');
         if (!res.ok) {
@@ -490,34 +475,26 @@
           if (window._appData) window._appData.daemonStatus = statusObj;
           if (valEl) {
             valEl.innerText = 'Offline';
-            valEl.style.color = '#dc2626';
+            valEl.className = 'bot-status-badge is-offline';
+            valEl.title = 'Bot patroli tidak aktif';
           }
-          if (detailEl) detailEl.innerText = 'Bot patroli tidak aktif';
           return;
         }
         const bot = await res.json();
         if (window._appData) window._appData.daemonStatus = bot;
         if (valEl) {
           valEl.innerText = bot.status_text || (bot.is_online ? 'Online' : 'Offline');
-          valEl.style.color = bot.is_online ? '#16a34a' : (bot.status_text === 'Di-pause' ? '#d97706' : '#dc2626');
-        }
-        if (detailEl) {
-          detailEl.innerText = bot.detail_text || (bot.is_online ? 'Patroli aktif' : 'Bot patroli tidak aktif');
+          valEl.className = `bot-status-badge ${bot.is_online ? 'is-online' : 'is-offline'}`;
+          valEl.title = bot.detail_text || (bot.is_online ? 'Patroli aktif' : 'Bot patroli tidak aktif');
         }
       } catch (err) {
         console.warn("Error fetching bot status:", err);
         if (valEl) {
           valEl.innerText = 'Offline';
-          valEl.style.color = '#dc2626';
+          valEl.className = 'bot-status-badge is-offline';
+          valEl.title = 'Bot patroli tidak aktif';
         }
-        if (detailEl) detailEl.innerText = 'Bot patroli tidak aktif';
       }
-    }
-
-    function setKpiLoading(isLoading) {
-      document.querySelectorAll('.stat-val, .stat-detail').forEach(element => {
-        element.classList.toggle('is-skeleton-loading', isLoading);
-      });
     }
 
     function showTableSkeleton() {
@@ -544,12 +521,7 @@
     }
 
     function updateMetrics(stores) {
-      document.getElementById('totalOutletsVal').innerText = stores.length;
       document.getElementById('tabOutletCount').innerText = stores.length;
-      const activeCount = stores.filter(s => s.subscription_status === 'Aktif' && !s.is_suspended).length;
-      const susCount = stores.filter(s => s.is_suspended).length;
-      document.getElementById('activeSubVal').innerText = activeCount;
-      document.getElementById('suspendVal').innerText = susCount;
       fetchBotStatus();
     }
 
@@ -647,9 +619,6 @@
                 <div class="detail-layout">
                   <dl class="detail-grid">${getStoreDetailMarkup(s)}</dl>
                   <div class="detail-actions">
-                    <button class="btn-outline" onclick="openEditModal('${s.store_id}')">Edit data</button>
-                    <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur akun</button>
-                    <button class="btn-outline" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang</button>
                     <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
                   </div>
                 </div>
@@ -683,9 +652,6 @@
           ${s.is_suspended && s.alasan_penangguhan ? `<div class="suspension-note"><strong>Alasan penangguhan</strong><span>${s.alasan_penangguhan}</span></div>` : ''}
 
           <div class="mobile-card-actions d-grid gap-2">
-            <button class="btn-outline" onclick="openEditModal('${s.store_id}')">Edit data outlet</button>
-            <button class="btn-outline" onclick="openSuspendModal('${s.store_id}', '${s.store_name}', ${s.is_suspended}, '${s.alasan_penangguhan || ''}')">Atur status akun</button>
-            <button class="btn-outline" onclick="openRenewModal('${s.store_id}', '${s.store_name}')">Perpanjang layanan</button>
             <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
           </div>
         `;
@@ -974,15 +940,11 @@
       }
     }
 
-    let selectedOwnerForDelete = '';
     let isDeletingStore = false;
 
     function openDeleteModal(storeId, storeName, ownerName) {
       selectedStoreForAction = storeId;
-      selectedOwnerForDelete = ownerName;
       document.getElementById('deleteStoreSubtitle').innerText = `${storeName} (ID: ${storeId})`;
-      document.getElementById('deleteOwnerNameLabel').innerText = ownerName;
-      document.getElementById('deleteEntireMerchantCheck').checked = false;
       const deleteButton = document.getElementById('submitDeleteButton');
       deleteButton.disabled = false;
       deleteButton.textContent = 'Ya, Hapus Data';
@@ -995,10 +957,7 @@
       const deleteButton = document.getElementById('submitDeleteButton');
       deleteButton.disabled = true;
       deleteButton.textContent = 'Menghapus...';
-      const isDeleteMerchant = document.getElementById('deleteEntireMerchantCheck').checked;
-      const url = isDeleteMerchant
-        ? `/api/v1/admin/users/${encodeURIComponent(selectedOwnerForDelete)}`
-        : `/api/v1/admin/outlets/${encodeURIComponent(selectedStoreForAction)}`;
+      const url = `/api/v1/admin/outlets/${encodeURIComponent(selectedStoreForAction)}`;
 
       try {
         const res = await fetch(url, { method: 'DELETE' });

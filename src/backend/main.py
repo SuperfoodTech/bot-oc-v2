@@ -28,6 +28,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from backend import db, state, worker
+from backend import apps_script
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
@@ -42,12 +43,8 @@ from backend.models import (
     AdminAccountUpdateRequest,
     AdminAccountCreateRequest,
     UserLoginRequest,
-    UserPauseRequest,
-    AgencyToggleRequest,
-    AgencyForceCloseRequest
+    UserPauseRequest
 )
-from agency import sheets as agency_sheets
-from agency import runner as agency_runner
 
 
 # Spreadsheet-backed state has no database startup step.
@@ -129,7 +126,7 @@ def admin_dashboard_page(request: Request, admin_session: Optional[str] = Cookie
 def admin_add_merchant_page(request: Request, admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE)):
     if not _read_admin_session(admin_session):
         return RedirectResponse(url="/admin/login")
-    return templates.TemplateResponse(request=request, name="admin_add_merchant.html", context={"active_page": "add-merchant"})
+    raise HTTPException(status_code=403, detail="Tambah mitra dari Dashboard sedang dinonaktifkan. Gunakan Google Sheet lalu Fetch.")
 
 
 @app.get("/admin/bot", summary="Admin Bot Patrol Monitor Page Redirect")
@@ -340,9 +337,9 @@ def admin_list_users(admin: dict = Depends(require_admin)):
 @app.post("/api/v1/admin/sync-source", summary="Admin: Import the published spreadsheet into PostgreSQL")
 def admin_sync_source(admin: dict = Depends(require_admin)):
     try:
-        from scripts.import_sheet import run_import_sheet
-        imported_count = run_import_sheet()
-        return {"success": True, "message": f"Successfully imported {imported_count} store(s) from spreadsheet into PostgreSQL."}
+        from core.import_sheet import run_import_sheet
+        summary = run_import_sheet()
+        return {"success": True, "summary": summary, "message": "Data Google Sheet berhasil di-fetch ke database."}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Source import failed: {exc}") from exc
 
@@ -363,8 +360,7 @@ def admin_generate_link(req: AdminGenerateLinkRequest, request: Request, admin: 
 
 @app.post("/api/v1/admin/outlets", summary="Admin: Create or update merchant outlet")
 def admin_create_outlet(req: AdminCreateOutletRequest, request: Request, admin: dict = Depends(require_admin)):
-    if state.get_store_by_id(req.store_id):
-        raise HTTPException(status_code=409, detail=f"Store ID '{req.store_id}' sudah terdaftar.")
+    raise HTTPException(status_code=403, detail="Tambah mitra dari Dashboard sedang dinonaktifkan. Gunakan Google Sheet lalu Fetch.")
     base_url = str(request.base_url).rstrip("/")
     try:
         state.save_or_update_store(
@@ -390,6 +386,7 @@ def admin_create_outlet(req: AdminCreateOutletRequest, request: Request, admin: 
 
 @app.post("/api/v1/admin/suspend", summary="Admin: Toggle User/Store Suspension")
 def admin_suspend(req: AdminSuspendRequest, admin: dict = Depends(require_admin)):
+    raise HTTPException(status_code=403, detail="Pengaturan akun dari Dashboard sedang dinonaktifkan.")
     penangguhan_upper = req.penangguhan.capitalize()
     if penangguhan_upper not in ("Ya", "Tidak"):
         raise HTTPException(status_code=400, detail="penangguhan must be 'Ya' or 'Tidak'.")
@@ -418,6 +415,7 @@ def admin_suspend(req: AdminSuspendRequest, admin: dict = Depends(require_admin)
 
 @app.post("/api/v1/admin/renew", summary="Admin: Renew Active Expiry Date")
 def admin_renew(req: AdminRenewRequest, admin: dict = Depends(require_admin)):
+    raise HTTPException(status_code=403, detail="Perpanjangan layanan dari Dashboard sedang dinonaktifkan.")
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
@@ -441,6 +439,7 @@ def admin_renew(req: AdminRenewRequest, admin: dict = Depends(require_admin)):
 
 @app.post("/api/v1/admin/outlets/edit", summary="Admin: Edit merchant, portal, and outlet fields")
 def admin_edit_outlet(req: AdminEditOutletRequest, admin: dict = Depends(require_admin)):
+    raise HTTPException(status_code=403, detail="Edit outlet dari Dashboard sedang dinonaktifkan. Ubah data di Google Sheet lalu Fetch.")
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' tidak ditemukan.")
@@ -478,8 +477,18 @@ def admin_delete_outlet(store_id: str, admin: dict = Depends(require_admin)):
     store = state.get_store_by_id(store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{store_id}' tidak ditemukan.")
-    success = state.delete_store(store_id)
+    try:
+        apps_script.set_store_import_status(store_id, "Nonaktif")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gagal mengubah status Google Sheet: {exc}") from exc
+    try:
+        success = state.delete_store(store_id)
+    except Exception as exc:
+        # Keep the dashboard consistent if the database delete fails after the Sheet write.
+        state.deactivate_store(store_id)
+        raise HTTPException(status_code=500, detail=f"Google Sheet sudah Nonaktif, tetapi database gagal dihapus: {exc}") from exc
     if not success:
+        state.deactivate_store(store_id)
         raise HTTPException(status_code=500, detail="Gagal menghapus outlet dari database.")
     state.record_log(
         store_id=store_id,
@@ -1000,117 +1009,3 @@ def control_bot_endpoint(req: BotControlRequest, admin: dict = Depends(require_a
             return {"success": True, "message": f"Sync selesai! Status toko di-refresh.", "data": {"processed": processed_count}}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Gagal eksekusi sync: {e}")
-
-
-# ── AGENCY FORCE CLOSE ENDPOINTS ─────────────────────────────────────────────
-
-_AGENCY_INTERNAL_URL = os.getenv("AGENCY_INTERNAL_URL", "http://fm-agency:8082")
-
-
-def _call_agency_api(path: str, payload: dict = None, timeout: float = 30.0) -> dict:
-    """
-    Memanggil internal HTTP API di container fm-agency.
-    Semua action yang membutuhkan browser (force close, status) diarahkan ke sini.
-    """
-    url = f"{_AGENCY_INTERNAL_URL}{path}"
-    try:
-        if payload is not None:
-            body = json.dumps(payload).encode()
-            req = urllib.request.Request(
-                url, data=body,
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-        else:
-            req = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        try:
-            return json.loads(body)
-        except Exception:
-            return {"success": False, "error": f"HTTP {e.code}: {body}"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-@app.get("/api/v1/agency/outlets", summary="Get agency churn outlets with live status from DB")
-def get_agency_outlets(admin: dict = Depends(require_admin)):
-    try:
-        churn_list, live_list = agency_sheets.get_agency_shopeefood_outlets()
-        auto_enabled = db.get_agency_auto_toggle()
-        # Merge real-time status dari DB (diisi oleh fm-agency daemon)
-        statuses = db.get_agency_outlet_statuses()
-        for outlet in churn_list:
-            store_id = outlet.get("store_id", "")
-            db_status = statuses.get(store_id, {})
-            outlet["shopee_status"] = db_status.get("shopee_status", "UNKNOWN")
-            outlet["last_checked"] = db_status.get("last_checked")
-            outlet["last_action"] = db_status.get("last_action", "")
-        # Query patrol status dari fm-agency internal API
-        patrol_running = False
-        try:
-            agency_status = _call_agency_api("/status", timeout=3.0)
-            patrol_running = agency_status.get("agency_state", {}).get("status") == "running"
-        except Exception:
-            pass
-        return {
-            "success": True,
-            "outlets": churn_list,
-            "total_churn": len(churn_list),
-            "total_live": len(live_list),
-            "auto_force_close_enabled": auto_enabled,
-            "patrol_running": patrol_running,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gagal mengambil data sheet Agency: {e}")
-
-
-@app.post("/api/v1/agency/toggle-auto", summary="Set auto force close toggle state")
-def set_agency_toggle(req: AgencyToggleRequest, admin: dict = Depends(require_admin)):
-    try:
-        db.set_agency_auto_toggle(req.enabled)
-        state.record_log(
-            store_id="AGENCY_SYSTEM",
-            store_name="Agency Force Close Engine",
-            action="ADMIN_TOGGLE_AGENCY_AUTO",
-            target_state="ENABLED" if req.enabled else "DISABLED",
-            reason=f"Admin {admin.get('username')} mengubah Auto Force Close ke {'ON' if req.enabled else 'OFF'}"
-        )
-        return {
-            "success": True,
-            "auto_force_close_enabled": req.enabled,
-            "message": f"Auto Force Close berhasil diset ke {'ON' if req.enabled else 'OFF'}"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gagal mengubah toggle Agency: {e}")
-
-
-@app.post("/api/v1/agency/force-close-single", summary="Proxy force close ke fm-agency container")
-def agency_force_close_single(req: AgencyForceCloseRequest, admin: dict = Depends(require_admin)):
-    if db.get_agency_auto_toggle():
-        raise HTTPException(
-            status_code=400,
-            detail="Tombol eksekusi manual ter-disable saat Auto Force Close aktif."
-        )
-    try:
-        # Proxy request ke fm-agency internal API
-        res = _call_agency_api("/force-close", payload={"store_id": req.store_id})
-        if res.get("success"):
-            state.record_log(
-                store_id=req.store_id,
-                store_name=req.store_id,
-                action="AGENCY_FORCE_CLOSE_SINGLE",
-                target_state="CLOSED",
-                reason=f"Admin {admin.get('username')} memicu manual force close outlet churn {req.store_id}"
-            )
-        return res.get("result", res)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gagal eksekusi force close: {e}")
-
-
-@app.get("/api/v1/agency/patrol/status", summary="Get fm-agency container patrol status")
-def agency_patrol_status(admin: dict = Depends(require_admin)):
-    result = _call_agency_api("/status", timeout=3.0)
-    return result

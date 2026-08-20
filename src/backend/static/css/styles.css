@@ -1144,6 +1144,16 @@ input:checked + .slider::before {
   .table-search {
     width: 100%;
   }
+
+  .table-heading-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-heading-actions .btn-primary {
+    width: 100%;
+  }
 }
 
 @media (max-width: 767.98px) {
@@ -2559,6 +2569,16 @@ body {
   font-weight: 700 !important;
 }
 
+/* Center the outlet list columns while keeping the expanded detail layout intact. */
+#adminTable > thead th,
+#adminTable > tbody > tr:not(.detail-row) > td {
+  text-align: center;
+}
+
+#adminTable > tbody > tr:not(.detail-row) .row-actions {
+  justify-content: center;
+}
+
 .btn-primary {
   background: #BE1A1A !important;
   color: #ffffff !important;
@@ -2611,155 +2631,42 @@ body {
   color: #BE1A1A !important;
 }
 
-/* Agency table: keep the operational scan order on desktop and turn each row
-   into a readable action card on narrow screens. */
-.agency-table-wrap {
-  overflow-x: auto;
+.table-heading-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.agency-table th {
-  white-space: nowrap;
+.table-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.agency-table {
-  table-layout: fixed;
+.bot-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #52705a;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.agency-table th,
-.agency-table td {
-  text-align: center;
-  vertical-align: middle;
+.bot-status-badge::before {
+  width: 7px;
+  height: 7px;
+  background: #6d9a76;
+  border-radius: 50%;
+  content: '';
 }
 
-.agency-table th:nth-child(1),
-.agency-table td:nth-child(1) { width: 6%; }
-.agency-table th:nth-child(2),
-.agency-table td:nth-child(2) { width: 23%; }
-.agency-table th:nth-child(3),
-.agency-table td:nth-child(3) { width: 20%; }
-.agency-table th:nth-child(4),
-.agency-table td:nth-child(4) { width: 14%; }
-.agency-table th:nth-child(5),
-.agency-table td:nth-child(5) { width: 13%; }
-.agency-table th:nth-child(6),
-.agency-table td:nth-child(6) { width: 14%; }
-.agency-table th:nth-child(7),
-.agency-table td:nth-child(7) { width: 10%; }
-
-.agency-table .agency-index {
-  color: var(--muted) !important;
+.bot-status-badge.is-offline {
+  color: #87615d;
 }
 
-.agency-table .agency-action-cell {
-  text-align: center;
-}
-
-.agency-table .agency-action-cell button {
-  min-width: 72px;
-  min-height: 40px;
-}
-
-.agency-table .agency-action-cell .btn-danger {
-  background: #ffffff !important;
-  border: 1.5px solid #BE1A1A !important;
-  color: #BE1A1A !important;
-}
-
-.agency-table .agency-action-cell .btn-danger:hover:not(:disabled) {
-  background: #f9e4e1 !important;
-  color: #991515 !important;
-}
-
-.agency-state {
-  padding: 32px 20px !important;
-  text-align: center;
-  color: var(--muted);
-}
-
-.agency-state strong,
-.agency-state span {
-  display: block;
-}
-
-.agency-state span {
-  margin: 6px 0 14px;
-}
-
-@media (max-width: 767.98px) {
-  .agency-table-wrap {
-    overflow: visible;
-  }
-
-  .agency-table,
-  .agency-table tbody {
-    display: block;
-    width: 100%;
-  }
-
-  .agency-table {
-    table-layout: auto;
-  }
-
-  .agency-table thead {
-    display: none;
-  }
-
-  .agency-table tbody tr {
-    display: grid;
-    grid-template-columns: 30px 1fr;
-    gap: 0 10px;
-    padding: 14px 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .agency-table tbody td {
-    display: grid;
-    grid-template-columns: 94px minmax(0, 1fr);
-    gap: 8px;
-    width: auto;
-    min-width: 0;
-    padding: 5px 0;
-    border: 0;
-    overflow-wrap: anywhere;
-    text-align: center;
-  }
-
-  .agency-table tbody td::before {
-    color: var(--muted);
-    content: attr(data-label);
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .agency-table tbody .agency-index {
-    display: block;
-    grid-row: 1 / span 4;
-    width: 30px;
-    padding-top: 8px;
-  }
-
-  .agency-table tbody .agency-index::before {
-    display: none;
-  }
-
-  .agency-table tbody .agency-action-cell {
-    grid-column: 2;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 8px;
-    width: auto;
-    padding-top: 10px;
-  }
-
-  .agency-table tbody .agency-action-cell::before {
-    flex: 0 0 94px;
-  }
-
-  .agency-table tbody .agency-action-cell button {
-    flex: 1;
-    max-width: 180px;
-  }
+.bot-status-badge.is-offline::before {
+  background: #a9827c;
 }
 
 /* Final cascade: Red & White styling */
