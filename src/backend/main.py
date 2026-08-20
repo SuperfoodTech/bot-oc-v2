@@ -72,6 +72,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 ADMIN_SESSION_COOKIE = "foodmaster_admin_session"
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "dev-only-change-me")
 ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12
+GOOGLE_AUTH_ENABLED = os.getenv("GOOGLE_AUTH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _sign_admin_session(payload: dict) -> str:
@@ -165,6 +166,8 @@ def admin_logout(response: Response):
 
 @app.get("/api/v1/auth/google/login", summary="Initiate Google OAuth Flow")
 def google_login(role: str = "merchant", state_url: Optional[str] = Query(None, alias="state_url")):
+    if not GOOGLE_AUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Google Auth sedang dinonaktifkan.")
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
     if not client_id or not redirect_uri:
@@ -192,6 +195,8 @@ def google_login(role: str = "merchant", state_url: Optional[str] = Query(None, 
 
 @app.get("/api/v1/auth/google/callback", summary="Google OAuth Callback")
 def google_callback(code: str, state_val: Optional[str] = Query(None, alias="state"), response: Response = None):
+    if not GOOGLE_AUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Google Auth sedang dinonaktifkan.")
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")

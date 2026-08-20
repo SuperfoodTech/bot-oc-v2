@@ -126,8 +126,8 @@
             <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@">
           </div>
           <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
-            <input type="email" id="genGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com">
+            <div style="display: none;"><label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
+            <input type="email" id="genGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com"></div>
           </div>
         </div>
 
@@ -267,8 +267,8 @@
 
         <div style="display: flex; gap: 10px; margin-top: 10px;">
           <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
-            <input type="email" id="editGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com">
+            <div style="display: none;"><label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
+            <input type="email" id="editGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com"></div>
           </div>
         </div>
 
@@ -649,8 +649,6 @@
             <div class="mobile-detail-wide"><dt>Dashboard mitra</dt><dd><a href="${linkUrl}" target="_blank" class="mobile-dashboard-link">Buka dashboard mitra</a></dd></div>
           </dl>
 
-          ${s.is_suspended && s.alasan_penangguhan ? `<div class="suspension-note"><strong>Alasan penangguhan</strong><span>${s.alasan_penangguhan}</span></div>` : ''}
-
           <div class="mobile-card-actions d-grid gap-2">
             <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
           </div>
@@ -670,7 +668,6 @@
         ['Pause', isVercelOn ? 'Tidak sedang pause' : getPauseDetail(store.pause_until)],
         ['Paket', store.paket],
         ['Status akun', store.is_suspended ? 'Ditangguhkan' : 'Aktif'],
-        ['Alasan penangguhan', store.alasan_penangguhan],
         ['Password dashboard mitra', store.vercel_password],
         ['Action terakhir', detailValue(store.last_action, 'no change')]
       ];
