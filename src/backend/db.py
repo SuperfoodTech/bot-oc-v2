@@ -35,7 +35,9 @@ def init_db() -> None:
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS dashboard_url text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS role varchar(20) DEFAULT 'MERCHANT'")
-        conn.execute("UPDATE dashboard_accounts SET password_plain='Master@00@' WHERE role='MERCHANT' OR role IS NULL")
+        # Keep passwords imported from Google Sheet. Only initialize legacy or
+        # newly-added merchant accounts when the password is actually empty.
+        conn.execute("UPDATE dashboard_accounts SET password_plain='Master@00@' WHERE (role='MERCHANT' OR role IS NULL) AND (password_plain IS NULL OR BTRIM(password_plain)='')")
         conn.execute("ALTER TABLE dashboard_accounts DROP COLUMN IF EXISTS password_hash")
         conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE shopee_accounts ADD COLUMN IF NOT EXISTS merchant_id_external varchar(100) DEFAULT ''")

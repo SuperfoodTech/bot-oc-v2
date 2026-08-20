@@ -134,4 +134,5 @@ class UserLoginRequest(BaseModel):
 class UserPauseRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
     duration_type: str = Field(..., description="'30_min', '60_min', 'rest_of_day', or 'custom'")
-    custom_minutes: Optional[int] = Field(default=120, description="Custom pause duration in minutes if duration_type is custom")
+    custom_until: Optional[str] = Field(default=None, description="Target pause end time in local ISO format when duration_type is custom")
+    custom_minutes: Optional[int] = Field(default=None, description="Legacy custom pause duration in minutes")

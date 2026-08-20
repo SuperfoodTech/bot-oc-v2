@@ -96,10 +96,11 @@
   <div id="userToast" class="user-toast" role="status" aria-live="polite" hidden></div>
 
   <div class="modal-overlay" id="pauseModal">
-    <div class="modal-card">
+    <div class="modal-card pause-modal-card">
       <div class="step-indicator">Tutup sementara</div>
       <h3 class="card-title" id="modalStoreName">Pilih durasi</h3>
-      <p class="card-subtitle">Outlet akan dibuka kembali setelah durasi selesai.</p>
+      <p class="card-subtitle">Outlet akan dibuka kembali otomatis sesuai durasi yang dipilih.</p>
+      <div id="pauseEndPreview" class="pause-end-preview" aria-live="polite">Berakhir pada -</div>
 
       <div class="radio-group">
         <label class="radio-card active">
@@ -134,7 +135,43 @@
         </label>
         
         <div id="customDurationBox" style="display: none; margin-top: 6px;">
-          <input type="number" id="customMinutesInput" class="form-input" placeholder="Durasi dalam menit" value="120">
+          <div class="custom-datetime-fields">
+            <label>Mulai<input type="text" id="customStartInput" class="form-input" readonly></label>
+            <span class="custom-datetime-arrow" aria-hidden="true">→</span>
+            <label>Target berakhir
+              <div class="custom-picker-anchor">
+                <button type="button" id="customUntilTrigger" class="custom-picker-trigger" onclick="openCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="customUntilDisplay">Pilih tanggal &amp; waktu</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 9h18"></path></svg>
+                </button>
+                <input type="hidden" id="customUntilInput" aria-hidden="true">
+                <div id="customDateTimePicker" class="custom-picker-popover" role="dialog" aria-label="Pilih tanggal dan waktu" hidden>
+                  <div class="custom-picker-header">
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button>
+                    <strong id="customPickerMonthLabel"></strong>
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(1)" aria-label="Bulan berikutnya">›</button>
+                  </div>
+                  <div class="custom-picker-weekdays" aria-hidden="true">
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span> Sb</span>
+                  </div>
+                  <div id="customPickerCalendar" class="custom-picker-calendar"></div>
+                  <div class="custom-picker-time">
+                    <span>Waktu</span>
+                    <div class="custom-picker-time-fields">
+                      <select id="customPickerHour" aria-label="Jam WIB"></select>
+                      <span>:</span>
+                      <select id="customPickerMinute" aria-label="Menit WIB"></select>
+                      <b>WIB</b>
+                    </div>
+                  </div>
+                  <div class="custom-picker-actions">
+                    <button type="button" class="btn-outline" onclick="closeCustomDateTimePicker()">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyCustomDateTimePicker()">Terapkan</button>
+                  </div>
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -150,6 +187,8 @@
     let activePasscode = "";
     let currentUserOutlets = [];
     let selectedStoreId = null;
+    let pickerDate = null;
+    let pickerMonth = null;
     const currentSlug = window.location.pathname.match(/^\/mitra\/([^/]+)/)?.[1] || '';
     const userSessionKey = currentSlug ? `user_passcode:${currentSlug}` : 'user_passcode:legacy';
 
@@ -175,8 +214,12 @@
           } else {
             document.getElementById('customDurationBox').style.display = 'none';
           }
+          updatePauseEndPreview();
         });
       });
+
+      document.getElementById('customUntilInput')?.addEventListener('input', updatePauseEndPreview);
+      document.getElementById('customUntilInput')?.addEventListener('change', updatePauseEndPreview);
 
       // Google OAuth Redirect Click Event
       document.getElementById('googleLoginBtn').addEventListener('click', () => {
@@ -368,19 +411,6 @@
             </label>
           </div>
 
-          ${isSuspended ? `
-            <button class="btn-primary" onclick="showUserToast('Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${out.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.', 'error')" style="opacity: 0.7; cursor: pointer;">
-              Buka sekarang
-            </button>
-          ` : (isVercelOn ? `
-            <button class="btn-danger" onclick="openPauseModal('${out.store_id}', '${out.store_name}')">
-              Tutup sementara
-            </button>
-          ` : `
-            <button class="btn-primary" onclick="resumeStore('${out.store_id}')">
-              Buka sekarang
-            </button>
-          `)}
         `;
         container.appendChild(card);
       });
@@ -414,10 +444,176 @@
     function openPauseModal(storeId, storeName) {
       selectedStoreId = storeId;
       document.getElementById('modalStoreName').innerText = storeName;
+      setCustomDateTimeDefaults();
+      updatePauseEndPreview();
       document.getElementById('pauseModal').classList.add('active');
     }
 
+    function toDateTimeLocalValue(date) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function formatWibDate(date) {
+      return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    }
+
+    function formatWibTime(date) {
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function parseCustomUntil() {
+      const value = document.getElementById('customUntilInput')?.value || '';
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function populatePickerTimeOptions() {
+      const hourSelect = document.getElementById('customPickerHour');
+      const minuteSelect = document.getElementById('customPickerMinute');
+      if (!hourSelect || !minuteSelect || hourSelect.options.length) return;
+      for (let value = 0; value < 24; value += 1) {
+        const option = document.createElement('option');
+        option.value = String(value).padStart(2, '0');
+        option.textContent = option.value;
+        hourSelect.appendChild(option);
+      }
+      for (let value = 0; value < 60; value += 1) {
+        const option = document.createElement('option');
+        option.value = String(value).padStart(2, '0');
+        option.textContent = option.value;
+        minuteSelect.appendChild(option);
+      }
+    }
+
+    function pickerDateKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function renderPickerCalendar() {
+      const calendar = document.getElementById('customPickerCalendar');
+      const monthLabel = document.getElementById('customPickerMonthLabel');
+      if (!calendar || !monthLabel || !pickerMonth || !pickerDate) return;
+      const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      monthLabel.textContent = `${monthNames[pickerMonth.getMonth()]} ${pickerMonth.getFullYear()}`;
+      calendar.innerHTML = '';
+      const firstDay = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), 1).getDay();
+      const daysInMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 0).getDate();
+      const todayKey = pickerDateKey(new Date());
+      for (let index = 0; index < firstDay; index += 1) {
+        calendar.appendChild(document.createElement('span'));
+      }
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = day;
+        button.setAttribute('aria-label', `${day} ${monthNames[pickerMonth.getMonth()]} ${pickerMonth.getFullYear()}`);
+        button.disabled = pickerDateKey(date) < todayKey;
+        if (pickerDateKey(date) === pickerDateKey(pickerDate)) button.classList.add('is-selected');
+        if (pickerDateKey(date) === todayKey) button.classList.add('is-today');
+        button.onclick = () => selectPickerDay(date);
+        calendar.appendChild(button);
+      }
+    }
+
+    function selectPickerDay(date) {
+      pickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), pickerDate.getHours(), pickerDate.getMinutes());
+      renderPickerCalendar();
+    }
+
+    function shiftPickerMonth(offset) {
+      pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + offset, 1);
+      renderPickerCalendar();
+    }
+
+    function openCustomDateTimePicker() {
+      const existing = parseCustomUntil();
+      const selected = existing || new Date(Date.now() + (2 * 60 * 60 * 1000));
+      pickerDate = new Date(selected);
+      pickerMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+      populatePickerTimeOptions();
+      document.getElementById('customPickerHour').value = formatWibTime(selected).slice(0, 2);
+      document.getElementById('customPickerMinute').value = formatWibTime(selected).slice(3, 5);
+      renderPickerCalendar();
+      document.getElementById('customDateTimePicker').hidden = false;
+      document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'true');
+    }
+
+    function closeCustomDateTimePicker() {
+      document.getElementById('customDateTimePicker').hidden = true;
+      document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'false');
+    }
+
+    function applyCustomDateTimePicker() {
+      if (!pickerDate) return;
+      const hours = Number(document.getElementById('customPickerHour').value);
+      const minutes = Number(document.getElementById('customPickerMinute').value);
+      const selected = new Date(pickerDate.getFullYear(), pickerDate.getMonth(), pickerDate.getDate(), hours, minutes);
+      if (selected <= new Date()) {
+        showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
+        return;
+      }
+      document.getElementById('customUntilInput').value = toDateTimeLocalValue(selected);
+      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(selected)} ${formatWibTime(selected)}`;
+      closeCustomDateTimePicker();
+      updatePauseEndPreview();
+    }
+
+    function setCustomDateTimeDefaults() {
+      const start = new Date();
+      const until = new Date(start.getTime() + (2 * 60 * 60 * 1000));
+      document.getElementById('customStartInput').value = `${formatWibDate(start)} ${formatWibTime(start)}`;
+      document.getElementById('customUntilInput').value = toDateTimeLocalValue(until);
+      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(until)} ${formatWibTime(until)}`;
+    }
+
+    function getSelectedPauseMinutes() {
+      const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
+      if (durationType === '30_min') return 30;
+      if (durationType === '60_min') return 60;
+      if (durationType === 'custom') {
+        const until = parseCustomUntil();
+        if (!until) return 0;
+        return Math.max(0, Math.floor((until.getTime() - Date.now()) / 60000));
+      }
+      return null;
+    }
+
+    function getCustomUntilValue() {
+      const value = parseCustomUntil();
+      if (!value) return null;
+      return document.getElementById('customUntilInput').value;
+    }
+
+    function updatePauseEndPreview() {
+      const preview = document.getElementById('pauseEndPreview');
+      if (!preview) return;
+      const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
+      if (durationType === 'rest_of_day') {
+        const end = new Date();
+        end.setHours(23, 59, 59, 0);
+        preview.textContent = `Berakhir pada ${formatIndonesianTime(end.toISOString())}`;
+        return;
+      }
+      if (durationType === 'custom') {
+        const until = parseCustomUntil();
+        preview.textContent = until
+          ? `Berakhir pada ${formatWibDate(until)} ${formatWibTime(until)} WIB`
+          : 'Pilih tanggal dan waktu WIB';
+        return;
+      }
+      const minutes = getSelectedPauseMinutes();
+      if (!minutes) {
+        preview.textContent = 'Masukkan durasi lebih dari 0 menit';
+        return;
+      }
+      preview.textContent = `Berakhir pada ${formatIndonesianTime(new Date(Date.now() + minutes * 60000).toISOString())}`;
+    }
+
     function closeModal() {
+      if (typeof closeCustomDateTimePicker === 'function') closeCustomDateTimePicker();
       document.getElementById('pauseModal').classList.remove('active');
       renderOutlets(currentUserOutlets);
     }
@@ -426,7 +622,12 @@
       if (!selectedStoreId) return;
 
       const durationType = document.querySelector('input[name="pauseDuration"]:checked').value;
-      const customMins = parseInt(document.getElementById('customMinutesInput').value) || 120;
+      const customMins = getSelectedPauseMinutes() || 0;
+      const customUntil = getCustomUntilValue();
+      if (durationType === 'custom' && customMins <= 0) {
+        showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
+        return;
+      }
 
       try {
         const res = await fetch('/api/v1/user/pause', {
@@ -435,7 +636,8 @@
           body: JSON.stringify({
             store_id: selectedStoreId,
             duration_type: durationType,
-            custom_minutes: customMins
+            custom_minutes: customMins,
+            custom_until: durationType === 'custom' ? customUntil : null
           })
         });
         const data = await res.json();

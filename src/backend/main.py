@@ -572,13 +572,29 @@ def user_pause_store(req: UserPauseRequest):
             duration_mins = 60
         label = "Sepanjang Hari"
     elif dtype in ("custom", "waktu_lain"):
-        duration_mins = req.custom_minutes or 120
-        label = f"{duration_mins} Menit (Custom)"
+        if req.custom_until:
+            try:
+                pause_until_dt = datetime.fromisoformat(req.custom_until.replace("Z", "+00:00"))
+                if pause_until_dt.tzinfo is not None:
+                    pause_until_dt = pause_until_dt.astimezone().replace(tzinfo=None)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="Target waktu penutupan tidak valid.") from exc
+            duration_mins = int((pause_until_dt - now_dt).total_seconds() // 60)
+            if duration_mins <= 0:
+                raise HTTPException(status_code=422, detail="Target waktu harus lebih besar dari waktu sekarang.")
+            label = f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
+        else:
+            duration_mins = req.custom_minutes or 0
+            if duration_mins <= 0:
+                raise HTTPException(status_code=422, detail="Target waktu penutupan wajib diisi.")
+            pause_until_dt = now_dt + timedelta(minutes=duration_mins)
+            label = f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
     else:
         duration_mins = 1440
         label = "Default (1 Hari)"
 
-    pause_until_dt = now_dt + timedelta(minutes=duration_mins)
+    if dtype not in ("custom", "waktu_lain"):
+        pause_until_dt = now_dt + timedelta(minutes=duration_mins)
     pause_until_str = pause_until_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     state.update_vercel_toggle(req.store_id, "OFF", pause_until_str)

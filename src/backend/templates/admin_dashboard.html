@@ -353,6 +353,30 @@
       alert(message);
     }
 
+    async function copyDashboardLink(encodedUrl, button) {
+      const url = decodeURIComponent(encodedUrl);
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          const input = document.createElement('textarea');
+          input.value = url;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          input.remove();
+        }
+        button.classList.add('is-copied');
+        showToast('Link dashboard berhasil disalin.', 'success');
+        setTimeout(() => button.classList.remove('is-copied'), 1600);
+      } catch (error) {
+        showToast('Link dashboard gagal disalin.', 'error');
+      }
+    }
+
     function showErrorModal(title, msg) {
       if (window._appData) {
         window._appData.showErrorModal(title, msg);
@@ -584,10 +608,17 @@
           <td><code>${s.store_id}</code></td>
           <td>
             ${s.store_name}
-            <a href="${linkUrl}" target="_blank" class="compact-meta compact-meta-link">${linkUrl}</a>
+            <a href="${linkUrl}" target="_blank" class="compact-meta compact-meta-link">Dashboard Mitra</a>
             <small class="compact-meta compact-meta-expiry">Berlaku sampai ${s.tanggal_berakhir_layanan || '2026-11-01'}</small>
           </td>
-          <td><a href="${linkUrl}" target="_blank" class="table-link">${linkUrl}</a></td>
+          <td>
+            <div class="dashboard-link-cell">
+              <a href="${linkUrl}" target="_blank" class="dashboard-link-button">Buka dashboard</a>
+              <button type="button" class="copy-link-button" aria-label="Salin link dashboard mitra" title="Salin link dashboard mitra" onclick="copyDashboardLink('${encodeURIComponent(linkUrl)}', this)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
+          </td>
           <td>
             <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Buka' : 'Paused'}</span>
             ${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}
