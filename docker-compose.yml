@@ -48,6 +48,7 @@ services:
     build:
       context: .
       dockerfile: main-bot/Dockerfile
+    image: foodmaster-bot-runtime:dev
     container_name: fm-bot
     restart: always
     depends_on:
@@ -65,6 +66,35 @@ services:
       - ./src/data:/app/src/data
       - ./src:/app/src
       - ./credentials.json:/app/credentials.json
+
+  bot-vb:
+    build:
+      context: .
+      dockerfile: main-bot/Dockerfile
+    image: foodmaster-bot-runtime:dev
+    container_name: fm-bot-vb
+    restart: always
+    depends_on:
+      db:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
+      - PYTHONPATH=/app/main-vb/src:/app/src
+      - HEADLESS=true
+      - VB_SESSION_FILE=/app/vb-data/session.json
+      - VB_CREDENTIALS_FILE=/app/vb-data/credentials.json
+      - VB_CHROME_PROFILE_DIR=/app/vb-data/chrome_profile
+      - VB_CHROME_PROFILE_NAME=shopee_profile
+      - VB_PATROL_INTERVAL_SECONDS=30
+      - VB_MAX_RETRIES=2
+      - CHROMEDRIVER_PATH=/usr/bin/chromedriver
+      - CHROME_BIN=/usr/bin/chromium
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - TZ=Asia/Jakarta
+    command: ["uv", "run", "python", "main-vb/src/daemon.py"]
+    volumes:
+      - ./src/data:/app/vb-data
+      - ./src/data/credentials allvbadmin.json:/app/vb-data/credentials.json:ro
 
 volumes:
   postgres_data:

@@ -39,6 +39,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ── 4. Copy source code (Instant < 2s rebuild layer) ──────────
 COPY src/ ./src/
 COPY main-bot/src/ ./main-bot/src/
+COPY main-vb/src/ ./main-vb/src/
 COPY database/ ./database/
 COPY scripts/ ./scripts/
 

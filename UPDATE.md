@@ -8,7 +8,60 @@
 - Unified the Logs tab for Bot O/C and Virtual Brand with compact summaries, recent changes, and traceable Store ID errors.
 - Updated the regular spreadsheet importer for the current 11-column layout after removal of the ownership column.
 - Configured VB to use `main-vb/src/data/session.json`, `main-vb/src/data/credentials.json`, and the `shopee_profile` Chrome subprofile.
-- VB browser runs with `HEADLESS=false` when started with the documented command.
+- VB browser uses `HEADLESS=true` in the server Docker service; local debugging may override this explicitly.
+
+## Server deployment: Bot VB Docker service
+
+Bot VB now has its own service, `fm-bot-vb`, while reusing the same image and
+dependency environment as `fm-bot`. There is no separate VB dependency
+installation and no public VB port.
+
+The service is configured server-side with `HEADLESS=true` and uses:
+
+- `/app/vb-data/chrome_profile` for the VB Chrome profile;
+- `/app/vb-data/session.json` for the VB session;
+- `/app/vb-data/credentials.json` for the VB credential file;
+- Chrome subprofile `shopee_profile`;
+- the existing `fm-postgres` database network.
+
+The host `src/data` directory is mounted at `/app/vb-data`; this avoids relying
+on the local symlinks under `main-vb/src/data` inside the container.
+
+### AI agent deployment instructions
+
+1. Ensure the host files exist and are not committed:
+   `src/data/chrome_profile`, `src/data/session.json`, and
+   `src/data/credentials allvbadmin.json`.
+2. The compose service maps the host credential file to
+   `/app/vb-data/credentials.json` as read-only; verify the source file exists.
+3. Build and start only the VB service with:
+
+   ```bash
+   docker compose build bot-vb
+   docker compose up -d bot-vb
+   ```
+
+4. Verify startup with:
+
+   ```bash
+   docker compose ps bot-vb
+   docker compose logs --tail=100 -f bot-vb
+   ```
+
+5. Confirm the logs contain `headless=True`, the `/app/vb-data/chrome_profile`
+   path, and `shopee_profile`. Confirm the first patrol reports a brand,
+   merchant, Store ID, action, and result.
+
+6. Stop or restart only this service when needed:
+
+   ```bash
+   docker compose stop bot-vb
+   docker compose restart bot-vb
+   ```
+
+Do not add a second dependency install, do not expose a new port, and do not
+mount the VB profile into `fm-bot`. The VB service performs real Shopee actions
+according to the persisted brand states.
 
 ## Validation
 
