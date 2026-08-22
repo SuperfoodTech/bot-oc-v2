@@ -24,12 +24,21 @@ def init_db() -> None:
     schema_path = base_dir / "001_initial_schema.sql"
     migration2_path = base_dir / "002_separate_merchant_outlet.sql"
     migration3_path = base_dir / "003_add_google_auth.sql"
+    migration4_path = base_dir / "004_virtual_brand.sql"
     with get_db_connection() as conn:
         conn.execute(schema_path.read_text(encoding="utf-8"))
         if migration2_path.exists():
             conn.execute(migration2_path.read_text(encoding="utf-8"))
         if migration3_path.exists():
             conn.execute(migration3_path.read_text(encoding="utf-8"))
+        if migration4_path.exists():
+            conn.execute(migration4_path.read_text(encoding="utf-8"))
+        migration5_path = base_dir / "005_remove_ownership_type.sql"
+        if migration5_path.exists():
+            conn.execute(migration5_path.read_text(encoding="utf-8"))
+        migration6_path = base_dir / "006_log_overview_and_errors.sql"
+        if migration6_path.exists():
+            conn.execute(migration6_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -144,7 +153,7 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     return merchant_id, portal["id"], account
 
 
-def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", account_password: str = "", nama_pemilik: str = "", ownership_type: str = "VB", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, is_active: bool = True, **_ignored) -> Dict:
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", account_password: str = "", nama_pemilik: str = "", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, is_active: bool = True, **_ignored) -> Dict:
     with get_db_connection() as conn:
         merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password, base_url=base_url, google_email=google_email)
         existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
@@ -154,7 +163,7 @@ def save_or_update_store(store_id: str, store_name: str, merchant_name: str, acc
                 conn.execute("UPDATE shopee_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (account_password, shopee_account_id))
         else:
             shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, account_password or BOT_PASSWORD)).fetchone()["id"]
-        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,ownership_type,long_name,special_hours,is_active) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,ownership_type=EXCLUDED.ownership_type,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,is_active=EXCLUDED.is_active,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, ownership_type, store_name or store_id, special_hours, is_active)).fetchone()
+        outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,long_name,special_hours,is_active) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,is_active=EXCLUDED.is_active,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, store_name or store_id, special_hours, is_active)).fetchone()
         outlet_id = outlet["id"]
         conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), (shopee_status or "UNKNOWN").upper(), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
         code = (paket or "3_MONTHS").upper().replace(" ", "_")
@@ -194,9 +203,12 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,o.ownership_type AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at::text AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at::text AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
-    query += " AND o.is_active=true" if where else " WHERE o.is_active=true"
+    # Virtual Brand outlets are controlled exclusively through vb_brands and
+    # must not appear in the regular outlet dashboard or bot-oc worker scope.
+    vb_exclusion = " AND NOT EXISTS (SELECT 1 FROM vb_brand_outlets vb_filter WHERE vb_filter.outlet_id=o.id)"
+    query += (" AND o.is_active=true" if where else " WHERE o.is_active=true") + vb_exclusion
     query += " ORDER BY m.name,p.name,o.store_id"
     with get_db_connection() as conn:
         rows = [dict(row) for row in conn.execute(query, (BOT_USERNAME, *params)).fetchall()]
@@ -344,7 +356,7 @@ def admin_set_suspension(store_id, penangguhan, alasan=""):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET suspension_status=%s,suspension_reason=%s,vercel_status=CASE WHEN %s THEN 'OFF' ELSE vercel_status END,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", ("SUSPENDED" if suspended else "ACTIVE", alasan, suspended, store_id))
 def admin_renew_subscription(store_id, new_expiry_date):
     with get_db_connection() as conn: conn.execute("UPDATE subscriptions s SET end_date=%s,status='ACTIVE',updated_at=now() FROM outlets o WHERE o.id=s.outlet_id AND o.store_id=%s", (new_expiry_date, store_id))
-def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_portal: Optional[str] = None, nama_panjang_outlet: Optional[str] = None, ownership_type: Optional[str] = None, paket: Optional[str] = None, dashboard_password: Optional[str] = None, google_email: Optional[str] = None) -> bool:
+def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_portal: Optional[str] = None, nama_panjang_outlet: Optional[str] = None, paket: Optional[str] = None, dashboard_password: Optional[str] = None, google_email: Optional[str] = None) -> bool:
     with get_db_connection() as conn:
         outlet = conn.execute("SELECT id, merchant_id, portal_id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
         if not outlet:
@@ -354,8 +366,6 @@ def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_po
         pid = outlet["portal_id"]
         if nama_panjang_outlet is not None and nama_panjang_outlet.strip():
             conn.execute("UPDATE outlets SET long_name=%s, updated_at=now() WHERE id=%s", (nama_panjang_outlet.strip(), oid))
-        if ownership_type is not None and ownership_type.strip():
-            conn.execute("UPDATE outlets SET ownership_type=%s, updated_at=now() WHERE id=%s", (ownership_type.strip(), oid))
         if nama_pemilik is not None and nama_pemilik.strip():
             new_owner = nama_pemilik.strip()
             conn.execute("UPDATE merchants SET name=%s, updated_at=now() WHERE id=%s", (new_owner, mid))
@@ -385,12 +395,18 @@ def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_po
 
 def update_shopee_actual_status(store_id, status):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET shopee_actual_status=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (status.upper(), store_id))
-def record_log(store_id, store_name, action, target_state, reason):
+def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="REGULAR"):
     with get_db_connection() as conn:
         outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
         if not outlet: return
         row = conn.execute("SELECT vercel_status,shopee_actual_status,suspension_status FROM outlet_states WHERE outlet_id=%s", (outlet["id"],)).fetchone() or {}
-        conn.execute("INSERT INTO automation_logs (outlet_id,suspension_status,subscription_status,vercel_status_before,shopee_status_before,target_status,action,success,reason) VALUES (%s,%s,'ACTIVE',%s,%s,%s,%s,true,%s)", (outlet["id"], row.get("suspension_status", "ACTIVE"), row.get("vercel_status", "OFF"), row.get("shopee_actual_status", "UNKNOWN"), target_state, action, reason))
+        conn.execute("INSERT INTO automation_logs (outlet_id,mode,suspension_status,subscription_status,vercel_status_before,shopee_status_before,target_status,action,success,error_message,reason) VALUES (%s,%s,%s,'ACTIVE',%s,%s,%s,%s,%s,%s,%s)", (outlet["id"], mode, row.get("suspension_status", "ACTIVE"), row.get("vercel_status", "OFF"), row.get("shopee_actual_status", "UNKNOWN"), target_state, action, success, error_message, reason))
+        if not success:
+            conn.execute("""INSERT INTO automation_errors
+                (mode, outlet_id, store_id, merchant_name, action, attempt_count, error_type, error_message)
+                SELECT %s, o.id, o.store_id, p.name, %s, 1, 'ACTION_FAILED', %s
+                FROM outlets o JOIN portals p ON p.id=o.portal_id WHERE o.id=%s""",
+                (mode, action, error_message or reason or "Automation action failed", outlet["id"]))
         conn.execute("UPDATE outlet_states SET last_action_at=now(), last_checked_at=now(), updated_at=now() WHERE outlet_id=%s", (outlet["id"],))
 def get_recent_logs(limit=50, store_ids=None):
     query = """
@@ -413,6 +429,69 @@ def get_recent_logs(limit=50, store_ids=None):
     params.append(limit)
     with get_db_connection() as conn:
         return [dict(r) for r in conn.execute(query, params).fetchall()]
+
+
+def get_log_overview(limit=40):
+    """Return compact two-bot activity plus traceable outlet errors."""
+    with get_db_connection() as conn:
+        summary_rows = conn.execute(
+            """SELECT CASE WHEN al.mode = 'VB' THEN 'VB' ELSE 'REGULAR' END AS mode,
+                      COUNT(*)::int AS event_count,
+                      MAX(al.checked_at)::text AS last_event_at
+               FROM automation_logs al
+               WHERE al.checked_at >= now() - interval '24 hours'
+               GROUP BY CASE WHEN al.mode = 'VB' THEN 'VB' ELSE 'REGULAR' END"""
+        ).fetchall()
+        summary = {
+            "REGULAR": {"event_count": 0, "last_event_at": None},
+            "VB": {"event_count": 0, "last_event_at": None},
+        }
+        for row in summary_rows:
+            summary[row["mode"]] = dict(row)["event_count"] and {
+                "event_count": row["event_count"],
+                "last_event_at": row["last_event_at"],
+            } or {"event_count": 0, "last_event_at": row["last_event_at"]}
+
+        recent = list(conn.execute(
+            """SELECT al.id, al.checked_at::text AS timestamp,
+                      CASE WHEN al.mode = 'VB' THEN 'VB' ELSE 'REGULAR' END AS mode,
+                      COALESCE(o.store_id, 'SYSTEM') AS store_id,
+                      COALESCE(o.long_name, b.name, 'Bot system') AS store_name,
+                      b.name AS brand_name, p.name AS merchant_name,
+                      al.action, al.target_status AS target_state,
+                      al.success, COALESCE(al.reason, '') AS reason
+               FROM automation_logs al
+               LEFT JOIN outlets o ON o.id=al.outlet_id
+               LEFT JOIN vb_brands b ON b.id=al.vb_brand_id
+               LEFT JOIN portals p ON p.id=o.portal_id
+               ORDER BY al.id DESC LIMIT %s""", (limit,)
+        ).fetchall())
+        errors = list(conn.execute(
+            """SELECT ae.id, ae.created_at::text AS timestamp, ae.mode,
+                      ae.store_id, COALESCE(ae.merchant_name, p.name, '') AS merchant_name,
+                      b.name AS brand_name, ae.action, ae.attempt_count,
+                      ae.error_type, ae.error_message
+               FROM automation_errors ae
+               LEFT JOIN outlets o ON o.id=ae.outlet_id
+               LEFT JOIN portals p ON p.id=o.portal_id
+               LEFT JOIN vb_brands b ON b.id=ae.vb_brand_id
+               ORDER BY ae.id DESC LIMIT %s""", (limit,)
+        ).fetchall())
+        errors.extend(conn.execute(
+            """SELECT al.id, al.checked_at::text AS timestamp, 'REGULAR' AS mode,
+                      COALESCE(o.store_id, 'SYSTEM') AS store_id,
+                      p.name AS merchant_name, NULL AS brand_name,
+                      al.action, 1 AS attempt_count, 'AUTOMATION_LOG_ERROR' AS error_type,
+                      COALESCE(al.error_message, al.reason, 'Automation action failed') AS error_message
+               FROM automation_logs al
+               LEFT JOIN outlets o ON o.id=al.outlet_id
+               LEFT JOIN portals p ON p.id=o.portal_id
+               WHERE COALESCE(al.mode, 'OUTLET') <> 'VB' AND (al.success=false OR al.error_message IS NOT NULL)
+               ORDER BY al.id DESC LIMIT %s""", (limit,)
+        ).fetchall())
+        errors.sort(key=lambda row: row["timestamp"] or "", reverse=True)
+        errors = errors[:limit]
+        return {"summary": summary, "recent": recent, "errors": errors}
 
 
 def fetch_merchant_outlets_from_db() -> List[Any]:

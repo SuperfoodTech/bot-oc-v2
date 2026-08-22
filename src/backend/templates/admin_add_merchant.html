@@ -40,20 +40,6 @@
                 <input id="addOwnerName" class="form-input" type="text" autocomplete="name" required placeholder="Contoh: Mitra Budi">
               </div>
               <div class="add-merchant-field">
-                <label for="addOwnership">Kepemilikan <span aria-hidden="true">*</span></label>
-                <div class="custom-select" data-select="addOwnership">
-                  <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Kepemilikan">
-                    <span class="custom-select-value">VB</span><span class="custom-select-chevron" aria-hidden="true">⌄</span>
-                  </button>
-                  <div class="custom-select-menu" role="listbox" hidden>
-                    <button type="button" role="option" data-value="VB" aria-selected="true">VB</button>
-                  </div>
-                  <select id="addOwnership" class="custom-select-native" tabindex="-1" aria-hidden="true">
-                    <option value="VB">VB</option>
-                  </select>
-                </div>
-              </div>
-              <div class="add-merchant-field">
                 <label for="addGoogleEmail">Email Google mitra</label>
                 <input id="addGoogleEmail" class="form-input" type="email" autocomplete="email" placeholder="mitra@gmail.com">
               </div>
@@ -321,7 +307,6 @@
         document.getElementById('addMerchantName').value.trim() ||
         document.getElementById('addOutletName').value.trim() ||
         document.getElementById('addStoreId').value.trim() ||
-        document.getElementById('addOwnership').value !== 'VB' ||
         document.getElementById('addPackage').value !== '3_MONTHS'
       );
     }
@@ -365,7 +350,6 @@
 
       const payload = {
         nama_pemilik: document.getElementById('addOwnerName').value.trim(),
-        ownership_type: document.getElementById('addOwnership').value,
         nama_portal: document.getElementById('addMerchantName').value.trim(),
         store_id: document.getElementById('addStoreId').value.trim(),
         nama_panjang_outlet: document.getElementById('addOutletName').value.trim(),

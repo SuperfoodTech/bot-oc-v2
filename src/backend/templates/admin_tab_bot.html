@@ -1,81 +1,46 @@
-    {# ── TAB PANE 2: BOT MONITOR ── #}
-    <div class="tab-pane" :class="{ 'active': currentTab === 'logs' }" id="paneLogs">
-
-
-
-
-      <div class="bot-monitor-card">
-        <div class="bot-status-bar flex-column flex-md-row align-items-md-center gap-3">
-          <div>
-            <div class="bot-log-eyebrow">Status Realtime</div>
-            <div class="bot-log-title">Monitor Bot Patroli</div>
-            <div class="bot-log-meta" id="botLastSyncText">Memuat catatan aktivitas...</div>
-          </div>
-
-          <div class="d-flex align-items-center gap-2 flex-wrap">
-            <button class="btn-outline btn-compact" onclick="controlBot('sync')">
-              Sync sekarang
-            </button>
-            <label class="bot-refresh-control ms-2">
-                <input type="checkbox" id="autoRefreshCheckbox" checked onchange="toggleAutoRefreshLogs(this)">
-                <span>Terima log baru (5s)</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- BOT ACTIVITY PANEL — Evidence that bot is genuinely running & acting -->
-      <div class="bot-activity-panel" id="botActivityPanel">
-        <div class="bot-act-card" id="actCardCycle">
-          <div class="bot-act-label">Siklus Terakhir</div>
-          <div class="bot-act-value" id="actLastCycle">—</div>
-          <div class="bot-act-sub" id="actCycleCount">Belum ada data</div>
-        </div>
-        <div class="bot-act-card" id="actCardStores">
-          <div class="bot-act-label">Toko Diperiksa</div>
-          <div class="bot-act-value" id="actStoresProcessed">—</div>
-          <div class="bot-act-sub" id="actNextCycle">Belum ada data</div>
-        </div>
-        <div class="bot-act-card bot-act-card--wide" id="actCardLastAction">
-          <div class="bot-act-label">Aksi Terakhir Bot</div>
-          <div id="actLastActionsList" class="bot-act-actions-list">
-            <span class="bot-act-empty">Bot belum mengambil aksi apapun.</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="table-card">
-        <div class="table-heading flex-column flex-sm-row gap-2">
-          <h2>Log &amp; action</h2>
-          <div class="log-filter-controls">
-            <select id="logActionFilter" class="form-input" style="width: auto; min-width: 150px;" onchange="loadFullBotLogs()">
-              <option value="">Semua Aksi</option>
-              <option value="ACTION_OPEN">Auto Open (Buka)</option>
-              <option value="ACTION_CLOSE">Auto Close (Tutup)</option>
-              <option value="ADMIN">Tindakan Admin</option>
-              <option value="USER">Tindakan Mitra</option>
-              <option value="SYNC_CYCLE">Evaluasi Sistem</option>
-            </select>
-            <input type="text" id="logSearchInput" class="form-input table-search" placeholder="Cari Store ID, outlet, alasan..." onkeyup="loadFullBotLogs()">
-            <button class="btn-outline btn-compact" onclick="loadFullBotLogs()">Muat Ulang</button>
-          </div>
-        </div>
-
-        <div class="table-scroll">
-          <table class="data-table" id="logsTable">
-            <thead>
-              <tr>
-                <th style="width: 160px;">Timestamp</th>
-                <th style="width: 110px;">Store ID</th>
-                <th style="width: 180px;">Nama Outlet</th>
-                <th style="width: 160px;">Action</th>
-                <th style="width: 120px;">Target State</th>
-              </tr>
-            </thead>
-            <tbody id="fullLogsTableBody">
-              <tr><td colspan="5" class="table-loading-state">Memuat log aktivitas bot...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+{# ── TAB PANE: UNIFIED BOT LOGS ── #}
+<div class="tab-pane" :class="{ 'active': currentTab === 'logs' }" id="paneLogs">
+  <section class="logs-intro">
+    <div>
+      <div class="bot-log-eyebrow">Observability</div>
+      <h2>Aktivitas bot</h2>
+      <p id="botLastSyncText">Memuat ringkasan aktivitas...</p>
     </div>
+    <div class="logs-filter-controls">
+      <select id="logModeFilter" class="form-input" onchange="loadFullBotLogs()" aria-label="Filter bot">
+        <option value="">Semua bot</option>
+        <option value="REGULAR">Bot O/C</option>
+        <option value="VB">Virtual Brand</option>
+      </select>
+      <input type="search" id="logSearchInput" class="form-input" placeholder="Cari Store ID, brand, merchant" oninput="loadFullBotLogs()">
+    </div>
+  </section>
+
+  <section class="logs-summary-grid" aria-label="Ringkasan bot">
+    <article class="logs-bot-card">
+      <div class="logs-bot-card-head"><h3>Bot O/C</h3><span class="logs-bot-badge">REGULAR</span></div>
+      <div class="logs-bot-stat"><strong id="regularLogCount">0</strong><span>event 24 jam</span></div>
+      <p id="regularLogLast">Belum ada aktivitas</p>
+    </article>
+    <article class="logs-bot-card logs-bot-card-vb">
+      <div class="logs-bot-card-head"><h3>Virtual Brand</h3><span class="logs-bot-badge">VB</span></div>
+      <div class="logs-bot-stat"><strong id="vbLogCount">0</strong><span>event perubahan 24 jam</span></div>
+      <p id="vbLogLast">Belum ada aktivitas</p>
+    </article>
+  </section>
+
+  <section class="logs-section logs-errors-section">
+    <div class="logs-section-head">
+      <div><h3>Error yang perlu ditelusuri</h3><p>Hanya error per Store ID yang ditampilkan di sini.</p></div>
+      <span class="logs-section-count" id="logErrorCount">0</span>
+    </div>
+    <div id="logsErrorList" class="logs-error-list"><div class="table-loading-state">Memuat error...</div></div>
+  </section>
+
+  <section class="logs-section">
+    <div class="logs-section-head">
+      <div><h3>Perubahan terbaru</h3><p>Ringkasan perubahan dari kedua bot.</p></div>
+    </div>
+    <div id="fullLogsTableBody" class="logs-event-list"><div class="table-loading-state">Memuat aktivitas...</div></div>
+  </section>
+</div>

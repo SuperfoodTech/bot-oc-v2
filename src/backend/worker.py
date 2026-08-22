@@ -247,7 +247,10 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 store_name=outlet.nama_pendek_outlet,
                 action=decision.action,
                 target_state=decision.target_state,
-                reason=reason_text
+                reason=reason_text,
+                success=exec_ok,
+                error_message=None if exec_ok else reason_text,
+                mode="REGULAR",
             )
 
     # Record overall cycle evaluation log for process tracking

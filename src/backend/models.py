@@ -65,7 +65,6 @@ class AdminGenerateLinkRequest(BaseModel):
 
 class AdminCreateOutletRequest(BaseModel):
     nama_pemilik: str = Field(..., min_length=1)
-    ownership_type: str = Field(default="VB", description="Kepemilikan outlet")
     nama_portal: str = Field(..., min_length=1)
     store_id: str = Field(..., min_length=1)
     nama_panjang_outlet: str = Field(..., min_length=1)
@@ -101,7 +100,6 @@ class AdminEditOutletRequest(BaseModel):
     nama_pemilik: Optional[str] = Field(default=None, description="Nama pemilik/mitra")
     nama_portal: Optional[str] = Field(default=None, description="Nama merchant/portal Shopee")
     nama_panjang_outlet: Optional[str] = Field(default=None, description="Nama outlet")
-    ownership_type: Optional[str] = Field(default=None, description="Kepemilikan outlet")
     paket: Optional[str] = Field(default=None, description="Paket: 3_MONTHS, 6_MONTHS, 12_MONTHS")
     dashboard_password: Optional[str] = Field(default=None, description="Passcode dashboard")
     google_email: Optional[str] = Field(default=None, description="Email Google Mitra")

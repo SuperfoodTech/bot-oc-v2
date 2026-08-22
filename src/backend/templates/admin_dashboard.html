@@ -36,6 +36,11 @@
         <span>Daftar Outlet</span>
         <span class="tab-badge" id="tabOutletCount" x-text="allStores.length">0</span>
       </button>
+      <button class="tab-btn" :class="{ 'active': currentTab === 'vb' }" id="tabBtnVB"
+        onclick="switchTab('vb')">
+        <span>Virtual Brand</span>
+        <span class="tab-badge" id="tabVBCount">0</span>
+      </button>
       <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs"
         onclick="switchTab('logs')">
         <span>Logs</span>
@@ -48,6 +53,8 @@
 
 
     {% include "admin_tab_operasional.html" %}
+
+    {% include "admin_tab_vb.html" %}
 
     {% include "admin_tab_bot.html" %}
 
@@ -73,12 +80,6 @@
           <div style="flex: 1;">
             <label style="font-size: 12px; font-weight: 700;">Nama Mitra *</label>
             <input type="text" id="genOwnerName" class="form-input" placeholder="cth: Mitra Budi">
-          </div>
-          <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
-            <select id="genKepemilikan" class="form-input">
-              <option value="VB">VB</option>
-            </select>
           </div>
         </div>
 
@@ -231,12 +232,6 @@
             <label style="font-size: 12px; font-weight: 700;">Nama Mitra *</label>
             <input type="text" id="editOwnerName" class="form-input" placeholder="cth: Mitra Budi">
           </div>
-          <div style="flex: 1;">
-            <label style="font-size: 12px; font-weight: 700;">Kepemilikan *</label>
-            <select id="editKepemilikan" class="form-input">
-              <option value="VB">VB</option>
-            </select>
-          </div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -316,7 +311,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       const hashTab = window.location.hash.replace('#', '');
       const tabParam = urlParams.get('tab') || hashTab;
-      const validTabs = ['outlets', 'logs', 'settings'];
+      const validTabs = ['outlets', 'vb', 'logs', 'settings'];
       const initialTab = validTabs.includes(tabParam) ? tabParam : 'outlets';
       return {
         currentTab: initialTab,
@@ -393,7 +388,7 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
-      if (tabParam && ['outlets', 'logs', 'settings'].includes(tabParam)) {
+      if (tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam)) {
         switchTab(tabParam);
       }
     });
@@ -401,7 +396,7 @@
     window.addEventListener('popstate', (e) => {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || 'outlets';
-      if (['outlets', 'logs', 'settings'].includes(tabParam)) {
+      if (['outlets', 'vb', 'logs', 'settings'].includes(tabParam)) {
         switchTab(tabParam);
       }
     });
@@ -428,6 +423,12 @@
         if (btn) btn.classList.add('active');
         if (pane) pane.classList.add('active');
         loadStoresData();
+      } else if (tabName === 'vb') {
+        const btn = document.getElementById('tabBtnVB');
+        const pane = document.getElementById('paneVB');
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
+        loadVBData();
       } else if (tabName === 'logs' || tabName === 'bot') {
         const btn = document.getElementById('tabBtnLogs');
         const pane = document.getElementById('paneLogs');
@@ -464,6 +465,165 @@
           document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
           document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
         }
+      }
+    }
+
+    let allVBBrands = [];
+
+    async function loadVBData(isSilent = false) {
+      const body = document.getElementById('vbTableBody');
+      if (!body) return;
+      if (!isSilent) body.innerHTML = '<div class="table-loading-state">Memuat data brand...</div>';
+      try {
+        const res = await fetch('/api/v1/admin/vb/brands');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Data VB gagal dimuat.');
+        allVBBrands = data.brands || [];
+        renderVBTable(allVBBrands);
+      } catch (err) {
+        body.innerHTML = `<div class="table-loading-state">${escapeVBHtml(err.message)}</div>`;
+      }
+    }
+
+    function vbStatusLabel(status) {
+      return status === 'ON' ? 'ON' : 'PAUSED';
+    }
+
+    function escapeVBHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[char]));
+    }
+
+    function renderVBTable(brands) {
+      const body = document.getElementById('vbTableBody');
+      const count = document.getElementById('tabVBCount');
+      if (!body) return;
+      if (count) count.textContent = brands.length;
+      if (!brands.length) {
+        body.innerHTML = '<div class="table-loading-state">Tidak ada brand VB.</div>';
+        return;
+      }
+      body.innerHTML = '';
+      brands.forEach(brand => {
+        const row = document.createElement('article');
+        row.className = 'vb-brand-card';
+        row.id = `vb-card-${brand.id}`;
+        const brandName = escapeVBHtml(brand.name);
+        row.innerHTML = `
+          <div class="vb-brand-card-head">
+            <div>
+              <div class="step-indicator">Virtual Brand</div>
+              <h3>${brandName}</h3>
+              <p>${brand.merchant_count || 0} merchant · ${brand.outlet_count || 0} outlet</p>
+            </div>
+            <div class="vb-brand-toggle"></div>
+          </div>
+          <div class="vb-brand-meta">
+            <span>Status diterapkan: <strong>${vbStatusLabel(brand.applied_status)}</strong></span>
+            <span class="vb-pending">${brand.requested_status ? `Menunggu: ${vbStatusLabel(brand.requested_status)}` : 'Tidak ada perubahan pending'}</span>
+          </div>
+          <div class="vb-brand-detail" id="vb-detail-${brand.id}">
+            <div class="vb-detail-content">Memuat merchant dan outlet...</div>
+          </div>`;
+        const statusCell = row.querySelector('.vb-brand-toggle');
+        const controlWrap = document.createElement('div');
+        controlWrap.className = 'vb-control';
+        const control = document.createElement('input');
+        control.type = 'checkbox';
+        control.checked = (brand.requested_status || brand.applied_status) === 'ON';
+        control.setAttribute('aria-label', `Ubah status ${brand.name}`);
+        const switchLabel = document.createElement('label');
+        switchLabel.className = 'switch-toggle';
+        switchLabel.appendChild(control);
+        const slider = document.createElement('span');
+        slider.className = 'slider';
+        switchLabel.appendChild(slider);
+        const controlText = document.createElement('span');
+        controlText.className = 'vb-control-label';
+        controlText.textContent = control.checked ? 'ON' : 'PAUSED';
+        control.addEventListener('change', () => {
+          controlText.textContent = control.checked ? 'ON' : 'PAUSED';
+          requestVBStatus(brand.id, control.checked ? 'ON' : 'PAUSED', control);
+        });
+        controlWrap.appendChild(switchLabel);
+        controlWrap.appendChild(controlText);
+        statusCell.appendChild(controlWrap);
+        body.appendChild(row);
+        loadVBDetail(brand.id);
+      });
+    }
+
+    async function loadVBDetail(brandId) {
+      const row = document.getElementById(`vb-detail-${brandId}`);
+      if (!row) return;
+      if (row.dataset.loaded === 'true') return;
+      try {
+        const res = await fetch(`/api/v1/admin/vb/brands/${encodeURIComponent(brandId)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Detail brand gagal dimuat.');
+        const outlets = data.brand.outlets || [];
+        const grouped = outlets.reduce((acc, outlet) => {
+          const key = outlet.merchant_name || 'Merchant tidak diketahui';
+          (acc[key] ||= []).push(outlet.store_id);
+          return acc;
+        }, {});
+        const content = row.querySelector('.vb-detail-content');
+        content.innerHTML = Object.entries(grouped).map(([merchant, ids]) => `
+          <div class="vb-detail-group">
+            <strong>${escapeVBHtml(merchant)}</strong>
+            <span>${ids.length} outlet: ${ids.map(escapeVBHtml).join(', ')}</span>
+          </div>`).join('') || 'Belum ada outlet terhubung.';
+        row.dataset.loaded = 'true';
+      } catch (err) {
+        row.querySelector('.vb-detail-content').textContent = err.message;
+      }
+    }
+
+    function filterVBTable() {
+      const q = (document.getElementById('vbSearchInput')?.value || '').toLowerCase();
+      renderVBTable(allVBBrands.filter(brand => (brand.name || '').toLowerCase().includes(q)));
+    }
+
+    async function requestVBStatus(brandId, status, control) {
+      control.disabled = true;
+      try {
+        const res = await fetch(`/api/v1/admin/vb/brands/${encodeURIComponent(brandId)}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Status VB gagal disimpan.');
+        showToast(data.message || 'Perubahan VB disimpan.', 'success');
+        await loadVBData(true);
+      } catch (err) {
+        showErrorModal('Status VB gagal disimpan', err.message);
+        await loadVBData(true);
+      } finally {
+        control.disabled = false;
+      }
+    }
+
+    async function importVBData() {
+      const button = document.getElementById('vbImportButton');
+      if (button) { button.disabled = true; button.textContent = 'Import...'; }
+      try {
+        const res = await fetch('/api/v1/admin/vb/import', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Import VB gagal.');
+        const summary = data.summary || {};
+        const missing = (summary.missing_store_ids || []).length;
+        const created = summary.outlets_created || 0;
+        const summaryText = `Brand: ${summary.brands_seen || 0} · Outlet baru: ${created} · Relasi: ${summary.outlets_linked || 0} · Missing: ${missing}`;
+        const summaryEl = document.getElementById('vbImportSummary');
+        if (summaryEl) summaryEl.textContent = summaryText;
+        showToast(`Import selesai. ${summaryText}`, missing ? 'warning' : 'success');
+        await loadVBData();
+      } catch (err) {
+        showErrorModal('Import VB gagal', err.message);
+      } finally {
+        if (button) { button.disabled = false; button.textContent = 'Import VB'; }
       }
     }
 
@@ -672,7 +832,6 @@
 
           <dl class="mobile-detail-list">
             <div><dt>Pemilik outlet</dt><dd>${ownerName}</dd></div>
-            <div><dt>Tipe kepemilikan</dt><dd><span class="status-text">${s.kepemilikan || 'VB'}</span></dd></div>
             <div><dt>Status utama</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
             <div><dt>Langganan berlaku sampai</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
             <div><dt>Status akun</dt><dd><span class="status-text ${s.is_suspended ? '' : 'is-active'}">${s.is_suspended ? 'Ditangguhkan' : 'Aktif'}</span></dd></div>
@@ -695,7 +854,6 @@
     function getStoreDetailMarkup(store) {
       const isVercelOn = store.vercel_status === 'ON';
       const detailRows = [
-        ['Kepemilikan', store.kepemilikan || 'VB'],
         ['Pause', isVercelOn ? 'Tidak sedang pause' : getPauseDetail(store.pause_until)],
         ['Paket', store.paket],
         ['Status akun', store.is_suspended ? 'Ditangguhkan' : 'Aktif'],
@@ -744,8 +902,7 @@
         (s.nama_pemilik || '').toLowerCase().includes(q) ||
         (s.store_name || '').toLowerCase().includes(q) ||
         (s.store_id || '').toLowerCase().includes(q) ||
-        (s.merchant_name || '').toLowerCase().includes(q) ||
-        (s.kepemilikan || '').toLowerCase().includes(q)
+        (s.merchant_name || '').toLowerCase().includes(q)
       );
       renderAdminTable(filtered);
     }
@@ -773,7 +930,6 @@
 
     async function submitGenerateLink() {
       const owner = document.getElementById('genOwnerName').value.trim();
-      const kepemilikan = document.getElementById('genKepemilikan') ? document.getElementById('genKepemilikan').value : 'VB';
       const portalNameInput = document.getElementById('genPortalName');
       const portalName = portalNameInput ? portalNameInput.value.trim() : '';
       const storeId = document.getElementById('genStoreId').value.trim();
@@ -797,7 +953,6 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nama_pemilik: owner,
-            ownership_type: kepemilikan,
             store_id: storeId,
             nama_panjang_outlet: storeName,
             nama_portal: portalName,
@@ -830,7 +985,6 @@
 
       document.getElementById('editModalStoreSubtitle').innerText = `${store.store_name} (ID: ${store.store_id})`;
       document.getElementById('editOwnerName').value = store.nama_pemilik || '';
-      document.getElementById('editKepemilikan').value = store.kepemilikan || 'VB';
       document.getElementById('editPortalName').value = store.nama_portal || store.merchant_name || '';
       document.getElementById('editStoreName').value = store.store_name || store.long_name || '';
 
@@ -849,7 +1003,6 @@
       if (!selectedStoreForAction) return;
 
       const owner = document.getElementById('editOwnerName').value.trim();
-      const kepemilikan = document.getElementById('editKepemilikan').value;
       const portalName = document.getElementById('editPortalName').value.trim();
       const storeName = document.getElementById('editStoreName').value.trim();
       const paket = document.getElementById('editPaket').value;
@@ -868,7 +1021,6 @@
           body: JSON.stringify({
             store_id: selectedStoreForAction,
             nama_pemilik: owner,
-            ownership_type: kepemilikan,
             nama_portal: portalName,
             nama_panjang_outlet: storeName,
             paket: paket,
@@ -1131,6 +1283,72 @@
         }
       } catch (err) {
         console.warn('fetchBotActivity error:', err);
+      }
+    }
+
+    function logBotLabel(mode) {
+      return mode === 'VB' ? 'Virtual Brand' : 'Bot O/C';
+    }
+
+    function renderLogErrorList(errors) {
+      const list = document.getElementById('logsErrorList');
+      const count = document.getElementById('logErrorCount');
+      if (!list) return;
+      if (count) count.textContent = errors.length;
+      if (!errors.length) {
+        list.innerHTML = '<div class="logs-empty-state">Tidak ada error yang tercatat.</div>';
+        return;
+      }
+      list.innerHTML = errors.map(error => `
+        <article class="logs-error-card">
+          <div class="logs-event-topline"><span class="logs-mode-chip ${error.mode === 'VB' ? 'is-vb' : ''}">${logBotLabel(error.mode)}</span><time>${formatLogTimestamp(error.timestamp)}</time></div>
+          <div class="logs-error-target"><strong>Store ID ${escapeVBHtml(error.store_id)}</strong><span>${escapeVBHtml(error.merchant_name || error.brand_name || '-')}</span></div>
+          <p class="logs-error-message">${escapeVBHtml(error.error_message)}</p>
+          <div class="logs-error-meta">${escapeVBHtml(error.action)} · percobaan ${error.attempt_count || 1}/${error.attempt_count || 1}${error.brand_name ? ` · Brand ${escapeVBHtml(error.brand_name)}` : ''}</div>
+        </article>`).join('');
+    }
+
+    function renderLogEventList(events) {
+      const list = document.getElementById('fullLogsTableBody');
+      if (!list) return;
+      if (!events.length) {
+        list.innerHTML = '<div class="logs-empty-state">Belum ada perubahan yang sesuai filter.</div>';
+        return;
+      }
+      list.innerHTML = events.map(event => `
+        <article class="logs-event-card">
+          <div class="logs-event-topline"><span class="logs-mode-chip ${event.mode === 'VB' ? 'is-vb' : ''}">${logBotLabel(event.mode)}</span><time>${formatLogTimestamp(event.timestamp)}</time></div>
+          <div class="logs-event-main"><strong>${escapeVBHtml(event.action)}</strong><span>${escapeVBHtml(event.store_id)} · ${escapeVBHtml(event.store_name)}</span></div>
+          <div class="logs-event-meta">${event.brand_name ? `Brand ${escapeVBHtml(event.brand_name)} · ` : ''}${escapeVBHtml(event.merchant_name || '')}${event.target_state ? ` · target ${escapeVBHtml(event.target_state)}` : ''}</div>
+        </article>`).join('');
+    }
+
+    async function loadFullBotLogs(isSilent = false) {
+      const eventList = document.getElementById('fullLogsTableBody');
+      if (!isSilent && eventList) eventList.innerHTML = '<div class="table-loading-state">Memuat aktivitas...</div>';
+      try {
+        const res = await fetch('/api/v1/admin/logs/overview?limit=40');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Log gagal dimuat.');
+        const mode = document.getElementById('logModeFilter')?.value || '';
+        const query = (document.getElementById('logSearchInput')?.value || '').trim().toLowerCase();
+        const matches = item => (!mode || item.mode === mode) && (!query || [item.store_id, item.store_name, item.brand_name, item.merchant_name, item.reason, item.error_message].some(value => String(value || '').toLowerCase().includes(query)));
+        const events = (data.recent || []).filter(matches);
+        const errors = (data.errors || []).filter(matches);
+        renderLogEventList(events);
+        renderLogErrorList(errors);
+        const summary = data.summary || {};
+        const regular = summary.REGULAR || {};
+        const vb = summary.VB || {};
+        document.getElementById('regularLogCount').textContent = regular.event_count || 0;
+        document.getElementById('vbLogCount').textContent = vb.event_count || 0;
+        document.getElementById('regularLogLast').textContent = regular.last_event_at ? `Terakhir ${formatLogTimestamp(regular.last_event_at)}` : 'Belum ada aktivitas';
+        document.getElementById('vbLogLast').textContent = vb.last_event_at ? `Terakhir ${formatLogTimestamp(vb.last_event_at)}` : 'Belum ada aktivitas';
+        document.getElementById('botLastSyncText').textContent = `Diperbarui ${formatLogTimestamp(new Date().toISOString())}`;
+      } catch (err) {
+        if (eventList) eventList.innerHTML = `<div class="logs-empty-state">${escapeVBHtml(err.message)}</div>`;
+        const errorList = document.getElementById('logsErrorList');
+        if (errorList) errorList.innerHTML = `<div class="logs-empty-state">${escapeVBHtml(err.message)}</div>`;
       }
     }
 

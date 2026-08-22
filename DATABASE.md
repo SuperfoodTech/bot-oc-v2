@@ -103,7 +103,7 @@ Spreadsheet hanya digunakan sebagai sumber import awal. Kolom A tidak dimigrasik
 
 | Kolom | Target |
 |---|---|
-| B Kepemilikan | `outlets.ownership_type` |
+| B Kepemilikan | Tidak digunakan; pemisahan VB memakai relasi `vb_brand_outlets` |
 | C Paket | `subscriptions.plan_id` |
 | D-E Tanggal layanan | `subscriptions.start_date`, `end_date` |
 | F Nomor HP | `shopee_accounts.phone` |
@@ -156,5 +156,4 @@ Subscription expired hanya menonaktifkan Auto Open. Subscription expired tidak o
 6. Pisahkan import data spreadsheet dari migration struktur tabel.
 7. Jangan menghapus data production sebagai bagian dari migration tanpa persetujuan eksplisit.
 8. Setelah adapter PostgreSQL aktif, tambahkan test integrasi PostgreSQL; jangan hanya mengandalkan test SQLite.
-
 

@@ -1,0 +1,21 @@
+{# ── TAB PANE: VIRTUAL BRAND ── #}
+<div class="tab-pane" :class="{ 'active': currentTab === 'vb' }" id="paneVB">
+  <div class="vb-panel">
+    <div class="vb-heading">
+      <div>
+        <div class="step-indicator">Virtual Brand</div>
+        <h2>Daftar Brand</h2>
+        <p class="card-subtitle mb-0">Satu status mengendalikan seluruh Store ID dalam brand tersebut.</p>
+      </div>
+      <div class="table-heading-actions">
+        <input type="search" id="vbSearchInput" class="form-input vb-search" placeholder="Cari brand" oninput="filterVBTable()">
+        <button class="btn-primary btn-compact" type="button" id="vbImportButton" onclick="importVBData()">Fetch data</button>
+      </div>
+    </div>
+    <div id="vbImportSummary" class="vb-import-summary" role="status" aria-live="polite"></div>
+
+    <div id="vbTableBody" class="vb-brand-list">
+      <div class="table-loading-state">Memuat data brand...</div>
+    </div>
+  </div>
+</div>

@@ -32,20 +32,20 @@ WEEKDAY_MAP = {
 
 @dataclass
 class MerchantOutlet:
-    """A row from the current A-K import layout."""
+    """A row from the A-L import layout."""
 
     nama_pemilik: str = ""                 # A
     import_status: str = "Aktif"           # B: Aktif/Nonaktif import gate
-    kepemilikan: str = ""                  # Legacy compatibility; not persisted or used for routing
-    paket: str = ""                        # C
-    tanggal_mulai_layanan: str = ""        # D
-    tanggal_berakhir_layanan: str = ""     # E
-    username: str = ""                     # F
-    password: str = ""                     # G: Shopee account password
-    nama_portal: str = ""                  # H
-    store_id: str = ""                     # I
-    nama_panjang_outlet: str = ""          # J
-    vercel_password: str = ""              # K: dashboard password
+    kepemilikan: str = ""                  # C
+    paket: str = ""                        # D
+    tanggal_mulai_layanan: str = ""        # E
+    tanggal_berakhir_layanan: str = ""     # F
+    username: str = ""                     # G
+    password: str = ""                     # H: Shopee account password
+    nama_portal: str = ""                  # I
+    store_id: str = ""                     # J
+    nama_panjang_outlet: str = ""          # K
+    vercel_password: str = ""              # L: dashboard password
     status_utama: str = "ON"          # Database default for new outlets only
     status_aktual: str = "UNKNOWN"
     merchant_id: str = ""
@@ -87,19 +87,20 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
         def get_col(index: int) -> str:
             return row[index].strip() if index < len(row) else ""
 
-        end_date = get_col(4)
+        end_date = get_col(5)
         outlets.append(MerchantOutlet(
             nama_pemilik=get_col(0),
             import_status=get_col(1),
-            paket=get_col(2),
-            tanggal_mulai_layanan=get_col(3),
+            kepemilikan=get_col(2),
+            paket=get_col(3),
+            tanggal_mulai_layanan=get_col(4),
             tanggal_berakhir_layanan=end_date,
-            username=get_col(5),
-            password=get_col(6),
-            nama_portal=get_col(7),
-            store_id=get_col(8),
-            nama_panjang_outlet=get_col(9),
-            vercel_password=get_col(10),
+            username=get_col(6),
+            password=get_col(7),
+            nama_portal=get_col(8),
+            store_id=get_col(9),
+            nama_panjang_outlet=get_col(10),
+            vercel_password=get_col(11),
             status_langganan=_subscription_status(end_date),
         ))
     return outlets

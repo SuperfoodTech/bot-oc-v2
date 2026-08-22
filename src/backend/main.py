@@ -15,6 +15,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timedelta
+from uuid import UUID
 from pydantic import BaseModel
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -29,6 +30,7 @@ from fastapi.templating import Jinja2Templates
 
 from backend import db, state, worker
 from backend import apps_script
+from backend import vb
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
@@ -45,6 +47,10 @@ from backend.models import (
     UserLoginRequest,
     UserPauseRequest
 )
+
+
+class VBStatusRequest(BaseModel):
+    status: str
 
 
 # Spreadsheet-backed state has no database startup step.
@@ -349,6 +355,38 @@ def admin_sync_source(admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=502, detail=f"Source import failed: {exc}") from exc
 
 
+@app.get("/api/v1/admin/vb/brands", summary="Admin: List Virtual Brands")
+def admin_vb_brands(admin: dict = Depends(require_admin)):
+    return {"success": True, "brands": vb.list_brands()}
+
+
+@app.get("/api/v1/admin/vb/brands/{brand_id}", summary="Admin: Virtual Brand detail")
+def admin_vb_brand_detail(brand_id: UUID, admin: dict = Depends(require_admin)):
+    result = vb.brand_detail(str(brand_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="Brand VB tidak ditemukan.")
+    return {"success": True, "brand": result}
+
+
+@app.patch("/api/v1/admin/vb/brands/{brand_id}/status", summary="Admin: Request Virtual Brand status")
+def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = Depends(require_admin)):
+    requested = req.status.strip().upper()
+    if requested not in {"ON", "PAUSED"}:
+        raise HTTPException(status_code=422, detail="Status VB harus ON atau PAUSED.")
+    result = vb.request_status(str(brand_id), requested, admin["sub"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Brand VB tidak ditemukan.")
+    return {"success": True, "brand": result, "message": "Perubahan disimpan dan menunggu giliran brand berikutnya."}
+
+
+@app.post("/api/v1/admin/vb/import", summary="Admin: Import Virtual Brand matrix")
+def admin_vb_import(admin: dict = Depends(require_admin)):
+    try:
+        return {"success": True, "summary": vb.import_sheet(admin["sub"])}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Import VB gagal: {exc}") from exc
+
+
 @app.post("/api/v1/admin/generate-link", summary="Admin: Generate Unique User Link")
 def admin_generate_link(req: AdminGenerateLinkRequest, request: Request, admin: dict = Depends(require_admin)):
     base_url = str(request.base_url).rstrip("/")
@@ -374,7 +412,6 @@ def admin_create_outlet(req: AdminCreateOutletRequest, request: Request, admin: 
             merchant_name=req.nama_portal,
             account_username=req.username,
             nama_pemilik=req.nama_pemilik,
-            ownership_type=req.ownership_type,
             paket=req.paket,
             tanggal_mulai_layanan=req.tanggal_mulai_layanan,
             tanggal_berakhir_layanan=req.tanggal_berakhir_layanan,
@@ -455,7 +492,6 @@ def admin_edit_outlet(req: AdminEditOutletRequest, admin: dict = Depends(require
             nama_pemilik=req.nama_pemilik,
             nama_portal=req.nama_portal,
             nama_panjang_outlet=req.nama_panjang_outlet,
-            ownership_type=req.ownership_type,
             paket=req.paket,
             dashboard_password=req.dashboard_password,
             google_email=req.google_email
@@ -772,6 +808,11 @@ def get_logs(
             reason=l["reason"]
         ) for l in logs
     ]
+
+
+@app.get("/api/v1/admin/logs/overview", summary="Admin: Compact logs for regular bot and VB")
+def get_logs_overview(limit: int = Query(default=40, ge=1, le=100), admin: dict = Depends(require_admin)):
+    return state.get_log_overview(limit=limit)
 
 
 import urllib.request

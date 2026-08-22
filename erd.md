@@ -59,7 +59,6 @@ erDiagram
         uuid portal_id FK
         uuid shopee_account_id FK
         varchar store_id UK
-        varchar ownership_type
         varchar long_name
         varchar short_name
         text special_hours
@@ -229,7 +228,7 @@ Mencatat perubahan penting oleh admin, terutama penangguhan, pencabutan penanggu
 | Kolom | Header | Target PostgreSQL |
 |---|---|---|
 | A | Aplikator | Tidak dimigrasikan; semua ShopeeFood |
-| B | Kepemilikan | `outlets.ownership_type` |
+| B | Kepemilikan | Tidak digunakan; pemisahan VB memakai `vb_brand_outlets` |
 | C | Paket | `subscriptions.plan_id` |
 | D | Tanggal Mulai Layanan | `subscriptions.start_date` |
 | E | Tanggal Berakhir Layanan | `subscriptions.end_date` |
