@@ -1,5 +1,16 @@
 # Update
 
+## Latest deployment handoff
+
+- Docker service definition for `bot-vb` was added to `docker-compose.yml`.
+- The service uses the shared `foodmaster-bot-runtime:dev` image and the existing
+  dependency layer; no second dependency installation is required.
+- Server runtime is explicitly `HEADLESS=true`.
+- The change was committed and pushed to `origin/main` as `0c3d5e9`.
+- Docker build/start has not been executed from this development workspace;
+  deployment must be performed by the server AI agent using the instructions
+  below.
+
 ## Virtual Brand Bot
 
 - Added the `main-vb` patrol service with brand-level controls and merchant switching.
