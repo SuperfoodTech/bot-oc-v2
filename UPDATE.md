@@ -1,6 +1,11 @@
 # Update
 
-## Latest update: v1.2.1
+## Latest update: v1.2.2
+
+- Memperbarui cache-busting asset CSS agar style jadwal reguler Shopee terbaru termuat setelah deployment.
+- Detail lengkap tersedia di [update/1.2.2.md](update/1.2.2.md).
+
+## Update v1.2.1
 
 - Menghapus tulisan `Read-only` dari tampilan jadwal reguler Shopee.
 - Detail lengkap tersedia di [update/1.2.1.md](update/1.2.1.md).

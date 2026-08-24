@@ -24,7 +24,7 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.2.1`.
+Latest documented release: `1.2.2`.
 
 Setiap update kode, konfigurasi, atau perilaku aplikasi wajib:
 
