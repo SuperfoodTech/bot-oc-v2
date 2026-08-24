@@ -22,11 +22,21 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 ## Aturan Pencatatan Versi Update (Semantic Versioning)
 
-Setiap generasi kode atau penambahan fitur baru wajib membuat file dokumentasi rilis baru di dalam folder `update/<MAJOR>.<MINOR>.<PATCH>.md` mengikuti standar Semantic Versioning (`MAJOR.MINOR.PATCH`):
-- **MAJOR**: Perubahan arsitektur besar / breaking changes.
-- **MINOR**: Penambahan fitur baru yang kompatibel.
-- **PATCH/FIX**: Perbaikan bug, optimasi handling error, atau patch stabilitas.
-Setiap file update wajib mencantumkan seksi `Whats New`, `Spesifikasi`, dan `Handling`.
+Baseline version project dimulai dari `1.0.0`.
+
+Latest documented release: `1.1.15`.
+
+Setiap update kode, konfigurasi, atau perilaku aplikasi wajib:
+
+1. Membuat atau memperbarui dokumentasi rilis di folder `/update`.
+2. Mencatat aturan atau perubahan penting yang memengaruhi pekerjaan berikutnya di `AGENTS.md`.
+3. Memilih nomor versi berdasarkan jenis perubahan, bukan sekadar menaikkan angka patch secara berurutan:
+   - **MAJOR** (`1.x.x`): breaking changes, perubahan kontrak API, migrasi yang tidak kompatibel, atau perubahan arsitektur besar.
+   - **MINOR** (`x.1.x`): fitur baru yang kompatibel dengan perilaku/API sebelumnya.
+   - **PATCH** (`x.x.1`): bug fix, perbaikan kecil, optimasi handling error, atau patch stabilitas yang tidak mengubah kontrak.
+4. Jika sebuah perubahan termasuk breaking atau feature, jangan menuliskannya sebagai patch hanya karena update sebelumnya memakai nomor patch. Nomor versi harus mencerminkan dampak perubahan.
+
+File update wajib menggunakan format `update/<MAJOR>.<MINOR>.<PATCH>.md` dan mencantumkan seksi `Whats New`, `Spesifikasi`, dan `Handling`.
 
 ## Aturan Gaya Penulisan & Komunikasi (Copywriting & Dokumentasi)
 
@@ -37,5 +47,3 @@ Setiap file update wajib mencantumkan seksi `Whats New`, `Spesifikasi`, dan `Han
 2. **Fakta Kode & Relevansi (Strict Project Relevance)**:
    - Dilarang mengarang fitur, membuat asumsi fiktif, atau menuliskan sesuatu yang tidak ada di dalam codebase project ini.
    - Seluruh penjelasan, analisis, dan dokumentasi rilis harus 100% akurat dan benar-benar terverifikasi (*strictly related*) dengan kode yang ada.
-
-

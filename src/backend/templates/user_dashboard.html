@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260819-logo">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260824-outlet-status-unknown">
 </head>
 <body x-data="userApp()">
 
@@ -20,7 +20,10 @@
         <img class="brand-logo brand-logo-mitra" src="/static/Logo_FoodMaster.png" alt="FoodMaster">
       </div>
       <div class="header-actions">
-        <a href="#" class="help-link" onclick="alert('Hubungi Customer Service: 0851-8315-1531'); return false;">Bantuan</a>
+        <a href="https://wa.me/6285183151531" class="help-link customer-service-link" target="_blank" rel="noopener noreferrer" aria-label="Hubungi customer service via WhatsApp" title="Customer Service via WhatsApp">
+          <span>Butuh bantuan?</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 0 2 2h1v-5H6a2 2 0 0 0-2 2Zm16 0a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2Z"></path><path d="M17 15v1a3 3 0 0 1-3 3h-1"></path><circle cx="12" cy="5" r="2"></circle></svg>
+        </a>
       </div>
     </header>
 
@@ -94,6 +97,18 @@
   </div>
 
   <div id="userToast" class="user-toast" role="status" aria-live="polite" hidden></div>
+
+  <div class="modal-overlay" id="resumeConfirmModal" aria-hidden="true">
+    <div class="modal-card confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="resumeConfirmTitle">
+      <div class="step-indicator">Buka outlet</div>
+      <h3 class="card-title" id="resumeConfirmTitle">Buka outlet sekarang?</h3>
+      <p class="card-subtitle">Outlet akan dibuka kembali dan dapat menerima pesanan.</p>
+      <div class="form-actions">
+        <button type="button" class="btn-outline" onclick="closeResumeConfirm()">Batal</button>
+        <button type="button" class="btn-danger confirm-continue-btn" onclick="confirmResume()">Lanjut</button>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-overlay" id="pauseModal">
     <div class="modal-card pause-modal-card">
@@ -176,8 +191,8 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn-primary" onclick="confirmPause()">Simpan</button>
         <button class="btn-outline" onclick="closeModal()">Batal</button>
+        <button class="btn-primary" onclick="confirmPause()">Simpan</button>
       </div>
     </div>
   </div>
@@ -186,6 +201,7 @@
   <script>
     let activePasscode = "";
     let currentUserOutlets = [];
+    let currentUserOwner = '';
     let selectedStoreId = null;
     let pickerDate = null;
     let pickerMonth = null;
@@ -224,7 +240,17 @@
       // Keep the remaining pause time current without changing Shopee's schedule.
       setInterval(() => {
         if (currentUserOutlets.length && document.getElementById('dashboardSection').style.display !== 'none') {
-          renderOutlets(currentUserOutlets);
+          const hasExpiredPause = currentUserOutlets.some(out => {
+            if (out.vercel_status !== 'OFF' || !out.pause_until) return false;
+            const end = getPauseEndDate(out.pause_until);
+            return end && end.getTime() <= Date.now();
+          });
+          if (hasExpiredPause) {
+            doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
+          } else {
+            renderOutlets(currentUserOutlets);
+            fetchHistory();
+          }
         }
       }, 60000);
 
@@ -301,6 +327,7 @@
         const data = await res.json();
         if (data.success) {
           activePasscode = passcode;
+          currentUserOwner = data.nama_pemilik || '';
           sessionStorage.setItem(userSessionKey, passcode);
           currentUserOutlets = data.outlets;
           if (window._appData) {
@@ -356,6 +383,8 @@
         if (!str.includes('T') && str.includes(' ')) {
           str = str.replace(' ', 'T');
         }
+        // PostgreSQL may return a short offset such as +00; normalize it first.
+        str = str.replace(/([+-]\d{2})$/, '$1:00');
         if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += '+07:00';
         let d = new Date(str);
         if (isNaN(d.getTime())) return isoStr;
@@ -384,6 +413,7 @@
     function getPauseEndDate(value) {
       if (!value) return null;
       let str = String(value).trim().replace(' ', 'T');
+      str = str.replace(/([+-]\d{2})$/, '$1:00');
       if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += '+07:00';
       const date = new Date(str);
       return Number.isNaN(date.getTime()) ? null : date;
@@ -393,13 +423,38 @@
       const end = getPauseEndDate(value);
       if (!end) return '';
       const remainingMinutes = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 60000));
-      if (remainingMinutes === 0) return 'Waktu pause selesai · menuju ON';
+      if (remainingMinutes === 0) return 'Selesai';
       const hours = Math.floor(remainingMinutes / 60);
       const minutes = remainingMinutes % 60;
       const parts = [];
       if (hours) parts.push(`${hours} jam`);
       if (minutes || !hours) parts.push(`${minutes} menit`);
-      return `Tersisa ${parts.join(' ')} · menuju ON ${formatIndonesianTime(value, false)}`;
+      return `Tersisa ${parts.join(' ')}`;
+    }
+
+    function formatPauseOpenTime(value) {
+      const end = getPauseEndDate(value);
+      if (!end) return 'Buka -';
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false
+      }).formatToParts(end).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      return `Buka ${parts.hour}:${parts.minute} WIB`;
+    }
+
+    function getShopeeStatusPresentation(value) {
+      const normalized = String(value || '').trim().toUpperCase();
+      const isLocalEnvironment = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+      // Dummy fallback is strictly local-only for older/mock outlet responses.
+      const status = ['ON', 'OPEN', 'PAUSE', 'CLOSED'].includes(normalized)
+        ? normalized
+        : (isLocalEnvironment ? 'OPEN' : 'UNKNOWN');
+      if (status === 'ON' || status === 'OPEN') {
+        return { label: 'Shopee: Buka', className: 'outlet-shopee-status is-open', value: status };
+      }
+      if (status === 'PAUSE' || status === 'CLOSED') {
+        return { label: 'Shopee: Tutup sementara', className: 'outlet-shopee-status is-closed', value: status };
+      }
+      return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status };
     }
 
     function renderOutlets(outlets) {
@@ -409,6 +464,7 @@
       outlets.forEach(out => {
         const isVercelOn = out.vercel_status === 'ON';
         const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
+        const shopeeStatus = getShopeeStatusPresentation(out.shopee_status);
         
         const card = document.createElement('div');
         card.className = 'card-box';
@@ -416,7 +472,10 @@
           <div class="outlet-head">
             <div>
               <div class="step-indicator">${out.merchant_name}</div>
-              <h3 class="card-title">${out.store_name}</h3>
+              <div class="outlet-name-row">
+                <h3 class="card-title">${out.store_name}</h3>
+                <span class="${shopeeStatus.className}" title="Status terakhir dari XHR Shopee: ${shopeeStatus.value}">${shopeeStatus.label}</span>
+              </div>
               <p class="card-subtitle">ID ${out.store_id}</p>
             </div>
           </div>
@@ -429,9 +488,12 @@
 
           <div class="outlet-control">
             <div>
-              <div class="control-title">Buka otomatis</div>
+              <div class="control-title-row">
+                <div class="control-title">Buka otomatis</div>
+              </div>
+              ${!isVercelOn && out.pause_until ? `<div class="pause-info-row"><span class="pause-open-pill">${formatPauseOpenTime(out.pause_until)}</span><span class="pause-remaining-pill">${formatRemainingPause(out.pause_until)}</span></div>` : ''}
               <div class="control-detail">
-                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isVercelOn ? 'Otomatisasi aktif (24/7)' : (out.pause_until ? formatRemainingPause(out.pause_until) : 'Dijeda (sampai dibuka manual)'))}
+                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isVercelOn ? 'Otomatisasi aktif (24/7)' : (out.pause_until ? '' : 'Dijeda (sampai dibuka manual)'))}
               </div>
             </div>
             <label class="switch-toggle" ${isSuspended ? 'style="opacity: 0.5; cursor: not-allowed;"' : ''}>
@@ -449,11 +511,20 @@
 
     function showUserToast(message, type = 'success') {
       const toast = document.getElementById('userToast');
-      toast.textContent = message;
+      const icon = type === 'error'
+        ? '<span class="toast-icon toast-icon-error" aria-hidden="true">!</span>'
+        : '<span class="toast-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg></span>';
+      toast.innerHTML = `${icon}<span>${message}</span>`;
       toast.className = 'user-toast' + (type === 'error' ? ' is-error' : '');
       toast.hidden = false;
       clearTimeout(userToastTimer);
-      userToastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
+      userToastTimer = setTimeout(() => {
+        toast.classList.add('is-hiding');
+        userToastTimer = setTimeout(() => {
+          toast.hidden = true;
+          toast.classList.remove('is-hiding');
+        }, 220);
+      }, 2600);
     }
 
     function toggleVercel(storeId, isChecked) {
@@ -466,8 +537,33 @@
       if (!isChecked) {
         openPauseModal(storeId, store ? store.store_name : storeId);
       } else {
-        resumeStore(storeId);
+        openResumeConfirm(storeId, store ? store.store_name : storeId);
       }
+    }
+
+    let resumeStoreId = null;
+
+    function openResumeConfirm(storeId, storeName) {
+      resumeStoreId = storeId;
+      document.getElementById('resumeConfirmTitle').textContent = `Buka ${storeName}?`;
+      const modal = document.getElementById('resumeConfirmModal');
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeResumeConfirm() {
+      resumeStoreId = null;
+      const modal = document.getElementById('resumeConfirmModal');
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+      renderOutlets(currentUserOutlets);
+    }
+
+    function confirmResume() {
+      if (!resumeStoreId) return;
+      const storeId = resumeStoreId;
+      closeResumeConfirm();
+      resumeStore(storeId);
     }
 
     function openPauseModal(storeId, storeName) {
@@ -616,6 +712,14 @@
       return document.getElementById('customUntilInput').value;
     }
 
+    function getPauseDurationLabel() {
+      const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
+      if (durationType === '30_min') return '30 menit';
+      if (durationType === '60_min') return '60 menit';
+      if (durationType === 'rest_of_day') return 'sampai akhir hari';
+      return 'sesuai waktu yang dipilih';
+    }
+
     function updatePauseEndPreview() {
       const preview = document.getElementById('pauseEndPreview');
       if (!preview) return;
@@ -671,8 +775,11 @@
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          const durationLabel = getPauseDurationLabel();
           closeModal();
-          doLogin();
+          showUserToast(`Outlet ditutup sementara selama ${durationLabel}.`);
+          // Refresh the outlet data without losing the current mitra session.
+          doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {
           showUserToast(data.detail || 'Gagal menutup outlet.', 'error');
           closeModal();
@@ -688,7 +795,9 @@
         const res = await fetch(`/api/v1/user/resume?store_id=${storeId}`, {method: 'POST'});
         const data = await res.json();
         if (res.ok && data.success) {
-          doLogin();
+          showUserToast('Outlet berhasil dibuka.');
+          // Refresh the outlet data without sending the user back to login.
+          doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {
           showUserToast(data.detail || 'Gagal membuka outlet.', 'error');
           renderOutlets(currentUserOutlets);
@@ -707,8 +816,8 @@
         'USER_RESUME_STORE': 'Toko Dibuka Kembali',
         'ADMIN_SUSPEND_UPDATE': 'Update Penangguhan Admin',
         'ADMIN_RENEW_SUBSCRIPTION': 'Perpanjangan Layanan',
-        'ACTION_OPEN': 'Buka Otomatis (Bot)',
-        'ACTION_CLOSE': 'Tutup Otomatis (Bot)'
+        'ACTION_OPEN': 'Buka Otomatis',
+        'ACTION_CLOSE': 'Tutup Otomatis'
       };
 
       try {
@@ -717,12 +826,21 @@
         const container = document.getElementById('historyLogs');
         container.innerHTML = '';
 
-        if (data.logs && data.logs.length) {
-          data.logs.slice(0, 5).forEach(l => {
+        let logs = Array.isArray(data.logs) ? data.logs : [];
+        const isLocalYolo = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+          && currentUserOwner.trim().toLowerCase() === 'yolo';
+        if (isLocalYolo) {
+          logs = [...createLocalBotDemoLogs(), ...logs];
+        }
+
+        if (logs.length) {
+          logs.slice(0, 5).forEach(l => {
             const friendlyAction = ACTION_LABELS[l.action] || l.action;
             const timeText = formatIndonesianTime(l.timestamp, false);
+            const isBotAction = ['ACTION_OPEN', 'ACTION_CLOSE'].includes(l.action);
 
             let friendlyReason = l.reason || '';
+            let botDetailHtml = '';
             if (friendlyReason.includes('User set store OFF with duration:')) {
               const match = friendlyReason.match(/duration:\s*([^(]+)/);
               const durLabel = match ? match[1].trim() : 'Sementara';
@@ -740,11 +858,20 @@
               friendlyReason = 'Ditangguhkan Admin';
             }
 
+            if (isBotAction) {
+              const isClose = l.action === 'ACTION_CLOSE';
+              const untilMatch = friendlyReason.match(/(?:Until|sampai)\s+([^|)]+)/i);
+              const untilText = untilMatch ? formatIndonesianTime(untilMatch[1].replace(/\s+WIB$/i, ''), false) : '';
+              botDetailHtml = isClose
+                ? `<span class="bot-action-time-pill">${timeText}</span><span class="bot-action-info-pill">Ditutup oleh bot${untilText ? ` sampai ${untilText}` : ' sesuai jadwal'}</span>`
+                : `<span class="bot-action-time-pill">${timeText}</span>`;
+            }
+
             const item = document.createElement('div');
             item.className = 'history-item';
             item.innerHTML = `
-              <strong>${friendlyAction} · ${l.store_name}</strong>
-              <span>${timeText} · ${friendlyReason}</span>
+              <strong>${isBotAction ? '<span class="bot-history-pill">Bot</span> ' : ''}${friendlyAction} · ${l.store_name}</strong>
+              ${isBotAction ? `<div class="bot-history-details">${botDetailHtml}</div>` : `<span>${timeText} · ${friendlyReason}</span>`}
             `;
             container.appendChild(item);
           });
@@ -752,6 +879,20 @@
           container.innerHTML = '<div class="history-item"><span>Belum ada aktivitas.</span></div>';
         }
       } catch (err) {}
+    }
+
+    function createLocalBotDemoLogs() {
+      const outlet = currentUserOutlets[0];
+      if (!outlet) return [];
+      const closeAt = new Date(Date.now() - 30 * 60000);
+      const openAt = new Date(Date.now() - 5 * 60000);
+      const until = new Date(closeAt.getTime() + 30 * 60000);
+      const timestamp = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:00 WIB`;
+      const untilText = `${until.getFullYear()}-${String(until.getMonth() + 1).padStart(2, '0')}-${String(until.getDate()).padStart(2, '0')} ${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}:00 WIB`;
+      return [
+        { action: 'ACTION_OPEN', store_name: outlet.store_name, timestamp: timestamp(openAt), reason: 'Shopee Action: SUCCESS' },
+        { action: 'ACTION_CLOSE', store_name: outlet.store_name, timestamp: timestamp(closeAt), reason: `Bot ditutup sampai ${untilText}` }
+      ];
     }
   </script>
 </body>

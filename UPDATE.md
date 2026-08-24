@@ -1,6 +1,103 @@
 # Update
 
-## Latest update: v0.3.5
+## Latest update: v1.1.15
+
+- Mengubah label `Aktif` pada kartu akun mitra menjadi merah solid dengan foreground putih.
+- Detail lengkap tersedia di [update/1.1.15.md](update/1.1.15.md).
+
+## Update v1.1.14
+
+- Menambahkan tulisan `Butuh bantuan?` di sebelah ikon customer service.
+- Teks dan ikon tetap menjadi satu link menuju WhatsApp admin.
+- Detail lengkap tersedia di [update/1.1.14.md](update/1.1.14.md).
+
+## Update v1.1.13
+
+- Mengganti visual ikon WhatsApp menjadi ikon customer service/headset.
+- Tujuan klik tetap menuju WhatsApp admin melalui `wa.me`.
+- Detail lengkap tersedia di [update/1.1.13.md](update/1.1.13.md).
+
+## Update v1.1.12
+
+- Mengganti tombol teks Bantuan menjadi ikon customer service.
+- Ikon mengarahkan mitra ke WhatsApp admin melalui `wa.me`.
+- Detail lengkap tersedia di [update/1.1.12.md](update/1.1.12.md).
+
+## Update v1.1.11
+
+- Menempatkan pill waktu buka sejajar dengan pill remaining time di bawah judul `Buka otomatis`.
+- Detail lengkap tersedia di [update/1.1.11.md](update/1.1.11.md).
+
+## Update v1.1.10
+
+- Mengubah background pill informasi `Ditutup oleh bot sampai ...` menjadi merah solid dengan foreground putih.
+- Detail lengkap tersedia di [update/1.1.10.md](update/1.1.10.md).
+
+## Update v1.1.9
+
+- Merapikan label log bot dengan menghapus redundansi teks `(Bot)` karena sudah diwakili pill `Bot`.
+- Menyesuaikan jarak antara baris action dan label waktu agar lebih proporsional.
+- Detail lengkap tersedia di [update/1.1.9.md](update/1.1.9.md).
+
+## Update v1.1.8
+
+- Memperbaiki pill `Bot` agar berukuran sesuai isi dan tidak melebar memenuhi baris.
+- Menampilkan waktu action bot dengan pill kuning dan informasi penutupan sampai waktu tertentu dengan pill hijau.
+- Menghapus teks redundan `Dibuka oleh bot` pada action open.
+- Detail lengkap tersedia di [update/1.1.8.md](update/1.1.8.md).
+
+## Update v1.1.7
+
+- Menampilkan action bot `open` dan `close` pada log mitra dengan pill biru.
+- Menambahkan dummy log action bot khusus owner `Yolo` di local tanpa menyalakan bot.
+- Log close menampilkan waktu aksi dan waktu target buka; log open menampilkan waktu pembukaan.
+- Detail lengkap tersedia di [update/1.1.7.md](update/1.1.7.md).
+
+## Update v1.1.6
+
+- Menambahkan animasi keluar toast berupa fade-out sambil bergerak ke atas sebelum toast disembunyikan.
+- Detail lengkap tersedia di [update/1.1.6.md](update/1.1.6.md).
+
+## Update v1.1.5
+
+- Menambahkan toast sukses di atas-tengah dengan warna hijau solid dan animasi ceklis untuk aksi pause/open.
+- Menambahkan modal konfirmasi saat membuka outlet dengan tombol `Batal` dan `Lanjut`.
+- Menukar urutan tombol modal pause menjadi `Batal` di kiri dan `Simpan` di kanan.
+- Detail lengkap tersedia di [update/1.1.5.md](update/1.1.5.md).
+
+## Update v1.1.4
+
+- Membatasi fallback status dummy hanya pada environment local (`localhost`, `127.0.0.1`, atau `::1`).
+- Server menampilkan `Shopee: Status belum tersedia` ketika status XHR belum tersedia dan tidak menerima nilai dummy.
+- Detail lengkap tersedia di [update/1.1.4.md](update/1.1.4.md).
+
+## Update v1.1.3
+
+- Menampilkan status Shopee terakhir yang diterima dari fetch XHR pada label di samping nama outlet.
+- Menormalkan status `ON`/`OPEN` menjadi `Shopee: Buka` dan `PAUSE`/`CLOSED` menjadi `Shopee: Tutup sementara`.
+- Memastikan label waktu buka hanya menampilkan `HH:MM WIB`.
+- Detail lengkap tersedia di [update/1.1.3.md](update/1.1.3.md).
+
+## Update v1.1.2
+
+- Memperbaiki parsing offset timestamp PostgreSQL seperti `+00`.
+- Menampilkan waktu buka hanya `HH:MM WIB` dan remaining time pada pill hijau.
+- Detail lengkap tersedia di [update/1.1.2.md](update/1.1.2.md).
+
+## Update v1.1.1
+
+- Menyinkronkan toggle internal menjadi ON setelah pause terjadwal Shopee selesai.
+- Dashboard memuat ulang status setelah countdown berakhir tanpa menyalakan bot.
+- Detail lengkap tersedia di [update/1.1.1.md](update/1.1.1.md).
+
+## Update v1.1.0
+
+- Menambahkan pill kuning berisi waktu buka exact dan pill hijau berisi
+  remaining time pada card outlet mitra.
+- Kedua pill menggunakan foreground putih dan rounded 50%.
+- Detail lengkap tersedia di [update/1.1.0.md](update/1.1.0.md).
+
+## Update v1.0.0
 
 - Memperbaiki penerusan durasi pause dashboard ke payload Shopee melalui
   `pause_end_time` Unix timestamp milidetik.
@@ -8,7 +105,7 @@
 - Menyeragamkan timezone tampilan dan log ke WIB/GMT+7 tanpa fractional seconds
   atau microseconds.
 - Memperbesar dan mempertebal teks status serta log agar lebih mudah dibaca.
-- Detail lengkap tersedia di [update/0.3.5.md](update/0.3.5.md).
+- Detail lengkap tersedia di [update/1.0.0.md](update/1.0.0.md).
 
 ## Latest deployment handoff
 

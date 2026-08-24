@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -565,6 +566,7 @@ def user_login(req: UserLoginRequest):
         raise HTTPException(status_code=401, detail="Link atau passcode mitra tidak valid.")
 
     pemilik = user_info.get("nama_pemilik", "Fando")
+    state.sync_expired_user_pauses()
     outlets = state.user_get_outlets(pemilik)
 
     return {
@@ -578,6 +580,7 @@ def user_login(req: UserLoginRequest):
 
 @app.get("/api/v1/user/outlets", summary="User Link: Get Outlets for Authenticated User")
 def user_get_outlets(nama_pemilik: str = Query(..., description="Nama Pemilik / Mitra")):
+    state.sync_expired_user_pauses()
     outlets = state.user_get_outlets(nama_pemilik)
     return {"success": True, "nama_pemilik": nama_pemilik, "total_outlets": len(outlets), "outlets": outlets}
 
@@ -593,7 +596,8 @@ def user_pause_store(req: UserPauseRequest):
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
     dtype = req.duration_type.lower()
-    now_dt = datetime.now()
+    wib = ZoneInfo("Asia/Jakarta")
+    now_dt = datetime.now(wib)
 
     if dtype in ("30", "30_min", "30min"):
         duration_mins = 30
@@ -612,7 +616,9 @@ def user_pause_store(req: UserPauseRequest):
             try:
                 pause_until_dt = datetime.fromisoformat(req.custom_until.replace("Z", "+00:00"))
                 if pause_until_dt.tzinfo is not None:
-                    pause_until_dt = pause_until_dt.astimezone().replace(tzinfo=None)
+                    pause_until_dt = pause_until_dt.astimezone(wib)
+                else:
+                    pause_until_dt = pause_until_dt.replace(tzinfo=wib)
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail="Target waktu penutupan tidak valid.") from exc
             duration_mins = int((pause_until_dt - now_dt).total_seconds() // 60)
@@ -632,14 +638,18 @@ def user_pause_store(req: UserPauseRequest):
     if dtype not in ("custom", "waktu_lain"):
         pause_until_dt = now_dt + timedelta(minutes=duration_mins)
     pause_until_str = pause_until_dt.strftime("%Y-%m-%d %H:%M:%S")
+    pause_start_time_ms = int(now_dt.timestamp() * 1000)
+    pause_end_time_ms = int(pause_until_dt.timestamp() * 1000)
 
-    state.update_vercel_toggle(req.store_id, "OFF", pause_until_str)
+    # Keep the database value timezone-aware. Passing a naive string to a
+    # timestamptz column makes PostgreSQL interpret WIB as UTC (+7 hours).
+    state.update_vercel_toggle(req.store_id, "OFF", pause_until_dt)
     state.record_log(
         store_id=req.store_id,
         store_name=store["store_name"],
         action="USER_PAUSE_STORE",
         target_state="CLOSED",
-        reason=f"User set store OFF with duration: {label} (Until {pause_until_str} WIB)"
+        reason=f"User set store OFF with duration: {label} (Until {pause_until_str} WIB); pause_start_time_ms={pause_start_time_ms}; pause_end_time_ms={pause_end_time_ms}"
     )
 
     return {
@@ -648,6 +658,9 @@ def user_pause_store(req: UserPauseRequest):
         "vercel_status": "OFF",
         "duration_label": label,
         "pause_until": pause_until_str,
+        "pause_start_time": pause_start_time_ms,
+        "pause_end_time": pause_end_time_ms,
+        "timezone": "Asia/Jakarta (GMT+7)",
         "message": f"Store {req.store_id} paused for {label}."
     }
 
@@ -754,8 +767,8 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
     pause_until = None
     if req.status.upper() == "OFF" and req.pause_duration_minutes:
-        pause_dt = datetime.now() + timedelta(minutes=req.pause_duration_minutes)
-        pause_until = pause_dt.strftime("%Y-%m-%d %H:%M:%S")
+        pause_dt = datetime.now(ZoneInfo("Asia/Jakarta")) + timedelta(minutes=req.pause_duration_minutes)
+        pause_until = pause_dt
     state.update_vercel_toggle(req.store_id, req.status, pause_until)
     updated = state.get_store_by_id(req.store_id)
     return {

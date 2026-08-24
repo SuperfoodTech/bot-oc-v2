@@ -6,6 +6,7 @@ import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from zoneinfo import ZoneInfo
 
 import psycopg
 from psycopg.rows import dict_row
@@ -258,6 +259,24 @@ def admin_get_all_users_with_stores():
     return list(grouped.values())
 def user_get_outlets(nama_pemilik): return [_public_store(row) for row in _store_query("m.name=%s", (nama_pemilik,))]
 
+def sync_expired_user_pauses():
+    """Mark completed user pauses ON after Shopee's scheduled auto-open."""
+    with get_db_connection() as conn:
+        conn.execute("""
+            UPDATE outlet_states os
+               SET vercel_status='ON', pause_until=NULL, updated_at=now()
+             WHERE os.vercel_status='OFF'
+               AND os.pause_until IS NOT NULL
+               AND os.pause_until <= now()
+               AND os.suspension_status='ACTIVE'
+               AND NOT EXISTS (
+                   SELECT 1 FROM subscriptions sx
+                    WHERE sx.outlet_id=os.outlet_id
+                      AND sx.end_date<CURRENT_DATE
+                      AND sx.status<>'CANCELLED'
+               )
+        """)
+
 def admin_generate_user_link(nama_pemilik, passcode=None, base_url=None):
     with get_db_connection() as conn:
         merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()
@@ -350,6 +369,10 @@ def admin_create_account(username, password, google_email=None):
         row = conn.execute("INSERT INTO dashboard_accounts (username,password_plain,role,is_active,google_email) VALUES (%s,%s,'ADMIN',true,%s) RETURNING id,username,role,is_active,google_email", (username, password, email_clean)).fetchone()
     return dict(row)
 def update_vercel_toggle(store_id, status, pause_until=None):
+    if isinstance(pause_until, str) and pause_until.strip():
+        pause_until = datetime.fromisoformat(pause_until.replace("Z", "+00:00"))
+        if pause_until.tzinfo is None:
+            pause_until = pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
     with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_until, store_id))
 def admin_set_suspension(store_id, penangguhan, alasan=""):
     suspended = penangguhan.lower() == "ya"
