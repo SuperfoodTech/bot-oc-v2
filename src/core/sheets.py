@@ -60,6 +60,7 @@ class MerchantOutlet:
     tgl_berakhir_penangguhan: str = ""
     # Stored local end time for a user-requested temporary pause.
     pause_until: str = ""
+    shopee_regular_hours: dict = field(default_factory=dict)
     hp: str = ""
 
 

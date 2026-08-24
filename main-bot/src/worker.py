@@ -49,6 +49,21 @@ def _pause_end_time_ms(outlet: MerchantOutlet):
         return None
 
 
+def _normalize_shopee_regular_hours(payload: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Convert Shopee regular-hours relative seconds into read-only WIB ranges."""
+    day_names = {1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu", 7: "Minggu"}
+    normalized = {name: [] for name in day_names.values()}
+    for day in payload.get("regular_hours", []) if isinstance(payload, dict) else []:
+        name = day_names.get(int(day.get("weekday", 0)))
+        if not name or not day.get("config_enabled"):
+            continue
+        for interval in day.get("intervals", []):
+            start = max(0, int(interval.get("start_relative_sec", 0)))
+            end = max(0, int(interval.get("end_relative_sec", 0)))
+            if end <= start:
+                continue
+            normalized[name].append(f"{start // 3600:02d}:{(start % 3600) // 60:02d}-{end // 3600:02d}:{(end % 3600) // 60:02d}")
+    return normalized
 def warmup_all_account_sessions():
     """
     On service startup, iterates over registered merchant accounts and ensures
@@ -296,6 +311,18 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                 log.info(f"  ✅ [BUSINESS HOURS CONFIRMED] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) TERDETEKSI & TER-LOAD SEMPURNA di menu Business Hours!")
             else:
                 log.warning(f"  ⚠️ [BUSINESS HOURS WARNING] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) BELUM TERDETEKSI SEMPURNA di menu Business Hours!")
+
+            # Pull Shopee's latest regular schedule through the same authenticated
+            # browser XHR used by live status checks. This is read-only and is
+            # stored separately from the decision-engine operating_hours.
+            try:
+                shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
+                if shopee_hours:
+                    normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
+                    db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                    log.info(f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan ({sum(bool(v) for v in normalized_hours.values())} hari aktif).")
+            except Exception as hours_err:
+                log.warning(f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menyimpan jadwal Shopee Store {outlet.store_id}: {hours_err}")
 
             # Single Essential Endpoint: Fetch Realtime Live Store Status via /api/seller/store
             try:

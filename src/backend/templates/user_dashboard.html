@@ -151,7 +151,7 @@
         
         <div id="customDurationBox" style="display: none; margin-top: 6px;">
           <div class="custom-datetime-fields">
-            <label>Mulai<input type="text" id="customStartInput" class="form-input" readonly></label>
+            <label>Mulai<input type="text" id="customStartInput" class="form-input" readonly disabled aria-disabled="true"></label>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
             <label>Target berakhir
               <div class="custom-picker-anchor">
@@ -205,6 +205,19 @@
     let selectedStoreId = null;
     let pickerDate = null;
     let pickerMonth = null;
+    const expandedScheduleStores = new Set();
+    const localRegularHoursDummy = {
+      code: 0,
+      msg: 'success',
+      data: {
+        store_id: '21897166',
+        regular_hours: [1, 2, 3, 4, 5, 6, 7].map(weekday => ({
+          weekday,
+          config_enabled: 0,
+          intervals: [1, 2, 3].map(() => ({start_relative_sec: 0, end_relative_sec: 0}))
+        }))
+      }
+    };
     const currentSlug = window.location.pathname.match(/^\/mitra\/([^/]+)/)?.[1] || '';
     const userSessionKey = currentSlug ? `user_passcode:${currentSlug}` : 'user_passcode:legacy';
 
@@ -441,6 +454,14 @@
       return `Buka ${parts.hour}:${parts.minute} WIB`;
     }
 
+    function formatPauseTargetDate(date) {
+      const parts = new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} WIB`;
+    }
+
     function getShopeeStatusPresentation(value) {
       const normalized = String(value || '').trim().toUpperCase();
       const isLocalEnvironment = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
@@ -457,6 +478,45 @@
       return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status };
     }
 
+    function getOutletSchedule(outlet) {
+      const isLocalYolo = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+        && currentUserOwner.trim().toLowerCase() === 'yolo';
+      if (isLocalYolo) return localRegularHoursDummy.data.regular_hours;
+      return outlet.shopee_regular_hours || {};
+    }
+
+    function normalizeOutletSchedule(schedule) {
+      const names = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const result = {};
+      names.forEach(name => { result[name] = []; });
+      if (Array.isArray(schedule)) {
+        schedule.forEach(day => {
+          const name = names[Number(day.weekday) % 7] || names[Number(day.weekday)];
+          if (!name || !day.config_enabled) return;
+          (day.intervals || []).forEach(interval => {
+            const start = Number(interval.start_relative_sec || 0);
+            const end = Number(interval.end_relative_sec || 0);
+            if (end > start) result[name].push(`${String(Math.floor(start / 3600)).padStart(2, '0')}:${String(Math.floor((start % 3600) / 60)).padStart(2, '0')}-${String(Math.floor(end / 3600)).padStart(2, '0')}:${String(Math.floor((end % 3600) / 60)).padStart(2, '0')}`);
+          });
+        });
+      } else if (schedule && typeof schedule === 'object') {
+        names.forEach(name => { result[name] = Array.isArray(schedule[name]) ? schedule[name] : (schedule[name] ? [schedule[name]] : []); });
+      }
+      return result;
+    }
+
+    function renderOutletSchedule(outlet) {
+      const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
+      const names = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+      return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal reguler Shopee</div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].join(' · ') + ' WIB' : 'Tutup'}</span></div>`).join('')}</div>`;
+    }
+
+    function toggleOutletSchedule(storeId) {
+      if (expandedScheduleStores.has(storeId)) expandedScheduleStores.delete(storeId);
+      else expandedScheduleStores.add(storeId);
+      renderOutlets(currentUserOutlets);
+    }
+
     function renderOutlets(outlets) {
       const container = document.getElementById('outletsList');
       container.innerHTML = '';
@@ -465,6 +525,7 @@
         const isVercelOn = out.vercel_status === 'ON';
         const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
         const shopeeStatus = getShopeeStatusPresentation(out.shopee_status);
+        const isScheduleExpanded = expandedScheduleStores.has(out.store_id);
         
         const card = document.createElement('div');
         card.className = 'card-box';
@@ -476,7 +537,7 @@
                 <h3 class="card-title">${out.store_name}</h3>
                 <span class="${shopeeStatus.className}" title="Status terakhir dari XHR Shopee: ${shopeeStatus.value}">${shopeeStatus.label}</span>
               </div>
-              <p class="card-subtitle">ID ${out.store_id}</p>
+              <p class="card-subtitle outlet-id">ID ${out.store_id}</p>
             </div>
           </div>
 
@@ -501,6 +562,12 @@
               <span class="slider"></span>
             </label>
           </div>
+
+          <button type="button" class="schedule-toggle" onclick="toggleOutletSchedule('${out.store_id}')" aria-expanded="${isScheduleExpanded ? 'true' : 'false'}">
+            <span>${isScheduleExpanded ? 'Sembunyikan jadwal' : 'Lihat jadwal Shopee'}</span>
+            <svg class="schedule-arrow ${isScheduleExpanded ? 'is-expanded' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+          ${isScheduleExpanded ? renderOutletSchedule(out) : ''}
 
         `;
         container.appendChild(card);
@@ -616,6 +683,13 @@
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 
+    function getPauseMaxDate() {
+      const now = new Date();
+      const targetMonth = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+      const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+      return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), Math.min(now.getDate(), lastDay), 23, 59, 59, 999);
+    }
+
     function renderPickerCalendar() {
       const calendar = document.getElementById('customPickerCalendar');
       const monthLabel = document.getElementById('customPickerMonthLabel');
@@ -626,6 +700,7 @@
       const firstDay = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), 1).getDay();
       const daysInMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 0).getDate();
       const todayKey = pickerDateKey(new Date());
+      const maxDateKey = pickerDateKey(getPauseMaxDate());
       for (let index = 0; index < firstDay; index += 1) {
         calendar.appendChild(document.createElement('span'));
       }
@@ -635,7 +710,8 @@
         button.type = 'button';
         button.textContent = day;
         button.setAttribute('aria-label', `${day} ${monthNames[pickerMonth.getMonth()]} ${pickerMonth.getFullYear()}`);
-        button.disabled = pickerDateKey(date) < todayKey;
+        const dateKey = pickerDateKey(date);
+        button.disabled = dateKey < todayKey || dateKey > maxDateKey;
         if (pickerDateKey(date) === pickerDateKey(pickerDate)) button.classList.add('is-selected');
         if (pickerDateKey(date) === todayKey) button.classList.add('is-today');
         button.onclick = () => selectPickerDay(date);
@@ -678,6 +754,10 @@
       const selected = new Date(pickerDate.getFullYear(), pickerDate.getMonth(), pickerDate.getDate(), hours, minutes);
       if (selected <= new Date()) {
         showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
+        return;
+      }
+      if (pickerDateKey(selected) > pickerDateKey(getPauseMaxDate())) {
+        showUserToast(`Target maksimal ${formatPauseTargetDate(getPauseMaxDate())}.`, 'error');
         return;
       }
       document.getElementById('customUntilInput').value = toDateTimeLocalValue(selected);
@@ -727,13 +807,13 @@
       if (durationType === 'rest_of_day') {
         const end = new Date();
         end.setHours(23, 59, 59, 0);
-        preview.textContent = `Berakhir pada ${formatIndonesianTime(end.toISOString())}`;
+        preview.textContent = `Berakhir pada ${formatPauseTargetDate(end)}`;
         return;
       }
       if (durationType === 'custom') {
         const until = parseCustomUntil();
         preview.textContent = until
-          ? `Berakhir pada ${formatWibDate(until)} ${formatWibTime(until)} WIB`
+          ? `Berakhir pada ${formatPauseTargetDate(until)}`
           : 'Pilih tanggal dan waktu WIB';
         return;
       }
@@ -742,7 +822,7 @@
         preview.textContent = 'Masukkan durasi lebih dari 0 menit';
         return;
       }
-      preview.textContent = `Berakhir pada ${formatIndonesianTime(new Date(Date.now() + minutes * 60000).toISOString())}`;
+      preview.textContent = `Berakhir pada ${formatPauseTargetDate(new Date(Date.now() + minutes * 60000))}`;
     }
 
     function closeModal() {

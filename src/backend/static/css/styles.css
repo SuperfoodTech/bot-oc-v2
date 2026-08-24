@@ -312,10 +312,94 @@ label {
 }
 
 .outlet-head {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+}
+
+.outlet-id {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.schedule-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #be1a1a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-arrow {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #be1a1a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  transition: transform 150ms ease;
+}
+
+.schedule-arrow.is-expanded {
+  transform: rotate(180deg);
+}
+
+.outlet-schedule-panel {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--subtle);
+}
+
+.outlet-schedule-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.outlet-schedule-title span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.outlet-schedule-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.outlet-schedule-row strong {
+  min-width: 70px;
+}
+
+.outlet-schedule-row span {
+  text-align: right;
+  font-weight: 700;
 }
 
 .outlet-name-row {
@@ -323,6 +407,7 @@ label {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  padding-right: 86px;
 }
 
 .outlet-shopee-status {
@@ -749,6 +834,11 @@ input:checked + .slider::before {
   pointer-events: auto;
 }
 
+.modal-overlay:has(.pause-modal-card),
+.modal-overlay:has(.confirm-modal-card) {
+  align-items: center;
+}
+
 .modal-card {
   width: 100%;
   max-width: 440px;
@@ -784,6 +874,14 @@ input:checked + .slider::before {
 
 .custom-datetime-fields input {
   margin-top: 4px;
+}
+
+.custom-datetime-fields input:disabled {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 .custom-picker-anchor {

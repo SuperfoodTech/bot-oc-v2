@@ -1,6 +1,40 @@
 # Update
 
-## Latest update: v1.1.15
+## Latest update: v1.2.1
+
+- Menghapus tulisan `Read-only` dari tampilan jadwal reguler Shopee.
+- Detail lengkap tersedia di [update/1.2.1.md](update/1.2.1.md).
+
+## Update v1.2.0
+
+- Mengambil dan menyimpan jadwal reguler Shopee melalui XHR yang sama dengan fetch status.
+- Menambahkan tampilan jadwal read-only per outlet dengan arrow merah.
+- Local owner `Yolo` memakai data dummy dari `DOCS/reguler-hours-response.json` tanpa menjalankan bot.
+- Detail lengkap tersedia di [update/1.2.0.md](update/1.2.0.md).
+
+## Update v1.1.19
+
+- Membatasi pilihan tanggal pause custom maksimal 6 bulan kalender dari tanggal sekarang sesuai aturan Shopee.
+- Contoh: 24 Agustus 2026 dibatasi sampai 24 Februari 2027.
+- Detail lengkap tersedia di [update/1.1.19.md](update/1.1.19.md).
+
+## Update v1.1.18
+
+- Menambahkan efek disabled pada field `Mulai` ketika memilih `Durasi lain`.
+- Detail lengkap tersedia di [update/1.1.18.md](update/1.1.18.md).
+
+## Update v1.1.17
+
+- Memusatkan modal pause dan modal konfirmasi open secara vertikal di layar.
+- Detail lengkap tersedia di [update/1.1.17.md](update/1.1.17.md).
+
+## Update v1.1.16
+
+- Memindahkan ID/store ID ke pojok kanan atas card outlet.
+- Menambahkan hari dan tanggal lengkap pada preview target pause yang dipilih.
+- Detail lengkap tersedia di [update/1.1.16.md](update/1.1.16.md).
+
+## Update v1.1.15
 
 - Mengubah label `Aktif` pada kartu akun mitra menjadi merah solid dengan foreground putih.
 - Detail lengkap tersedia di [update/1.1.15.md](update/1.1.15.md).
