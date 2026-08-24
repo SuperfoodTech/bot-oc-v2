@@ -1,6 +1,60 @@
 # Update
 
-## Latest update: v1.2.2
+## Latest update: v1.5.0
+
+- `bot-oc` melewati outlet secara diam-diam di luar jadwal operasional tanpa
+  menjalankan aksi atau mengirim report skip.
+- Toggle dashboard mitra tampil OFF dan disabled di luar jadwal, dengan toast
+  merah `Di luar jadwal operasional` saat dicoba.
+- Detail lengkap tersedia di [update/1.5.0.md](update/1.5.0.md).
+
+- `bot-vb` tidak lagi melaporkan outlet yang statusnya sudah sesuai sebagai
+  skip pada log operasional default.
+- Report hanya dibuat untuk kegagalan aksi, switch merchant, driver,
+  exception, atau validasi pasca-aksi.
+- Detail lengkap tersedia di [update/1.4.5.md](update/1.4.5.md).
+
+## Update v1.4.4
+
+- Memastikan foreground seluruh toast Virtual Brand menggunakan warna putih.
+- Detail lengkap tersedia di [update/1.4.4.md](update/1.4.4.md).
+
+## Update v1.4.3
+
+- Mengubah toggle Virtual Brand menjadi merah solid saat aktif.
+- Menyamakan desain toast admin dengan toast dashboard mitra, termasuk posisi, warna solid, ikon, dan animasi keluar.
+- Detail lengkap tersedia di [update/1.4.3.md](update/1.4.3.md).
+
+## Update v1.4.2
+
+- Menghapus background tombol `X` bottom sheet dan menggunakan simbol merah.
+- Meningkatkan visibilitas font mobile admin dengan warna lebih gelap, ukuran lebih besar, dan bobot lebih tebal.
+- Detail lengkap tersedia di [update/1.4.2.md](update/1.4.2.md).
+
+## Update v1.4.1
+
+- Memperbaiki alignment simbol `X` agar tepat berada di tengah tombol close bottom sheet.
+- Detail lengkap tersedia di [update/1.4.1.md](update/1.4.1.md).
+
+## Update v1.4.0
+
+- Menambahkan tombol `Lihat jadwal` pada detail outlet admin desktop.
+- Menambahkan tombol `Lihat jadwal` di samping `Hapus akun` pada card admin mobile.
+- Jadwal mobile tampil sebagai bottom sheet dengan handle tarik dan tombol `X`.
+- Detail lengkap tersedia di [update/1.4.0.md](update/1.4.0.md).
+
+## Update v1.3.0
+
+- Menambahkan tombol `Lihat jadwal` pada detail outlet dashboard admin.
+- Jadwal reguler Shopee ditampilkan per outlet dalam panel informasi.
+- Detail lengkap tersedia di [update/1.3.0.md](update/1.3.0.md).
+
+## Update v1.2.3
+
+- Menggunakan font Nunito khusus pada halaman login admin.
+- Detail lengkap tersedia di [update/1.2.3.md](update/1.2.3.md).
+
+## Update v1.2.2
 
 - Memperbarui cache-busting asset CSS agar style jadwal reguler Shopee terbaru termuat setelah deployment.
 - Detail lengkap tersedia di [update/1.2.2.md](update/1.2.2.md).

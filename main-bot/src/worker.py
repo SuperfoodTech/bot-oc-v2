@@ -22,7 +22,6 @@ from decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_N
 import browser
 import db
 from shopee import store_status
-from core.notifier import send_discord_skipped
 
 log = get_logger("backend_worker")
 
@@ -315,11 +314,17 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             # Pull Shopee's latest regular schedule through the same authenticated
             # browser XHR used by live status checks. This is read-only and is
             # stored separately from the decision-engine operating_hours.
+            # A failed fetch must not reuse a stale schedule from a previous
+            # cycle; the outlet will be silently skipped instead.
+            outlet.regular_hours = {}
             try:
                 shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
                 if shopee_hours:
                     normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
                     db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                    # Apply the freshly fetched Shopee schedule in this same
+                    # cycle; do not wait for the next database reload.
+                    outlet.regular_hours = normalized_hours
                     log.info(f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan ({sum(bool(v) for v in normalized_hours.values())} hari aktif).")
             except Exception as hours_err:
                 log.warning(f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menyimpan jadwal Shopee Store {outlet.store_id}: {hours_err}")
@@ -328,14 +333,18 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             try:
                 live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
                 if live_info and live_info.get("status_str") in ("OPEN", "CLOSED"):
-                    actual_st = "ON" if live_info["status_str"] == "OPEN" else "PAUSE"
+                    actual_st = "ON" if live_info["status_str"] == "OPEN" else "CLOSED"
                     outlet.status_aktual = actual_st
                     db.update_shopee_actual_status(outlet.store_id, actual_st)
             except Exception as st_err:
                 log.debug(f"  ⚠️ Live Shopee status query skipped for Store {outlet.store_id}: {st_err}")
 
             # Evaluate decision engine rules from database-backed state.
-            decision = evaluate_outlet_status(outlet)
+            decision = evaluate_outlet_status(
+                outlet,
+                current_time=datetime.now(ZoneInfo("Asia/Jakarta")),
+                require_regular_schedule=True,
+            )
             shopee_before = (outlet.status_aktual or "UNKNOWN").upper()
             vercel_status = (outlet.status_utama or "OFF").upper()
 
@@ -356,24 +365,16 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     post_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
                     expected_st = "ON" if decision.target_state == "OPEN" else "PAUSE"
                     if post_info and post_info.get("status_str") in ("OPEN", "CLOSED"):
-                        verified_st = "ON" if post_info["status_str"] == "OPEN" else "PAUSE"
+                        verified_st = "ON" if post_info["status_str"] == "OPEN" else "CLOSED"
                         log.info(f"  ✅ [POST-EXECUTION VERIFIED] Status Live Shopee Pasca-{decision.action}: '{verified_st}' (Expected: '{expected_st}').")
                         new_actual_status = verified_st
 
                         if verified_st != expected_st:
                             merchant_name = outlet.nama_portal or outlet.nama_pemilik or "Shopee Merchant"
                             outlet_name = outlet.nama_panjang_outlet or outlet.nama_pendek_outlet or outlet.store_id
-                            log.info(
-                                f"  ℹ️ [POST-EXECUTION MISMATCH - SKIPPED] Status Live Shopee ('{verified_st}') berbeda dari ekspektasi ('{expected_st}'). "
-                                f"Outlet '{outlet_name}' ({merchant_name}) di-SKIP (kemungkinan ada Jadwal Khusus / Libur di Shopee)."
-                            )
-                            send_discord_skipped(
-                                merchant=merchant_name,
-                                outlet=outlet_name,
-                                action=decision.action,
-                                live_status=verified_st,
-                                expected_status=expected_st,
-                                store_id=outlet.store_id
+                            log.debug(
+                                f"  [POST-EXECUTION SKIP] Status Live Shopee ('{verified_st}') berbeda dari ekspektasi ('{expected_st}'). "
+                                f"Outlet '{outlet_name}' ({merchant_name}) tidak dilaporkan karena skip bukan failure."
                             )
                     else:
                         new_actual_status = expected_st

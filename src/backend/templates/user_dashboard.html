@@ -473,7 +473,7 @@
         return { label: 'Shopee: Buka', className: 'outlet-shopee-status is-open', value: status };
       }
       if (status === 'PAUSE' || status === 'CLOSED') {
-        return { label: 'Shopee: Tutup sementara', className: 'outlet-shopee-status is-closed', value: status };
+        return { label: status === 'CLOSED' ? 'Shopee: Tutup' : 'Shopee: Tutup sementara', className: 'outlet-shopee-status is-closed', value: status };
       }
       return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status };
     }
@@ -511,6 +511,29 @@
       return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal reguler Shopee</div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].join(' · ') + ' WIB' : 'Tutup'}</span></div>`).join('')}</div>`;
     }
 
+    function isOutletWithinSchedule(outlet, now = new Date()) {
+      const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
+      const weekday = new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta', weekday: 'long'
+      }).format(now);
+      const intervals = schedule[weekday] || [];
+      if (!intervals.length) return false;
+
+      const timeParts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(now).split(':');
+      const currentMinutes = Number(timeParts[0]) * 60 + Number(timeParts[1]);
+      return intervals.some(range => {
+        const match = String(range).match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
+        if (!match) return false;
+        const start = Number(match[1]) * 60 + Number(match[2]);
+        const end = Number(match[3]) * 60 + Number(match[4]);
+        return start <= end
+          ? currentMinutes >= start && currentMinutes <= end
+          : currentMinutes >= start || currentMinutes <= end;
+      });
+    }
+
     function toggleOutletSchedule(storeId) {
       if (expandedScheduleStores.has(storeId)) expandedScheduleStores.delete(storeId);
       else expandedScheduleStores.add(storeId);
@@ -524,6 +547,9 @@
       outlets.forEach(out => {
         const isVercelOn = out.vercel_status === 'ON';
         const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
+        const isWithinSchedule = isOutletWithinSchedule(out);
+        const isScheduleBlocked = !isWithinSchedule;
+        const effectiveVercelOn = isVercelOn && isWithinSchedule;
         const shopeeStatus = getShopeeStatusPresentation(out.shopee_status);
         const isScheduleExpanded = expandedScheduleStores.has(out.store_id);
         
@@ -554,11 +580,11 @@
               </div>
               ${!isVercelOn && out.pause_until ? `<div class="pause-info-row"><span class="pause-open-pill">${formatPauseOpenTime(out.pause_until)}</span><span class="pause-remaining-pill">${formatRemainingPause(out.pause_until)}</span></div>` : ''}
               <div class="control-detail">
-                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isVercelOn ? 'Otomatisasi aktif (24/7)' : (out.pause_until ? '' : 'Dijeda (sampai dibuka manual)'))}
+                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isScheduleBlocked ? 'Di luar jadwal operasional' : (isVercelOn ? 'Otomatisasi aktif' : (out.pause_until ? '' : 'Dijeda (sampai dibuka manual)')))}
               </div>
             </div>
-            <label class="switch-toggle" ${isSuspended ? 'style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-              <input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isSuspended ? 'disabled' : ''} onchange="toggleVercel('${out.store_id}', this.checked)">
+            <label class="switch-toggle ${isScheduleBlocked ? 'is-schedule-disabled' : ''}" onclick="handleScheduleToggleAttempt(event, '${out.store_id}')">
+              <input type="checkbox" ${effectiveVercelOn ? 'checked' : ''} ${isSuspended || isScheduleBlocked ? 'disabled' : ''} onchange="toggleVercel('${out.store_id}', this.checked)">
               <span class="slider"></span>
             </label>
           </div>
@@ -601,10 +627,23 @@
         renderOutlets(currentUserOutlets);
         return;
       }
+      if (store && !isOutletWithinSchedule(store)) {
+        showUserToast('Di luar jadwal operasional', 'error');
+        renderOutlets(currentUserOutlets);
+        return;
+      }
       if (!isChecked) {
         openPauseModal(storeId, store ? store.store_name : storeId);
       } else {
         openResumeConfirm(storeId, store ? store.store_name : storeId);
+      }
+    }
+
+    function handleScheduleToggleAttempt(event, storeId) {
+      const store = currentUserOutlets.find(s => s.store_id === storeId);
+      if (store && !isOutletWithinSchedule(store)) {
+        event.preventDefault();
+        showUserToast('Di luar jadwal operasional', 'error');
       }
     }
 

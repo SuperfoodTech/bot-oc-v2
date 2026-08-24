@@ -48,10 +48,24 @@ from backend.models import (
     UserLoginRequest,
     UserPauseRequest
 )
+from core.decision import is_within_operating_hours
+from core.sheets import WEEKDAY_MAP
 
 
 class VBStatusRequest(BaseModel):
     status: str
+
+
+def _is_within_shopee_schedule(store: dict, now_dt: datetime) -> bool:
+    """Return whether a store may be manually changed at the current WIB time."""
+    schedule = store.get("shopee_regular_hours")
+    if not isinstance(schedule, dict) or not schedule:
+        return False
+    weekday_name = WEEKDAY_MAP.get(now_dt.weekday(), "Senin")
+    today_hours = schedule.get(weekday_name)
+    if not today_hours:
+        return False
+    return is_within_operating_hours(today_hours, now_dt.time())
 
 
 # Spreadsheet-backed state has no database startup step.
@@ -595,9 +609,12 @@ def user_pause_store(req: UserPauseRequest):
         reason = store.get("alasan_penangguhan") or "Tindakan admin"
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
+    now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+    if not _is_within_shopee_schedule(store, now_dt):
+        raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
+
     dtype = req.duration_type.lower()
     wib = ZoneInfo("Asia/Jakarta")
-    now_dt = datetime.now(wib)
 
     if dtype in ("30", "30_min", "30min"):
         duration_mins = 30
@@ -674,6 +691,10 @@ def user_resume_store(store_id: str = Query(..., description="Target Store ID"))
     if store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED":
         reason = store.get("alasan_penangguhan") or "Tindakan admin"
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
+
+    now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+    if not _is_within_shopee_schedule(store, now_dt):
+        raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
 
     state.update_vercel_toggle(store_id, "ON", None)
     actual_store = state.get_store_by_id(store_id)

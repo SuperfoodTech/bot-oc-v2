@@ -219,6 +219,20 @@
     </div>
   </div>
 
+  <div class="modal-overlay admin-schedule-sheet-overlay" id="adminScheduleSheet" aria-hidden="true">
+    <div class="admin-schedule-sheet" role="dialog" aria-modal="true" aria-labelledby="adminScheduleSheetTitle">
+      <div class="admin-schedule-sheet-handle" aria-hidden="true"></div>
+      <div class="admin-schedule-sheet-header">
+        <div>
+          <div class="step-indicator">Jadwal outlet</div>
+          <h3 class="card-title" id="adminScheduleSheetTitle">Jadwal reguler Shopee</h3>
+        </div>
+        <button type="button" class="admin-schedule-sheet-close" onclick="closeAdminScheduleSheet()" aria-label="Tutup jadwal">×</button>
+      </div>
+      <div id="adminScheduleSheetContent" class="admin-schedule-sheet-content"></div>
+    </div>
+  </div>
+
   <!-- MODAL 5: EDIT DATA OUTLET & MITRA -->
   <div class="modal-overlay" id="editModal">
     <div class="modal-card" style="max-width: 540px;">
@@ -294,7 +308,8 @@
   <!-- TOAST CONTAINER -->
   <div class="toast-container-custom" id="toastContainer">
     <template x-for="t in toasts" :key="t.id">
-      <div class="toast-custom" :class="'toast-' + t.type">
+      <div class="toast-custom" :class="['toast-' + t.type, t.exiting ? 'is-hiding' : '']">
+        <span class="toast-icon" :class="t.type === 'success' ? 'toast-icon-success' : 'toast-icon-alert'" x-text="t.type === 'success' ? '✓' : '!'" aria-hidden="true"></span>
         <span x-text="t.message"></span>
       </div>
     </template>
@@ -327,7 +342,11 @@
         },
         showToast(message, type = 'success') {
           const id = Date.now() + Math.random();
-          this.toasts.push({ id, message, type });
+          this.toasts.push({ id, message, type, exiting: false });
+          setTimeout(() => {
+            const toast = this.toasts.find(item => item.id === id);
+            if (toast) toast.exiting = true;
+          }, 3260);
           setTimeout(() => {
             this.toasts = this.toasts.filter(t => t.id !== id);
           }, 3500);
@@ -381,6 +400,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      setupAdminScheduleSheetDrag();
       showTableSkeleton();
       loadStoresData();
       loadAdminProfile();
@@ -813,8 +833,10 @@
                   <dl class="detail-grid">${getStoreDetailMarkup(s)}</dl>
                   <div class="detail-actions">
                     <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
+                    <button class="btn-outline admin-schedule-button" aria-expanded="false" aria-controls="admin-schedule-${s.store_id}" onclick="toggleAdminSchedule('${s.store_id}', this)">Lihat jadwal</button>
                   </div>
                 </div>
+                <div id="admin-schedule-${s.store_id}" class="admin-schedule-detail" hidden>${getAdminScheduleMarkup(s)}</div>
               </div>
             </div>
           </td>`;
@@ -843,6 +865,7 @@
 
           <div class="mobile-card-actions d-grid gap-2">
             <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
+            <button class="btn-outline admin-mobile-schedule-button" onclick="openAdminScheduleSheet('${s.store_id}')">Lihat jadwal</button>
           </div>
         `;
         mobileList.appendChild(mobileCard);
@@ -869,6 +892,85 @@
           <dd>${detailValue(value)}</dd>
         </div>
       `).join('');
+    }
+
+    function getAdminScheduleData(store) {
+      const isLocalYolo = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+        && (store.nama_pemilik || '').trim().toLowerCase() === 'yolo';
+      if (isLocalYolo && (!store.shopee_regular_hours || !Object.keys(store.shopee_regular_hours).length)) {
+        return { Minggu: [], Senin: [], Selasa: [], Rabu: [], Kamis: [], Jumat: [], Sabtu: [] };
+      }
+      return store.shopee_regular_hours || {};
+    }
+
+    function getAdminScheduleMarkup(store) {
+      const schedule = getAdminScheduleData(store);
+      const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+      return `<div class="admin-schedule-heading"><strong>Jadwal reguler Shopee</strong><span>Informasi outlet</span></div>${days.map(day => {
+        const values = Array.isArray(schedule[day]) ? schedule[day] : (schedule[day] ? [schedule[day]] : []);
+        return `<div class="admin-schedule-row"><strong>${day}</strong><span>${values.length ? values.join(' · ') + ' WIB' : 'Tutup'}</span></div>`;
+      }).join('')}`;
+    }
+
+    function toggleAdminSchedule(storeId, button) {
+      const panel = document.getElementById(`admin-schedule-${storeId}`);
+      if (!panel) return;
+      const expanded = panel.hidden;
+      panel.hidden = !expanded;
+      button.setAttribute('aria-expanded', String(expanded));
+      button.textContent = expanded ? 'Sembunyikan jadwal' : 'Lihat jadwal';
+    }
+
+    function openAdminScheduleSheet(storeId) {
+      const store = allStores.find(item => item.store_id === storeId);
+      if (!store) return;
+      document.getElementById('adminScheduleSheetTitle').textContent = store.store_name || 'Jadwal reguler Shopee';
+      document.getElementById('adminScheduleSheetContent').innerHTML = getAdminScheduleMarkup(store);
+      const overlay = document.getElementById('adminScheduleSheet');
+      overlay.classList.add('active');
+      overlay.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('admin-sheet-open');
+    }
+
+    function closeAdminScheduleSheet() {
+      const overlay = document.getElementById('adminScheduleSheet');
+      overlay.classList.remove('active');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('admin-sheet-open');
+    }
+
+    function setupAdminScheduleSheetDrag() {
+      const sheet = document.querySelector('.admin-schedule-sheet');
+      const handle = document.querySelector('.admin-schedule-sheet-handle');
+      if (!sheet || !handle) return;
+      let startY = 0;
+      let currentY = 0;
+      let dragging = false;
+      handle.addEventListener('pointerdown', event => {
+        dragging = true;
+        startY = event.clientY;
+        currentY = 0;
+        handle.setPointerCapture(event.pointerId);
+        sheet.classList.add('is-dragging');
+      });
+      handle.addEventListener('pointermove', event => {
+        if (!dragging) return;
+        currentY = Math.max(0, event.clientY - startY);
+        sheet.style.transform = `translateY(${currentY}px)`;
+      });
+      handle.addEventListener('pointerup', event => {
+        if (!dragging) return;
+        dragging = false;
+        handle.releasePointerCapture(event.pointerId);
+        sheet.classList.remove('is-dragging');
+        sheet.style.transform = '';
+        if (currentY > 110) closeAdminScheduleSheet();
+      });
+      handle.addEventListener('pointercancel', () => {
+        dragging = false;
+        sheet.classList.remove('is-dragging');
+        sheet.style.transform = '';
+      });
     }
 
     function toggleStoreDetail(storeId, button) {

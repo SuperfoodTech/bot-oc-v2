@@ -103,7 +103,10 @@ def _process_store(session: dict, store: dict, target: str, brand_name: str) -> 
             actual = _read_actual(driver, store["store_id"])
             log.info("  🔎 [VB CHECK] Brand=%s | Merchant=%s | Store ID=%s | Actual=%s | Target=%s | Action=%s | Attempt=%s/%s", brand_name, store.get("portal_name", "-"), store["store_id"], actual, target, action, attempt + 1, total_attempts)
             if actual == target:
-                log.info("  ⏭️ [VB SKIP] Brand=%s | Store ID=%s | Action=%s | Status sudah sesuai", brand_name, store["store_id"], action)
+                # Status yang sudah sesuai bukan kegagalan dan tidak perlu
+                # muncul sebagai report outlet. Tetap tersedia pada DEBUG
+                # untuk troubleshooting lokal bila dibutuhkan.
+                log.debug("[VB SKIP] Brand=%s | Store ID=%s | Action=%s | Status sudah sesuai", brand_name, store["store_id"], action)
                 return True, "Status sudah sesuai"
             if not _execute(driver, store, target):
                 last_error = "Aksi Shopee mengembalikan gagal"

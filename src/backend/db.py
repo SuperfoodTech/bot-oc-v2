@@ -548,7 +548,10 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             status_aktual=s.get("shopee_status", "UNKNOWN"),
             vercel_link=s.get("vercel_link", ""),
             vercel_password=s.get("vercel_password", ""),
-            regular_hours=s.get("regular_hours", {}),
+            # The bot-oc decision gate may use only Shopee's fetched schedule.
+            # An absent schedule must remain absent and must not fall back to
+            # the internal operating-hours table.
+            regular_hours=s.get("shopee_regular_hours") or {},
             special_hours=s.get("special_hours", ""),
             status_langganan=s.get("subscription_status", "Aktif"),
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
