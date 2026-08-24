@@ -221,6 +221,13 @@
       document.getElementById('customUntilInput')?.addEventListener('input', updatePauseEndPreview);
       document.getElementById('customUntilInput')?.addEventListener('change', updatePauseEndPreview);
 
+      // Keep the remaining pause time current without changing Shopee's schedule.
+      setInterval(() => {
+        if (currentUserOutlets.length && document.getElementById('dashboardSection').style.display !== 'none') {
+          renderOutlets(currentUserOutlets);
+        }
+      }, 60000);
+
       // Google OAuth Redirect Click Event
       document.getElementById('googleLoginBtn').addEventListener('click', () => {
         window.location.href = `/api/v1/auth/google/login?role=merchant&state_url=${encodeURIComponent(window.location.pathname)}`;
@@ -345,32 +352,54 @@
       if (!isoStr) return '';
       try {
         let str = String(isoStr).trim();
-        // If SQL string format without T e.g. "2026-08-10 13:43:59" or "2026-08-10 13:43:59+00:00"
+        // SQL timestamps without an offset are stored in WIB by the application.
         if (!str.includes('T') && str.includes(' ')) {
           str = str.replace(' ', 'T');
         }
+        if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += '+07:00';
         let d = new Date(str);
         if (isNaN(d.getTime())) return isoStr;
 
-        const hours = String(d.getHours()).padStart(2, '0');
-        const mins = String(d.getMinutes()).padStart(2, '0');
-        
-        const now = new Date();
-        const isToday = d.toDateString() === now.toDateString();
-        
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).formatToParts(d).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+        const nowParts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+        const isToday = parts.year === nowParts.year && parts.month === nowParts.month && parts.day === nowParts.day;
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-        const day = d.getDate();
-        const monthStr = months[d.getMonth()];
-        const year = d.getFullYear();
+        const monthStr = months[Number(parts.month) - 1];
 
         if (isToday) {
-          return includeDateIfToday ? `pkl ${hours}:${mins} WIB (Hari ini)` : `pkl ${hours}:${mins} WIB`;
+          return includeDateIfToday ? `pkl ${parts.hour}:${parts.minute} WIB (Hari ini)` : `pkl ${parts.hour}:${parts.minute} WIB`;
         } else {
-          return `${day} ${monthStr} ${year}, pkl ${hours}:${mins} WIB`;
+          return `${Number(parts.day)} ${monthStr} ${parts.year}, pkl ${parts.hour}:${parts.minute} WIB`;
         }
       } catch (e) {
         return isoStr;
       }
+    }
+
+    function getPauseEndDate(value) {
+      if (!value) return null;
+      let str = String(value).trim().replace(' ', 'T');
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += '+07:00';
+      const date = new Date(str);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function formatRemainingPause(value) {
+      const end = getPauseEndDate(value);
+      if (!end) return '';
+      const remainingMinutes = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 60000));
+      if (remainingMinutes === 0) return 'Waktu pause selesai · menuju ON';
+      const hours = Math.floor(remainingMinutes / 60);
+      const minutes = remainingMinutes % 60;
+      const parts = [];
+      if (hours) parts.push(`${hours} jam`);
+      if (minutes || !hours) parts.push(`${minutes} menit`);
+      return `Tersisa ${parts.join(' ')} · menuju ON ${formatIndonesianTime(value, false)}`;
     }
 
     function renderOutlets(outlets) {
@@ -402,7 +431,7 @@
             <div>
               <div class="control-title">Buka otomatis</div>
               <div class="control-detail">
-                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isVercelOn ? 'Otomatisasi aktif (24/7)' : (out.pause_until ? ('Dijeda s/d ' + formatIndonesianTime(out.pause_until)) : 'Dijeda (sampai dibuka manual)'))}
+                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isVercelOn ? 'Otomatisasi aktif (24/7)' : (out.pause_until ? formatRemainingPause(out.pause_until) : 'Dijeda (sampai dibuka manual)'))}
               </div>
             </div>
             <label class="switch-toggle" ${isSuspended ? 'style="opacity: 0.5; cursor: not-allowed;"' : ''}>
@@ -697,7 +726,9 @@
             if (friendlyReason.includes('User set store OFF with duration:')) {
               const match = friendlyReason.match(/duration:\s*([^(]+)/);
               const durLabel = match ? match[1].trim() : 'Sementara';
-              friendlyReason = `Ditutup mitra selama ${durLabel}`;
+              const untilMatch = friendlyReason.match(/Until\s+([^\)]+)/i);
+              const untilText = untilMatch ? formatIndonesianTime(untilMatch[1].replace(/\s+WIB$/i, ''), false) : '';
+              friendlyReason = `Ditutup mitra selama ${durLabel}${untilText ? ` · menuju ON ${untilText}` : ''}`;
             } else if (friendlyReason.includes('User manually turned Vercel Toggle ON')) {
               friendlyReason = 'Dibuka manual dari dashboard';
             } else if (friendlyReason.includes('Subscription renewed until')) {

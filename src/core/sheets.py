@@ -58,6 +58,8 @@ class MerchantOutlet:
     alasan_penangguhan: str = ""
     tgl_mulai_penangguhan: str = ""
     tgl_berakhir_penangguhan: str = ""
+    # Stored local end time for a user-requested temporary pause.
+    pause_until: str = ""
     hp: str = ""
 
 

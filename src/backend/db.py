@@ -203,7 +203,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,os.last_checked_at::text AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     # Virtual Brand outlets are controlled exclusively through vb_brands and
     # must not appear in the regular outlet dashboard or bot-oc worker scope.
@@ -412,7 +412,7 @@ def get_recent_logs(limit=50, store_ids=None):
     query = """
         SELECT
             al.id,
-            al.checked_at::text AS timestamp,
+            to_char(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
             COALESCE(o.store_id, 'SYSTEM') AS store_id,
             COALESCE(o.long_name, 'Bot system') AS store_name,
             al.action,
@@ -437,7 +437,7 @@ def get_log_overview(limit=40):
         summary_rows = conn.execute(
             """SELECT CASE WHEN al.mode = 'VB' THEN 'VB' ELSE 'REGULAR' END AS mode,
                       COUNT(*)::int AS event_count,
-                      MAX(al.checked_at)::text AS last_event_at
+                      to_char(MAX(al.checked_at) AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_event_at
                FROM automation_logs al
                WHERE al.checked_at >= now() - interval '24 hours'
                GROUP BY CASE WHEN al.mode = 'VB' THEN 'VB' ELSE 'REGULAR' END"""
@@ -453,7 +453,7 @@ def get_log_overview(limit=40):
             } or {"event_count": 0, "last_event_at": row["last_event_at"]}
 
         recent = list(conn.execute(
-            """SELECT al.id, al.checked_at::text AS timestamp,
+            """SELECT al.id, to_char(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
                       CASE WHEN al.mode = 'VB' THEN 'VB' ELSE 'REGULAR' END AS mode,
                       COALESCE(o.store_id, 'SYSTEM') AS store_id,
                       COALESCE(o.long_name, b.name, 'Bot system') AS store_name,
@@ -467,7 +467,7 @@ def get_log_overview(limit=40):
                ORDER BY al.id DESC LIMIT %s""", (limit,)
         ).fetchall())
         errors = list(conn.execute(
-            """SELECT ae.id, ae.created_at::text AS timestamp, ae.mode,
+            """SELECT ae.id, to_char(ae.created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp, ae.mode,
                       ae.store_id, COALESCE(ae.merchant_name, p.name, '') AS merchant_name,
                       b.name AS brand_name, ae.action, ae.attempt_count,
                       ae.error_type, ae.error_message
@@ -478,7 +478,7 @@ def get_log_overview(limit=40):
                ORDER BY ae.id DESC LIMIT %s""", (limit,)
         ).fetchall())
         errors.extend(conn.execute(
-            """SELECT al.id, al.checked_at::text AS timestamp, 'REGULAR' AS mode,
+            """SELECT al.id, to_char(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp, 'REGULAR' AS mode,
                       COALESCE(o.store_id, 'SYSTEM') AS store_id,
                       p.name AS merchant_name, NULL AS brand_name,
                       al.action, 1 AS attempt_count, 'AUTOMATION_LOG_ERROR' AS error_type,
@@ -521,6 +521,7 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             special_hours=s.get("special_hours", ""),
             status_langganan=s.get("subscription_status", "Aktif"),
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
+            pause_until=s.get("pause_until") or "",
         ))
     return outlets
 

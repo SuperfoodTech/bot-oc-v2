@@ -1,5 +1,15 @@
 # Update
 
+## Latest update: v0.3.5
+
+- Memperbaiki penerusan durasi pause dashboard ke payload Shopee melalui
+  `pause_end_time` Unix timestamp milidetik.
+- Menambahkan countdown sisa pause menuju outlet kembali ON.
+- Menyeragamkan timezone tampilan dan log ke WIB/GMT+7 tanpa fractional seconds
+  atau microseconds.
+- Memperbesar dan mempertebal teks status serta log agar lebih mudah dibaca.
+- Detail lengkap tersedia di [update/0.3.5.md](update/0.3.5.md).
+
 ## Latest deployment handoff
 
 - Docker service definition for `bot-vb` was added to `docker-compose.yml`.

@@ -639,7 +639,7 @@ def user_pause_store(req: UserPauseRequest):
         store_name=store["store_name"],
         action="USER_PAUSE_STORE",
         target_state="CLOSED",
-        reason=f"User set store OFF with duration: {label} (Until {pause_until_str})"
+        reason=f"User set store OFF with duration: {label} (Until {pause_until_str} WIB)"
     )
 
     return {

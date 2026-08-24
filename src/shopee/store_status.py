@@ -217,7 +217,13 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pause_duration_minutes: int = 1440) -> bool:
+def pause_store_action(
+    driver,
+    store_id: str,
+    merchant_id: str = "14367488",
+    pause_duration_minutes: int = 1440,
+    pause_end_time_ms: Optional[int] = None,
+) -> bool:
     """
     Triggers store pause (Auto Close) for store_id.
     Uses the in-browser XHR POST API directly. UI interaction is intentionally
@@ -243,7 +249,7 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
                         done({{code: -1, msg: 'Client timeout (5s)'}});
                     }}, 5000);
                     var now = Date.now();
-                    var end = now + ({pause_duration_minutes} * 60 * 1000);
+                    var end = {pause_end_time_ms if pause_end_time_ms is not None else f"now + ({pause_duration_minutes} * 60 * 1000)"};
                     fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
                         method: 'POST',
                         credentials: 'include',

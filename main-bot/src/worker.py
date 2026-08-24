@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
+from zoneinfo import ZoneInfo
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -31,6 +32,21 @@ ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.st
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
 ACTIVE_SESSIONS = {}
+
+
+def _pause_end_time_ms(outlet: MerchantOutlet):
+    """Convert the DB's local pause end time to Shopee's epoch milliseconds."""
+    pause_until = getattr(outlet, "pause_until", "") or ""
+    if not pause_until:
+        return None
+    try:
+        end_dt = datetime.fromisoformat(str(pause_until).replace("Z", "+00:00"))
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+        return int(end_dt.timestamp() * 1000)
+    except (TypeError, ValueError):
+        log.warning("  ⚠️ Invalid pause_until for Store %s: %s", outlet.store_id, pause_until)
+        return None
 
 
 def warmup_all_account_sessions():
@@ -121,7 +137,12 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
             if action == ACTION_OPEN:
                 success = store_status.open_store_action(driver, outlet.store_id, merchant_id=m_id)
             else:
-                success = store_status.pause_store_action(driver, outlet.store_id, merchant_id=m_id)
+                success = store_status.pause_store_action(
+                    driver,
+                    outlet.store_id,
+                    merchant_id=m_id,
+                    pause_end_time_ms=_pause_end_time_ms(outlet),
+                )
             if success:
                 log.info(f"  ✅ [IN-BROWSER XHR SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
                 return True
