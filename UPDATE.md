@@ -1,6 +1,12 @@
 # Update
 
-## Latest update: v1.5.0
+## Latest update: v1.5.1
+
+- Memperbaiki status `PAUSE` Shopee agar tidak salah terdeteksi sebagai
+  `CLOSED` atau jadwal khusus pada `bot-oc`.
+- Detail lengkap tersedia di [update/1.5.1.md](update/1.5.1.md).
+
+## Update v1.5.0
 
 - `bot-oc` melewati outlet secara diam-diam di luar jadwal operasional tanpa
   menjalankan aksi atau mengirim report skip.

@@ -33,6 +33,21 @@ ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.st
 ACTIVE_SESSIONS = {}
 
 
+def _normalize_live_status(live_info: dict) -> str:
+    """Preserve Shopee's PAUSE state instead of collapsing it into CLOSED."""
+    if not isinstance(live_info, dict):
+        return "UNKNOWN"
+    pause_info = live_info.get("pause_info") or {}
+    pause_start = pause_info.get("pause_start_time", 0) if isinstance(pause_info, dict) else 0
+    try:
+        pause_start = float(pause_start or 0)
+    except (TypeError, ValueError):
+        pause_start = 0
+    if pause_start > 0:
+        return "PAUSE"
+    return "ON" if live_info.get("status_str") == "OPEN" else "CLOSED"
+
+
 def _pause_end_time_ms(outlet: MerchantOutlet):
     """Convert the DB's local pause end time to Shopee's epoch milliseconds."""
     pause_until = getattr(outlet, "pause_until", "") or ""
@@ -333,7 +348,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
             try:
                 live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
                 if live_info and live_info.get("status_str") in ("OPEN", "CLOSED"):
-                    actual_st = "ON" if live_info["status_str"] == "OPEN" else "CLOSED"
+                    actual_st = _normalize_live_status(live_info)
                     outlet.status_aktual = actual_st
                     db.update_shopee_actual_status(outlet.store_id, actual_st)
             except Exception as st_err:
@@ -365,7 +380,7 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     post_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
                     expected_st = "ON" if decision.target_state == "OPEN" else "PAUSE"
                     if post_info and post_info.get("status_str") in ("OPEN", "CLOSED"):
-                        verified_st = "ON" if post_info["status_str"] == "OPEN" else "CLOSED"
+                        verified_st = _normalize_live_status(post_info)
                         log.info(f"  ✅ [POST-EXECUTION VERIFIED] Status Live Shopee Pasca-{decision.action}: '{verified_st}' (Expected: '{expected_st}').")
                         new_actual_status = verified_st
 
