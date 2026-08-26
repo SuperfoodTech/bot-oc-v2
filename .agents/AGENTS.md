@@ -24,7 +24,11 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.5.1`.
+Latest documented release: `1.6.2`.
+
+Deployment `bot-vb` menggunakan `HEADLESS=true` agar stabil pada server dan
+container tanpa X display. Mode GUI hanya boleh dipakai sementara untuk
+debugging langsung di host yang memiliki display aktif.
 
 Setiap update kode, konfigurasi, atau perilaku aplikasi wajib:
 

@@ -44,6 +44,9 @@ def init_db() -> None:
         migration7_path = base_dir / "007_shopee_regular_hours.sql"
         if migration7_path.exists():
             conn.execute(migration7_path.read_text(encoding="utf-8"))
+        migration8_path = base_dir / "008_vb_brand_pause_until.sql"
+        if migration8_path.exists():
+            conn.execute(migration8_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")

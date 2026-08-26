@@ -28,7 +28,8 @@ def list_brands() -> list[dict[str, Any]]:
     with get_db_connection() as conn:
         rows = list(conn.execute(
             """SELECT b.id, b.name, b.applied_status, b.requested_status,
-                      b.requested_at, b.last_applied_at, b.last_patrolled_at,
+                      b.requested_at, b.pause_until, b.requested_pause_until,
+                      b.last_applied_at, b.last_patrolled_at,
                       COUNT(bo.outlet_id)::int AS outlet_count,
                       COUNT(DISTINCT o.portal_id)::int AS merchant_count
                FROM vb_brands b
@@ -44,7 +45,7 @@ def list_brands() -> list[dict[str, Any]]:
 def brand_detail(brand_id: str) -> dict[str, Any] | None:
     with get_db_connection() as conn:
         brand = conn.execute(
-            "SELECT id, name, applied_status, requested_status, requested_at, last_applied_at, last_patrolled_at FROM vb_brands WHERE id=%s AND is_active=true",
+            "SELECT id, name, applied_status, requested_status, requested_at, pause_until, requested_pause_until, last_applied_at, last_patrolled_at FROM vb_brands WHERE id=%s AND is_active=true",
             (brand_id,),
         ).fetchone()
         if not brand:
@@ -62,15 +63,17 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
         return {**brand, "outlets": stores}
 
 
-def request_status(brand_id: str, status: str, admin_id: str) -> dict[str, Any] | None:
+def request_status(brand_id: str, status: str, admin_id: str, pause_until=None) -> dict[str, Any] | None:
     with get_db_connection() as conn:
         with conn.transaction():
             row = conn.execute(
                 """UPDATE vb_brands
-                   SET requested_status=%s, requested_at=now(), requested_by=%s, updated_at=now()
+                   SET requested_status=%s, requested_pause_until=%s,
+                       requested_at=now(), requested_by=%s, updated_at=now()
                    WHERE id=%s AND is_active=true
-                   RETURNING id, name, applied_status, requested_status, requested_at""",
-                (status, admin_id, brand_id),
+                   RETURNING id, name, applied_status, requested_status,
+                             requested_at, requested_pause_until""",
+                (status, pause_until if status == "PAUSED" else None, admin_id, brand_id),
             ).fetchone()
             if not row:
                 return None

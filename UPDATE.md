@@ -1,6 +1,19 @@
 # Update
 
-## Latest update: v1.5.1
+## Latest update: v1.6.2
+
+- Konfigurasi browser `bot-vb` dikembalikan ke mode headless (`HEADLESS=true`)
+  agar stabil di server dan Docker tanpa display.
+- Detail lengkap tersedia di [update/1.6.2.md](update/1.6.2.md).
+
+## Update v1.6.0
+
+- Toggle Virtual Brand sekarang memiliki modal pilihan durasi pause dan
+  penyimpanan `pause_until` pada level brand.
+- Pause otomatis mengajukan status `ON` setelah waktunya berakhir.
+- Detail lengkap tersedia di [update/1.6.0.md](update/1.6.0.md).
+
+## Update v1.5.1
 
 - Memperbaiki status `PAUSE` Shopee agar tidak salah terdeteksi sebagai
   `CLOSED` atau jadwal khusus pada `bot-oc`.

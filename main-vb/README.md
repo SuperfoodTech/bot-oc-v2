@@ -33,7 +33,8 @@ Migration database: jalankan `database/migrations/004_virtual_brand.sql` setelah
 Patrol:
 
 ```bash
-PYTHONPATH=main-vb/src python main-vb/src/daemon.py
+PYTHONPATH=main-vb/src:/home/akbarhann/project/bot-oc/src \
+uv run --project main-vb python main-vb/src/daemon.py
 ```
 
 API admin:

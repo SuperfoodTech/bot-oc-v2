@@ -54,6 +54,9 @@ from core.sheets import WEEKDAY_MAP
 
 class VBStatusRequest(BaseModel):
     status: str
+    duration_type: Optional[str] = None
+    custom_minutes: Optional[int] = None
+    custom_until: Optional[str] = None
 
 
 def _is_within_shopee_schedule(store: dict, now_dt: datetime) -> bool:
@@ -388,7 +391,27 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
     requested = req.status.strip().upper()
     if requested not in {"ON", "PAUSED"}:
         raise HTTPException(status_code=422, detail="Status VB harus ON atau PAUSED.")
-    result = vb.request_status(str(brand_id), requested, admin["sub"])
+    pause_until = None
+    if requested == "PAUSED":
+        now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+        duration_type = (req.duration_type or "").lower()
+        if duration_type in {"30", "30_min", "30min"}:
+            pause_until = now_dt + timedelta(minutes=30)
+        elif duration_type in {"60", "60_min", "60min"}:
+            pause_until = now_dt + timedelta(minutes=60)
+        elif duration_type in {"rest_of_day", "sepanjang_hari", "today"}:
+            pause_until = now_dt.replace(hour=23, minute=59, second=59, microsecond=0)
+        elif duration_type in {"custom", "waktu_lain"} and req.custom_until:
+            try:
+                pause_until = datetime.fromisoformat(req.custom_until.replace("Z", "+00:00"))
+                pause_until = pause_until.astimezone(ZoneInfo("Asia/Jakarta")) if pause_until.tzinfo else pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="Target waktu penutupan tidak valid.") from exc
+        else:
+            raise HTTPException(status_code=422, detail="Durasi pause VB wajib dipilih.")
+        if pause_until <= now_dt:
+            raise HTTPException(status_code=422, detail="Target waktu harus lebih besar dari waktu sekarang.")
+    result = vb.request_status(str(brand_id), requested, admin["sub"], pause_until=pause_until)
     if not result:
         raise HTTPException(status_code=404, detail="Brand VB tidak ditemukan.")
     return {"success": True, "brand": result, "message": "Perubahan disimpan dan menunggu giliran brand berikutnya."}

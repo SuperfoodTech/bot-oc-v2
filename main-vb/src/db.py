@@ -22,7 +22,8 @@ def normalize_brand(name: str) -> str:
 
 def list_brands(conn) -> list[dict[str, Any]]:
     return list(conn.execute(
-        """SELECT id, name, applied_status, requested_status, requested_at
+        """SELECT id, name, applied_status, requested_status, requested_at,
+                  pause_until, requested_pause_until
            FROM vb_brands WHERE is_active=true ORDER BY name_normalized"""
     ).fetchall())
 
@@ -43,9 +44,22 @@ def get_brand_outlets(conn, brand_id):
 
 
 def apply_pending_status(conn, brand_id):
+    # Timed brand pauses expire on the next patrol turn. Convert the expired
+    # state into the same pending ON transition used by the admin control.
+    conn.execute(
+        """UPDATE vb_brands
+           SET requested_status='ON', requested_pause_until=NULL,
+               requested_at=now(), updated_at=now()
+           WHERE id=%s AND applied_status='PAUSED'
+             AND pause_until IS NOT NULL AND pause_until <= now()
+             AND requested_status IS NULL""",
+        (brand_id,),
+    )
     row = conn.execute(
         """UPDATE vb_brands
-           SET applied_status=requested_status, requested_status=NULL,
+           SET applied_status=requested_status,
+               pause_until=CASE WHEN requested_status='PAUSED' THEN requested_pause_until ELSE NULL END,
+               requested_status=NULL, requested_pause_until=NULL,
                requested_at=NULL, last_applied_at=now(), updated_at=now()
            WHERE id=%s AND requested_status IS NOT NULL
            RETURNING id, name, applied_status, requested_by""", (brand_id,)
