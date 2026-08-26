@@ -1,6 +1,30 @@
 # Update
 
-## Latest update: v1.6.3
+## Latest update: v1.7.2
+
+- Memperbaiki filter status VB agar brand lama yang sudah tidak ada di Sheet
+  juga dinonaktifkan.
+- Database VB sekarang mengikuti Sheet VB sebagai source of truth; brand yang
+  hilang atau berstatus nonaktif tidak masuk scope dashboard maupun bot.
+- Dashboard sekarang menampilkan jumlah brand aktif dan brand yang
+  dinonaktifkan pada hasil import.
+- Detail lengkap tersedia di [update/1.7.2.md](update/1.7.2.md).
+
+## Update v1.7.1
+
+- Memperbaiki sumber Google Sheet VB menggunakan tab `gid=401458905` yang
+  valid dan mengembalikan CSV.
+- Detail lengkap tersedia di [update/1.7.1.md](update/1.7.1.md).
+
+## Update v1.7.0
+
+- Import VB sekarang memakai kolom `Status` sebagai filter scope seperti Bot
+  O/C: hanya status aktif yang diproses oleh dashboard dan bot.
+- Brand nonaktif dikeluarkan dari scope, dan dapat aktif kembali saat status
+  Sheet berubah menjadi aktif.
+- Detail lengkap tersedia di [update/1.7.0.md](update/1.7.0.md).
+
+## Update v1.6.3
 
 - Konfigurasi `HEADLESS` dipusatkan ke satu variabel di file `.env`.
 - Service `bot-oc` dan `bot-vb` sekarang membaca nilai `HEADLESS` yang sama

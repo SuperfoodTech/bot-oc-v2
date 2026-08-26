@@ -14,7 +14,7 @@ from backend.db import get_db_connection
 VB_SHEET_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/"
-    "pub?gid=2099001096&single=true&output=csv"
+    "pub?gid=401458905&single=true&output=csv"
 )
 VB_OWNER_NAME = "VB"
 VB_ACCOUNT_USERNAME = "auto7313"
@@ -94,18 +94,27 @@ def _parse_matrix(content: str) -> list[dict[str, Any]]:
     if not rows:
         return []
     headers = rows[0]
+    status_index = next(
+        (index for index, header in enumerate(headers)
+         if header.strip().casefold() in {"status", "status import", "import status"}),
+        None,
+    )
     matrix = []
     for row_number, row in enumerate(rows[1:], start=2):
         if not row or not row[0].strip():
             continue
+        status = row[status_index].strip() if status_index is not None and status_index < len(row) else "Aktif"
+        is_active = status.casefold() == "aktif"
         stores = []
         for col_index, value in enumerate(row[1:], start=1):
+            if col_index == status_index:
+                continue
             if value.strip():
                 stores.append({
                     "store_id": value.strip(),
                     "source_column": headers[col_index].strip() if col_index < len(headers) else "",
                 })
-        matrix.append({"row_number": row_number, "brand": row[0].strip(), "stores": stores})
+        matrix.append({"row_number": row_number, "brand": row[0].strip(), "status": status, "is_active": is_active, "stores": stores})
     return matrix
 
 
@@ -116,24 +125,50 @@ def import_sheet(admin_id: str) -> dict[str, Any]:
     brands_created = 0
     outlets_linked = 0
     outlets_created = 0
+    brands_deactivated = 0
+    brands_activated = 0
     portal_mismatches: list[dict[str, Any]] = []
     missing_store_ids: list[dict[str, Any]] = []
     with get_db_connection() as conn:
         with conn.transaction():
+            incoming_names = {normalize_brand(item["brand"]) for item in matrix}
+            if incoming_names:
+                stale_brands = conn.execute(
+                    "SELECT id, is_active FROM vb_brands WHERE is_active=true AND name_normalized <> ALL(%s)",
+                    (list(incoming_names),),
+                ).fetchall()
+                if stale_brands:
+                    conn.execute(
+                        "UPDATE vb_brands SET is_active=false, updated_at=now() WHERE is_active=true AND name_normalized <> ALL(%s)",
+                        (list(incoming_names),),
+                    )
+                    brands_deactivated += len(stale_brands)
             owner = conn.execute("SELECT id FROM merchants WHERE name=%s", (VB_OWNER_NAME,)).fetchone()
             if not owner:
                 owner = conn.execute("INSERT INTO merchants (name) VALUES (%s) RETURNING id", (VB_OWNER_NAME,)).fetchone()
             owner_id = owner["id"]
             for item in matrix:
+                existing_brand = conn.execute(
+                    "SELECT is_active FROM vb_brands WHERE name_normalized=%s",
+                    (normalize_brand(item["brand"]),),
+                ).fetchone()
                 brand = conn.execute(
-                    """INSERT INTO vb_brands (name, name_normalized)
-                       VALUES (%s, %s)
-                       ON CONFLICT (name_normalized) DO UPDATE SET name=EXCLUDED.name, updated_at=now()
-                       RETURNING id, (xmax = 0) AS inserted""",
-                    (item["brand"], normalize_brand(item["brand"])),
+                    """INSERT INTO vb_brands (name, name_normalized, is_active)
+                       VALUES (%s, %s, %s)
+                       ON CONFLICT (name_normalized) DO UPDATE SET
+                         name=EXCLUDED.name, is_active=EXCLUDED.is_active, updated_at=now()
+                       RETURNING id, is_active, (xmax = 0) AS inserted""",
+                    (item["brand"], normalize_brand(item["brand"]), item["is_active"]),
                 ).fetchone()
                 if brand["inserted"]:
                     brands_created += 1
+                elif existing_brand and existing_brand["is_active"] != item["is_active"]:
+                    if item["is_active"]:
+                        brands_activated += 1
+                    else:
+                        brands_deactivated += 1
+                if not item["is_active"]:
+                    continue
                 for store in item["stores"]:
                     outlet = conn.execute(
                         "SELECT id FROM outlets WHERE store_id=%s AND is_active=true",
@@ -188,12 +223,15 @@ def import_sheet(admin_id: str) -> dict[str, Any]:
             conn.execute(
                 """INSERT INTO admin_audit_logs (admin_account_id, action, new_value, reason)
                    VALUES (%s, 'VB_IMPORT', %s, %s)""",
-                (admin_id, Jsonb({"brands_seen": len(matrix), "brands_created": brands_created, "outlets_created": outlets_created, "outlets_linked": outlets_linked}),
+                (admin_id, Jsonb({"brands_seen": len(matrix), "brands_created": brands_created, "brands_activated": brands_activated, "brands_deactivated": brands_deactivated, "outlets_created": outlets_created, "outlets_linked": outlets_linked}),
                  "Import matrix Virtual Brand dari Google Sheet"),
             )
     return {
         "brands_seen": len(matrix),
+        "brands_active": sum(1 for item in matrix if item["is_active"]),
         "brands_created": brands_created,
+        "brands_activated": brands_activated,
+        "brands_deactivated": brands_deactivated,
         "outlets_created": outlets_created,
         "outlets_linked": outlets_linked,
         "missing_store_ids": missing_store_ids,

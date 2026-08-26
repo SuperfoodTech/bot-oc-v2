@@ -24,7 +24,18 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.6.3`.
+Latest documented release: `1.7.2`.
+
+Sheet VB menjadi source of truth untuk scope brand: setiap brand yang tidak
+ada pada hasil fetch terbaru harus ditandai `is_active=false`, bukan dibiarkan
+aktif dari import sebelumnya.
+
+Published tab Google Sheet Virtual Brand menggunakan `gid=401458905`.
+
+Import VB wajib memperlakukan kolom `Status` sebagai import gate yang
+konsisten dengan Bot O/C. Hanya nilai `Aktif` (case-insensitive) yang
+memasukkan brand ke scope; nilai lain menonaktifkan brand dari dashboard dan
+patrol tanpa menganggap kolom tersebut sebagai Store ID.
 
 Konfigurasi `HEADLESS` dipusatkan di `.env` dan dibaca bersama oleh service
 `bot-oc` serta `bot-vb` melalui Docker Compose. Nilai default tetap `true`

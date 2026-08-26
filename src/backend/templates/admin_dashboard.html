@@ -723,7 +723,8 @@
         const summary = data.summary || {};
         const missing = (summary.missing_store_ids || []).length;
         const created = summary.outlets_created || 0;
-        const summaryText = `Brand: ${summary.brands_seen || 0} · Outlet baru: ${created} · Relasi: ${summary.outlets_linked || 0} · Missing: ${missing}`;
+        const activeBrands = summary.brands_active || 0;
+        const summaryText = `Brand aktif: ${Math.max(0, activeBrands)} · Dinonaktifkan: ${summary.brands_deactivated || 0} · Outlet baru: ${created} · Relasi: ${summary.outlets_linked || 0} · Missing: ${missing}`;
         const summaryEl = document.getElementById('vbImportSummary');
         if (summaryEl) summaryEl.textContent = summaryText;
         showToast(`Import selesai. ${summaryText}`, missing ? 'warning' : 'success');

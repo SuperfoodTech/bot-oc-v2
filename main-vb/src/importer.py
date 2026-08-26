@@ -13,7 +13,7 @@ import db
 DEFAULT_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/"
-    "pub?gid=2099001096&single=true&output=csv"
+    "pub?gid=401458905&single=true&output=csv"
 )
 
 
@@ -22,16 +22,25 @@ def parse_matrix(content: str) -> list[dict[str, Any]]:
     if not rows:
         return []
     headers = rows[0]
+    status_index = next(
+        (index for index, header in enumerate(headers)
+         if header.strip().casefold() in {"status", "status import", "import status"}),
+        None,
+    )
     output = []
     for row_number, row in enumerate(rows[1:], start=2):
         if not row or not row[0].strip():
             continue
         brand = row[0].strip()
+        status = row[status_index].strip() if status_index is not None and status_index < len(row) else "Aktif"
+        is_active = status.casefold() == "aktif"
         stores = []
         for index, store_id in enumerate(row[1:], start=1):
+            if index == status_index:
+                continue
             if store_id.strip():
                 stores.append({"store_id": store_id.strip(), "source_column": headers[index].strip() if index < len(headers) else ""})
-        output.append({"row_number": row_number, "brand": brand, "stores": stores})
+        output.append({"row_number": row_number, "brand": brand, "status": status, "is_active": is_active, "stores": stores})
     return output
 
 
@@ -42,16 +51,25 @@ def import_csv(content: str) -> dict[str, Any]:
     missing_store_ids = []
     with db.connection() as conn:
         with conn.transaction():
+            incoming_names = {db.normalize_brand(item["brand"]) for item in matrix}
+            if incoming_names:
+                conn.execute(
+                    "UPDATE vb_brands SET is_active=false, updated_at=now() WHERE is_active=true AND name_normalized <> ALL(%s)",
+                    (list(incoming_names),),
+                )
             for item in matrix:
                 normalized = db.normalize_brand(item["brand"])
                 brand = conn.execute(
-                    """INSERT INTO vb_brands (name, name_normalized)
-                       VALUES (%s, %s)
-                       ON CONFLICT (name_normalized) DO UPDATE SET name=EXCLUDED.name, updated_at=now()
-                       RETURNING id, applied_status, (xmax = 0) AS inserted""", (item["brand"], normalized)
+                    """INSERT INTO vb_brands (name, name_normalized, is_active)
+                       VALUES (%s, %s, %s)
+                       ON CONFLICT (name_normalized) DO UPDATE SET
+                         name=EXCLUDED.name, is_active=EXCLUDED.is_active, updated_at=now()
+                       RETURNING id, applied_status, is_active, (xmax = 0) AS inserted""", (item["brand"], normalized, item["is_active"])
                 ).fetchone()
                 if brand["inserted"]:
                     created_brands += 1
+                if not item["is_active"]:
+                    continue
                 for store in item["stores"]:
                     outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s AND is_active=true", (store["store_id"],)).fetchone()
                     if not outlet:
