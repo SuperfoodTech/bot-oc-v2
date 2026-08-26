@@ -6,7 +6,10 @@ import time
 
 from config import PATROL_INTERVAL_SECONDS
 from core.logger import get_logger
-from worker import patrol_once
+# The VB worker intentionally follows bot-OC and exposes sync_all_stores.
+# Keep the daemon's legacy local name for compatibility without changing the
+# shared worker implementation.
+from worker import sync_all_stores as patrol_once
 
 log = get_logger("vb_daemon")
 

@@ -1,6 +1,72 @@
 # Update
 
-## Latest update: v1.7.2
+## Latest update: v1.10.1
+
+### Server safety fix v1.10.1
+
+- `bot-vb` dikembalikan ke `HEADLESS=true` untuk kompatibilitas server Docker
+  tanpa display/X server.
+- Catatan eksperimen `HEADLESS=false` dihapus dari riwayat update aktif.
+- Detail lengkap tersedia di [update/1.10.1.md](update/1.10.1.md).
+
+## Update v1.10.0
+
+- Runtime VB tidak lagi dipengaruhi `penangguhan` atau masa aktif layanan.
+- Setelah gate jadwal dan status khusus Shopee, target action hanya ditentukan
+  oleh toggle Virtual Brand admin.
+- Worker VB dan bot-OC tetap tidak berubah.
+- Detail lengkap tersedia di [update/1.10.0.md](update/1.10.0.md).
+
+### Build/runtime fix v1.9.2
+
+- Memperbaiki import daemon VB agar memakai `sync_all_stores` dari worker yang
+  sudah disamakan dengan bot-OC.
+- Detail lengkap tersedia di [update/1.9.2.md](update/1.9.2.md).
+
+### Build fix v1.9.1
+
+- Build context Docker sekarang mengecualikan seluruh `src/data/**` karena
+  seluruh data runtime dipasang melalui volume; ini mencegah cache Chrome
+  dengan permission lokal menghambat build `bot-vb`.
+- Detail lengkap tersedia di [update/1.9.1.md](update/1.9.1.md).
+
+- `main-vb/src/worker.py` sekarang identik byte-for-byte dengan worker bot-OC.
+- Core `decision`, `sheets`, `import_sheet`, `browser`, dan `store_status` VB
+  disamakan dengan bot-OC.
+- Adapter database VB membaca target toggle dari `vb_brands.applied_status`,
+  hanya outlet dari brand aktif, menyimpan schedule/status Shopee, dan memberi
+  label log `VB` agar tidak tercampur dengan log bot-OC.
+- Tidak ada perubahan pada `main-bot/src/worker.py`.
+- Detail lengkap tersedia di [update/1.9.0.md](update/1.9.0.md).
+
+## Update v1.8.0
+
+- `main-vb/src/core/browser.py` sekarang identik 100% dengan
+  `src/core/browser.py`.
+- Perbedaan VB hanya berasal dari environment variable credential, session,
+  dan Chrome profile.
+- Detail lengkap tersedia di [update/1.8.0.md](update/1.8.0.md).
+
+## Update v1.7.5
+
+- Menyamakan normalisasi status live `bot-vb` dengan `bot-oc`: hanya status
+  dengan `pause_start_time` aktif yang dianggap `PAUSE`; status non-OPEN lain
+  menjadi `CLOSED`.
+- Detail lengkap tersedia di [update/1.7.5.md](update/1.7.5.md).
+
+## Update v1.7.4
+
+- Menyamakan `bot-vb` dengan `bot-oc` untuk pause timed: `pause_until` brand
+  diteruskan sebagai `pause_end_time` Unix milliseconds ke XHR Shopee.
+- Detail lengkap tersedia di [update/1.7.4.md](update/1.7.4.md).
+
+## Update v1.7.3
+
+- Memperbaiki kalkulasi opsi `rest_of_day` agar selalu menggunakan timezone
+  WIB dan tidak gagal saat dikurangi dengan waktu timezone-aware.
+- Detail lengkap tersedia di [update/1.7.3.md](update/1.7.3.md).
+
+## Update v1.7.2
 
 - Memperbaiki filter status VB agar brand lama yang sudah tidak ada di Sheet
   juga dinonaktifkan.

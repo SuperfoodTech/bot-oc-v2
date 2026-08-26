@@ -62,7 +62,7 @@ def apply_pending_status(conn, brand_id):
                requested_status=NULL, requested_pause_until=NULL,
                requested_at=NULL, last_applied_at=now(), updated_at=now()
            WHERE id=%s AND requested_status IS NOT NULL
-           RETURNING id, name, applied_status, requested_by""", (brand_id,)
+           RETURNING id, name, applied_status, pause_until, requested_by""", (brand_id,)
     ).fetchone()
     if row:
         conn.execute(
@@ -82,3 +82,129 @@ def mark_patrolled(conn, brand_id):
 
 def create_patrol_run(conn):
     return conn.execute("INSERT INTO vb_patrol_runs DEFAULT VALUES RETURNING id").fetchone()["id"]
+
+
+def fetch_merchant_outlets_from_db() -> list[Any]:
+    """Return only active Virtual Brand outlets for the copied worker engine.
+
+    The admin Virtual Brand toggle is the target-state source of truth.  The
+    spreadsheet is intentionally not read here; it is import-only.
+    """
+    from core.sheets import MerchantOutlet
+
+    query = """
+        SELECT b.name AS brand_name, b.applied_status, b.pause_until::text AS brand_pause_until,
+               o.store_id, o.long_name, p.name AS portal_name,
+               sa.username, sa.password_plain, sa.phone, sa.merchant_id_external,
+               os.shopee_actual_status, os.shopee_regular_hours,
+               COALESCE(s.status, CASE WHEN s.end_date >= CURRENT_DATE THEN 'ACTIVE' ELSE 'EXPIRED' END, 'ACTIVE') AS subscription_status,
+               s.start_date::text AS service_start, s.end_date::text AS service_end,
+               sp.name AS package_name, os.suspension_status, os.suspension_reason
+        FROM vb_brand_outlets bo
+        JOIN vb_brands b ON b.id = bo.vb_brand_id AND b.is_active = true
+        JOIN outlets o ON o.id = bo.outlet_id AND o.is_active = true
+        JOIN portals p ON p.id = o.portal_id AND p.is_active = true
+        LEFT JOIN shopee_accounts sa ON sa.id = o.shopee_account_id
+        LEFT JOIN outlet_states os ON os.outlet_id = o.id
+        LEFT JOIN LATERAL (
+            SELECT sx.status, sx.start_date, sx.end_date, sx.plan_id
+            FROM subscriptions sx
+            WHERE sx.outlet_id = o.id
+            ORDER BY sx.end_date DESC NULLS LAST
+            LIMIT 1
+        ) s ON true
+        LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
+        ORDER BY b.name, p.name, o.store_id
+    """
+    with connection() as conn:
+        rows = conn.execute(query).fetchall()
+
+    outlets = []
+    for row in rows:
+        actual = (row.get("shopee_actual_status") or "UNKNOWN").upper()
+        if actual == "OFF":
+            actual = "CLOSED"
+        target = "ON" if row["applied_status"] == "ON" else "OFF"
+        suspended = (row.get("suspension_status") or "ACTIVE").upper() == "SUSPENDED"
+        outlets.append(MerchantOutlet(
+            nama_pemilik=row.get("brand_name") or "Virtual Brand",
+            kepemilikan="VB",
+            paket=row.get("package_name") or "",
+            tanggal_mulai_layanan=row.get("service_start") or "",
+            tanggal_berakhir_layanan=row.get("service_end") or "",
+            username=row.get("username") or "",
+            password=row.get("password_plain") or "",
+            hp=row.get("phone") or "",
+            nama_portal=row.get("portal_name") or "",
+            merchant_id=str(row.get("merchant_id_external") or ""),
+            store_id=str(row.get("store_id") or ""),
+            nama_panjang_outlet=row.get("long_name") or str(row.get("store_id") or ""),
+            nama_pendek_outlet=row.get("long_name") or "",
+            status_utama=target,
+            status_aktual=actual,
+            regular_hours=row.get("shopee_regular_hours") or {},
+            shopee_regular_hours=row.get("shopee_regular_hours") or {},
+            status_langganan="Aktif" if (row.get("subscription_status") or "").upper() in {"ACTIVE", "AKTIF"} else "Kedaluwarsa",
+            penangguhan="Ya" if suspended else "Tidak",
+            alasan_penangguhan=row.get("suspension_reason") or "",
+            pause_until=row.get("brand_pause_until") or "",
+        ))
+    return outlets
+
+
+def update_shopee_regular_hours(store_id: str, regular_hours: dict) -> None:
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os SET shopee_regular_hours=%s,
+               last_checked_at=now(), updated_at=now()
+               FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (Jsonb(regular_hours), store_id),
+        )
+
+
+def update_shopee_actual_status(store_id: str, status: str) -> None:
+    # outlet_states deliberately stores OFF for Shopee CLOSED because CLOSED
+    # is not one of the column's allowed persisted values.
+    persisted = "OFF" if str(status).upper() in {"CLOSED", "CLOSE"} else str(status).upper()
+    if persisted not in {"ON", "PAUSE", "OFF", "UNKNOWN"}:
+        persisted = "UNKNOWN"
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os SET shopee_actual_status=%s,
+               last_checked_at=now(), updated_at=now()
+               FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (persisted, store_id),
+        )
+
+
+def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="VB"):
+    """Write copied-worker actions as VB logs without mixing regular bot logs."""
+    with connection() as conn:
+        outlet = conn.execute(
+            "SELECT id FROM outlets WHERE store_id=%s", (store_id,)
+        ).fetchone()
+        if not outlet:
+            return
+        state = conn.execute(
+            "SELECT vercel_status, shopee_actual_status, suspension_status FROM outlet_states WHERE outlet_id=%s",
+            (outlet["id"],),
+        ).fetchone() or {}
+        brand = conn.execute(
+            """SELECT bo.vb_brand_id FROM vb_brand_outlets bo
+               WHERE bo.outlet_id=%s LIMIT 1""", (outlet["id"],)
+        ).fetchone()
+        conn.execute(
+            """INSERT INTO automation_logs
+               (outlet_id, mode, vb_brand_id, suspension_status, subscription_status,
+                vercel_status_before, shopee_status_before, target_status, action,
+                success, error_message, reason)
+               VALUES (%s,%s,%s,%s,'ACTIVE',%s,%s,%s,%s,%s,%s,%s)""",
+            (outlet["id"], mode, brand["vb_brand_id"] if brand else None,
+             state.get("suspension_status", "ACTIVE"), state.get("vercel_status", "OFF"),
+             state.get("shopee_actual_status", "UNKNOWN"), target_state, action,
+             success, error_message, reason),
+        )
+        conn.execute(
+            "UPDATE outlet_states SET last_action_at=now(), last_checked_at=now(), updated_at=now() WHERE outlet_id=%s",
+            (outlet["id"],),
+        )

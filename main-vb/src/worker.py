@@ -1,258 +1,436 @@
-"""Brand-level patrol worker for Virtual Brand.
-
-The patrol unit is a brand. Shopee operations remain per Store ID, grouped by
-portal so the copied browser merchant-switch flow is reused unchanged.
+"""
+worker.py
+=========
+Backend Worker Engine that syncs store states, evaluates PRD rules, and triggers direct API open/close actions or Selenium browser login.
 """
 
-from __future__ import annotations
-
 import sys
+import os
 import time
-import fcntl
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Any
+from zoneinfo import ZoneInfo
 
-VB_SRC = Path(__file__).resolve().parent
-if str(VB_SRC) not in sys.path:
-    sys.path.insert(0, str(VB_SRC))
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from config import MAX_RETRIES, PASSWORD, SESSION_FILE, USERNAME, validate_runtime_paths
-from core import browser
-from core.logger import get_logger
+from logger import get_logger
+from sheets import MerchantOutlet
+from decision import evaluate_outlet_status, ACTION_OPEN, ACTION_CLOSE, ACTION_NO_CHANGE
+import browser
+import db
 from shopee import store_status
 
-import db
+log = get_logger("backend_worker")
 
-log = get_logger("vb_worker")
-ACTIVE_SESSION = None
-PATROL_LOCK_PATH = VB_SRC.parent / "patrol.lock"
-
-
-def configure_browser() -> None:
-    """Inject VB session path without changing the copied browser.py."""
-    validate_runtime_paths()
-    browser.set_session_file(SESSION_FILE)
+# Filter account usernames allowed for bot execution (Default: auto7313 only)
+ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
+ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
+# One long-lived browser per Shopee bot account. Merchant switching happens in
+# this browser; the bot does not close/reopen Chrome for every outlet action.
+ACTIVE_SESSIONS = {}
 
 
-def _load_session():
-    global ACTIVE_SESSION
-    configure_browser()
-    if ACTIVE_SESSION and ACTIVE_SESSION.get("driver"):
-        return ACTIVE_SESSION
-    ACTIVE_SESSION = browser.get_session(
-        username=USERNAME,
-        password=PASSWORD,
-        phone=None,
-        target_name=None,
+def _normalize_live_status(live_info: dict) -> str:
+    """Preserve Shopee's PAUSE state instead of collapsing it into CLOSED."""
+    if not isinstance(live_info, dict):
+        return "UNKNOWN"
+    pause_info = live_info.get("pause_info") or {}
+    pause_start = pause_info.get("pause_start_time", 0) if isinstance(pause_info, dict) else 0
+    try:
+        pause_start = float(pause_start or 0)
+    except (TypeError, ValueError):
+        pause_start = 0
+    if pause_start > 0:
+        return "PAUSE"
+    return "ON" if live_info.get("status_str") == "OPEN" else "CLOSED"
+
+
+def _pause_end_time_ms(outlet: MerchantOutlet):
+    """Convert the DB's local pause end time to Shopee's epoch milliseconds."""
+    pause_until = getattr(outlet, "pause_until", "") or ""
+    if not pause_until:
+        return None
+    try:
+        end_dt = datetime.fromisoformat(str(pause_until).replace("Z", "+00:00"))
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+        return int(end_dt.timestamp() * 1000)
+    except (TypeError, ValueError):
+        log.warning("  ⚠️ Invalid pause_until for Store %s: %s", outlet.store_id, pause_until)
+        return None
+
+
+def _normalize_shopee_regular_hours(payload: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Convert Shopee regular-hours relative seconds into read-only WIB ranges."""
+    day_names = {1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu", 7: "Minggu"}
+    normalized = {name: [] for name in day_names.values()}
+    for day in payload.get("regular_hours", []) if isinstance(payload, dict) else []:
+        name = day_names.get(int(day.get("weekday", 0)))
+        if not name or not day.get("config_enabled"):
+            continue
+        for interval in day.get("intervals", []):
+            start = max(0, int(interval.get("start_relative_sec", 0)))
+            end = max(0, int(interval.get("end_relative_sec", 0)))
+            if end <= start:
+                continue
+            normalized[name].append(f"{start // 3600:02d}:{(start % 3600) // 60:02d}-{end // 3600:02d}:{(end % 3600) // 60:02d}")
+    return normalized
+def warmup_all_account_sessions():
+    """
+    On service startup, iterates over registered merchant accounts and ensures
+    each account is logged in to the Shopee Partner Dashboard, saving active sessions.
+    Only processes accounts matching ALLOWED_USERNAMES (e.g. auto7313).
+    """
+    log.info(f"🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for whitelisted accounts {ALLOWED_USERNAMES}...")
+    try:
+        outlets = db.fetch_merchant_outlets_from_db()
+    except Exception as e:
+        log.warning(f"⚠️ [STARTUP WARMUP] Could not fetch control source outlets for warmup: {e}")
+        return
+
+    processed_accounts = set()
+    for outlet in outlets:
+        username = (outlet.username or "").strip()
+        if not username or username in processed_accounts:
+            continue
+
+        # Exclude usernames not in whitelist (username != auto7313)
+        if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+            log.info(f"  ⏭️ [STARTUP WARMUP] Excluding account '{username}' (username != auto7313).")
+            continue
+
+        processed_accounts.add(username)
+
+        session_file = PROJECT_ROOT / "src" / "data" / f"session_{username}.json"
+        browser.set_session_file(session_file)
+
+        # Warmup: verifikasi login saja, tanpa switch ke portal tertentu.
+        # Switch portal dilakukan per-merchant-group saat sync_all_stores berjalan.
+        log.info(f"  🌐 [STARTUP WARMUP] Initializing active browser session for account '{username}'...")
+        try:
+            session = browser.get_session(
+                username=username,
+                password=outlet.password,
+                phone=outlet.hp,
+                target_name=None,  # Jangan paksa switch portal saat warmup
+                close_browser=False,
+                interactive=False,
+            )
+            if session and session.get("shopee_tob_token"):
+                ACTIVE_SESSIONS[username] = session
+                log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' session active & stored (Entity ID: {session.get('shopee_tob_entity_id')}).")
+            else:
+                log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' login completed, session pending.")
+        except Exception as ex:
+            log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' warmup exception: {ex}")
+
+
+def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
+    """
+    Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
+    Excludes execution if outlet.username != auto7313.
+    """
+    # Exclude accounts not in ALLOWED_USERNAMES whitelist
+    if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
+        log.info(f"  ⏭️ [SHOPEE EXECUTION] Excluding Store {outlet.store_id} - username '{outlet.username}' != auto7313.")
+        return False
+
+    log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
+
+    # Set session file according to outlet username
+    if outlet.username:
+        account_session_file = PROJECT_ROOT / "src" / "data" / f"session_{outlet.username}.json"
+        if account_session_file.exists():
+            browser.set_session_file(account_session_file)
+
+    cached = ACTIVE_SESSIONS.get(outlet.username)
+    session = cached or browser.get_session(
+        username=outlet.username,
+        password=outlet.password,
+        phone=outlet.hp,
+        target_name=outlet.nama_portal,
         close_browser=False,
         interactive=False,
     )
-    return ACTIVE_SESSION
 
+    if session:
+        driver = session.get("driver")
+        ACTIVE_SESSIONS[outlet.username] = session
 
-def _driver_alive(driver) -> bool:
-    run_id = None
-    try:
-        _ = driver.current_url
-        return True
-    except Exception:
-        return False
-
-
-def _ensure_portal(session: dict, portal_name: str) -> bool:
-    driver = session.get("driver")
-    if not driver or not _driver_alive(driver):
-        return False
-    current = ""
-    try:
-        current = driver.execute_script("return (document.querySelector('.merchantName')?.innerText || '').trim();")
-    except Exception:
-        pass
-    current_norm = current.casefold().strip()
-    target_norm = (portal_name or "").casefold().strip()
-    if target_norm and (target_norm == current_norm or target_norm in current_norm or current_norm in target_norm):
-        return True
-    return bool(browser.auto_switch_merchant(driver, portal_name))
-
-
-def _read_actual(driver, store_id: str) -> str:
-    data = store_status.get_actual_store_status(driver, store_id=store_id)
-    if not data:
-        return "UNKNOWN"
-    return "ON" if data.get("status_str") == "OPEN" else "PAUSE"
-
-
-def _execute(driver, store: dict, target: str) -> bool:
-    if target == "ON":
-        return bool(store_status.open_store_action(driver, store["store_id"], merchant_id=store.get("merchant_id_external") or ""))
-    return bool(store_status.pause_store_action(driver, store["store_id"], merchant_id=store.get("merchant_id_external") or ""))
-
-
-def _process_store(session: dict, store: dict, target: str, brand_name: str) -> tuple[bool, str]:
-    driver = session.get("driver")
-    action = "OPEN" if target == "ON" else "PAUSE"
-    total_attempts = MAX_RETRIES + 1
-    if not driver:
-        log.error("❌ [VB ERROR] Brand=%s | Merchant=%s | Store ID=%s | Action=%s | Browser driver tidak tersedia", brand_name, store.get("portal_name", "-"), store["store_id"], action)
-        return False, "Browser driver tidak tersedia"
-    if not _ensure_portal(session, store["portal_name"]):
-        log.error("❌ [VB ERROR] Brand=%s | Merchant=%s | Store ID=%s | Action=%s | Gagal switch merchant", brand_name, store.get("portal_name", "-"), store["store_id"], action)
-        return False, f"Gagal switch merchant: {store['portal_name']}"
-    last_error = ""
-    for attempt in range(total_attempts):
-        try:
-            actual = _read_actual(driver, store["store_id"])
-            log.info("  🔎 [VB CHECK] Brand=%s | Merchant=%s | Store ID=%s | Actual=%s | Target=%s | Action=%s | Attempt=%s/%s", brand_name, store.get("portal_name", "-"), store["store_id"], actual, target, action, attempt + 1, total_attempts)
-            if actual == target:
-                # Status yang sudah sesuai bukan kegagalan dan tidak perlu
-                # muncul sebagai report outlet. Tetap tersedia pada DEBUG
-                # untuk troubleshooting lokal bila dibutuhkan.
-                log.debug("[VB SKIP] Brand=%s | Store ID=%s | Action=%s | Status sudah sesuai", brand_name, store["store_id"], action)
-                return True, "Status sudah sesuai"
-            if not _execute(driver, store, target):
-                last_error = "Aksi Shopee mengembalikan gagal"
+        # Primary Action: In-Browser XHR via store_status module (Instant execution)
+        if driver and outlet.store_id:
+            m_id = str(getattr(outlet, "merchant_id", "") or "14367488")
+            if action == ACTION_OPEN:
+                success = store_status.open_store_action(driver, outlet.store_id, merchant_id=m_id)
             else:
-                log.info("  ⚡ [VB ACTION] Brand=%s | Merchant=%s | Store ID=%s | Action=%s | Target=%s", brand_name, store.get("portal_name", "-"), store["store_id"], action, target)
-                time.sleep(1.5)
-                verified = _read_actual(driver, store["store_id"])
-                if verified == target:
-                    log.info("  ✅ [VB SUCCESS] Brand=%s | Store ID=%s | Action=%s | Verified=%s", brand_name, store["store_id"], action, verified)
-                    return True, "Aksi berhasil dan terverifikasi"
-                last_error = f"Verifikasi status {verified}, target {target}"
-        except Exception as exc:
-            last_error = str(exc)
-        if attempt < MAX_RETRIES:
-            log.warning("  🔁 [VB RETRY] Brand=%s | Store ID=%s | Action=%s | Retry=%s/%s | Error=%s", brand_name, store["store_id"], action, attempt + 1, MAX_RETRIES, last_error)
-    log.error("❌ [VB ERROR] Brand=%s | Merchant=%s | Store ID=%s | Action=%s | Attempts=%s | Error=%s", brand_name, store.get("portal_name", "-"), store["store_id"], action, total_attempts, last_error)
-    return False, last_error
-
-
-def patrol_once(execute_actions: bool = True) -> dict:
-    """Process one complete patrol round, in stable brand order."""
-    run_id = None
-    lock_handle = PATROL_LOCK_PATH.open("w")
-    try:
-        fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError as exc:
-        lock_handle.close()
-        raise RuntimeError("Putaran patroli VB lain masih berjalan") from exc
-
-    try:
-        session = _load_session()
-        if not session or not session.get("driver"):
-            raise RuntimeError("Session VB tidak aktif")
-
-        with db.connection() as conn:
-            with conn.transaction():
-                run_id = db.create_patrol_run(conn)
-                brands = db.list_brands(conn)
-
-        log.info("🚀 [VB PATROL START] Run=%s | Brands=%s | Interval=30s | Max retry=%s", run_id, len(brands), MAX_RETRIES)
-
-        processed = 0
-        outlets_processed = 0
-        failures = []
-        for brand_index, brand in enumerate(brands, start=1):
-            with db.connection() as conn:
-                with conn.transaction():
-                    applied = db.apply_pending_status(conn, brand["id"])
-                    if applied:
-                        brand["applied_status"] = applied["applied_status"]
-                    stores = db.get_brand_outlets(conn, brand["id"])
-
-            target = "ON" if brand["applied_status"] == "ON" else "PAUSE"
-            brand_failures = []
-            brand_changed = 0
-            merchants = sorted({store.get("portal_name") or "Unknown Merchant" for store in stores})
-            log.info("🏷️ [VB BRAND %s/%s] Brand=%s | Target=%s | Merchants=%s | Outlets=%s", brand_index, len(brands), brand["name"], target, ", ".join(merchants), len(stores))
-            for store in stores:
-                outlets_processed += 1
-                if not execute_actions:
-                    continue
-                ok, reason = _process_store(session, store, target, brand["name"])
-                with db.connection() as conn:
-                    with conn.transaction():
-                        before = store.get("shopee_actual_status") or "UNKNOWN"
-                        action = "OPEN_STORE" if target == "ON" else "PAUSE_STORE"
-                        if ok and before != target:
-                            brand_changed += 1
-                            conn.execute(
-                                """INSERT INTO automation_logs
-                                   (outlet_id, mode, vb_brand_id, vb_patrol_run_id,
-                                    suspension_status, subscription_status,
-                                    vercel_status_before, shopee_status_before,
-                                    target_status, action, success, reason)
-                                   VALUES (%s, 'VB', %s, %s, 'ACTIVE', 'ACTIVE',
-                                           'ON', %s, %s, %s, true, %s)""",
-                                (store["outlet_id"], brand["id"], run_id, before, target, action, reason),
-                            )
-                        if not ok:
-                            conn.execute(
-                                """INSERT INTO automation_errors
-                                   (mode, patrol_run_id, vb_brand_id, outlet_id, store_id,
-                                    merchant_name, action, attempt_count, error_type, error_message)
-                                   VALUES ('VB', %s, %s, %s, %s, %s, %s, 2, 'SHOPEE_ACTION_FAILED', %s)""",
-                                (run_id, brand["id"], store["outlet_id"], store["store_id"],
-                                 store.get("portal_name"), action, reason),
-                            )
-                        if ok:
-                            conn.execute(
-                                "UPDATE outlet_states SET shopee_actual_status=%s, last_checked_at=now(), last_action_at=now(), updated_at=now() WHERE outlet_id=%s",
-                                (target, store["outlet_id"]),
-                            )
-                if not ok:
-                    brand_failures.append({"store_id": store["store_id"], "reason": reason})
-            with db.connection() as conn:
-                with conn.transaction():
-                    db.mark_patrolled(conn, brand["id"])
-                    conn.execute(
-                        """INSERT INTO vb_brand_runtime_status
-                           (vb_brand_id, last_patrol_run_id, last_patrolled_at,
-                            outlets_processed, outlets_changed, error_count,
-                            last_error_at, last_error_message, updated_at)
-                           VALUES (%s, %s, now(), %s, %s, %s,
-                                   CASE WHEN %s > 0 THEN now() ELSE NULL END, %s, now())
-                           ON CONFLICT (vb_brand_id) DO UPDATE SET
-                             last_patrol_run_id=EXCLUDED.last_patrol_run_id,
-                             last_patrolled_at=EXCLUDED.last_patrolled_at,
-                             outlets_processed=EXCLUDED.outlets_processed,
-                             outlets_changed=EXCLUDED.outlets_changed,
-                             error_count=EXCLUDED.error_count,
-                             last_error_at=EXCLUDED.last_error_at,
-                             last_error_message=EXCLUDED.last_error_message,
-                             updated_at=now()""",
-                        (brand["id"], run_id, len(stores), brand_changed,
-                         len(brand_failures), len(brand_failures),
-                         brand_failures[-1]["reason"] if brand_failures else None),
-                    )
-                    if brand_failures:
-                        failures.append({"brand": brand["name"], "stores": brand_failures})
-            processed += 1
-            log.info("📌 [VB BRAND DONE] Brand=%s | Target=%s | Checked=%s | Changed=%s | Errors=%s", brand["name"], target, len(stores), brand_changed, len(brand_failures))
-
-        status = "PARTIAL_FAILURE" if failures else "SYNCED"
-        with db.connection() as conn:
-            with conn.transaction():
-                conn.execute(
-                    "UPDATE vb_patrol_runs SET finished_at=now(), status=%s, brands_processed=%s, outlets_processed=%s WHERE id=%s",
-                    (status, processed, outlets_processed, run_id),
+                success = store_status.pause_store_action(
+                    driver,
+                    outlet.store_id,
+                    merchant_id=m_id,
+                    pause_end_time_ms=_pause_end_time_ms(outlet),
                 )
-        log.info("🏁 [VB PATROL DONE] Run=%s | Status=%s | Brands=%s | Outlets=%s | Errors=%s", run_id, status, processed, outlets_processed, len(failures))
-        return {"run_id": run_id, "status": status, "brands_processed": processed, "outlets_processed": outlets_processed, "failures": failures}
-    except Exception as exc:
-        if run_id is not None:
+            if success:
+                log.info(f"  ✅ [IN-BROWSER XHR SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                return True
+
+    log.error(f"  ❌ Gagal mengeksekusi {action} untuk Store {outlet.store_id}.")
+    return False
+
+
+def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
+    log.info("🔄 [BACKEND WORKER] Starting store synchronization...")
+
+    # Runtime source of truth: PostgreSQL. Spreadsheet is import-only.
+    outlets = db.fetch_merchant_outlets_from_db()
+    actions_taken = []
+
+    # Group outlets by account and merchant portal (nama_portal)
+    # Format: { (username, nama_portal): [outlet1, outlet2, ...] }
+    grouped_outlets: Dict[tuple, List[MerchantOutlet]] = {}
+    for outlet in outlets:
+        if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
+            log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - username '{outlet.username}' not in ALLOWED_USERNAMES")
+            continue
+        key = (outlet.username, outlet.nama_portal or "")
+        if key not in grouped_outlets:
+            grouped_outlets[key] = []
+        grouped_outlets[key].append(outlet)
+
+    # Process each merchant portal group
+    for (username, portal_name), merchant_outlets in grouped_outlets.items():
+        log.info(f"🏬 [MERCHANT GROUP] Processing {len(merchant_outlets)} outlets for Merchant Portal: '{portal_name}' (Account: {username})...")
+
+        # 1. Ensure browser session is active and switched to portal_name
+        cached = ACTIVE_SESSIONS.get(username)
+        driver = cached.get("driver") if cached else None
+
+        def _is_session_dead(drv) -> bool:
+            """Return True if the WebDriver session is no longer valid."""
             try:
-                with db.connection() as conn:
-                    with conn.transaction():
-                        conn.execute(
-                            "UPDATE vb_patrol_runs SET finished_at=now(), status='FAILED', error_message=%s WHERE id=%s",
-                            (str(exc), run_id),
+                _ = drv.current_url
+                return False
+            except Exception:
+                return True
+
+        def _recover_session(reason: str) -> None:
+            """Clear stale session cache and re-launch a fresh browser session."""
+            nonlocal cached, driver
+            log.warning(f"  🔁 [SESSION RECOVERY] Dead session detected ({reason}). Re-launching browser for account '{username}'...")
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+            ACTIVE_SESSIONS.pop(username, None)
+            cached = None
+            driver = None
+            try:
+                first_outlet = merchant_outlets[0]
+                new_session = browser.get_session(
+                    username=username,
+                    password=first_outlet.password,
+                    phone=first_outlet.hp,
+                    target_name=portal_name,
+                    close_browser=False,
+                    interactive=False,
+                )
+                if new_session and new_session.get("shopee_tob_token"):
+                    ACTIVE_SESSIONS[username] = new_session
+                    cached = new_session
+                    driver = new_session.get("driver")
+                    log.info(f"  ✅ [SESSION RECOVERY] Browser session restored for account '{username}' (Portal: {portal_name}).")
+                else:
+                    log.warning(f"  ⚠️ [SESSION RECOVERY] Re-launch completed but session token missing for '{username}'.")
+            except Exception as rec_err:
+                log.error(f"  ❌ [SESSION RECOVERY] Failed to re-launch browser for '{username}': {rec_err}")
+
+        if driver:
+            if _is_session_dead(driver):
+                _recover_session("invalid session id")
+            else:
+                try:
+                    # Ambil nama merchant yang sedang aktif di browser DOM (.merchantName)
+                    current_merchant = ""
+                    try:
+                        current_merchant = driver.execute_script(
+                            "return (document.querySelector('.merchantName')?.innerText || '').trim();"
                         )
-            except Exception as mark_error:
-                log.error("Gagal menandai patrol run %s sebagai FAILED: %s", run_id, mark_error)
-        log.exception("💥 [VB PATROL FAILED] Run=%s | Error=%s", run_id, exc)
-        raise
-    finally:
-        try:
-            fcntl.flock(lock_handle, fcntl.LOCK_UN)
-        finally:
-            lock_handle.close()
+                    except Exception:
+                        pass
+
+                    already_active = False
+                    if portal_name and current_merchant:
+                        p_norm = portal_name.lower().strip()
+                        c_norm = current_merchant.lower().strip()
+                        if p_norm == c_norm or p_norm in c_norm or c_norm in p_norm:
+                            already_active = True
+
+                    if already_active:
+                        log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}' (Current UI: '{current_merchant}'). Skip switch.")
+                    else:
+                        log.info(f"  🔄 [MERCHANT] Current merchant di browser: '{current_merchant or 'Unknown'}' | Target group: '{portal_name}'. Executing auto_switch_merchant...")
+                        sw_ok = browser.auto_switch_merchant(driver, portal_name)
+                        if sw_ok:
+                            log.info(f"  ✅ [MERCHANT] Switched successfully to portal merchant '{portal_name}'.")
+                            # Perbarui token dan entity_id di session cache setelah merchant switch
+                            tok, eid = browser.extract_tokens_from_driver(driver)
+                            if cached:
+                                if tok:
+                                    cached["shopee_tob_token"] = tok
+                                if eid:
+                                    cached["shopee_tob_entity_id"] = eid
+                        else:
+                            log.warning(f"  ⚠️ [MERCHANT] auto_switch_merchant ke '{portal_name}' gagal. Initiating session recovery...")
+                            _recover_session(f"switch merchant to {portal_name} failed")
+                except Exception as sw_err:
+                    log.warning(f"  ⚠️ Merchant context switch warning: {sw_err}")
+                    if _is_session_dead(driver):
+                        _recover_session("switch merchant failed")
+        else:
+            # Launch/get browser session targeting portal_name
+            try:
+                first_outlet = merchant_outlets[0]
+                session = browser.get_session(
+                    username=username,
+                    password=first_outlet.password,
+                    phone=first_outlet.hp,
+                    target_name=portal_name,
+                    close_browser=False,
+                    interactive=False,
+                )
+                if session and session.get("shopee_tob_token"):
+                    ACTIVE_SESSIONS[username] = session
+                    cached = session
+                    driver = session.get("driver")
+            except Exception as sess_err:
+                log.warning(f"  ⚠️ Browser session init error for merchant '{portal_name}': {sess_err}")
+
+        tob_token = cached.get("shopee_tob_token") if cached else None
+        entity_id = cached.get("shopee_tob_entity_id") if cached else None
+        extra_cookies = cached.get("extra_cookies") if cached else None
+
+        # 2. Process all outlets in this merchant group
+        for outlet in merchant_outlets:
+            if outlet.username:
+                browser.set_session_file(PROJECT_ROOT / "src" / "data" / f"session_{outlet.username}.json")
+
+            log.info(f"📌 Memasuki tab Business Hours untuk Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
+
+            # Check and verify if the Business Hours menu for target store_id is detected
+            is_detected = store_status.ensure_business_hours_page(driver, store_id=outlet.store_id)
+            if is_detected:
+                log.info(f"  ✅ [BUSINESS HOURS CONFIRMED] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) TERDETEKSI & TER-LOAD SEMPURNA di menu Business Hours!")
+            else:
+                log.warning(f"  ⚠️ [BUSINESS HOURS WARNING] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) BELUM TERDETEKSI SEMPURNA di menu Business Hours!")
+
+            # Pull Shopee's latest regular schedule through the same authenticated
+            # browser XHR used by live status checks. This is read-only and is
+            # stored separately from the decision-engine operating_hours.
+            # A failed fetch must not reuse a stale schedule from a previous
+            # cycle; the outlet will be silently skipped instead.
+            outlet.regular_hours = {}
+            try:
+                shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
+                if shopee_hours:
+                    normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
+                    db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                    # Apply the freshly fetched Shopee schedule in this same
+                    # cycle; do not wait for the next database reload.
+                    outlet.regular_hours = normalized_hours
+                    log.info(f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan ({sum(bool(v) for v in normalized_hours.values())} hari aktif).")
+            except Exception as hours_err:
+                log.warning(f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menyimpan jadwal Shopee Store {outlet.store_id}: {hours_err}")
+
+            # Single Essential Endpoint: Fetch Realtime Live Store Status via /api/seller/store
+            try:
+                live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
+                if live_info and live_info.get("status_str") in ("OPEN", "CLOSED"):
+                    actual_st = _normalize_live_status(live_info)
+                    outlet.status_aktual = actual_st
+                    db.update_shopee_actual_status(outlet.store_id, actual_st)
+            except Exception as st_err:
+                log.debug(f"  ⚠️ Live Shopee status query skipped for Store {outlet.store_id}: {st_err}")
+
+            # Evaluate decision engine rules from database-backed state.
+            decision = evaluate_outlet_status(
+                outlet,
+                current_time=datetime.now(ZoneInfo("Asia/Jakarta")),
+                require_regular_schedule=True,
+            )
+            shopee_before = (outlet.status_aktual or "UNKNOWN").upper()
+            vercel_status = (outlet.status_utama or "OFF").upper()
+
+            log.info(
+                f"  🔍 [PRE-CHECK] Store {outlet.store_id} ({outlet.nama_panjang_outlet}) | "
+                f"Shopee Status Sebelum: {shopee_before} | Vercel Toggle: {vercel_status} | "
+                f"Decision: {decision.action} ({decision.reason})"
+            )
+
+            # 3. If action needed and execute_actions is True
+            if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
+                log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id} (Target: {decision.target_state})...")
+                exec_ok = execute_outlet_shopee_action(outlet, decision.action)
+
+                if exec_ok:
+                    log.info(f"  🔍 [POST-EXECUTION VERIFICATION] Memverifikasi ulang status live Shopee setelah {decision.action} untuk Store {outlet.store_id}...")
+                    time.sleep(1.5)
+                    post_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
+                    expected_st = "ON" if decision.target_state == "OPEN" else "PAUSE"
+                    if post_info and post_info.get("status_str") in ("OPEN", "CLOSED"):
+                        verified_st = _normalize_live_status(post_info)
+                        log.info(f"  ✅ [POST-EXECUTION VERIFIED] Status Live Shopee Pasca-{decision.action}: '{verified_st}' (Expected: '{expected_st}').")
+                        new_actual_status = verified_st
+
+                        if verified_st != expected_st:
+                            merchant_name = outlet.nama_portal or outlet.nama_pemilik or "Shopee Merchant"
+                            outlet_name = outlet.nama_panjang_outlet or outlet.nama_pendek_outlet or outlet.store_id
+                            log.debug(
+                                f"  [POST-EXECUTION SKIP] Status Live Shopee ('{verified_st}') berbeda dari ekspektasi ('{expected_st}'). "
+                                f"Outlet '{outlet_name}' ({merchant_name}) tidak dilaporkan karena skip bukan failure."
+                            )
+                    else:
+                        new_actual_status = expected_st
+
+                    try:
+                        db.update_shopee_actual_status(outlet.store_id, new_actual_status)
+                        log.info(f"  ✅ [DB STATUS SYNC] Status shopee_actual_status Store {outlet.store_id} berhasil diupdate ke '{new_actual_status}' di DB.")
+                    except Exception as sync_err:
+                        log.warning(f"  ⚠️ Gagal mengupdate DB shopee_actual_status: {sync_err}")
+
+
+                reason_text = f"{decision.reason} | Shopee Action: {'SUCCESS' if exec_ok else 'FAILED'}"
+                actions_taken.append({
+                    "store_id": outlet.store_id,
+                    "store_name": outlet.nama_panjang_outlet,
+                    "action": decision.action,
+                    "target_state": decision.target_state,
+                    "reason": reason_text
+                })
+
+                # Record in the runtime audit log
+                db.record_log(
+                    store_id=outlet.store_id,
+                    store_name=outlet.nama_panjang_outlet,
+                    action=decision.action,
+                    target_state=decision.target_state,
+                    reason=reason_text
+                )
+
+    # Record overall cycle evaluation log for process tracking
+    db.record_log(
+        store_id="SYSTEM",
+        store_name="BOT_DAEMON",
+        action="SYNC_CYCLE",
+        target_state="SYNCED",
+        reason=f"Evaluasi bot selesai untuk {len(actions_taken)} aksi dijalankan (Filtered: username == auto7313)"
+    )
+
+    return {
+        "success": True,
+        "total_stores_processed": len(outlets),
+        "actions_taken": actions_taken,
+        "message": f"Successfully processed stores for allowed usernames {ALLOWED_USERNAMES}."
+    }

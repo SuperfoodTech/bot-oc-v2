@@ -80,7 +80,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
       - PYTHONPATH=/app/main-vb/src:/app/src
-      - HEADLESS=${HEADLESS:-true}
+      - HEADLESS=true
       - VB_SESSION_FILE=/app/vb-data/session.json
       - VB_CREDENTIALS_FILE=/app/vb-data/credentials.json
       - VB_CHROME_PROFILE_DIR=/app/vb-data/chrome_profile

@@ -29,12 +29,20 @@ def is_within_operating_hours(hours_str: str, check_time: Optional[time] = None)
     Checks if check_time (default: current local time) falls within a string range like "08:00-22:00".
     If hours_str is empty, assumes open 24/7 or valid.
     """
-    if not hours_str or "-" not in hours_str:
-        return True
+    if isinstance(hours_str, (list, tuple)):
+        return bool(hours_str) and any(is_within_operating_hours(interval, check_time) for interval in hours_str)
 
-    parts = hours_str.split("-")
-    if len(parts) != 2:
+    normalized_hours = (hours_str or "").strip().lower()
+    if normalized_hours in {"tutup", "closed", "close", "off", "nonaktif"}:
+        return False
+    if not normalized_hours:
         return True
+    if "-" not in normalized_hours:
+        return False
+
+    parts = normalized_hours.split("-")
+    if len(parts) != 2:
+        return False
 
     try:
         start_h, start_m = map(int, parts[0].strip().split(":"))
@@ -52,16 +60,21 @@ def is_within_operating_hours(hours_str: str, check_time: Optional[time] = None)
             # Overnight shift e.g. 20:00-04:00
             return check_time >= start_t or check_time <= end_t
     except Exception:
-        return True
+        return False
 
 
-def evaluate_outlet_status(outlet: MerchantOutlet, current_time: Optional[datetime] = None) -> DecisionResult:
+def evaluate_outlet_status(
+    outlet: MerchantOutlet,
+    current_time: Optional[datetime] = None,
+    require_regular_schedule: bool = False,
+) -> DecisionResult:
     """
     Evaluates the target status of an outlet based on the PRD priority chain:
     1. Status Penangguhan (Ya/Tidak) -> If "Ya", forced CLOSE.
     2. Status Subscription (Aktif/Kedaluwarsa) -> If not "Aktif", Auto Open disabled -> CLOSE.
-    3. Operating Hours (Senin-Minggu) -> If outside hours, forced CLOSE.
-    4. Vercel Toggle / Status Utama (On/Off) -> Primary Source of Truth.
+    3. Operating Hours (Senin-Minggu) -> If outside or unavailable, silently skip.
+    4. Shopee CLOSED during regular hours -> Treat as special schedule and skip.
+    5. Vercel Toggle / Status Utama (On/Off) -> Primary Source of Truth.
     """
     if current_time is None:
         current_time = datetime.now()
@@ -87,12 +100,30 @@ def evaluate_outlet_status(outlet: MerchantOutlet, current_time: Optional[dateti
     # 3. Check Operating Hours for today
     weekday_name = WEEKDAY_MAP.get(current_time.weekday(), "Senin")
     today_hours = outlet.regular_hours.get(weekday_name, "")
+
+    if require_regular_schedule and not today_hours:
+        return DecisionResult(
+            target_state=TARGET_CLOSE,
+            action=ACTION_NO_CHANGE,
+            reason=f"Jadwal reguler Shopee {weekday_name} tidak tersedia",
+        )
     
     if not is_within_operating_hours(today_hours, current_time.time()):
+        # Shopee owns the CLOSED state outside the regular schedule. Do not
+        # translate it into a PAUSE/CLOSE action from the bot.
         target = TARGET_CLOSE
-        reason = f"Di luar jam operasional ({weekday_name}: {today_hours})"
-        action = ACTION_CLOSE if is_currently_open else ACTION_NO_CHANGE
+        reason = f"Di luar jam operasional ({weekday_name}: {today_hours or 'Tutup'})"
+        action = ACTION_NO_CHANGE
         return DecisionResult(target_state=target, action=action, reason=reason)
+
+    # Shopee's CLOSED state during an active regular interval indicates a
+    # higher-priority special schedule/holiday. Never force OPEN in that case.
+    if aktual_status_raw in ["closed", "close"]:
+        return DecisionResult(
+            target_state=TARGET_CLOSE,
+            action=ACTION_NO_CHANGE,
+            reason="Shopee CLOSED di dalam jam reguler; dianggap jadwal khusus",
+        )
 
     # 4. Vercel Toggle / Status Utama (Source of Truth)
     status_utama_raw = (outlet.status_utama or "").strip().lower()

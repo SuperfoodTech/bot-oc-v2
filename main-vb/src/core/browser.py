@@ -73,7 +73,7 @@ def cleanup_driver_process(driver) -> None:
 BASE_DIR         = Path(__file__).resolve().parent.parent
 DATA_DIR         = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-CREDENTIALS_FILE = Path(os.getenv("VB_CREDENTIALS_FILE", str(DATA_DIR / "credentials.json")))
+CREDENTIALS_FILE = Path(os.getenv("SHOPEE_CREDENTIALS_FILE", os.getenv("VB_CREDENTIALS_FILE", str(DATA_DIR / "credentials.json"))))
 PROJECT_ROOT     = BASE_DIR.parent
 
 import sys
@@ -84,7 +84,7 @@ _thread_local = threading.local()
 
 def get_session_file() -> Path:
     if not hasattr(_thread_local, "session_file"):
-        _thread_local.session_file = Path(os.getenv("VB_SESSION_FILE", str(DATA_DIR / "session.json")))
+        _thread_local.session_file = Path(os.getenv("SHOPEE_SESSION_FILE", os.getenv("VB_SESSION_FILE", str(DATA_DIR / "session_auto7313.json"))))
     return _thread_local.session_file
 
 def get_otp_code(username: str, phone: str) -> str:
@@ -733,9 +733,10 @@ def _init_driver(headless: bool = None):
         options.add_argument("--start-maximized")
     
     session_file = get_session_file()
-    profile_dir = Path(os.getenv("VB_CHROME_PROFILE_DIR", str(DATA_DIR / "chrome_profile")))
+    account_name = session_file.stem.replace("session_", "") if "session_" in session_file.stem else "auto7313"
+    profile_dir = Path(os.getenv("SHOPEE_CHROME_PROFILE_DIR", os.getenv("VB_CHROME_PROFILE_DIR", str(DATA_DIR / f"chrome_profile_{account_name}"))))
     options.add_argument(f"--user-data-dir={profile_dir.resolve()}")
-    profile_name = os.getenv("VB_CHROME_PROFILE_NAME", "shopee_profile")
+    profile_name = os.getenv("SHOPEE_CHROME_PROFILE_NAME", os.getenv("VB_CHROME_PROFILE_NAME", f"profile_{account_name}"))
     options.add_argument(f"--profile-directory={profile_name}")
     log.info(f"📂 [CHROME PROFILE] Loaded Profile Directory: {profile_dir} ({profile_name})")
 
@@ -1438,7 +1439,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
     if headless is None:
         headless = is_headless_enabled()
     if not password and username:
-        cred_paths = [CREDENTIALS_FILE]
+        cred_paths = [CREDENTIALS_FILE, PROJECT_ROOT / "credentials.json"]
         for cp in cred_paths:
             if cp.exists():
                 try:

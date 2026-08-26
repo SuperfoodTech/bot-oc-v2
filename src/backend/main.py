@@ -646,7 +646,15 @@ def user_pause_store(req: UserPauseRequest):
         duration_mins = 60
         label = "60 Menit"
     elif dtype in ("rest_of_day", "sepanjang_hari", "today"):
-        midnight = datetime(now_dt.year, now_dt.month, now_dt.day, 23, 59, 59)
+        midnight = datetime(
+            now_dt.year,
+            now_dt.month,
+            now_dt.day,
+            23,
+            59,
+            59,
+            tzinfo=wib,
+        )
         duration_mins = int((midnight - now_dt).total_seconds() // 60)
         if duration_mins < 10:
             duration_mins = 60

@@ -24,7 +24,46 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.7.2`.
+Latest documented release: `1.10.1`.
+
+Service `bot-vb` wajib menggunakan `HEADLESS=true` pada deployment Docker.
+Jangan menambahkan release yang mengubahnya ke `false`, karena server tidak
+memiliki display/X server dan Chrome akan gagal start.
+
+Runtime VB bersifat pure toggle setelah gate jadwal: `penangguhan` dan masa
+aktif layanan tidak boleh memaksa action VB. Pengecualian ini harus berada di
+adapter decision VB, bukan mengubah worker bot-OC.
+
+`bot-vb` pada deployment server wajib tetap `HEADLESS=true`; jangan mengubah
+konfigurasi service server menjadi mode GUI.
+
+`main-vb/src/daemon.py` harus memanggil `sync_all_stores` dari worker VB yang
+identik dengan bot-OC; jangan mengembalikan API `patrol_once` ke worker.
+
+Build Docker wajib mengecualikan seluruh `src/data/**` dari build context.
+Credential, session, dan Chrome profile adalah data runtime yang dipasang
+melalui volume, bukan bagian image.
+
+`main-vb/src/core/browser.py` wajib identik byte-for-byte dengan
+`src/core/browser.py`. Perbedaan runtime hanya boleh melalui environment
+variable `VB_CREDENTIALS_FILE`, `VB_SESSION_FILE`,
+`VB_CHROME_PROFILE_DIR`, dan `VB_CHROME_PROFILE_NAME`.
+
+`main-vb/src/worker.py` wajib identik byte-for-byte dengan
+`main-bot/src/worker.py`. Perbedaan VB harus berada di adapter `main-vb/src/db.py`
+dan konfigurasi runtime: target toggle dibaca dari `vb_brands.applied_status`,
+sedangkan Sheet hanya dipakai untuk import scope brand.
+
+Normalisasi live status VB wajib sama dengan Bot O/C: gunakan
+`pause_info.pause_start_time > 0` untuk `PAUSE`, `status_str == OPEN` untuk
+`ON`, dan status non-OPEN tanpa pause aktif sebagai `CLOSED`.
+
+Bot VB wajib meneruskan `pause_until` brand yang sudah diterapkan ke payload
+pause XHR Shopee sebagai `pause_end_time` Unix milliseconds; tidak boleh
+memakai fallback 1 hari ketika target waktu tersedia.
+
+Perhitungan pause `rest_of_day` wajib menggunakan objek datetime timezone-aware
+Asia/Jakarta sebelum dikonversi menjadi Unix timestamp milliseconds.
 
 Sheet VB menjadi source of truth untuk scope brand: setiap brand yang tidak
 ada pada hasil fetch terbaru harus ditandai `is_active=false`, bukan dibiarkan

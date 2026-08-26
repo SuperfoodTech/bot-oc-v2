@@ -217,10 +217,17 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pause_duration_minutes: int = 1440) -> bool:
+def pause_store_action(
+    driver,
+    store_id: str,
+    merchant_id: str = "14367488",
+    pause_duration_minutes: int = 1440,
+    pause_end_time_ms: Optional[int] = None,
+) -> bool:
     """
     Triggers store pause (Auto Close) for store_id.
-    Executes UI Button Click ('Tutup Outlet Sementara') first, then falls back to XHR POST API.
+    Uses the in-browser XHR POST API directly. UI interaction is intentionally
+    disabled while this execution path is being evaluated.
     """
     if not driver or not store_id:
         return False
@@ -228,45 +235,9 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
     try:
         ensure_business_hours_page(driver, store_id)
 
-        log.info(f"⚡ [ACTION PAUSE UI] Triggering UI Button Click for Store {store_id}...")
+        log.info(f"🌐 [ACTION PAUSE XHR] Executing direct API action for Store {store_id} (UI disabled)...")
 
-        # 1. UI Button Click (Native React UI trigger on Business Hours page)
-        btn_clicked = driver.execute_script("""
-            var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
-            var targetBtn = btns.find(b => {
-                var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-                return txt.includes('tutup outlet') || txt.includes('tutup sementara') || txt.includes('pause');
-            });
-            if (targetBtn) {
-                targetBtn.scrollIntoView({block: 'center'});
-                targetBtn.click();
-                return true;
-            }
-            return false;
-        """)
-
-        if btn_clicked:
-            log.info("  👉 Clicked 'Tutup Outlet Sementara' button on UI. Confirming modal...")
-            time.sleep(1.0)
-            modal_confirm = driver.execute_script("""
-                var modalBtns = Array.from(document.querySelectorAll('.ant-modal-footer button, div[class*="modal"] button, button'));
-                var confirmBtn = modalBtns.find(b => {
-                    var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-                    return txt === 'konfirmasi' || txt === 'ya' || txt === 'setuju' || txt === 'ok' || txt.includes('tutup');
-                });
-                if (confirmBtn) {
-                    confirmBtn.click();
-                    return true;
-                }
-                return false;
-            """)
-            if modal_confirm:
-                log.info("  ✅ [UI ACTION PAUSE SUCCESS] Confirmed 'Tutup Outlet' modal successfully.")
-                time.sleep(1.0)
-                return True
-
-        # 2. XHR POST API Fallback with explicit store_id query param
-        log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
+        # Direct XHR POST with explicit store_id query parameter.
         target_num = int(store_id) if str(store_id).isdigit() else store_id
         for attempt in range(1, 3):
             try:
@@ -278,7 +249,7 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
                         done({{code: -1, msg: 'Client timeout (5s)'}});
                     }}, 5000);
                     var now = Date.now();
-                    var end = now + ({pause_duration_minutes} * 60 * 1000);
+                    var end = {pause_end_time_ms if pause_end_time_ms is not None else f"now + ({pause_duration_minutes} * 60 * 1000)"};
                     fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
                         method: 'POST',
                         credentials: 'include',
@@ -311,7 +282,8 @@ def pause_store_action(driver, store_id: str, merchant_id: str = "14367488", pau
 def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> bool:
     """
     Triggers store reopen (Auto Open) for store_id.
-    Executes UI Button Click ('Buka Outlet') first, then falls back to XHR POST API.
+    Uses the in-browser XHR POST API directly. UI interaction is intentionally
+    disabled while this execution path is being evaluated.
     """
     if not driver or not store_id:
         return False
@@ -319,45 +291,9 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
     try:
         ensure_business_hours_page(driver, store_id)
 
-        log.info(f"⚡ [ACTION OPEN UI] Triggering UI Button Click for Store {store_id}...")
+        log.info(f"🌐 [ACTION OPEN XHR] Executing direct API action for Store {store_id} (UI disabled)...")
 
-        # 1. UI Button Click (Native React UI trigger on Business Hours page)
-        btn_clicked = driver.execute_script("""
-            var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
-            var targetBtn = btns.find(b => {
-                var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-                return txt.includes('buka outlet') || txt.includes('buka toko') || txt === 'buka';
-            });
-            if (targetBtn) {
-                targetBtn.scrollIntoView({block: 'center'});
-                targetBtn.click();
-                return true;
-            }
-            return false;
-        """)
-
-        if btn_clicked:
-            log.info("  👉 Clicked 'Buka Outlet' button on UI. Confirming modal...")
-            time.sleep(1.0)
-            modal_confirm = driver.execute_script("""
-                var modalBtns = Array.from(document.querySelectorAll('.ant-modal-footer button, div[class*="modal"] button, button'));
-                var confirmBtn = modalBtns.find(b => {
-                    var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-                    return txt === 'konfirmasi' || txt === 'ya' || txt === 'setuju' || txt === 'ok' || txt.includes('buka');
-                });
-                if (confirmBtn) {
-                    confirmBtn.click();
-                    return true;
-                }
-                return false;
-            """)
-            if modal_confirm:
-                log.info("  ✅ [UI ACTION OPEN SUCCESS] Confirmed 'Buka Outlet' modal successfully.")
-                time.sleep(1.0)
-                return True
-
-        # 2. XHR POST API Fallback with explicit store_id query param
-        log.info("  🌐 UI Button not found, executing XHR POST fallback with store context...")
+        # Direct XHR POST with explicit store_id query parameter.
         target_num = int(store_id) if str(store_id).isdigit() else store_id
         for attempt in range(1, 3):
             try:
@@ -393,4 +329,3 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
         log.error(f"  ❌ Failed to execute open action for store {store_id}: {e}")
 
     return False
-

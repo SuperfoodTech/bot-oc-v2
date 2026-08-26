@@ -73,7 +73,7 @@ def cleanup_driver_process(driver) -> None:
 BASE_DIR         = Path(__file__).resolve().parent.parent
 DATA_DIR         = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-CREDENTIALS_FILE = DATA_DIR / "credentials.json"
+CREDENTIALS_FILE = Path(os.getenv("SHOPEE_CREDENTIALS_FILE", os.getenv("VB_CREDENTIALS_FILE", str(DATA_DIR / "credentials.json"))))
 PROJECT_ROOT     = BASE_DIR.parent
 
 import sys
@@ -84,7 +84,7 @@ _thread_local = threading.local()
 
 def get_session_file() -> Path:
     if not hasattr(_thread_local, "session_file"):
-        _thread_local.session_file = DATA_DIR / "session_auto7313.json"
+        _thread_local.session_file = Path(os.getenv("SHOPEE_SESSION_FILE", os.getenv("VB_SESSION_FILE", str(DATA_DIR / "session_auto7313.json"))))
     return _thread_local.session_file
 
 def get_otp_code(username: str, phone: str) -> str:
@@ -734,10 +734,11 @@ def _init_driver(headless: bool = None):
     
     session_file = get_session_file()
     account_name = session_file.stem.replace("session_", "") if "session_" in session_file.stem else "auto7313"
-    profile_dir = DATA_DIR / f"chrome_profile_{account_name}"
+    profile_dir = Path(os.getenv("SHOPEE_CHROME_PROFILE_DIR", os.getenv("VB_CHROME_PROFILE_DIR", str(DATA_DIR / f"chrome_profile_{account_name}"))))
     options.add_argument(f"--user-data-dir={profile_dir.resolve()}")
-    options.add_argument(f"--profile-directory=profile_{account_name}")
-    log.info(f"📂 [CHROME PROFILE] Loaded Profile Directory: {profile_dir} (profile_{account_name})")
+    profile_name = os.getenv("SHOPEE_CHROME_PROFILE_NAME", os.getenv("VB_CHROME_PROFILE_NAME", f"profile_{account_name}"))
+    options.add_argument(f"--profile-directory={profile_name}")
+    log.info(f"📂 [CHROME PROFILE] Loaded Profile Directory: {profile_dir} ({profile_name})")
 
     # Delete SingletonLock if it exists to avoid SessionNotCreatedException on Linux
     singleton_lock = profile_dir / "SingletonLock"
@@ -1438,10 +1439,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
     if headless is None:
         headless = is_headless_enabled()
     if not password and username:
-        cred_paths = [
-            CREDENTIALS_FILE,
-            PROJECT_ROOT / "credentials.json",
-        ]
+        cred_paths = [CREDENTIALS_FILE, PROJECT_ROOT / "credentials.json"]
         for cp in cred_paths:
             if cp.exists():
                 try:
@@ -1804,4 +1802,3 @@ def refresh_tokens(driver, fallback_entity_id=None) -> dict:
     all_c = get_all_cookies_dict(driver)
     save_session(t, eid or "", extra_cookies=all_c)
     return {"shopee_tob_token": t, "shopee_tob_entity_id": eid or "", "extra_cookies": all_c}
-
