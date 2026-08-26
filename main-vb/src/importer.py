@@ -78,7 +78,7 @@ def import_csv(content: str) -> dict[str, Any]:
                     conn.execute(
                         """INSERT INTO vb_brand_outlets (vb_brand_id, outlet_id, source_column)
                            VALUES (%s, %s, %s)
-                           ON CONFLICT (vb_brand_id, outlet_id) DO UPDATE SET source_column=EXCLUDED.source_column""",
+                           ON CONFLICT (outlet_id) DO UPDATE SET vb_brand_id=EXCLUDED.vb_brand_id, source_column=EXCLUDED.source_column""",
                         (brand["id"], outlet["id"], store["source_column"]),
                     )
                     linked += 1

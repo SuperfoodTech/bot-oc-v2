@@ -22,8 +22,9 @@ def _read_credentials() -> tuple[str, str]:
     data = json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
     if isinstance(data, dict) and data.get("username"):
         return str(data["username"]), str(data.get("password") or "")
-    for username, item in data.items():
+    for key, item in data.items():
         if isinstance(item, dict) and item.get("password"):
+            username = item.get("username") or key
             return str(username), str(item["password"])
     return os.getenv("VB_SHOPEE_USERNAME", "allvbadmin"), ""
 

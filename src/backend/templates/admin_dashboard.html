@@ -384,6 +384,23 @@
       alert(message);
     }
 
+    async function safeFetchJson(url, options = {}) {
+      const res = await fetch(url, options);
+      let data = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+      if (!res.ok) {
+        throw new Error(data.detail || `Server error (${res.status})`);
+      }
+      return data;
+    }
+
     async function copyDashboardLink(encodedUrl, button) {
       const url = decodeURIComponent(encodedUrl);
       try {
@@ -717,9 +734,7 @@
       const button = document.getElementById('vbImportButton');
       if (button) { button.disabled = true; button.textContent = 'Import...'; }
       try {
-        const res = await fetch('/api/v1/admin/vb/import', { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Import VB gagal.');
+        const data = await safeFetchJson('/api/v1/admin/vb/import', { method: 'POST' });
         const summary = data.summary || {};
         const missing = (summary.missing_store_ids || []).length;
         const created = summary.outlets_created || 0;
@@ -743,9 +758,7 @@
         button.textContent = 'Fetching...';
       }
       try {
-        const res = await fetch('/api/v1/admin/sync-source', { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Fetch Google Sheet gagal.');
+        const data = await safeFetchJson('/api/v1/admin/sync-source', { method: 'POST' });
         const summary = data.summary || {};
         showToast(`Fetch selesai: ${summary.imported || 0} aktif, ${summary.deactivated || 0} nonaktif, ${summary.skipped || 0} dilewati.`);
         await loadStoresData(true);
