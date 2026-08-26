@@ -1,6 +1,13 @@
 # Update
 
-## Latest update: v1.6.2
+## Latest update: v1.6.3
+
+- Konfigurasi `HEADLESS` dipusatkan ke satu variabel di file `.env`.
+- Service `bot-oc` dan `bot-vb` sekarang membaca nilai `HEADLESS` yang sama
+  melalui Docker Compose.
+- Detail lengkap tersedia di [update/1.6.3.md](update/1.6.3.md).
+
+## Update v1.6.2
 
 - Konfigurasi browser `bot-vb` dikembalikan ke mode headless (`HEADLESS=true`)
   agar stabil di server dan Docker tanpa display.

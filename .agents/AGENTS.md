@@ -24,11 +24,11 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.6.2`.
+Latest documented release: `1.6.3`.
 
-Deployment `bot-vb` menggunakan `HEADLESS=true` agar stabil pada server dan
-container tanpa X display. Mode GUI hanya boleh dipakai sementara untuk
-debugging langsung di host yang memiliki display aktif.
+Konfigurasi `HEADLESS` dipusatkan di `.env` dan dibaca bersama oleh service
+`bot-oc` serta `bot-vb` melalui Docker Compose. Nilai default tetap `true`
+agar stabil pada server/container tanpa X display.
 
 Setiap update kode, konfigurasi, atau perilaku aplikasi wajib:
 
