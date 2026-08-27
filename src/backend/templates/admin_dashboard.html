@@ -564,6 +564,20 @@
         row.className = 'vb-brand-card';
         row.id = `vb-card-${brand.id}`;
         const brandName = escapeVBHtml(brand.name);
+        
+        const outlets = brand.outlets || [];
+        const grouped = outlets.reduce((acc, outlet) => {
+          const key = outlet.merchant_name || 'Merchant tidak diketahui';
+          acc[key] = acc[key] || [];
+          acc[key].push(outlet.store_id);
+          return acc;
+        }, {});
+        const detailHtml = Object.entries(grouped).map(([merchant, ids]) => `
+          <div class="vb-detail-group">
+            <strong>${escapeVBHtml(merchant)}</strong>
+            <span>${ids.length} outlet: ${ids.map(escapeVBHtml).join(', ')}</span>
+          </div>`).join('') || (outlets.length ? '' : 'Belum ada outlet terhubung.');
+
         row.innerHTML = `
           <div class="vb-brand-card-head">
             <div>
@@ -577,8 +591,8 @@
             <span>Status diterapkan: <strong>${vbStatusLabel(brand.applied_status)}</strong></span>
             <span class="vb-pending">${brand.requested_status ? `Menunggu: ${vbStatusLabel(brand.requested_status)}` : 'Tidak ada perubahan pending'}</span>
           </div>
-          <div class="vb-brand-detail" id="vb-detail-${brand.id}">
-            <div class="vb-detail-content">Memuat merchant dan outlet...</div>
+          <div class="vb-brand-detail" id="vb-detail-${brand.id}" data-loaded="${outlets.length ? 'true' : 'false'}">
+            <div class="vb-detail-content">${detailHtml || 'Memuat merchant dan outlet...'}</div>
           </div>`;
         const statusCell = row.querySelector('.vb-brand-toggle');
         const controlWrap = document.createElement('div');
@@ -609,7 +623,9 @@
         controlWrap.appendChild(controlText);
         statusCell.appendChild(controlWrap);
         body.appendChild(row);
-        loadVBDetail(brand.id);
+        if (!outlets.length) {
+          loadVBDetail(brand.id);
+        }
       });
     }
 
@@ -621,10 +637,11 @@
         const res = await fetch(`/api/v1/admin/vb/brands/${encodeURIComponent(brandId)}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Detail brand gagal dimuat.');
-        const outlets = data.brand.outlets || [];
+        const outlets = (data.brand && data.brand.outlets) || [];
         const grouped = outlets.reduce((acc, outlet) => {
           const key = outlet.merchant_name || 'Merchant tidak diketahui';
-          (acc[key] ||= []).push(outlet.store_id);
+          acc[key] = acc[key] || [];
+          acc[key].push(outlet.store_id);
           return acc;
         }, {});
         const content = row.querySelector('.vb-detail-content');
@@ -705,7 +722,7 @@
       if (!end || Number.isNaN(end.getTime()) || end <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       const customUntil = document.getElementById('vbCustomUntilInput').value;
-      const control = document.querySelector(`#vb-card-${CSS.escape(String(brandId))} input[type="checkbox"]`);
+      const control = document.getElementById('vb-card-' + brandId)?.querySelector('input[type="checkbox"]');
       closeVbPauseModal();
       await requestVBStatus(brandId, 'PAUSED', control, { duration_type: type, custom_until: type === 'custom' ? customUntil : null });
     }

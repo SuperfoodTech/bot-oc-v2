@@ -29,16 +29,28 @@ def list_brands() -> list[dict[str, Any]]:
         rows = list(conn.execute(
             """SELECT b.id, b.name, b.applied_status, b.requested_status,
                       b.requested_at, b.pause_until, b.requested_pause_until,
-                      b.last_applied_at, b.last_patrolled_at,
-                      COUNT(bo.outlet_id)::int AS outlet_count,
-                      COUNT(DISTINCT o.portal_id)::int AS merchant_count
+                      b.last_applied_at, b.last_patrolled_at
                FROM vb_brands b
-               LEFT JOIN vb_brand_outlets bo ON bo.vb_brand_id=b.id
-               LEFT JOIN outlets o ON o.id=bo.outlet_id
                WHERE b.is_active=true
-               GROUP BY b.id
                ORDER BY b.name_normalized"""
         ).fetchall())
+        for row in rows:
+            stores = list(conn.execute(
+                """SELECT o.store_id, o.long_name, p.name AS merchant_name,
+                          os.shopee_actual_status
+                   FROM vb_brand_outlets bo
+                   JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
+                   JOIN portals p ON p.id=o.portal_id AND p.is_active=true
+                   LEFT JOIN outlet_states os ON os.outlet_id=o.id
+                   WHERE bo.vb_brand_id=%s
+                     AND o.store_id ~ '^[0-9]+$'
+                     AND p.name !~* '^(status|status import|import status)$'
+                   ORDER BY p.name, o.store_id""",
+                (row["id"],),
+            ).fetchall())
+            row["outlets"] = stores
+            row["outlet_count"] = len(stores)
+            row["merchant_count"] = len({s["merchant_name"] for s in stores if s.get("merchant_name")})
         return rows
 
 
@@ -54,10 +66,12 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
             """SELECT o.store_id, o.long_name, p.name AS merchant_name,
                       os.shopee_actual_status
                FROM vb_brand_outlets bo
-               JOIN outlets o ON o.id=bo.outlet_id
-               JOIN portals p ON p.id=o.portal_id
+               JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
+               JOIN portals p ON p.id=o.portal_id AND p.is_active=true
                LEFT JOIN outlet_states os ON os.outlet_id=o.id
                WHERE bo.vb_brand_id=%s
+                 AND o.store_id ~ '^[0-9]+$'
+                 AND p.name !~* '^(status|status import|import status)$'
                ORDER BY p.name, o.store_id""", (brand_id,)
         ).fetchall())
         return {**brand, "outlets": stores}
@@ -109,10 +123,14 @@ def _parse_matrix(content: str) -> list[dict[str, Any]]:
         for col_index, value in enumerate(row[1:], start=1):
             if col_index == status_index:
                 continue
-            if value.strip():
+            header_name = headers[col_index].strip() if col_index < len(headers) else ""
+            if header_name.casefold() in {"status", "status import", "import status", "nama outlet asli"}:
+                continue
+            clean_val = value.strip()
+            if clean_val and clean_val.isdigit():
                 stores.append({
-                    "store_id": value.strip(),
-                    "source_column": headers[col_index].strip() if col_index < len(headers) else "",
+                    "store_id": clean_val,
+                    "source_column": header_name,
                 })
         matrix.append({"row_number": row_number, "brand": row[0].strip(), "status": status, "is_active": is_active, "stores": stores})
     return matrix

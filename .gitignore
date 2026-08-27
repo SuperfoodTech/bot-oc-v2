@@ -48,3 +48,7 @@ main-bot/src/bot_state.json
 dist/
 build/
 *.egg-info/
+
+# Database dumps & backups
+*.sql
+!database/migrations/*.sql

@@ -9,11 +9,56 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from config import DATABASE_URL
+from config import DATABASE_URL, USERNAME, PASSWORD
 
 
 def connection():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+
+
+def apply_all_pending_statuses(conn) -> list[dict[str, Any]]:
+    """Apply any pending requested_status to applied_status for all active brands,
+    and automatically revert expired timed pauses back to ON.
+    """
+    # 1. Expire timed pauses that have passed their deadline
+    conn.execute("""
+        UPDATE vb_brands
+        SET requested_status='ON', requested_pause_until=NULL,
+            requested_at=now(), updated_at=now()
+        WHERE is_active=true
+          AND applied_status='PAUSED'
+          AND pause_until IS NOT NULL AND pause_until <= now()
+          AND requested_status IS NULL
+    """)
+    # 2. Apply all pending requested_status
+    rows = conn.execute("""
+        UPDATE vb_brands
+        SET applied_status=requested_status,
+            pause_until=CASE WHEN requested_status='PAUSED' THEN requested_pause_until ELSE NULL END,
+            requested_status=NULL,
+            requested_pause_until=NULL,
+            requested_at=NULL,
+            last_applied_at=now(),
+            updated_at=now()
+        WHERE is_active=true AND requested_status IS NOT NULL
+        RETURNING id, name, applied_status, pause_until, requested_by
+    """).fetchall()
+    for row in rows:
+        conn.execute(
+            """INSERT INTO admin_audit_logs
+               (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
+               VALUES (%s, %s, 'VB_CONTROL_STATUS_APPLIED', %s, %s, %s)""",
+            (row.get("requested_by"), row["id"],
+             Jsonb({"pending": True}), Jsonb({"applied_status": row["applied_status"]}),
+             "Perubahan diterapkan saat brand mendapat giliran patroli"),
+        )
+    return rows
+
+
+def sync_expired_user_pauses():
+    """Mark expired timed brand pauses ON on patrol turn and apply pending changes."""
+    with connection() as conn:
+        apply_all_pending_statuses(conn)
 
 
 def normalize_brand(name: str) -> str:
@@ -50,7 +95,7 @@ def apply_pending_status(conn, brand_id):
         """UPDATE vb_brands
            SET requested_status='ON', requested_pause_until=NULL,
                requested_at=now(), updated_at=now()
-           WHERE id=%s AND applied_status='PAUSED'
+           WHERE id=%s AND is_active=true AND applied_status='PAUSED'
              AND pause_until IS NOT NULL AND pause_until <= now()
              AND requested_status IS NULL""",
         (brand_id,),
@@ -61,7 +106,7 @@ def apply_pending_status(conn, brand_id):
                pause_until=CASE WHEN requested_status='PAUSED' THEN requested_pause_until ELSE NULL END,
                requested_status=NULL, requested_pause_until=NULL,
                requested_at=NULL, last_applied_at=now(), updated_at=now()
-           WHERE id=%s AND requested_status IS NOT NULL
+           WHERE id=%s AND is_active=true AND requested_status IS NOT NULL
            RETURNING id, name, applied_status, pause_until, requested_by""", (brand_id,)
     ).fetchone()
     if row:
@@ -69,7 +114,7 @@ def apply_pending_status(conn, brand_id):
             """INSERT INTO admin_audit_logs
                (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
                VALUES (%s, %s, 'VB_CONTROL_STATUS_APPLIED', %s, %s, %s)""",
-            (row["requested_by"], row["id"],
+            (row.get("requested_by"), row["id"],
              Jsonb({"pending": True}), Jsonb({"applied_status": row["applied_status"]}),
              "Perubahan diterapkan saat brand mendapat giliran patroli"),
         )
@@ -93,7 +138,9 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
     from core.sheets import MerchantOutlet
 
     query = """
-        SELECT b.name AS brand_name, b.applied_status, b.pause_until::text AS brand_pause_until,
+        SELECT b.name AS brand_name,
+               COALESCE(b.requested_status, b.applied_status) AS effective_status,
+               COALESCE(b.requested_pause_until, b.pause_until)::text AS brand_pause_until,
                o.store_id, o.long_name, p.name AS portal_name,
                sa.username, sa.password_plain, sa.phone, sa.merchant_id_external,
                os.shopee_actual_status, os.shopee_regular_hours,
@@ -114,17 +161,24 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             LIMIT 1
         ) s ON true
         LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
+        WHERE o.store_id ~ '^[0-9]+$' AND p.name !~* '^(status|status import|import status)$'
         ORDER BY b.name, p.name, o.store_id
     """
     with connection() as conn:
+        apply_all_pending_statuses(conn)
         rows = conn.execute(query).fetchall()
 
     outlets = []
     for row in rows:
+        store_id = str(row.get("store_id") or "").strip()
+        portal_name = str(row.get("portal_name") or "").strip()
+        if not store_id.isdigit() or portal_name.casefold() in {"status", "status import", "import status"}:
+            continue
         actual = (row.get("shopee_actual_status") or "UNKNOWN").upper()
         if actual == "OFF":
             actual = "CLOSED"
-        target = "ON" if row["applied_status"] == "ON" else "OFF"
+        effective = (row.get("effective_status") or "ON").upper()
+        target = "ON" if effective == "ON" else "OFF"
         suspended = (row.get("suspension_status") or "ACTIVE").upper() == "SUSPENDED"
         outlets.append(MerchantOutlet(
             nama_pemilik=row.get("brand_name") or "Virtual Brand",
@@ -132,8 +186,8 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             paket=row.get("package_name") or "",
             tanggal_mulai_layanan=row.get("service_start") or "",
             tanggal_berakhir_layanan=row.get("service_end") or "",
-            username=row.get("username") or "",
-            password=row.get("password_plain") or "",
+            username=USERNAME,
+            password=PASSWORD,
             hp=row.get("phone") or "",
             nama_portal=row.get("portal_name") or "",
             merchant_id=str(row.get("merchant_id_external") or ""),

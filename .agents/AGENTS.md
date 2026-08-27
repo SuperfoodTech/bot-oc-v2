@@ -24,7 +24,7 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.10.1`.
+Latest documented release: `1.10.3`.
 
 Service `bot-vb` wajib menggunakan `HEADLESS=true` pada deployment Docker.
 Jangan menambahkan release yang mengubahnya ke `false`, karena server tidak

@@ -38,8 +38,12 @@ def parse_matrix(content: str) -> list[dict[str, Any]]:
         for index, store_id in enumerate(row[1:], start=1):
             if index == status_index:
                 continue
-            if store_id.strip():
-                stores.append({"store_id": store_id.strip(), "source_column": headers[index].strip() if index < len(headers) else ""})
+            header_name = headers[index].strip() if index < len(headers) else ""
+            if header_name.casefold() in {"status", "status import", "import status", "nama outlet asli"}:
+                continue
+            clean_id = store_id.strip()
+            if clean_id and clean_id.isdigit():
+                stores.append({"store_id": clean_id, "source_column": header_name})
         output.append({"row_number": row_number, "brand": brand, "status": status, "is_active": is_active, "stores": stores})
     return output
 

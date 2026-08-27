@@ -57,6 +57,10 @@ def _pause_end_time_ms(outlet: MerchantOutlet):
         end_dt = datetime.fromisoformat(str(pause_until).replace("Z", "+00:00"))
         if end_dt.tzinfo is None:
             end_dt = end_dt.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+        now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+        if end_dt <= now_dt:
+            log.info("  ℹ️ Pause time %s for Store %s has already passed. Using default pause.", pause_until, outlet.store_id)
+            return None
         return int(end_dt.timestamp() * 1000)
     except (TypeError, ValueError):
         log.warning("  ⚠️ Invalid pause_until for Store %s: %s", outlet.store_id, pause_until)
@@ -182,6 +186,12 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
 
 def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
     log.info("🔄 [BACKEND WORKER] Starting store synchronization...")
+
+    if hasattr(db, "sync_expired_user_pauses"):
+        try:
+            db.sync_expired_user_pauses()
+        except Exception as e:
+            log.warning("  ⚠️ Failed to sync expired user pauses: %s", e)
 
     # Runtime source of truth: PostgreSQL. Spreadsheet is import-only.
     outlets = db.fetch_merchant_outlets_from_db()

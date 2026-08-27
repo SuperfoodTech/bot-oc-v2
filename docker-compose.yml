@@ -81,6 +81,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
       - PYTHONPATH=/app/main-vb/src:/app/src
       - HEADLESS=true
+      - ALLOWED_USERNAMES=allvbadmin
+      - VB_SHOPEE_USERNAME=allvbadmin
       - VB_SESSION_FILE=/app/vb-data/session.json
       - VB_CREDENTIALS_FILE=/app/vb-data/credentials.json
       - VB_CHROME_PROFILE_DIR=/app/vb-data/chrome_profile
@@ -95,6 +97,8 @@ services:
     volumes:
       - ./src/data:/app/vb-data
       - ./src/data/credentials allvbadmin.json:/app/vb-data/credentials.json:ro
+      - ./main-vb:/app/main-vb
+      - ./src:/app/src
 
 volumes:
   postgres_data:
