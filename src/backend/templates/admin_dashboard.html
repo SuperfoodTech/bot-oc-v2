@@ -16,7 +16,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260829-admin-console-v38">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260829-admin-console-v40">
 </head>
 
 <body x-data="adminApp()">
@@ -947,10 +947,20 @@
       const row = '<tr class="skeleton-table-row">' + Array.from({ length: 9 }, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
       document.getElementById('tableBody').innerHTML = row.repeat(5);
       document.getElementById('mobileOutletList').innerHTML = Array.from({ length: 3 }, () => `
-        <article class="mobile-outlet-card skeleton-mobile-card">
-          <span class="skeleton skeleton-title"></span>
-          <span class="skeleton skeleton-line"></span>
-          <span class="skeleton skeleton-line skeleton-line-short"></span>
+        <article class="mobile-outlet-card admin-mobile-outlet-card skeleton-mobile-card">
+          <div class="admin-mobile-outlet-head">
+            <div class="admin-mobile-outlet-copy">
+              <span class="skeleton skeleton-chip"></span>
+              <span class="skeleton skeleton-title"></span>
+              <span class="skeleton skeleton-line skeleton-line-short"></span>
+            </div>
+            <span class="skeleton skeleton-pill"></span>
+          </div>
+          <div class="admin-mobile-skeleton-grid">
+            <span class="skeleton skeleton-block"></span>
+            <span class="skeleton skeleton-block"></span>
+            <span class="skeleton skeleton-block skeleton-block-wide"></span>
+          </div>
         </article>`).join('');
     }
 
@@ -1249,9 +1259,24 @@
 
       sortedStores.forEach(s => {
         const isVercelOn = s.vercel_status === 'ON';
+        const statusClass = isVercelOn ? 'is-success' : 'is-warning';
         const isTogglePending = pendingAdminToggleStoreIds.has(String(s.store_id));
         const ownerName = s.nama_pemilik || 'Fando';
-        const linkUrl = getMitraDynamicUrl(s.vercel_link, ownerName);
+        const storeName = escapeHtml(detailValue(s.store_name, 'Outlet'));
+        const storeId = escapeHtml(detailValue(s.store_id));
+        const merchantName = escapeHtml(detailValue(s.merchant_name, '-'));
+        const ownerNameText = escapeHtml(detailValue(ownerName, '-'));
+        const servicePeriod = formatServicePeriod(s.tanggal_mulai_layanan, s.tanggal_berakhir_layanan);
+        const serviceRemaining = getServiceRemainingTime(s.tanggal_berakhir_layanan);
+        const shopeeStatus = getAdminShopeeStatusPresentation(s.shopee_status);
+        const pauseSummary = getAdminPauseSummary(s);
+        const toggleSummary = getAdminActionSummary(s);
+        const actionDetailNote = toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.';
+        const toggleMetaText = isTogglePending
+          ? 'Menyimpan perubahan...'
+          : (toggleSummary.note && toggleSummary.note !== '-'
+              ? `${toggleSummary.title} · ${toggleSummary.note}`
+              : toggleSummary.title);
         const tr = document.createElement('tr');
         const todaySchedule = getTodayOperatingHours(s);
 
@@ -1267,7 +1292,7 @@
           </td>
           <td>${todaySchedule}</td>
           <td>
-            <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Buka' : 'Paused'}</span>
+            <span class="table-status ${statusClass}">${isVercelOn ? 'Buka' : 'Paused'}</span>
             ${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}
           </td>
           <td>${getAdminActionMarkup(s)}</td>
@@ -1283,27 +1308,62 @@
         tbody.appendChild(tr);
 
         const mobileCard = document.createElement('article');
-        mobileCard.className = 'mobile-outlet-card';
+        mobileCard.className = 'mobile-outlet-card admin-mobile-outlet-card';
         mobileCard.innerHTML = `
-          <div class="mobile-outlet-head">
-            <div>
-              <div class="step-indicator">${s.merchant_name}</div>
-              <h3>${s.store_name}</h3>
-              <div class="mobile-store-id">Store ID ${s.store_id}</div>
+          <div class="admin-mobile-outlet-head">
+            <div class="admin-mobile-outlet-copy">
+              <div class="admin-mobile-outlet-owner">${ownerNameText}</div>
+              <h3>${storeName}</h3>
+              <div class="admin-mobile-outlet-meta">
+                <span class="admin-mobile-outlet-merchant">${merchantName}</span>
+                <span class="admin-mobile-store-chip">Store ID ${storeId}</span>
+              </div>
             </div>
-            <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Buka' : 'Paused'}</span>
+            <div class="admin-mobile-outlet-side">
+              <span class="table-status ${statusClass}">${isVercelOn ? 'Buka' : 'Paused'}</span>
+              <small class="admin-mobile-status-note">${escapeHtml(isVercelOn ? 'Toggle outlet sedang aktif.' : getPauseDetail(s.pause_until))}</small>
+              <span class="admin-mobile-card-disclosure" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
+              </span>
+            </div>
           </div>
 
-          <dl class="mobile-detail-list">
-            <div><dt>Pemilik outlet</dt><dd>${ownerName}</dd></div>
-            <div><dt>Status</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
-            <div><dt>Periode layanan</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
-            <div><dt>Action terakhir</dt><dd>${escapeHtml(getAdminActionText(s))}</dd></div>
-            <div class="mobile-detail-wide"><dt>Dashboard mitra</dt><dd><a href="${linkUrl}" target="_blank" class="mobile-dashboard-link">Buka dashboard mitra</a></dd></div>
+          <dl class="admin-mobile-outlet-grid">
+            <div class="admin-mobile-data-block is-wide">
+              <dt>Jam operasional</dt>
+              <dd>${todaySchedule}</dd>
+            </div>
+            <div class="admin-mobile-data-block">
+              <dt>Periode layanan</dt>
+              <dd><span class="service-period"><strong>${escapeHtml(servicePeriod)}</strong><small>${escapeHtml(serviceRemaining)}</small></span></dd>
+            </div>
+            <div class="admin-mobile-data-block">
+              <dt>Status live Shopee</dt>
+              <dd><span class="${shopeeStatus.className}" title="Nilai status terakhir: ${escapeHtml(shopeeStatus.value)}">${escapeHtml(shopeeStatus.label)}</span></dd>
+            </div>
+            <div class="admin-mobile-data-block is-wide">
+              <dt>Action terakhir</dt>
+              <dd><span class="admin-action-summary"><strong>${escapeHtml(toggleSummary.title)}</strong><small>${escapeHtml(actionDetailNote)}</small></span></dd>
+            </div>
           </dl>
 
-          <div class="mobile-card-actions d-grid gap-2">
-            <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
+          <div class="admin-mobile-toggle-row">
+            <div class="admin-mobile-toggle-copy">
+              <strong>Toggle outlet</strong>
+              <span>${escapeHtml(toggleMetaText)}</span>
+            </div>
+            <label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet">
+              <input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="admin-mobile-card-footer">
+            <span class="admin-mobile-pause-summary">${escapeHtml(pauseSummary.value)}</span>
+            <span class="admin-mobile-card-hint">
+              Tap untuk detail outlet
+              <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
+            </span>
           </div>
         `;
         mobileCard.tabIndex = 0;
@@ -1827,7 +1887,18 @@
             ${detailScheduleRows}
           </div>
         </section>
-        <div class="outlet-detail-actions"><a class="btn-primary" style="background:#be1a1a;border-color:#be1a1a;text-decoration:none" href="${mitraUrl}" target="_blank" rel="noopener noreferrer">Dashboard Mitra</a></div>`;
+        <div class="outlet-detail-actions">
+          <a class="btn-primary" style="background:#be1a1a;border-color:#be1a1a;text-decoration:none" href="${mitraUrl}" target="_blank" rel="noopener noreferrer">Dashboard Mitra</a>
+          <button type="button" class="btn-outline outlet-detail-delete-button" id="outletDetailDeleteButton">Hapus outlet</button>
+        </div>`;
+      const deleteButton = content.querySelector('#outletDetailDeleteButton');
+      if (deleteButton) {
+        deleteButton.addEventListener('click', () => openDeleteModal(
+          String(store.store_id || ''),
+          String(store.store_name || '-'),
+          String(store.nama_pemilik || '-')
+        ));
+      }
       const backdrop = document.getElementById('outletDetailBackdrop');
       showOutletDetailPanel(panel, backdrop);
       document.body.classList.add('outlet-detail-open');

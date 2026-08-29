@@ -92,6 +92,15 @@ Setiap update kode, konfigurasi, atau perilaku aplikasi wajib:
 
 File update wajib menggunakan format `update/<MAJOR>.<MINOR>.<PATCH>.md` dan mencantumkan seksi `Whats New`, `Spesifikasi`, dan `Handling`.
 
+## Aturan UI Admin Mobile
+
+Perubahan pada daftar outlet dashboard admin untuk breakpoint mobile wajib
+menjaga parity informasi dengan mode desktop terbaru. Kartu mobile minimal
+harus tetap menampilkan identitas outlet, jam operasional hari ini, action
+terakhir, periode layanan, dan toggle outlet. Hindari meletakkan tombol
+destruktif dominan di setiap kartu; aksi sensitif seperti hapus outlet harus
+diletakkan di konteks detail outlet atau modal konfirmasi.
+
 ## Aturan Gaya Penulisan & Komunikasi (Copywriting & Dokumentasi)
 
 1. **Penggunaan Emoji**:
