@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#BE1A1A">
   <title>FoodMaster Admin Console | ShopeeFood Auto-Open</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,42 +16,45 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260820-admin-outlet-surface">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260829-admin-console-v38">
 </head>
 
 <body x-data="adminApp()">
 
-  <div class="desktop-wrapper">
-    <header class="admin-nav flex-column flex-sm-row align-items-stretch align-items-sm-center">
-      <div class="brand-badge">
-        <img class="brand-logo brand-logo-admin" src="/static/Logo_FoodMaster.png" alt="FoodMaster">
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Navigasi Admin">
+      <div class="admin-sidebar-brand">
+        <img class="brand-logo brand-logo-admin" src="/static/icons/Logo_FoodMaster.png" alt="FoodMaster">
+        <span>Online Food Management</span>
       </div>
-
-    </header>
-
-    <!-- NAV TABS -->
-    <nav class="admin-tab-nav" aria-label="Navigasi Tab Admin">
-      <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets"
-        onclick="switchTab('outlets')">
-        <span>Daftar Outlet</span>
-        <span class="tab-badge" id="tabOutletCount" x-text="allStores.length">0</span>
-      </button>
-      <button class="tab-btn" :class="{ 'active': currentTab === 'vb' }" id="tabBtnVB"
-        onclick="switchTab('vb')">
-        <span>Virtual Brand</span>
-        <span class="tab-badge" id="tabVBCount">0</span>
-      </button>
-      <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs"
-        onclick="switchTab('logs')">
-        <span>Logs</span>
-      </button>
-      <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings"
-        onclick="switchTab('settings')">
-        <span>Settings</span>
-      </button>
-    </nav>
-
-
+      <nav class="admin-sidebar-nav">
+        <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets" onclick="switchTab('outlets')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9 20v-6h6v6"/></svg><span>Agency</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'vb' }" id="tabBtnVB" onclick="switchTab('vb')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 9 3 3-3 3m5 0h3"/></svg><span>Virtual Brand</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs" onclick="switchTab('logs')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Logs</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings" onclick="switchTab('settings')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l1.5-1.2-1.6-2.7-1.8.7a7 7 0 0 0-2-1.2L14.8 4h-3.2l-.3 2.4a7 7 0 0 0-2 1.2l-1.8-.7-1.6 2.7 1.5 1.2A7 7 0 0 0 7.3 12c0 .4 0 .8.1 1.2l-1.5 1.2 1.6 2.7 1.8-.7a7 7 0 0 0 2 1.2l.3 2.4h3.2l.3-2.4a7 7 0 0 0 2-1.2l1.8.7 1.6-2.7-1.5-1.2c.1-.4.1-.8.1-1.2Z"/></svg><span>Settings</span></button>
+      </nav>
+      <div class="admin-sidebar-note">
+        <span class="admin-sidebar-note-icon" aria-hidden="true">▣</span>
+        <p>Data master outlet dikelola dari Google Sheet.</p>
+        <small>Gunakan Fetch dari Sheet untuk memperbarui data terbaru.</small>
+      </div>
+    </aside>
+    <main class="admin-main">
+      <header class="admin-page-header">
+        <div class="admin-heading-copy"><h1 class="page-title" id="adminPageTitle">Agency Outlet Management</h1><p class="admin-breadcrumb"><span>Agency</span><span aria-hidden="true">›</span><span>Daftar Outlet</span></p></div>
+        <div class="admin-actions">
+          <label class="admin-header-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            <input type="search" id="searchInput" placeholder="Cari nama outlet, pemilik, atau Store ID..." oninput="filterTable()">
+          </label>
+          <button class="btn-primary fetch-sheet-button" type="button" id="fetchSheetHeader" onclick="fetchSheetData()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M8 17h8"/><path d="m16 12 2 2 2-2"/></svg>
+            <span class="fetch-label">Fetch dari Sheet</span>
+          </button>
+          <button class="admin-user-avatar" type="button" onclick="switchTab('settings')" aria-label="Buka settings admin">AD</button>
+        </div>
+      </header>
+  <div class="desktop-wrapper">
     {% include "admin_tab_operasional.html" %}
 
     {% include "admin_tab_vb.html" %}
@@ -66,6 +69,8 @@
 
 
 
+  </div>
+    </main>
   </div>
 
   <!-- MODAL 1: GENERATE USER LINK & TAMBAH MITRA -->
@@ -219,20 +224,6 @@
     </div>
   </div>
 
-  <div class="modal-overlay admin-schedule-sheet-overlay" id="adminScheduleSheet" aria-hidden="true">
-    <div class="admin-schedule-sheet" role="dialog" aria-modal="true" aria-labelledby="adminScheduleSheetTitle">
-      <div class="admin-schedule-sheet-handle" aria-hidden="true"></div>
-      <div class="admin-schedule-sheet-header">
-        <div>
-          <div class="step-indicator">Jadwal outlet</div>
-          <h3 class="card-title" id="adminScheduleSheetTitle">Jadwal reguler Shopee</h3>
-        </div>
-        <button type="button" class="admin-schedule-sheet-close" onclick="closeAdminScheduleSheet()" aria-label="Tutup jadwal">×</button>
-      </div>
-      <div id="adminScheduleSheetContent" class="admin-schedule-sheet-content"></div>
-    </div>
-  </div>
-
   <!-- MODAL 5: EDIT DATA OUTLET & MITRA -->
   <div class="modal-overlay" id="editModal">
     <div class="modal-card" style="max-width: 540px;">
@@ -314,11 +305,98 @@
       <div class="radio-group">
         <label class="radio-card active"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30 Menit</span></div><span class="radio-meta">30 mnt</span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span></div><span class="radio-meta">1 jam</span></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta">hingga 23.59</span></label>
+        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta">24 jam</span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="custom"><span>Durasi lain</span></div></label>
         <div id="vbCustomDurationBox" style="display:none; margin-top:6px"><label>Target berakhir<input type="datetime-local" id="vbCustomUntilInput" class="form-input" step="60"></label></div>
       </div>
       <div class="form-actions"><button type="button" class="btn-outline" onclick="closeVbPauseModal()">Batal</button><button type="button" class="btn-primary" onclick="confirmVbPause()">Simpan</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="adminPauseModal" aria-hidden="true">
+    <div class="modal-card pause-modal-card">
+      <div class="step-indicator">Tutup sementara</div>
+      <h3 class="card-title" id="adminModalStoreName">Pilih durasi</h3>
+      <p class="card-subtitle">Outlet akan dibuka kembali otomatis sesuai durasi yang dipilih.</p>
+      <div id="adminPauseEndPreview" class="pause-end-preview" aria-live="polite">Berakhir pada -</div>
+
+      <div class="radio-group">
+        <label class="radio-card active">
+          <div class="radio-card-label">
+            <input type="radio" name="adminPauseDuration" value="30_min" checked>
+            <span>30 Menit</span>
+          </div>
+          <span class="radio-meta">30 mnt</span>
+        </label>
+
+        <label class="radio-card">
+          <div class="radio-card-label">
+            <input type="radio" name="adminPauseDuration" value="60_min">
+            <span>60 Menit</span>
+          </div>
+          <span class="radio-meta">1 jam</span>
+        </label>
+
+        <label class="radio-card">
+          <div class="radio-card-label">
+            <input type="radio" name="adminPauseDuration" value="rest_of_day">
+            <span>Sepanjang Hari</span>
+          </div>
+          <span class="radio-meta">24 jam</span>
+        </label>
+
+        <label class="radio-card">
+          <div class="radio-card-label">
+            <input type="radio" name="adminPauseDuration" value="custom">
+            <span>Durasi lain</span>
+          </div>
+        </label>
+
+        <div id="adminCustomDurationBox" style="display: none; margin-top: 6px;">
+          <div class="custom-datetime-fields">
+            <label>Mulai<input type="text" id="adminCustomStartInput" class="form-input" readonly disabled aria-disabled="true"></label>
+            <span class="custom-datetime-arrow" aria-hidden="true">→</span>
+            <label>Target berakhir
+              <div class="custom-picker-anchor">
+                <button type="button" id="adminCustomUntilTrigger" class="custom-picker-trigger" onclick="openAdminCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="adminCustomUntilDisplay">Pilih tanggal &amp; waktu</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 9h18"></path></svg>
+                </button>
+                <input type="hidden" id="adminCustomUntilInput" aria-hidden="true">
+                <div id="adminCustomDateTimePicker" class="custom-picker-popover" role="dialog" aria-label="Pilih tanggal dan waktu" hidden>
+                  <div class="custom-picker-header">
+                    <button type="button" class="custom-picker-nav" onclick="shiftAdminPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button>
+                    <strong id="adminCustomPickerMonthLabel"></strong>
+                    <button type="button" class="custom-picker-nav" onclick="shiftAdminPickerMonth(1)" aria-label="Bulan berikutnya">›</button>
+                  </div>
+                  <div class="custom-picker-weekdays" aria-hidden="true">
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span> Sb</span>
+                  </div>
+                  <div id="adminCustomPickerCalendar" class="custom-picker-calendar"></div>
+                  <div class="custom-picker-time">
+                    <span>Waktu</span>
+                    <div class="custom-picker-time-fields">
+                      <select id="adminCustomPickerHour" aria-label="Jam WIB"></select>
+                      <span>:</span>
+                      <select id="adminCustomPickerMinute" aria-label="Menit WIB"></select>
+                      <b>WIB</b>
+                    </div>
+                  </div>
+                  <div class="custom-picker-actions">
+                    <button type="button" class="btn-outline" onclick="closeAdminCustomDateTimePicker()">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyAdminCustomDateTimePicker()">Terapkan</button>
+                  </div>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-outline" onclick="closeAdminPauseModal()">Batal</button>
+        <button class="btn-primary" onclick="confirmAdminPause()">Simpan</button>
+      </div>
     </div>
   </div>
 
@@ -338,6 +416,10 @@
     let selectedStoreForAction = null;
     let currentTab = 'outlets';
     let autoRefreshTimer = null;
+    let adminEventSource = null;
+    let storeFetchGeneration = 0;
+    const pendingAdminToggleStoreIds = new Set();
+    const deferredAdminOutletEvents = new Map();
 
     function adminApp() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -434,9 +516,9 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      setupAdminScheduleSheetDrag();
       showTableSkeleton();
       loadStoresData();
+      startAdminEventStream();
       loadAdminProfile();
       setInterval(fetchBotStatus, 15000);
 
@@ -462,6 +544,26 @@
 
     function switchTab(tabName) {
       if (window._appData) window._appData.currentTab = tabName;
+      const contentWrapper = document.querySelector('.admin-main > .desktop-wrapper');
+      const isSettingsTab = tabName === 'settings';
+      if (contentWrapper) {
+        contentWrapper.classList.toggle('is-settings-active', isSettingsTab);
+        contentWrapper.scrollTop = 0;
+      }
+      if (tabName !== 'outlets') closeOutletDetail();
+      const pageCopy = {
+        outlets: ['Agency Outlet Management', ''],
+        vb: ['Virtual Brand Management', ''],
+        logs: ['Bot Activity Logs', ''],
+        settings: ['Admin Settings', '']
+      };
+      const copy = pageCopy[tabName] || pageCopy.outlets;
+      const title = document.getElementById('adminPageTitle');
+      const description = document.getElementById('adminPageDescription');
+      const fetchButton = document.getElementById('fetchSheetHeader');
+      if (title) title.textContent = copy[0];
+      if (description) description.textContent = copy[1];
+      if (fetchButton) fetchButton.hidden = tabName !== 'outlets';
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
@@ -503,23 +605,43 @@
 
 
     async function loadStoresData(isSilent = false) {
+      const requestGeneration = ++storeFetchGeneration;
       if (!isSilent) {
         showTableSkeleton();
       }
       try {
         const res = await fetch('/api/v1/stores');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        allStores = await res.json();
+        const stores = await res.json();
+        if (requestGeneration !== storeFetchGeneration) return;
+        allStores = stores;
         if (window._appData) window._appData.allStores = allStores;
         renderAdminTable(allStores);
         updateMetrics(allStores);
       } catch (err) {
+        if (requestGeneration !== storeFetchGeneration) return;
         console.error("Error loading stores:", err);
         if (!isSilent) {
           document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
           document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
         }
       }
+    }
+
+    function startAdminEventStream() {
+      if (adminEventSource) return;
+      adminEventSource = new EventSource('/api/v1/admin/events');
+      adminEventSource.onopen = () => {
+        // Reconcile once after reconnect so an event missed during a network gap is repaired.
+        if (allStores.length) loadStoresData(true);
+      };
+      adminEventSource.addEventListener('outlet-state-changed', event => {
+        try {
+          handleAdminOutletStateEvent(JSON.parse(event.data));
+        } catch (error) {
+          // EventSource reconnects automatically; the next event or fetch repairs the view.
+        }
+      });
     }
 
     let allVBBrands = [];
@@ -695,7 +817,7 @@
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       if (type === '30_min') return new Date(Date.now() + 30 * 60000);
       if (type === '60_min') return new Date(Date.now() + 60 * 60000);
-      if (type === 'rest_of_day') { const end = new Date(); end.setHours(23, 59, 59, 0); return end; }
+      if (type === 'rest_of_day') return new Date(Date.now() + 24 * 60 * 60 * 1000);
       const value = document.getElementById('vbCustomUntilInput').value;
       return value ? new Date(value) : null;
     }
@@ -769,10 +891,11 @@
     }
 
     async function fetchSheetData() {
-      const button = document.getElementById('fetchSheetButton');
+      const button = document.getElementById('fetchSheetHeader');
+      const label = button ? button.querySelector('.fetch-label') : null;
       if (button) {
         button.disabled = true;
-        button.textContent = 'Fetching...';
+        if (label) label.textContent = 'Fetching...';
       }
       try {
         const data = await safeFetchJson('/api/v1/admin/sync-source', { method: 'POST' });
@@ -784,7 +907,7 @@
       } finally {
         if (button) {
           button.disabled = false;
-          button.textContent = 'Fetch dari Sheet';
+          if (label) label.textContent = 'Fetch dari Sheet';
         }
       }
     }
@@ -846,15 +969,101 @@
     }
 
     function updateMetrics(stores) {
-      document.getElementById('tabOutletCount').innerText = stores.length;
+      const outletCount = document.getElementById('tabOutletCount');
+      if (outletCount) outletCount.innerText = stores.length;
+      const isActiveSubscription = store => {
+        const expiry = store.tanggal_berakhir_layanan;
+        if (!expiry) return false;
+        const date = new Date(String(expiry).includes('T') ? expiry : `${expiry}T23:59:59`);
+        return !Number.isNaN(date.getTime()) && date >= new Date();
+      };
+      const metric = id => document.getElementById(id);
+      if (metric('metricTotal')) metric('metricTotal').innerText = stores.length;
+      if (metric('metricOpen')) metric('metricOpen').innerText = stores.filter(s => s.vercel_status === 'ON').length;
+      if (metric('metricClosed')) metric('metricClosed').innerText = stores.filter(s => s.vercel_status !== 'ON').length;
+      if (metric('metricSubscription')) metric('metricSubscription').innerText = stores.filter(isActiveSubscription).length;
+      populateOutletFilters(stores);
       fetchBotStatus();
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    }
+
+    function populateOutletFilters(stores) {
+      const fields = {
+        ownerFilter: ['nama_pemilik', 'Nama pemilik'], outletFilter: ['store_name', 'Nama outlet'],
+        storeIdFilter: ['store_id', 'Store ID'], packageFilter: ['paket', 'Paket']
+      };
+      Object.entries(fields).forEach(([id, [key, label]]) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const current = select.value;
+        const values = [...new Set(stores.map(s => String(s[key] || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+        select.innerHTML = `<option value="">${label}</option>` + values.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+        if (values.includes(current)) select.value = current;
+      });
+      setupCustomFilterDropdowns();
+    }
+
+    function setupCustomFilterDropdowns() {
+      document.querySelectorAll('.outlet-filter-card .filter-select').forEach(select => {
+        let wrapper = select.previousElementSibling;
+        if (!wrapper || !wrapper.classList.contains('custom-filter')) {
+          wrapper = document.createElement('div');
+          wrapper.className = 'custom-filter';
+          select.parentNode.insertBefore(wrapper, select);
+          select.hidden = true;
+          select.setAttribute('aria-hidden', 'true');
+          select.classList.add('native-filter-select');
+          const trigger = document.createElement('button');
+          trigger.type = 'button';
+          trigger.className = 'custom-filter-trigger';
+          trigger.setAttribute('aria-haspopup', 'listbox');
+          trigger.addEventListener('click', event => {
+            event.preventDefault();
+            document.querySelectorAll('.custom-filter.is-open').forEach(item => { if (item !== wrapper) item.classList.remove('is-open'); });
+            wrapper.classList.toggle('is-open');
+            trigger.setAttribute('aria-expanded', String(wrapper.classList.contains('is-open')));
+          });
+          wrapper.appendChild(trigger);
+          const list = document.createElement('div');
+          list.className = 'custom-filter-list';
+          list.setAttribute('role', 'listbox');
+          wrapper.appendChild(list);
+        }
+        const trigger = wrapper.querySelector('.custom-filter-trigger');
+        const list = wrapper.querySelector('.custom-filter-list');
+        trigger.textContent = select.options[select.selectedIndex]?.text || '';
+        trigger.setAttribute('aria-expanded', String(wrapper.classList.contains('is-open')));
+        list.innerHTML = [...select.options].map((option, index) => `<button type="button" role="option" class="custom-filter-option${option.value === select.value ? ' is-selected' : ''}" data-index="${index}">${option.textContent}</button>`).join('');
+        list.querySelectorAll('.custom-filter-option').forEach(optionButton => optionButton.addEventListener('click', () => {
+          select.selectedIndex = Number(optionButton.dataset.index);
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          wrapper.classList.remove('is-open');
+          setupCustomFilterDropdowns();
+        }));
+      });
+      if (!document.body.dataset.customFilterCloseBound) {
+        document.body.dataset.customFilterCloseBound = 'true';
+        document.addEventListener('click', event => {
+          if (!event.target.closest('.custom-filter')) document.querySelectorAll('.custom-filter.is-open').forEach(item => item.classList.remove('is-open'));
+        });
+      }
+    }
+
+    function isStoreSubscriptionActive(store) {
+      const value = store.tanggal_berakhir_layanan;
+      if (!value) return false;
+      const expiry = new Date(String(value).includes('T') ? value : `${value}T23:59:59`);
+      return !Number.isNaN(expiry.getTime()) && expiry >= new Date();
     }
 
     function getPauseDetail(pauseUntil) {
       if (!pauseUntil) return 'hingga dibuka manual';
 
-      const pauseDate = new Date(String(pauseUntil).replace(' ', 'T'));
-      if (Number.isNaN(pauseDate.getTime())) return `hingga ${pauseUntil}`;
+      const pauseDate = parseWibDate(pauseUntil);
+      if (!pauseDate) return `hingga ${String(pauseUntil).trim()}`;
 
       const remainingMinutes = Math.max(0, Math.ceil((pauseDate.getTime() - Date.now()) / 60000));
       if (!remainingMinutes) return 'pause selesai';
@@ -862,6 +1071,150 @@
       const hours = Math.floor(remainingMinutes / 60);
       const minutes = remainingMinutes % 60;
       return hours ? `sisa ${hours}j ${minutes}m` : `sisa ${minutes}m`;
+    }
+
+    function parseWibDate(value) {
+      if (!value) return null;
+      let raw = String(value).trim();
+      if (!raw) return null;
+      const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+      if (slashMatch) {
+        const [, day, month, year, hour, minute, second = '00'] = slashMatch;
+        raw = `${year}-${month}-${day}T${hour}:${minute}:${second}+07:00`;
+      } else {
+        if (!raw.includes('T') && raw.includes(' ')) raw = raw.replace(' ', 'T');
+        raw = raw.replace(/([+-]\d{2})$/, '$1:00');
+        if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) raw += '+07:00';
+      }
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function formatActionDateTime(value, includeDateIfToday = false) {
+      const parsed = parseWibDate(value);
+      if (!parsed) return String(value || '-');
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(parsed).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {});
+      const nowParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(new Date()).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {});
+      const isToday = parts.year === nowParts.year && parts.month === nowParts.month && parts.day === nowParts.day;
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+      if (isToday && !includeDateIfToday) return `pkl ${parts.hour}:${parts.minute} WIB`;
+      return `${Number(parts.day)} ${monthNames[Number(parts.month) - 1]} ${parts.year}, pkl ${parts.hour}:${parts.minute} WIB`;
+    }
+
+    function extractActionUntil(reason) {
+      const text = String(reason || '');
+      const isoMatch = text.match(/Until\s+([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})/i)
+        || text.match(/until\s+([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})/i);
+      if (isoMatch) return isoMatch[1];
+      const slashMatch = text.match(/Sampai\s+([0-9]{2}\/[0-9]{2}\/[0-9]{4}\s+[0-9]{2}:[0-9]{2})/i);
+      return slashMatch ? slashMatch[1] : '';
+    }
+
+    function getAdminActionSummary(store) {
+      const action = String(store.last_toggle_action_raw || '').trim().toUpperCase();
+      const actionAt = store.last_toggle_at || '';
+      const reason = String(store.last_toggle_reason || '');
+      const actionAtLabel = actionAt ? formatActionDateTime(actionAt) : '';
+      const pauseUntilRaw = (store.vercel_status === 'OFF' && store.pause_until) ? store.pause_until : extractActionUntil(reason);
+      const pauseUntilLabel = pauseUntilRaw ? formatActionDateTime(pauseUntilRaw) : '';
+
+      switch (action) {
+        case 'ADMIN_PAUSE_STORE':
+          return { title: 'Pause oleh Admin', note: pauseUntilLabel ? `sampai ${pauseUntilLabel}` : 'sampai dibuka manual' };
+        case 'USER_PAUSE_STORE':
+          return { title: 'Pause oleh Mitra', note: pauseUntilLabel ? `sampai ${pauseUntilLabel}` : 'sampai dibuka manual' };
+        case 'ACTION_CLOSE':
+          return { title: 'Pause oleh Bot', note: pauseUntilLabel ? `sampai ${pauseUntilLabel}` : (actionAtLabel || 'sesuai jadwal') };
+        case 'ADMIN_RESUME_STORE':
+          return { title: 'Buka oleh Admin', note: actionAtLabel || 'dibuka manual' };
+        case 'USER_RESUME_STORE':
+          return { title: 'Buka oleh Mitra', note: actionAtLabel || 'dibuka manual' };
+        case 'ACTION_OPEN':
+          return { title: 'Buka oleh Bot', note: actionAtLabel || 'sesuai jadwal' };
+        case 'OPEN_STORE':
+        case 'OPEN':
+          return { title: 'Buka manual', note: actionAtLabel || 'toggle ON' };
+        case 'CLOSE_STORE':
+        case 'CLOSE':
+        case 'PAUSE':
+          return { title: 'Pause manual', note: pauseUntilLabel ? `sampai ${pauseUntilLabel}` : 'sampai dibuka manual' };
+        default:
+          if (store.vercel_status === 'OFF') {
+            return { title: 'Pause aktif', note: store.pause_until ? `sampai ${formatActionDateTime(store.pause_until)}` : 'sampai dibuka manual' };
+          }
+          if (store.vercel_status === 'ON') {
+            return { title: 'Buka aktif', note: 'belum ada log toggle' };
+          }
+          return { title: 'Belum ada aksi', note: '-' };
+      }
+    }
+
+    function getAdminActionMarkup(store) {
+      const summary = getAdminActionSummary(store);
+      return `<span class="admin-action-summary"><strong>${escapeHtml(summary.title)}</strong><small>${escapeHtml(summary.note)}</small></span>`;
+    }
+
+    function getAdminActionText(store) {
+      const summary = getAdminActionSummary(store);
+      return summary.note && summary.note !== '-' ? `${summary.title} · ${summary.note}` : summary.title;
+    }
+
+    function escapeHtmlWithBreaks(value, fallback = '-') {
+      const text = String(value || '').trim();
+      return text ? escapeHtml(text).replace(/\n/g, '<br>') : escapeHtml(fallback);
+    }
+
+    function getAdminShopeeStatusPresentation(value) {
+      const status = String(value || '').trim().toUpperCase();
+      if (status === 'ON' || status === 'OPEN') {
+        return { label: 'Shopee: Buka', className: 'outlet-shopee-status is-open', value: status || 'OPEN' };
+      }
+      if (status === 'PAUSE' || status === 'CLOSED' || status === 'OFF' || status === 'CLOSE') {
+        return {
+          label: status === 'CLOSED' ? 'Shopee: Tutup' : 'Shopee: Tutup sementara',
+          className: 'outlet-shopee-status is-closed',
+          value: status || 'PAUSE'
+        };
+      }
+      return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status || 'UNKNOWN' };
+    }
+
+    function getAdminPauseSummary(store) {
+      if (store.vercel_status === 'ON') {
+        return { value: 'Tidak sedang pause', note: 'Toggle outlet sedang aktif.' };
+      }
+      if (store.pause_until) {
+        return { value: formatActionDateTime(store.pause_until, true), note: getPauseDetail(store.pause_until) };
+      }
+      return { value: 'Sampai dibuka manual', note: 'Belum ada target buka otomatis.' };
+    }
+
+    function getAdminSubscriptionSummary(store) {
+      const status = String(store.subscription_status || '').trim() || 'Belum tersedia';
+      if (status.toLowerCase() === 'aktif') return { value: 'Aktif', note: 'Layanan outlet masih berjalan.' };
+      if (status.toLowerCase() === 'kedaluwarsa' || status.toLowerCase() === 'expired') {
+        return { value: 'Kedaluwarsa', note: 'Perlu perpanjangan layanan.' };
+      }
+      return { value: status, note: 'Status langganan mengikuti data database.' };
     }
 
     function getMitraDynamicUrl(rawLink, ownerName) {
@@ -896,9 +1249,11 @@
 
       sortedStores.forEach(s => {
         const isVercelOn = s.vercel_status === 'ON';
+        const isTogglePending = pendingAdminToggleStoreIds.has(String(s.store_id));
         const ownerName = s.nama_pemilik || 'Fando';
         const linkUrl = getMitraDynamicUrl(s.vercel_link, ownerName);
         const tr = document.createElement('tr');
+        const todaySchedule = getTodayOperatingHours(s);
 
         tr.innerHTML = `
           <td>
@@ -909,57 +1264,23 @@
           <td><code>${s.store_id}</code></td>
           <td>
             ${s.store_name}
-            <a href="${linkUrl}" target="_blank" class="compact-meta compact-meta-link">Dashboard Mitra</a>
-            <small class="compact-meta compact-meta-expiry">Berlaku sampai ${s.tanggal_berakhir_layanan || '2026-11-01'}</small>
           </td>
-          <td>
-            <div class="dashboard-link-cell">
-              <a href="${linkUrl}" target="_blank" class="dashboard-link-button">Buka dashboard</a>
-              <button type="button" class="copy-link-button" aria-label="Salin link dashboard mitra" title="Salin link dashboard mitra" onclick="copyDashboardLink('${encodeURIComponent(linkUrl)}', this)">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg>
-              </button>
-            </div>
-          </td>
+          <td>${todaySchedule}</td>
           <td>
             <span class="table-status ${isVercelOn ? 'is-success' : 'is-warning'}">${isVercelOn ? 'Buka' : 'Paused'}</span>
             ${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}
           </td>
-          <td><strong>${s.tanggal_berakhir_layanan || '2026-11-01'}</strong></td>
-          <td>
-            <span class="table-status ${s.is_suspended ? 'is-danger' : 'is-success'}">${s.is_suspended ? 'Akun ditangguhkan' : 'Akun aktif'}</span>
-            ${s.is_suspended ? `<small class="table-cell-note">${s.alasan_penangguhan || 'Perlu ditinjau admin'}</small>` : ''}
-          </td>
-          <td>
-            <div class="row-actions">
-              <button class="btn-detail" aria-expanded="false" aria-controls="detail-${s.store_id}" onclick="toggleStoreDetail('${s.store_id}', this)">
-                Detail
-              </button>
-            </div>
-          </td>
+          <td>${getAdminActionMarkup(s)}</td>
+          <td><span class="service-period"><strong>${formatServicePeriod(s.tanggal_mulai_layanan, s.tanggal_berakhir_layanan)}</strong><small>${getServiceRemainingTime(s.tanggal_berakhir_layanan)}</small></span></td>
+          <td><label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet"><input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
         `;
+        tr.classList.add('outlet-data-row');
+        tr.tabIndex = 0;
+        tr.setAttribute('role', 'button');
+        tr.setAttribute('aria-label', `Lihat detail ${s.store_name || 'outlet'}`);
+        tr.addEventListener('click', event => { if (!event.target.closest('a,button,input,label')) openOutletDetail(s.store_id); });
+        tr.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openOutletDetail(s.store_id); } });
         tbody.appendChild(tr);
-
-        const detailRow = document.createElement('tr');
-        detailRow.className = 'detail-row';
-        detailRow.id = `detail-${s.store_id}`;
-        detailRow.setAttribute('aria-hidden', 'true');
-        detailRow.inert = true;
-        detailRow.innerHTML = `
-          <td colspan="9">
-            <div class="detail-shell">
-              <div class="detail-inner">
-                <div class="detail-layout">
-                  <dl class="detail-grid">${getStoreDetailMarkup(s)}</dl>
-                  <div class="detail-actions">
-                    <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
-                    <button class="btn-outline admin-schedule-button" aria-expanded="false" aria-controls="admin-schedule-${s.store_id}" onclick="toggleAdminSchedule('${s.store_id}', this)">Lihat jadwal</button>
-                  </div>
-                </div>
-                <div id="admin-schedule-${s.store_id}" class="admin-schedule-detail" hidden>${getAdminScheduleMarkup(s)}</div>
-              </div>
-            </div>
-          </td>`;
-        tbody.appendChild(detailRow);
 
         const mobileCard = document.createElement('article');
         mobileCard.className = 'mobile-outlet-card';
@@ -975,20 +1296,392 @@
 
           <dl class="mobile-detail-list">
             <div><dt>Pemilik outlet</dt><dd>${ownerName}</dd></div>
-            <div><dt>Status utama</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
-            <div><dt>Langganan berlaku sampai</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
-            <div><dt>Status akun</dt><dd><span class="status-text ${s.is_suspended ? '' : 'is-active'}">${s.is_suspended ? 'Ditangguhkan' : 'Aktif'}</span></dd></div>
-            <div><dt>Action terakhir</dt><dd>${detailValue(s.last_action, 'no change')}</dd></div>
+            <div><dt>Status</dt><dd><span class="status-text ${isVercelOn ? 'is-active' : ''}">${isVercelOn ? 'Buka' : 'Paused'}</span>${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}</dd></div>
+            <div><dt>Periode layanan</dt><dd>${s.tanggal_berakhir_layanan || '2026-11-01'}</dd></div>
+            <div><dt>Action terakhir</dt><dd>${escapeHtml(getAdminActionText(s))}</dd></div>
             <div class="mobile-detail-wide"><dt>Dashboard mitra</dt><dd><a href="${linkUrl}" target="_blank" class="mobile-dashboard-link">Buka dashboard mitra</a></dd></div>
           </dl>
 
           <div class="mobile-card-actions d-grid gap-2">
             <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="openDeleteModal('${s.store_id}', '${s.store_name}', '${ownerName}')">Hapus akun</button>
-            <button class="btn-outline admin-mobile-schedule-button" onclick="openAdminScheduleSheet('${s.store_id}')">Lihat jadwal</button>
           </div>
         `;
+        mobileCard.tabIndex = 0;
+        mobileCard.setAttribute('role', 'button');
+        mobileCard.setAttribute('aria-label', `Lihat detail ${s.store_name || 'outlet'}`);
+        mobileCard.addEventListener('click', event => { if (!event.target.closest('a,button,input,label')) openOutletDetail(s.store_id); });
+        mobileCard.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openOutletDetail(s.store_id); } });
         mobileList.appendChild(mobileCard);
       });
+    }
+
+    function getTodayOperatingHours(store) {
+      const schedule = store.shopee_regular_hours || {};
+      const today = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long' }).format(new Date());
+      const ranges = schedule[today];
+      if (Array.isArray(ranges) && ranges.length) return `<span class="today-operating-hours"><span class="operating-time">${ranges.join(' · ')} WIB</span><span class="operating-day">${today}</span></span>`;
+      if (typeof ranges === 'string' && ranges.trim()) return `<span class="today-operating-hours"><span class="operating-time">${ranges} WIB</span><span class="operating-day">${today}</span></span>`;
+      return `<span class="today-operating-hours"><span class="operating-time">Tutup</span><span class="operating-day">${today}</span></span>`;
+    }
+
+    function formatServicePeriod(start, end) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+      const formatDate = value => {
+        const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return null;
+        const day = Number(match[3]);
+        return {
+          day,
+          dayText: String(day).padStart(2, '0'),
+          month: monthNames[Number(match[2]) - 1],
+          year: Number(match[1])
+        };
+      };
+      const from = formatDate(start);
+      const to = formatDate(end);
+      if (!from && !to) return '-';
+      if (!from) return `${to.dayText} ${to.month} ${to.year}`;
+      if (!to) return `${from.dayText} ${from.month} ${from.year}`;
+      return `${from.dayText} ${from.month} - ${to.dayText} ${to.month} ${to.year}`;
+    }
+
+    function getServiceRemainingTime(end) {
+      const match = String(end || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!match) return 'Tenggat belum ditentukan';
+      const deadline = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 23, 59, 59);
+      const remainingDays = Math.ceil((deadline - new Date()) / 86400000);
+      if (remainingDays < 0) return 'Sudah berakhir';
+      if (remainingDays === 0) return 'Berakhir hari ini';
+      return `${remainingDays} hari lagi`;
+    }
+
+    let selectedAdminPauseStoreId = null;
+    let adminPickerDate = null;
+    let adminPickerMonth = null;
+
+    function openAdminPauseModal(storeId, storeName) {
+      if (pendingAdminToggleStoreIds.has(String(storeId))) return;
+      selectedAdminPauseStoreId = storeId;
+      document.getElementById('adminModalStoreName').innerText = storeName;
+      setAdminCustomDateTimeDefaults();
+      updateAdminPauseEndPreview();
+      document.getElementById('adminPauseModal').classList.add('active');
+      document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'false');
+    }
+
+    function toAdminDateTimeLocalValue(date) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function formatAdminWibDate(date) {
+      return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    }
+
+    function formatAdminWibTime(date) {
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function parseAdminCustomUntil() {
+      const value = document.getElementById('adminCustomUntilInput')?.value || '';
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function populateAdminPickerTimeOptions() {
+      const hourSelect = document.getElementById('adminCustomPickerHour');
+      const minuteSelect = document.getElementById('adminCustomPickerMinute');
+      if (!hourSelect || !minuteSelect || hourSelect.options.length) return;
+      for (let value = 0; value < 24; value += 1) {
+        const option = document.createElement('option');
+        option.value = String(value).padStart(2, '0');
+        option.textContent = option.value;
+        hourSelect.appendChild(option);
+      }
+      for (let value = 0; value < 60; value += 1) {
+        const option = document.createElement('option');
+        option.value = String(value).padStart(2, '0');
+        option.textContent = option.value;
+        minuteSelect.appendChild(option);
+      }
+    }
+
+    function adminPickerDateKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function getAdminPauseMaxDate() {
+      const now = new Date();
+      const targetMonth = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+      const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+      return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), Math.min(now.getDate(), lastDay), 23, 59, 59, 999);
+    }
+
+    function renderAdminPickerCalendar() {
+      const calendar = document.getElementById('adminCustomPickerCalendar');
+      const monthLabel = document.getElementById('adminCustomPickerMonthLabel');
+      if (!calendar || !monthLabel || !adminPickerMonth || !adminPickerDate) return;
+      const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      monthLabel.textContent = `${monthNames[adminPickerMonth.getMonth()]} ${adminPickerMonth.getFullYear()}`;
+      calendar.innerHTML = '';
+      const firstDay = new Date(adminPickerMonth.getFullYear(), adminPickerMonth.getMonth(), 1).getDay();
+      const daysInMonth = new Date(adminPickerMonth.getFullYear(), adminPickerMonth.getMonth() + 1, 0).getDate();
+      const todayKey = adminPickerDateKey(new Date());
+      const maxDateKey = adminPickerDateKey(getAdminPauseMaxDate());
+      for (let index = 0; index < firstDay; index += 1) {
+        calendar.appendChild(document.createElement('span'));
+      }
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = new Date(adminPickerMonth.getFullYear(), adminPickerMonth.getMonth(), day);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = day;
+        button.setAttribute('aria-label', `${day} ${monthNames[adminPickerMonth.getMonth()]} ${adminPickerMonth.getFullYear()}`);
+        const dateKey = adminPickerDateKey(date);
+        button.disabled = dateKey < todayKey || dateKey > maxDateKey;
+        if (adminPickerDateKey(date) === adminPickerDateKey(adminPickerDate)) button.classList.add('is-selected');
+        if (adminPickerDateKey(date) === todayKey) button.classList.add('is-today');
+        button.onclick = () => selectAdminPickerDay(date);
+        calendar.appendChild(button);
+      }
+    }
+
+    function selectAdminPickerDay(date) {
+      adminPickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), adminPickerDate.getHours(), adminPickerDate.getMinutes());
+      renderAdminPickerCalendar();
+    }
+
+    function shiftAdminPickerMonth(offset) {
+      adminPickerMonth = new Date(adminPickerMonth.getFullYear(), adminPickerMonth.getMonth() + offset, 1);
+      renderAdminPickerCalendar();
+    }
+
+    function openAdminCustomDateTimePicker() {
+      const existing = parseAdminCustomUntil();
+      const selected = existing || new Date(Date.now() + (2 * 60 * 60 * 1000));
+      adminPickerDate = new Date(selected);
+      adminPickerMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+      populateAdminPickerTimeOptions();
+      document.getElementById('adminCustomPickerHour').value = formatAdminWibTime(selected).slice(0, 2);
+      document.getElementById('adminCustomPickerMinute').value = formatAdminWibTime(selected).slice(3, 5);
+      renderAdminPickerCalendar();
+      document.getElementById('adminCustomDateTimePicker').hidden = false;
+      document.getElementById('adminCustomUntilTrigger').setAttribute('aria-expanded', 'true');
+    }
+
+    function closeAdminCustomDateTimePicker() {
+      document.getElementById('adminCustomDateTimePicker').hidden = true;
+      document.getElementById('adminCustomUntilTrigger').setAttribute('aria-expanded', 'false');
+    }
+
+    function applyAdminCustomDateTimePicker() {
+      if (!adminPickerDate) return;
+      const hours = Number(document.getElementById('adminCustomPickerHour').value);
+      const minutes = Number(document.getElementById('adminCustomPickerMinute').value);
+      const selected = new Date(adminPickerDate.getFullYear(), adminPickerDate.getMonth(), adminPickerDate.getDate(), hours, minutes);
+      if (selected <= new Date()) {
+        showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
+        return;
+      }
+      if (adminPickerDateKey(selected) > adminPickerDateKey(getAdminPauseMaxDate())) {
+        showToast(`Target maksimal ${formatAdminPauseTargetDate(getAdminPauseMaxDate())}.`, 'error');
+        return;
+      }
+      document.getElementById('adminCustomUntilInput').value = toAdminDateTimeLocalValue(selected);
+      document.getElementById('adminCustomUntilDisplay').textContent = `${formatAdminWibDate(selected)} ${formatAdminWibTime(selected)}`;
+      closeAdminCustomDateTimePicker();
+      updateAdminPauseEndPreview();
+    }
+
+    function setAdminCustomDateTimeDefaults() {
+      const start = new Date();
+      const until = new Date(start.getTime() + (2 * 60 * 60 * 1000));
+      document.getElementById('adminCustomStartInput').value = `${formatAdminWibDate(start)} ${formatAdminWibTime(start)}`;
+      document.getElementById('adminCustomUntilInput').value = toAdminDateTimeLocalValue(until);
+      document.getElementById('adminCustomUntilDisplay').textContent = `${formatAdminWibDate(until)} ${formatAdminWibTime(until)}`;
+    }
+
+    function getAdminSelectedPauseMinutes() {
+      const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
+      if (durationType === '30_min') return 30;
+      if (durationType === '60_min') return 60;
+      if (durationType === 'custom') {
+        const until = parseAdminCustomUntil();
+        if (!until) return 0;
+        return Math.max(0, Math.floor((until.getTime() - Date.now()) / 60000));
+      }
+      return null;
+    }
+
+    function getAdminCustomUntilValue() {
+      const value = parseAdminCustomUntil();
+      if (!value) return null;
+      return document.getElementById('adminCustomUntilInput').value;
+    }
+
+    function getAdminPauseDurationLabel() {
+      const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
+      if (durationType === '30_min') return '30 menit';
+      if (durationType === '60_min') return '60 menit';
+      if (durationType === 'rest_of_day') return '24 jam';
+      return 'sesuai waktu yang dipilih';
+    }
+
+    function formatAdminPauseTargetDate(date) {
+      const parts = new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} WIB`;
+    }
+
+    function updateAdminPauseEndPreview() {
+      const preview = document.getElementById('adminPauseEndPreview');
+      if (!preview) return;
+      const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
+      if (durationType === 'rest_of_day') {
+        const end = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        preview.textContent = `Berakhir pada ${formatAdminPauseTargetDate(end)}`;
+        return;
+      }
+      if (durationType === 'custom') {
+        const until = parseAdminCustomUntil();
+        preview.textContent = until
+          ? `Berakhir pada ${formatAdminPauseTargetDate(until)}`
+          : 'Pilih tanggal dan waktu WIB';
+        return;
+      }
+      const minutes = getAdminSelectedPauseMinutes();
+      if (!minutes) {
+        preview.textContent = 'Masukkan durasi lebih dari 0 menit';
+        return;
+      }
+      preview.textContent = `Berakhir pada ${formatAdminPauseTargetDate(new Date(Date.now() + minutes * 60000))}`;
+    }
+
+    function closeAdminPauseModal(shouldRender = true) {
+      if (typeof closeAdminCustomDateTimePicker === 'function') closeAdminCustomDateTimePicker();
+      document.getElementById('adminPauseModal').classList.remove('active');
+      document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'true');
+      selectedAdminPauseStoreId = null;
+      if (shouldRender) renderAdminTable(allStores);
+    }
+
+    async function confirmAdminPause() {
+      if (!selectedAdminPauseStoreId) return;
+      const storeId = selectedAdminPauseStoreId;
+      const durationType = document.querySelector('input[name="adminPauseDuration"]:checked').value;
+      const customMins = getAdminSelectedPauseMinutes() || 0;
+      const customUntil = getAdminCustomUntilValue();
+      if (durationType === 'custom' && customMins <= 0) {
+        showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
+        return;
+      }
+      if (pendingAdminToggleStoreIds.has(String(storeId))) return;
+      pendingAdminToggleStoreIds.add(String(storeId));
+      closeAdminPauseModal(false);
+      renderAdminTable(allStores);
+
+      try {
+        const res = await fetch('/api/v1/user/pause', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            store_id: storeId,
+            duration_type: durationType,
+            custom_minutes: customMins,
+            custom_until: durationType === 'custom' ? customUntil : null
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`Outlet dijeda selama ${getAdminPauseDurationLabel()}.`, 'success');
+          await loadStoresData(true);
+        } else {
+          throw new Error(data.detail || 'Gagal menutup outlet.');
+        }
+      } catch (err) {
+        showToast(err.message || 'Gagal menutup outlet.', 'error');
+      } finally {
+        finishAdminToggle(storeId);
+      }
+    }
+
+    document.addEventListener('change', event => {
+      if (!event.target.matches('input[name="adminPauseDuration"]')) return;
+      document.querySelectorAll('input[name="adminPauseDuration"]').forEach(radio => radio.closest('.radio-card').classList.toggle('active', radio.checked));
+      document.getElementById('adminCustomDurationBox').style.display = event.target.value === 'custom' ? 'block' : 'none';
+      updateAdminPauseEndPreview();
+    });
+
+    document.addEventListener('input', event => {
+      if (event.target.id === 'adminCustomUntilInput') updateAdminPauseEndPreview();
+    });
+
+    function applyAdminOutletStateEvent(update) {
+      const store = allStores.find(item => String(item.store_id) === String(update.store_id));
+      if (!store) {
+        loadStoresData(true);
+        return;
+      }
+      // Invalidate older fetches so a stale response cannot undo this event.
+      storeFetchGeneration += 1;
+      store.vercel_status = update.vercel_status;
+      store.pause_until = update.pause_until || null;
+      store.last_toggle_action_raw = update.action || store.last_toggle_action_raw;
+      store.last_toggle_reason = update.reason || store.last_toggle_reason || '';
+      store.last_toggle_at = update.changed_at || store.last_toggle_at || null;
+      store.last_synced_at = update.changed_at || store.last_synced_at;
+      if (window._appData) window._appData.allStores = allStores;
+      renderAdminTable(allStores);
+      updateMetrics(allStores);
+    }
+
+    function handleAdminOutletStateEvent(update) {
+      const key = String(update.store_id || '');
+      if (pendingAdminToggleStoreIds.has(key)) {
+        deferredAdminOutletEvents.set(key, update);
+        return;
+      }
+      applyAdminOutletStateEvent(update);
+    }
+
+    function finishAdminToggle(storeId) {
+      const key = String(storeId);
+      const deferredEvent = deferredAdminOutletEvents.get(key);
+      deferredAdminOutletEvents.delete(key);
+      pendingAdminToggleStoreIds.delete(key);
+      if (deferredEvent) {
+        applyAdminOutletStateEvent(deferredEvent);
+      } else {
+        renderAdminTable(allStores);
+      }
+    }
+
+    async function toggleAdminOutlet(storeId, isChecked, toggle) {
+      const key = String(storeId);
+      if (pendingAdminToggleStoreIds.has(key)) return;
+      if (!isChecked) {
+        renderAdminTable(allStores);
+        const store = allStores.find(item => String(item.store_id) === key);
+        openAdminPauseModal(storeId, store?.store_name || storeId);
+        return;
+      }
+      pendingAdminToggleStoreIds.add(key);
+      renderAdminTable(allStores);
+      try {
+        await safeFetchJson('/api/v1/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ store_id: storeId, status: 'ON', pause_duration_minutes: null })
+        });
+        await loadStoresData(true);
+      } catch (error) {
+        alert(error.message || 'Status outlet gagal diperbarui.');
+      } finally {
+        finishAdminToggle(storeId);
+      }
     }
 
     function detailValue(value, fallback = '-') {
@@ -1000,9 +1693,8 @@
       const detailRows = [
         ['Pause', isVercelOn ? 'Tidak sedang pause' : getPauseDetail(store.pause_until)],
         ['Paket', store.paket],
-        ['Status akun', store.is_suspended ? 'Ditangguhkan' : 'Aktif'],
         ['Password dashboard mitra', store.vercel_password],
-        ['Action terakhir', detailValue(store.last_action, 'no change')]
+        ['Action terakhir', getAdminActionText(store)]
       ];
 
       return detailRows.map(([label, value]) => `
@@ -1022,112 +1714,158 @@
       return store.shopee_regular_hours || {};
     }
 
-    function getAdminScheduleMarkup(store) {
+    function getAdminScheduleRowsMarkup(store) {
       const schedule = getAdminScheduleData(store);
       const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      return `<div class="admin-schedule-heading"><strong>Jadwal reguler Shopee</strong><span>Informasi outlet</span></div>${days.map(day => {
+      return days.map(day => {
         const values = Array.isArray(schedule[day]) ? schedule[day] : (schedule[day] ? [schedule[day]] : []);
         return `<div class="admin-schedule-row"><strong>${day}</strong><span>${values.length ? values.join(' · ') + ' WIB' : 'Tutup'}</span></div>`;
-      }).join('')}`;
+      }).join('');
     }
 
-    function toggleAdminSchedule(storeId, button) {
-      const panel = document.getElementById(`admin-schedule-${storeId}`);
+    function toggleOutletDetailSchedule(button) {
+      const panel = button?.nextElementSibling;
       if (!panel) return;
-      const expanded = panel.hidden;
-      panel.hidden = !expanded;
-      button.setAttribute('aria-expanded', String(expanded));
-      button.textContent = expanded ? 'Sembunyikan jadwal' : 'Lihat jadwal';
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', String(!expanded));
+      panel.hidden = expanded;
     }
 
-    function openAdminScheduleSheet(storeId) {
-      const store = allStores.find(item => item.store_id === storeId);
-      if (!store) return;
-      document.getElementById('adminScheduleSheetTitle').textContent = store.store_name || 'Jadwal reguler Shopee';
-      document.getElementById('adminScheduleSheetContent').innerHTML = getAdminScheduleMarkup(store);
-      const overlay = document.getElementById('adminScheduleSheet');
-      overlay.classList.add('active');
-      overlay.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('admin-sheet-open');
+    const OUTLET_DETAIL_ANIMATION_MS = 240;
+    let outletDetailHideTimer = null;
+    let outletDetailOpenFrame = null;
+
+    function clearOutletDetailAnimationTimers() {
+      if (outletDetailHideTimer) {
+        window.clearTimeout(outletDetailHideTimer);
+        outletDetailHideTimer = null;
+      }
+      if (outletDetailOpenFrame) {
+        window.cancelAnimationFrame(outletDetailOpenFrame);
+        outletDetailOpenFrame = null;
+      }
     }
 
-    function closeAdminScheduleSheet() {
-      const overlay = document.getElementById('adminScheduleSheet');
-      overlay.classList.remove('active');
-      overlay.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('admin-sheet-open');
-    }
-
-    function setupAdminScheduleSheetDrag() {
-      const sheet = document.querySelector('.admin-schedule-sheet');
-      const handle = document.querySelector('.admin-schedule-sheet-handle');
-      if (!sheet || !handle) return;
-      let startY = 0;
-      let currentY = 0;
-      let dragging = false;
-      handle.addEventListener('pointerdown', event => {
-        dragging = true;
-        startY = event.clientY;
-        currentY = 0;
-        handle.setPointerCapture(event.pointerId);
-        sheet.classList.add('is-dragging');
-      });
-      handle.addEventListener('pointermove', event => {
-        if (!dragging) return;
-        currentY = Math.max(0, event.clientY - startY);
-        sheet.style.transform = `translateY(${currentY}px)`;
-      });
-      handle.addEventListener('pointerup', event => {
-        if (!dragging) return;
-        dragging = false;
-        handle.releasePointerCapture(event.pointerId);
-        sheet.classList.remove('is-dragging');
-        sheet.style.transform = '';
-        if (currentY > 110) closeAdminScheduleSheet();
-      });
-      handle.addEventListener('pointercancel', () => {
-        dragging = false;
-        sheet.classList.remove('is-dragging');
-        sheet.style.transform = '';
+    function showOutletDetailPanel(panel, backdrop) {
+      if (!panel) return;
+      const alreadyOpen = !panel.hidden && panel.classList.contains('is-open');
+      clearOutletDetailAnimationTimers();
+      panel.hidden = false;
+      panel.setAttribute('aria-hidden', 'false');
+      if (backdrop) backdrop.hidden = false;
+      if (alreadyOpen) {
+        if (backdrop) backdrop.classList.add('is-open');
+        return;
+      }
+      panel.classList.remove('is-open');
+      if (backdrop) backdrop.classList.remove('is-open');
+      // Force the browser to paint the resting state before we slide the panel in.
+      void panel.offsetWidth;
+      outletDetailOpenFrame = window.requestAnimationFrame(() => {
+        panel.classList.add('is-open');
+        if (backdrop) backdrop.classList.add('is-open');
+        outletDetailOpenFrame = null;
       });
     }
 
-    function toggleStoreDetail(storeId, button) {
-      const detailRow = document.getElementById(`detail-${storeId}`);
-      if (!detailRow) return;
+    function hideOutletDetailPanel(panel, backdrop) {
+      if (!panel) return;
+      clearOutletDetailAnimationTimers();
+      panel.classList.remove('is-open');
+      panel.setAttribute('aria-hidden', 'true');
+      if (backdrop) backdrop.classList.remove('is-open');
+      outletDetailHideTimer = window.setTimeout(() => {
+        panel.hidden = true;
+        if (backdrop) backdrop.hidden = true;
+        outletDetailHideTimer = null;
+      }, OUTLET_DETAIL_ANIMATION_MS);
+    }
 
-      document.querySelectorAll('.detail-row.is-open').forEach(row => {
-        if (row !== detailRow) {
-          row.classList.remove('is-open');
-          row.setAttribute('aria-hidden', 'true');
-          row.inert = true;
-        }
-      });
-      document.querySelectorAll('.btn-detail.is-open').forEach(toggle => {
-        if (toggle !== button) {
-          toggle.classList.remove('is-open');
-          toggle.innerText = 'Detail';
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-      });
+    function openOutletDetail(storeId) {
+      const store = allStores.find(item => String(item.store_id) === String(storeId));
+      const panel = document.getElementById('outletDetailPanel');
+      const content = document.getElementById('outletDetailContent');
+      if (!store || !panel || !content) return;
+      const isOpen = store.vercel_status === 'ON';
+      const mitraUrl = getMitraDynamicUrl(store.vercel_link, store.nama_pemilik || '-');
+      const statusClass = isOpen ? 'is-success' : 'is-warning';
+      const shopeeStatus = getAdminShopeeStatusPresentation(store.shopee_status);
+      const pauseSummary = getAdminPauseSummary(store);
+      const subscriptionSummary = getAdminSubscriptionSummary(store);
+      const toggleSummary = getAdminActionSummary(store);
+      const lastToggleAt = store.last_toggle_at ? formatActionDateTime(store.last_toggle_at, true) : 'Belum ada log toggle';
+      const lastSyncedAt = store.last_synced_at ? formatActionDateTime(store.last_synced_at, true) : 'Belum pernah sinkron';
+      const detailScheduleRows = getAdminScheduleRowsMarkup(store);
+      document.getElementById('outletDetailTitle').textContent = 'Detail Outlet';
+      content.innerHTML = `
+        <div class="outlet-detail-status"><span class="table-status ${statusClass}">${isOpen ? 'Sedang Buka' : 'Sedang Tutup'}</span></div>
+        <div class="outlet-detail-identity">
+          <div class="outlet-detail-identity-copy">
+            <h3>${store.store_name || '-'}</h3>
+            <p class="outlet-detail-store-id">Store ID&nbsp; ${store.store_id || '-'}</p>
+          </div>
+          <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
+        </div>
+        <dl class="outlet-detail-list">
+          <div><dt>Status live Shopee</dt><dd><span class="${shopeeStatus.className}" title="Nilai status terakhir: ${escapeHtml(shopeeStatus.value)}">${shopeeStatus.label}</span></dd><small>Nilai terakhir yang diterima dari XHR Shopee.</small></div>
+          <div><dt>Pause sampai</dt><dd>${escapeHtml(pauseSummary.value)}</dd><small>${escapeHtml(pauseSummary.note)}</small></div>
+          <div><dt>Sinkron terakhir</dt><dd>${escapeHtml(lastSyncedAt)}</dd><small>Waktu pembacaan status outlet terakhir oleh backend.</small></div>
+          <div><dt>Toggle terakhir</dt><dd>${escapeHtml(toggleSummary.title)}</dd><small>${escapeHtml(toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.')}</small></div>
+          <div><dt>Waktu toggle</dt><dd>${escapeHtml(lastToggleAt)}</dd><small>Timestamp dari audit log toggle terbaru.</small></div>
+          <div><dt>Catatan toggle</dt><dd>${escapeHtmlWithBreaks(store.last_toggle_reason, 'Belum ada catatan toggle.')}</dd></div>
+          <div><dt>Status subscription</dt><dd>${escapeHtml(subscriptionSummary.value)}</dd><small>${escapeHtml(subscriptionSummary.note)}</small></div>
+          <div><dt>Password dashboard</dt><dd>${escapeHtml(detailValue(store.vercel_password))}</dd><small>Password login dashboard mitra.</small></div>
+          <div><dt>Catatan jam khusus</dt><dd>${escapeHtmlWithBreaks(store.special_hours, 'Belum ada catatan jam khusus.')}</dd></div>
+        </dl>
+        <section class="outlet-detail-section">
+          <button type="button" class="outlet-detail-accordion" aria-expanded="false" onclick="toggleOutletDetailSchedule(this)">
+            <span>Jadwal reguler Shopee</span>
+            <svg class="outlet-detail-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="outlet-detail-schedule-panel" hidden>
+            <div class="admin-schedule-heading"><strong>Tampilan 7 hari</strong><span>Klik panah untuk tutup</span></div>
+            ${detailScheduleRows}
+          </div>
+        </section>
+        <div class="outlet-detail-actions"><a class="btn-primary" style="background:#be1a1a;border-color:#be1a1a;text-decoration:none" href="${mitraUrl}" target="_blank" rel="noopener noreferrer">Dashboard Mitra</a></div>`;
+      const backdrop = document.getElementById('outletDetailBackdrop');
+      showOutletDetailPanel(panel, backdrop);
+      document.body.classList.add('outlet-detail-open');
+      document.querySelectorAll('.outlet-data-row.is-selected').forEach(row => row.classList.remove('is-selected'));
+      const row = [...document.querySelectorAll('.outlet-data-row')].find(item => item.querySelector('code')?.textContent === String(store.store_id));
+      if (row) row.classList.add('is-selected');
+    }
 
-      const isOpen = detailRow.classList.toggle('is-open');
-      button.classList.toggle('is-open', isOpen);
-      button.innerText = isOpen ? 'Tutup detail' : 'Detail';
-      button.setAttribute('aria-expanded', String(isOpen));
-      detailRow.setAttribute('aria-hidden', String(!isOpen));
-      detailRow.inert = !isOpen;
+    function closeOutletDetail() {
+      const panel = document.getElementById('outletDetailPanel');
+      const backdrop = document.getElementById('outletDetailBackdrop');
+      hideOutletDetailPanel(panel, backdrop);
+      document.body.classList.remove('outlet-detail-open');
+      document.querySelectorAll('.outlet-data-row.is-selected').forEach(row => row.classList.remove('is-selected'));
     }
 
     function filterTable() {
-      const q = document.getElementById('searchInput').value.toLowerCase();
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const value = id => document.getElementById(id).value;
+      const owner = value('ownerFilter'), outlet = value('outletFilter'), storeId = value('storeIdFilter');
+      const status = value('statusFilter'), subscription = value('subscriptionFilter'), paket = value('packageFilter');
       const filtered = allStores.filter(s =>
-        (s.nama_pemilik || '').toLowerCase().includes(q) ||
-        (s.store_name || '').toLowerCase().includes(q) ||
-        (s.store_id || '').toLowerCase().includes(q) ||
-        (s.merchant_name || '').toLowerCase().includes(q)
+        (!q || [s.nama_pemilik, s.store_name, s.store_id, s.merchant_name].some(v => String(v || '').toLowerCase().includes(q))) &&
+        (!owner || s.nama_pemilik === owner) && (!outlet || s.store_name === outlet) && (!storeId || String(s.store_id) === storeId) &&
+        (!status || (status === 'open' ? s.vercel_status === 'ON' : s.vercel_status !== 'ON')) &&
+        (!subscription || (subscription === 'active' ? isStoreSubscriptionActive(s) : !isStoreSubscriptionActive(s))) &&
+        (!paket || s.paket === paket)
       );
       renderAdminTable(filtered);
+    }
+
+    function resetOutletFilters() {
+      ['searchInput', 'ownerFilter', 'outletFilter', 'storeIdFilter', 'statusFilter', 'subscriptionFilter', 'packageFilter'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.value = '';
+      });
+      setupCustomFilterDropdowns();
+      renderAdminTable(allStores);
     }
 
 

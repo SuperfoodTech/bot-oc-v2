@@ -26,12 +26,13 @@ sys.path.insert(0, str(SCRIPT_DIR.parent))
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from backend import db, state, worker
+from backend import db, realtime, state, worker
 from backend import apps_script
 from backend import vb
+from backend.pause_utils import resolve_pause_window
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
@@ -96,6 +97,9 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 ADMIN_SESSION_COOKIE = "foodmaster_admin_session"
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "dev-only-change-me")
 ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12
+USER_SESSION_COOKIE = "foodmaster_user_session"
+USER_SESSION_SECRET = os.getenv("USER_SESSION_SECRET", ADMIN_SESSION_SECRET)
+USER_SESSION_TTL_SECONDS = 60 * 60 * 12
 GOOGLE_AUTH_ENABLED = os.getenv("GOOGLE_AUTH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -116,6 +120,35 @@ def _read_admin_session(token: Optional[str]) -> Optional[dict]:
         padded = encoded + "=" * (-len(encoded) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded).decode())
         if payload.get("role") != "ADMIN" or int(payload.get("exp", 0)) < int(datetime.now().timestamp()):
+            return None
+        return payload
+    except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+def _sign_user_session(owner: str, slug: Optional[str]) -> str:
+    payload = {
+        "role": "MERCHANT",
+        "owner": owner,
+        "slug": slug or "",
+        "exp": int(datetime.now().timestamp()) + USER_SESSION_TTL_SECONDS,
+    }
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(USER_SESSION_SECRET.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _read_user_session(token: Optional[str]) -> Optional[dict]:
+    if not token or "." not in token:
+        return None
+    encoded, signature = token.rsplit(".", 1)
+    expected = hmac.new(USER_SESSION_SECRET.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        return None
+    try:
+        padded = encoded + "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded).decode())
+        if payload.get("role") != "MERCHANT" or int(payload.get("exp", 0)) < int(datetime.now().timestamp()):
             return None
         return payload
     except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
@@ -394,23 +427,19 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
     pause_until = None
     if requested == "PAUSED":
         now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
-        duration_type = (req.duration_type or "").lower()
-        if duration_type in {"30", "30_min", "30min"}:
-            pause_until = now_dt + timedelta(minutes=30)
-        elif duration_type in {"60", "60_min", "60min"}:
-            pause_until = now_dt + timedelta(minutes=60)
-        elif duration_type in {"rest_of_day", "sepanjang_hari", "today"}:
-            pause_until = now_dt.replace(hour=23, minute=59, second=59, microsecond=0)
-        elif duration_type in {"custom", "waktu_lain"} and req.custom_until:
-            try:
-                pause_until = datetime.fromisoformat(req.custom_until.replace("Z", "+00:00"))
-                pause_until = pause_until.astimezone(ZoneInfo("Asia/Jakarta")) if pause_until.tzinfo else pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
-            except ValueError as exc:
-                raise HTTPException(status_code=422, detail="Target waktu penutupan tidak valid.") from exc
-        else:
-            raise HTTPException(status_code=422, detail="Durasi pause VB wajib dipilih.")
-        if pause_until <= now_dt:
-            raise HTTPException(status_code=422, detail="Target waktu harus lebih besar dari waktu sekarang.")
+        try:
+            pause_until, _duration_mins, _label = resolve_pause_window(
+                now_dt,
+                req.duration_type or "",
+                custom_until=req.custom_until,
+                custom_minutes=req.custom_minutes,
+                allow_default=False,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            if message == "Durasi pause wajib dipilih.":
+                message = "Durasi pause VB wajib dipilih."
+            raise HTTPException(status_code=422, detail=message) from exc
     result = vb.request_status(str(brand_id), requested, admin["sub"], pause_until=pause_until)
     if not result:
         raise HTTPException(status_code=404, detail="Brand VB tidak ditemukan.")
@@ -597,14 +626,23 @@ def admin_delete_merchant(nama_pemilik: str, admin: dict = Depends(require_admin
 # ── USER LINK / DASHBOARD ENDPOINTS ───────────────────────────────────────────
 
 @app.post("/api/v1/user/login", summary="User Link: Login by Passcode")
-def user_login(req: UserLoginRequest):
+def user_login(req: UserLoginRequest, response: Response):
     user_info = state.user_authenticate(req.passcode, req.slug)
     if not user_info:
+        response.delete_cookie(USER_SESSION_COOKIE)
         raise HTTPException(status_code=401, detail="Link atau passcode mitra tidak valid.")
 
     pemilik = user_info.get("nama_pemilik", "Fando")
     state.sync_expired_user_pauses()
     outlets = state.user_get_outlets(pemilik)
+    response.set_cookie(
+        USER_SESSION_COOKIE,
+        _sign_user_session(pemilik, user_info.get("link_slug") or req.slug),
+        max_age=USER_SESSION_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
 
     return {
         "success": True,
@@ -615,6 +653,28 @@ def user_login(req: UserLoginRequest):
     }
 
 
+@app.get("/api/v1/admin/events", summary="Admin realtime outlet state events")
+def admin_events(admin: dict = Depends(require_admin)):
+    return StreamingResponse(
+        realtime.stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/v1/user/events", summary="Mitra realtime outlet state events")
+def user_events(user_session: Optional[str] = Cookie(default=None, alias=USER_SESSION_COOKIE)):
+    session = _read_user_session(user_session)
+    if not session:
+        raise HTTPException(status_code=401, detail="Mitra session expired.")
+    owner = session.get("owner", "")
+    return StreamingResponse(
+        realtime.stream(lambda event: event.get("owner_name") == owner),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.get("/api/v1/user/outlets", summary="User Link: Get Outlets for Authenticated User")
 def user_get_outlets(nama_pemilik: str = Query(..., description="Nama Pemilik / Mitra")):
     state.sync_expired_user_pauses()
@@ -623,82 +683,56 @@ def user_get_outlets(nama_pemilik: str = Query(..., description="Nama Pemilik / 
 
 
 @app.post("/api/v1/user/pause", summary="User Link: Pause Store with Selected Duration")
-def user_pause_store(req: UserPauseRequest):
+def user_pause_store(
+    req: UserPauseRequest,
+    admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE),
+):
+    admin_account = _read_admin_session(admin_session)
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
 
-    if store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED":
+    if not admin_account and (store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED"):
         reason = store.get("alasan_penangguhan") or "Tindakan admin"
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
     now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
-    if not _is_within_shopee_schedule(store, now_dt):
+    if not admin_account and not _is_within_shopee_schedule(store, now_dt):
         raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
 
-    dtype = req.duration_type.lower()
-    wib = ZoneInfo("Asia/Jakarta")
-
-    if dtype in ("30", "30_min", "30min"):
-        duration_mins = 30
-        label = "30 Menit"
-    elif dtype in ("60", "60_min", "60min"):
-        duration_mins = 60
-        label = "60 Menit"
-    elif dtype in ("rest_of_day", "sepanjang_hari", "today"):
-        midnight = datetime(
-            now_dt.year,
-            now_dt.month,
-            now_dt.day,
-            23,
-            59,
-            59,
-            tzinfo=wib,
+    try:
+        pause_until_dt, duration_mins, label = resolve_pause_window(
+            now_dt,
+            req.duration_type,
+            custom_until=req.custom_until,
+            custom_minutes=req.custom_minutes,
         )
-        duration_mins = int((midnight - now_dt).total_seconds() // 60)
-        if duration_mins < 10:
-            duration_mins = 60
-        label = "Sepanjang Hari"
-    elif dtype in ("custom", "waktu_lain"):
-        if req.custom_until:
-            try:
-                pause_until_dt = datetime.fromisoformat(req.custom_until.replace("Z", "+00:00"))
-                if pause_until_dt.tzinfo is not None:
-                    pause_until_dt = pause_until_dt.astimezone(wib)
-                else:
-                    pause_until_dt = pause_until_dt.replace(tzinfo=wib)
-            except ValueError as exc:
-                raise HTTPException(status_code=422, detail="Target waktu penutupan tidak valid.") from exc
-            duration_mins = int((pause_until_dt - now_dt).total_seconds() // 60)
-            if duration_mins <= 0:
-                raise HTTPException(status_code=422, detail="Target waktu harus lebih besar dari waktu sekarang.")
-            label = f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
-        else:
-            duration_mins = req.custom_minutes or 0
-            if duration_mins <= 0:
-                raise HTTPException(status_code=422, detail="Target waktu penutupan wajib diisi.")
-            pause_until_dt = now_dt + timedelta(minutes=duration_mins)
-            label = f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
-    else:
-        duration_mins = 1440
-        label = "Default (1 Hari)"
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    if dtype not in ("custom", "waktu_lain"):
-        pause_until_dt = now_dt + timedelta(minutes=duration_mins)
     pause_until_str = pause_until_dt.strftime("%Y-%m-%d %H:%M:%S")
     pause_start_time_ms = int(now_dt.timestamp() * 1000)
     pause_end_time_ms = int(pause_until_dt.timestamp() * 1000)
 
-    # Keep the database value timezone-aware. Passing a naive string to a
-    # timestamptz column makes PostgreSQL interpret WIB as UTC (+7 hours).
-    state.update_vercel_toggle(req.store_id, "OFF", pause_until_dt)
-    state.record_log(
-        store_id=req.store_id,
-        store_name=store["store_name"],
-        action="USER_PAUSE_STORE",
-        target_state="CLOSED",
-        reason=f"User set store OFF with duration: {label} (Until {pause_until_str} WIB); pause_start_time_ms={pause_start_time_ms}; pause_end_time_ms={pause_end_time_ms}"
+    # Admin uses the same request contract as Mitra, but keeps Admin ownership in the audit log.
+    action = "ADMIN_PAUSE_STORE" if admin_account else "USER_PAUSE_STORE"
+    reason = (
+        f"Admin {admin_account.get('username')} set store OFF via Mitra pause modal until {pause_until_str} WIB"
+        if admin_account
+        else f"User set store OFF with duration: {label} (Until {pause_until_str} WIB); pause_start_time_ms={pause_start_time_ms}; pause_end_time_ms={pause_end_time_ms}"
     )
+    apply_toggle = state.apply_admin_toggle if admin_account else state.apply_user_toggle
+    transition = apply_toggle(
+        store_id=req.store_id,
+        status="OFF",
+        pause_until=pause_until_dt,
+        action=action,
+        target_state="CLOSED",
+        reason=reason,
+    )
+    if not transition["success"]:
+        raise HTTPException(status_code=403 if transition["code"] in {"suspended", "subscription_expired"} else 404, detail=transition["detail"])
+    realtime.publish_outlet_state_changed(transition, action, "ADMIN" if admin_account else "MITRA")
 
     return {
         "success": True,
@@ -727,21 +761,23 @@ def user_resume_store(store_id: str = Query(..., description="Target Store ID"))
     if not _is_within_shopee_schedule(store, now_dt):
         raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
 
-    state.update_vercel_toggle(store_id, "ON", None)
-    actual_store = state.get_store_by_id(store_id)
-    state.record_log(
+    transition = state.apply_user_toggle(
         store_id=store_id,
-        store_name=store["store_name"],
+        status="ON",
+        pause_until=None,
         action="USER_RESUME_STORE",
         target_state="OPEN",
-        reason="User manually turned Vercel Toggle ON (Auto Open)"
+        reason="User manually turned Vercel Toggle ON (Auto Open)",
     )
+    if not transition["success"]:
+        raise HTTPException(status_code=403 if transition["code"] in {"suspended", "subscription_expired"} else 404, detail=transition["detail"])
+    realtime.publish_outlet_state_changed(transition, "USER_RESUME_STORE", "MITRA")
 
     return {
         "success": True,
         "store_id": store_id,
-        "vercel_status": actual_store["vercel_status"],
-        "message": f"Store {store_id} Vercel status updated to {actual_store['vercel_status']}."
+        "vercel_status": transition["vercel_status"],
+        "message": f"Store {store_id} Vercel status updated to {transition['vercel_status']}."
     }
 
 
@@ -772,14 +808,20 @@ def list_stores(admin: dict = Depends(require_admin)):
             tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
             vercel_link=s.get("vercel_link", ""),
             vercel_password=s.get("vercel_password", ""),
+            google_email=s.get("google_email", ""),
+            special_hours=s.get("special_hours", ""),
             vercel_status=s["vercel_status"],
             shopee_status=s["shopee_status"],
+            shopee_regular_hours=s.get("shopee_regular_hours") or {},
             subscription_status=s["subscription_status"],
             is_suspended=bool(s["is_suspended"]),
             alasan_penangguhan=s.get("alasan_penangguhan", ""),
             pause_until=s["pause_until"],
             last_synced_at=s["last_synced_at"],
-            last_action=s.get("last_action", "no change")
+            last_action=s.get("last_action", "no change"),
+            last_toggle_action_raw=s.get("last_toggle_action_raw"),
+            last_toggle_reason=s.get("last_toggle_reason", ""),
+            last_toggle_at=s.get("last_toggle_at")
         ))
     return response
 
@@ -801,14 +843,20 @@ def get_store_detail(store_id: str, admin: dict = Depends(require_admin)):
         tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
         vercel_link=s.get("vercel_link", ""),
         vercel_password=s.get("vercel_password", ""),
+        google_email=s.get("google_email", ""),
+        special_hours=s.get("special_hours", ""),
         vercel_status=s["vercel_status"],
         shopee_status=s["shopee_status"],
+        shopee_regular_hours=s.get("shopee_regular_hours") or {},
         subscription_status=s["subscription_status"],
         is_suspended=bool(s["is_suspended"]),
         alasan_penangguhan=s.get("alasan_penangguhan", ""),
         pause_until=s["pause_until"],
         last_synced_at=s["last_synced_at"],
-        last_action=s.get("last_action", "no change")
+        last_action=s.get("last_action", "no change"),
+        last_toggle_action_raw=s.get("last_toggle_action_raw"),
+        last_toggle_reason=s.get("last_toggle_reason", ""),
+        last_toggle_at=s.get("last_toggle_at")
     )
 
 
@@ -817,17 +865,34 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
+    next_status = req.status.upper()
     pause_until = None
-    if req.status.upper() == "OFF" and req.pause_duration_minutes:
+    if next_status == "OFF" and req.pause_duration_minutes:
         pause_dt = datetime.now(ZoneInfo("Asia/Jakarta")) + timedelta(minutes=req.pause_duration_minutes)
         pause_until = pause_dt
-    state.update_vercel_toggle(req.store_id, req.status, pause_until)
-    updated = state.get_store_by_id(req.store_id)
+    pause_until_str = pause_until.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S") if pause_until else ""
+    transition = state.apply_admin_toggle(
+        store_id=req.store_id,
+        status=next_status,
+        pause_until=pause_until,
+        action="ADMIN_PAUSE_STORE" if next_status == "OFF" else "ADMIN_RESUME_STORE",
+        target_state="CLOSED" if next_status == "OFF" else "OPEN",
+        reason=(f"Admin {admin.get('username')} set store OFF via Dashboard until {pause_until_str} WIB" if next_status == "OFF" and pause_until_str
+                else f"Admin {admin.get('username')} set store OFF via Dashboard" if next_status == "OFF"
+                else f"Admin {admin.get('username')} set store ON via Dashboard"),
+    )
+    if not transition["success"]:
+        raise HTTPException(status_code=404, detail=transition["detail"])
+    realtime.publish_outlet_state_changed(
+        transition,
+        "ADMIN_PAUSE_STORE" if next_status == "OFF" else "ADMIN_RESUME_STORE",
+        "ADMIN",
+    )
     return {
         "success": True,
         "store_id": req.store_id,
-        "new_vercel_status": updated["vercel_status"],
-        "pause_until": updated["pause_until"]
+        "new_vercel_status": transition["vercel_status"],
+        "pause_until": transition["pause_until"]
     }
 
 

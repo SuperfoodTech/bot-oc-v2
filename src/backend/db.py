@@ -200,9 +200,9 @@ def format_last_action(raw_action: Optional[str]) -> str:
     if not raw_action:
         return "no change"
     act = str(raw_action).strip().upper()
-    if act in ("ACTION_OPEN", "USER_RESUME_STORE", "OPEN_STORE", "OPEN"):
+    if act in ("ACTION_OPEN", "USER_RESUME_STORE", "ADMIN_RESUME_STORE", "OPEN_STORE", "OPEN"):
         return "action open"
-    elif act in ("ACTION_CLOSE", "USER_PAUSE_STORE", "CLOSE_STORE", "CLOSE", "PAUSE"):
+    elif act in ("ACTION_CLOSE", "USER_PAUSE_STORE", "ADMIN_PAUSE_STORE", "CLOSE_STORE", "CLOSE", "PAUSE"):
         return "action close"
     elif act in ("NO_CHANGE", "NONE"):
         return "no change"
@@ -211,7 +211,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     # Virtual Brand outlets are controlled exclusively through vb_brands and
     # must not appear in the regular outlet dashboard or bot-oc worker scope.
@@ -381,6 +381,124 @@ def update_vercel_toggle(store_id, status, pause_until=None):
         if pause_until.tzinfo is None:
             pause_until = pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
     with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_until, store_id))
+
+
+def _apply_toggle_transaction(
+    store_id: str,
+    status: str,
+    pause_until,
+    action: str,
+    target_state: str,
+    reason: str,
+    reject_suspended: bool,
+    reject_expired_on: bool,
+) -> Dict[str, Any]:
+    """Serialize one outlet toggle and its audit log in a single transaction."""
+    normalized_status = str(status or "").upper()
+    if normalized_status not in {"ON", "OFF"}:
+        return {"success": False, "code": "invalid_status", "detail": "Status toggle tidak valid."}
+
+    if isinstance(pause_until, str) and pause_until.strip():
+        pause_until = datetime.fromisoformat(pause_until.replace("Z", "+00:00"))
+        if pause_until.tzinfo is None:
+            pause_until = pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+
+    with get_db_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT o.id AS outlet_id, o.store_id, o.long_name AS store_name,
+                   m.name AS owner_name,
+                   os.vercel_status, os.shopee_actual_status, os.suspension_status,
+                   os.suspension_reason,
+                   EXISTS (
+                       SELECT 1 FROM subscriptions sx
+                        WHERE sx.outlet_id=o.id
+                          AND sx.end_date<CURRENT_DATE
+                          AND sx.status<>'CANCELLED'
+                   ) AS subscription_expired
+              FROM outlets o
+              JOIN merchants m ON m.id=o.merchant_id
+              JOIN outlet_states os ON os.outlet_id=o.id
+             WHERE o.store_id=%s AND o.is_active=true
+             FOR UPDATE OF os
+            """,
+            (store_id,),
+        ).fetchone()
+        if not row:
+            return {"success": False, "code": "not_found", "detail": f"Store ID '{store_id}' not found."}
+
+        if reject_suspended and row["suspension_status"] == "SUSPENDED":
+            suspension_reason = row.get("suspension_reason") or "Tindakan admin"
+            return {
+                "success": False,
+                "code": "suspended",
+                "detail": f"Outlet ditangguhkan oleh Admin (Alasan: {suspension_reason}). Silakan hubungi CS.",
+            }
+        if reject_expired_on and normalized_status == "ON" and row["subscription_expired"]:
+            return {"success": False, "code": "subscription_expired", "detail": "Subscription outlet sudah berakhir."}
+
+        next_pause_until = pause_until if normalized_status == "OFF" else None
+        effective_status = "OFF" if row["suspension_status"] == "SUSPENDED" or row["subscription_expired"] else normalized_status
+        updated = conn.execute(
+            """
+            UPDATE outlet_states
+               SET vercel_status=%s,
+                   pause_until=%s,
+                   last_action_at=now(),
+                   last_checked_at=now(),
+                   updated_at=now()
+             WHERE outlet_id=%s
+         RETURNING vercel_status, pause_until::text AS pause_until,
+                   last_action_at::text AS changed_at
+            """,
+            (effective_status, next_pause_until, row["outlet_id"]),
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO automation_logs
+                (outlet_id, mode, suspension_status, subscription_status,
+                 vercel_status_before, shopee_status_before, target_status,
+                 action, success, error_message, reason)
+            VALUES (%s, 'REGULAR', %s, 'ACTIVE', %s, %s, %s, %s, true, NULL, %s)
+            """,
+            (
+                row["outlet_id"],
+                row["suspension_status"],
+                row["vercel_status"],
+                row["shopee_actual_status"],
+                target_state,
+                action,
+                reason,
+            ),
+        )
+        return {
+            "success": True,
+            "store_id": row["store_id"],
+            "store_name": row["store_name"],
+            "owner_name": row["owner_name"],
+            "vercel_status": updated["vercel_status"],
+            "pause_until": updated["pause_until"],
+            "changed_at": updated["changed_at"],
+            "reason": reason,
+        }
+
+
+def apply_user_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str) -> Dict[str, Any]:
+    return _apply_toggle_transaction(
+        store_id, status, pause_until, action, target_state, reason,
+        reject_suspended=True,
+        reject_expired_on=True,
+    )
+
+
+def apply_admin_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str) -> Dict[str, Any]:
+    return _apply_toggle_transaction(
+        store_id, status, pause_until, action, target_state, reason,
+        reject_suspended=False,
+        reject_expired_on=False,
+    )
+
+
 def admin_set_suspension(store_id, penangguhan, alasan=""):
     suspended = penangguhan.lower() == "ya"
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET suspension_status=%s,suspension_reason=%s,vercel_status=CASE WHEN %s THEN 'OFF' ELSE vercel_status END,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", ("SUSPENDED" if suspended else "ACTIVE", alasan, suspended, store_id))

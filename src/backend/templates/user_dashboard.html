@@ -5,19 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#BE1A1A">
   <title>FoodMaster Auto-Open | Mitra Dashboard</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260824-regular-hours">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260829-mitra-dashboard-v54">
 </head>
 <body x-data="userApp()">
 
-  <div class="mobile-wrapper">
+  <div class="mobile-wrapper is-auth-view">
     <header class="app-header">
       <div class="brand-badge">
-        <img class="brand-logo brand-logo-mitra" src="/static/Logo_FoodMaster.png" alt="FoodMaster">
+        <img class="brand-logo brand-logo-mitra" src="/static/icons/Logo_FoodMaster.png" alt="FoodMaster">
       </div>
       <div class="header-actions">
         <a href="https://wa.me/6285183151531" class="help-link customer-service-link" target="_blank" rel="noopener noreferrer" aria-label="Hubungi customer service via WhatsApp" title="Customer Service via WhatsApp">
@@ -28,69 +28,142 @@
     </header>
 
     <div class="content-body" id="mainContent">
-      <div id="loginSection" class="card-box" style="display: block;">
-        <div class="step-indicator">Akses mitra</div>
-        <h2 class="card-title">Masukkan kata sandi</h2>
-        <p class="card-subtitle">Gunakan kata sandi dari admin untuk membuka dashboard.</p>
-        
-        <div style="margin-top: 14px;">
-          <div class="password-input-wrapper">
-            <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
-            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </button>
+      <div id="loginSection" class="card-box mitra-login-panel" style="display: block;">
+        <div class="mitra-login-stack">
+          <div class="mitra-login-hero">
+            <div class="mitra-login-copy">
+              <div class="step-indicator">Dashboard Mitra</div>
+              <h1 class="card-title">Masukkan kata sandi</h1>
+              <p class="card-subtitle">Gunakan kata sandi dari admin FoodMaster untuk mengakses dashboard outlet Anda.</p>
+            </div>
           </div>
-          <p id="userLoginError" style="color: #BE1A1A; font-size: 13px; margin-top: 8px; font-weight: 500; display: none; text-align: center; line-height: 1.4;"></p>
-          <button class="btn-primary" style="margin-top: 12px; width: 100%;" onclick="doLogin()">Masuk</button>
-          <div class="google-auth-option" style="display: none;">
-            <div class="login-divider">ATAU</div>
-            <button type="button" class="btn-google" id="googleLoginBtn">
-            <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-            </svg>
-              Masuk dengan Google
-            </button>
+
+          <div class="mitra-login-form">
+            <div class="password-input-wrapper">
+              <span class="password-field-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <rect x="6.5" y="10.5" width="11" height="9" rx="2"></rect>
+                  <path d="M8.5 10.5V8.75a3.5 3.5 0 1 1 7 0v1.75"></path>
+                  <circle cx="12" cy="14.5" r="1"></circle>
+                </svg>
+              </span>
+              <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+            <p id="userLoginError" style="color: #BE1A1A; font-size: 13px; margin-top: 8px; font-weight: 500; display: none; text-align: center; line-height: 1.4;"></p>
+            <button class="btn-primary mitra-login-submit" onclick="doLogin()">Masuk</button>
+            <div class="auth-highlights" aria-label="Keunggulan FoodMaster">
+              <article class="auth-highlight">
+                <div class="auth-highlight-icon is-shield">
+                  <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
+                </div>
+                <div class="auth-highlight-copy">
+                  <strong>Akses aman untuk mitra terdaftar</strong>
+                  <p>Data outlet Anda terlindungi dengan sistem keamanan FoodMaster.</p>
+                </div>
+              </article>
+              <article class="auth-highlight is-automation">
+                <div class="auth-highlight-icon is-shopeefood">
+                  <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+                </div>
+                <div class="auth-highlight-copy">
+                  <strong>ShopeeFood Auto Open/Close Bot</strong>
+                  <p>Kelola outlet Anda jauh lebih mudah dengan proses operasional outlet yang efisien.</p>
+                </div>
+              </article>
+            </div>
+            <div class="google-auth-option" style="display: none;">
+              <div class="login-divider">ATAU</div>
+              <button type="button" class="btn-google" id="googleLoginBtn">
+              <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+              </svg>
+                Masuk dengan Google
+              </button>
+            </div>
+            <p class="mitra-login-copyright">&copy; 2026 FoodMaster. All rights reserved.</p>
           </div>
         </div>
       </div>
 
       <div id="dashboardSection" class="dashboard-stack" style="display: none;">
-        <section class="page-intro">
-          <div class="eyebrow">Dashboard mitra</div>
-          <h1 class="page-title">Kelola outlet</h1>
-          <p class="page-description">Pantau status dan atur operasional outlet Anda.</p>
+        <section class="page-intro mitra-dashboard-hero">
+          <div class="mitra-hero-copy">
+            <div class="mitra-hero-label">Dashboard Mitra</div>
+            <h1 class="page-title">Kelola outlet Anda</h1>
+            <p class="page-description">Pantau status dan kelola operasional outlet Anda dengan mudah.</p>
+          </div>
+          <div class="mitra-hero-art" aria-hidden="true">
+            <img class="mitra-hero-shop" src="/static/icons/shop-outlet-red.svg" alt="">
+          </div>
         </section>
 
-        <div class="card-box subscription-card">
-          <div>
-            <div class="step-indicator">Akun</div>
-            <h2 class="card-title" id="mitraName">Mitra Fando</h2>
-            <p class="card-subtitle" id="subDetails">Aktif hingga 01 Nov 2026</p>
-          </div>
-          <span class="badge badge-open" id="subBadge">Aktif</span>
-        </div>
+        <div class="dashboard-content-stack">
+          <button type="button" class="card-box mitra-account-card" onclick="scrollToAccountNotice()">
+            <span class="mitra-account-avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 13.25a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 13.25Z"></path>
+                <path d="M5 19.5a7 7 0 0 1 14 0"></path>
+              </svg>
+            </span>
+            <span class="mitra-account-copy">
+              <span class="mitra-account-label">Akun</span>
+              <span class="mitra-account-heading">
+                <span class="card-title" id="mitraName">Mitra Fando</span>
+                <span class="badge badge-open" id="subBadge">Aktif</span>
+              </span>
+              <span class="card-subtitle" id="subDetails">Aktif hingga 01 Nov 2026</span>
+              <span class="mitra-account-meta">
+                <span class="mitra-account-meta-item">
+                  <svg viewBox="0 0 16 16">
+                    <path d="M3 1L0 4v1s2 1 4 1 4-1 4-1 2 1 4 1 4-1 4-1V4l-3-3H3Z"></path>
+                    <path d="M1 15V7.52C1.82 7.76 2.88 8 4 8c1.3 0 2.53-.32 3.38-.6.23-.08.43-.15.62-.22.18.07.39.14.62.22.85.28 2.08.6 3.38.6 1.12 0 2.18-.24 3-.48V15H7v-5H4v5H1Zm11-5h-2v3h2v-3Z"></path>
+                  </svg>
+                  <span id="accountOutletCount">0 outlet</span>
+                </span>
+              </span>
+            </span>
+            <span class="mitra-account-chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
+            </span>
+          </button>
 
-        <div class="section-heading">
-          <h2>Outlet Anda</h2>
-          <span class="section-count" id="outletCount">Memuat...</span>
-        </div>
-
-        <div id="outletsList" class="outlet-list"></div>
-
-        <div class="card-box">
-          <div class="card-heading">
-            <h2>Aktivitas terbaru</h2>
-            <button class="text-button" onclick="fetchHistory()" style="background: none; border: 0; cursor: pointer;">Muat ulang</button>
+          <div class="section-heading mitra-section-heading">
+            <h2>Outlet Anda</h2>
+            <span class="section-count" id="outletCount">Memuat...</span>
           </div>
-          <div id="historyLogs" class="history-list">
-            <div class="history-item"><span>Memuat aktivitas...</span></div>
+
+          <div id="outletsList" class="outlet-list"></div>
+
+          <div class="card-box mitra-activity-card">
+            <div class="card-heading">
+              <h2>Aktivitas terbaru</h2>
+            </div>
+            <div id="historyLogs" class="history-list">
+              <div class="history-item is-empty"><span>Memuat aktivitas...</span></div>
+            </div>
           </div>
+
+          <div class="mitra-security-note" id="accountNotice">
+            <span class="mitra-security-note-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 11v5"></path>
+                <path d="M12 7.25h.01"></path>
+              </svg>
+            </span>
+            <p>Kata sandi akun Anda dikelola oleh admin FoodMaster dan tidak dapat diubah oleh mitra.</p>
+          </div>
+
+          <p class="mitra-dashboard-copyright">&copy; 2026 FoodMaster. All rights reserved.</p>
         </div>
       </div>
     </div>
@@ -139,7 +212,7 @@
             <input type="radio" name="pauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta">hingga 23.59</span>
+          <span class="radio-meta">24 jam</span>
         </label>
 
         <label class="radio-card">
@@ -203,6 +276,10 @@
     let currentUserOutlets = [];
     let currentUserOwner = '';
     let selectedStoreId = null;
+    const pendingToggleStoreIds = new Set();
+    const deferredOutletEvents = new Map();
+    let userEventSource = null;
+    let userLoginInFlight = false;
     let pickerDate = null;
     let pickerMonth = null;
     const expandedScheduleStores = new Set();
@@ -213,13 +290,37 @@
         store_id: '21897166',
         regular_hours: [1, 2, 3, 4, 5, 6, 7].map(weekday => ({
           weekday,
-          config_enabled: 0,
-          intervals: [1, 2, 3].map(() => ({start_relative_sec: 0, end_relative_sec: 0}))
+          config_enabled: 1,
+          intervals: [{ start_relative_sec: 10 * 60 * 60, end_relative_sec: 21 * 60 * 60 }]
         }))
       }
     };
     const currentSlug = window.location.pathname.match(/^\/mitra\/([^/]+)/)?.[1] || '';
     const userSessionKey = currentSlug ? `user_passcode:${currentSlug}` : 'user_passcode:legacy';
+
+    function setUserViewState(isLoggedIn) {
+      const wrapper = document.querySelector('.mobile-wrapper');
+      if (!wrapper) return;
+      wrapper.classList.toggle('is-auth-view', !isLoggedIn);
+      wrapper.classList.toggle('is-dashboard-view', !!isLoggedIn);
+    }
+
+    function scrollToAccountNotice() {
+      document.getElementById('accountNotice')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function getShopeeFoodStoreUrl(storeId) {
+      return `https://shopee.co.id/universal-link/now-food/shop/${encodeURIComponent(String(storeId || '').trim())}`;
+    }
+
+    function openShopeeFoodOutlet(storeId) {
+      const normalizedStoreId = String(storeId || '').trim();
+      if (!normalizedStoreId) {
+        showUserToast('Store ID outlet belum tersedia.', 'error');
+        return;
+      }
+      window.location.assign(getShopeeFoodStoreUrl(normalizedStoreId));
+    }
 
     function userApp() {
       return {
@@ -250,7 +351,7 @@
       document.getElementById('customUntilInput')?.addEventListener('input', updatePauseEndPreview);
       document.getElementById('customUntilInput')?.addEventListener('change', updatePauseEndPreview);
 
-      // Keep the remaining pause time current without changing Shopee's schedule.
+      // Keep the local pause countdown fresh; state changes arrive through SSE below.
       setInterval(() => {
         if (currentUserOutlets.length && document.getElementById('dashboardSection').style.display !== 'none') {
           const hasExpiredPause = currentUserOutlets.some(out => {
@@ -258,14 +359,13 @@
             const end = getPauseEndDate(out.pause_until);
             return end && end.getTime() <= Date.now();
           });
-          if (hasExpiredPause) {
+          if (hasExpiredPause && !userLoginInFlight) {
             doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
           } else {
             renderOutlets(currentUserOutlets);
-            fetchHistory();
           }
         }
-      }, 60000);
+      }, 5000);
 
       // Google OAuth Redirect Click Event
       document.getElementById('googleLoginBtn').addEventListener('click', () => {
@@ -305,8 +405,10 @@
       // 3. Regular Session Restore
       const savedPasscode = sessionStorage.getItem(userSessionKey);
       if (savedPasscode) {
+        setUserViewState(true);
         doLogin(savedPasscode, true);
       } else {
+        setUserViewState(false);
         document.getElementById('loginSection').style.display = 'block';
         document.getElementById('dashboardSection').style.display = 'none';
       }
@@ -326,11 +428,14 @@
             alert('Mohon masukkan kata sandi mitra!');
           }
         }
+        setUserViewState(false);
         document.getElementById('loginSection').style.display = 'block';
         document.getElementById('dashboardSection').style.display = 'none';
         return;
       }
 
+      if (userLoginInFlight) return;
+      userLoginInFlight = true;
       try {
         const res = await fetch('/api/v1/user/login', {
           method: 'POST',
@@ -346,14 +451,25 @@
           if (window._appData) {
             window._appData.outlets = data.outlets;
           }
+          setUserViewState(true);
           document.getElementById('loginSection').style.display = 'none';
           document.getElementById('dashboardSection').style.display = 'flex';
-          document.getElementById('mitraName').innerText = `Mitra ${data.nama_pemilik}`;
-          document.getElementById('outletCount').innerText = `${data.total_outlets} outlet`;
+          const accountSummary = getAccountSubscriptionSummary(data.outlets);
+          document.getElementById('mitraName').textContent = `Mitra ${data.nama_pemilik}`;
+          document.getElementById('subDetails').textContent = accountSummary.details;
+          const subBadge = document.getElementById('subBadge');
+          if (subBadge) {
+            subBadge.textContent = accountSummary.label;
+            subBadge.className = accountSummary.className;
+          }
+          document.getElementById('accountOutletCount').textContent = formatOutletCount(data.total_outlets);
+          document.getElementById('outletCount').textContent = formatOutletCount(data.total_outlets);
           renderOutlets(data.outlets);
           fetchHistory();
+          startUserEventStream();
         } else {
           sessionStorage.removeItem(userSessionKey);
+          setUserViewState(false);
           document.getElementById('loginSection').style.display = 'block';
           document.getElementById('dashboardSection').style.display = 'none';
           if (!isAuto) {
@@ -366,13 +482,57 @@
           }
         }
       } catch (err) {
+        setUserViewState(false);
         document.getElementById('loginSection').style.display = 'block';
         document.getElementById('dashboardSection').style.display = 'none';
         if (errorEl) {
           errorEl.innerText = 'Gagal menghubungkan ke server.';
           errorEl.style.display = 'block';
         }
+      } finally {
+        userLoginInFlight = false;
       }
+    }
+
+    function applyUserOutletStateEvent(update) {
+      const storeId = String(update.store_id || '');
+      const outlet = currentUserOutlets.find(item => String(item.store_id) === storeId);
+      if (!outlet) return;
+      outlet.vercel_status = update.vercel_status;
+      outlet.pause_until = update.pause_until || null;
+      outlet.last_toggle_action_raw = update.action || outlet.last_toggle_action_raw;
+      outlet.last_toggle_reason = update.reason || outlet.last_toggle_reason || '';
+      outlet.last_toggle_at = update.changed_at || outlet.last_toggle_at || null;
+      if (window._appData) window._appData.outlets = currentUserOutlets;
+      renderOutlets(currentUserOutlets);
+      fetchHistory();
+    }
+
+    function handleUserOutletStateEvent(update) {
+      const storeId = String(update.store_id || '');
+      if (pendingToggleStoreIds.has(storeId)) {
+        deferredOutletEvents.set(storeId, update);
+        return;
+      }
+      applyUserOutletStateEvent(update);
+    }
+
+    function startUserEventStream() {
+      if (userEventSource) return;
+      userEventSource = new EventSource('/api/v1/user/events');
+      userEventSource.onopen = () => {
+        // Reconcile once after reconnect so an event missed during a network gap is repaired.
+        if (!userLoginInFlight && activePasscode && currentUserOutlets.length) {
+          doLogin(activePasscode, true);
+        }
+      };
+      userEventSource.addEventListener('outlet-state-changed', event => {
+        try {
+          handleUserOutletStateEvent(JSON.parse(event.data));
+        } catch (error) {
+          // EventSource reconnects automatically; keep the last confirmed state visible.
+        }
+      });
     }
 
     function togglePasswordVisibility(inputId, btn) {
@@ -388,10 +548,62 @@
       btn.setAttribute('aria-label', isPass ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getReadableDate(value) {
+      if (!value) return '';
+      let str = String(value).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) str += 'T12:00:00+07:00';
+      else {
+        if (!str.includes('T') && str.includes(' ')) str = str.replace(' ', 'T');
+        str = str.replace(/([+-]\d{2})$/, '$1:00');
+        if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += '+07:00';
+      }
+      const date = new Date(str);
+      if (Number.isNaN(date.getTime())) return '';
+      const parts = new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      return `${parts.day} ${parts.month} ${parts.year}`;
+    }
+
+    function formatOutletCount(total) {
+      const safeTotal = Number.isFinite(Number(total)) ? Number(total) : 0;
+      return `${safeTotal} outlet`;
+    }
+
+    function getAccountSubscriptionSummary(outlets) {
+      const outletList = Array.isArray(outlets) ? outlets : [];
+      const hasActive = outletList.some(outlet => String(outlet.subscription_status || '').trim().toLowerCase() === 'aktif');
+      const validDates = outletList
+        .map(outlet => ({ raw: outlet.tanggal_berakhir_layanan, label: getReadableDate(outlet.tanggal_berakhir_layanan) }))
+        .filter(item => item.raw && item.label)
+        .sort((a, b) => String(a.raw).localeCompare(String(b.raw)));
+      const lastExpiry = validDates.length ? validDates[validDates.length - 1].label : '';
+      return {
+        label: hasActive ? 'Aktif' : 'Tidak aktif',
+        className: hasActive ? 'badge badge-open' : 'badge badge-closed',
+        details: lastExpiry
+          ? `${hasActive ? 'Aktif hingga' : 'Berakhir pada'} ${lastExpiry}`
+          : (hasActive ? 'Status layanan sedang aktif' : 'Status layanan belum tersedia')
+      };
+    }
+
     function formatIndonesianTime(isoStr, includeDateIfToday = true) {
       if (!isoStr) return '';
       try {
         let str = String(isoStr).trim();
+        str = str.replace(/\s+WIB$/i, '');
         // SQL timestamps without an offset are stored in WIB by the application.
         if (!str.includes('T') && str.includes(' ')) {
           str = str.replace(' ', 'T');
@@ -454,6 +666,37 @@
       return `Buka ${parts.hour}:${parts.minute} WIB`;
     }
 
+    function formatPauseResumeInline(value) {
+      const end = getPauseEndDate(value);
+      if (!end) return '';
+      const remainingText = formatRemainingPause(value);
+      const dateParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(end).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const nowParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const timeParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(end).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const isToday = dateParts.year === nowParts.year && dateParts.month === nowParts.month && dateParts.day === nowParts.day;
+      const reopenText = isToday
+        ? `Akan buka kembali pada ${timeParts.hour}:${timeParts.minute} WIB`
+        : `Akan buka kembali ${dateParts.day}/${dateParts.month}, ${timeParts.hour}:${timeParts.minute} WIB`;
+      return remainingText && remainingText !== 'Selesai'
+        ? `${reopenText} · ${remainingText}`
+        : reopenText;
+    }
+
     function formatPauseTargetDate(date) {
       const parts = new Intl.DateTimeFormat('id-ID', {
         timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -478,9 +721,31 @@
       return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status };
     }
 
+    function getMitraStatusPresentation(outlet) {
+      const normalized = String(outlet?.shopee_status || '').trim().toUpperCase();
+      if (normalized === 'ON' || normalized === 'OPEN') {
+        return { label: 'Sedang Buka', className: 'mitra-status-pill is-open', value: normalized || 'OPEN' };
+      }
+      if (normalized === 'PAUSE' || normalized === 'CLOSED' || outlet?.vercel_status === 'OFF') {
+        return { label: 'Sedang Tutup', className: 'mitra-status-pill is-closed', value: normalized || 'CLOSED' };
+      }
+      return { label: 'Status Dicek Bot', className: 'mitra-status-pill is-pending', value: normalized || 'UNKNOWN' };
+    }
+
+    function hasUsableSchedule(schedule) {
+      if (Array.isArray(schedule)) {
+        return schedule.some(day => Number(day?.config_enabled) && Array.isArray(day?.intervals) && day.intervals.some(interval => Number(interval?.end_relative_sec) > Number(interval?.start_relative_sec)));
+      }
+      if (schedule && typeof schedule === 'object') {
+        return Object.values(schedule).some(value => Array.isArray(value) ? value.length > 0 : Boolean(value));
+      }
+      return false;
+    }
+
     function getOutletSchedule(outlet) {
       const isLocalYolo = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
         && currentUserOwner.trim().toLowerCase() === 'yolo';
+      if (hasUsableSchedule(outlet.shopee_regular_hours)) return outlet.shopee_regular_hours;
       if (isLocalYolo) return localRegularHoursDummy.data.regular_hours;
       return outlet.shopee_regular_hours || {};
     }
@@ -505,10 +770,97 @@
       return result;
     }
 
+    function parseScheduleRange(range) {
+      const match = String(range || '').match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
+      if (!match) return null;
+      return {
+        start: Number(match[1]) * 60 + Number(match[2]),
+        end: Number(match[3]) * 60 + Number(match[4])
+      };
+    }
+
+    function formatScheduleRange(range) {
+      return String(range || '').replace(/:/g, '.');
+    }
+
+    function getWibParts(date = new Date()) {
+      const dateParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const weekday = new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        weekday: 'long'
+      }).format(date);
+      return { ...dateParts, weekday };
+    }
+
+    function getOutletScheduleSummary(outlet) {
+      const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
+      const today = getWibParts().weekday;
+      const todayIntervals = schedule[today] || [];
+      const hasAnySchedule = Object.values(schedule).some(intervals => Array.isArray(intervals) && intervals.length);
+      if (!hasAnySchedule) return 'Jadwal operasional belum tersedia';
+      return todayIntervals.length
+        ? `${today} ${todayIntervals.map(formatScheduleRange).join(', ')}`
+        : `${today} tutup`;
+    }
+
+    function getNextScheduleOpenText(outlet, now = new Date()) {
+      const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
+      const nowParts = getWibParts(now);
+      const currentMinutes = Number(nowParts.hour) * 60 + Number(nowParts.minute);
+      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00+07:00`);
+
+      for (let offset = 0; offset < 8; offset += 1) {
+        const candidateDate = new Date(baseDate.getTime() + (offset * 24 * 60 * 60 * 1000));
+        const candidateParts = getWibParts(candidateDate);
+        const intervals = (schedule[candidateParts.weekday] || [])
+          .map(parseScheduleRange)
+          .filter(Boolean)
+          .sort((a, b) => a.start - b.start);
+
+        for (const interval of intervals) {
+          if (offset === 0 && interval.start <= currentMinutes) continue;
+          const hours = String(Math.floor(interval.start / 60)).padStart(2, '0');
+          const minutes = String(interval.start % 60).padStart(2, '0');
+          return offset === 0
+            ? `Akan buka kembali pada ${hours}:${minutes} WIB`
+            : `Akan buka kembali ${candidateParts.weekday}, ${hours}:${minutes} WIB`;
+        }
+      }
+      return '';
+    }
+
+    function getOutletAutomationDetail(outlet, isVercelOn, isScheduleBlocked, isSuspended) {
+      if (isSuspended) return 'Otomatisasi dinonaktifkan oleh admin.';
+      if (isVercelOn && !isScheduleBlocked) return 'Bot mengikuti jam operasional Shopee secara otomatis.';
+      if (isVercelOn && isScheduleBlocked) return 'Bot aktif dan menunggu jadwal buka berikutnya.';
+      if (outlet.pause_until) return 'Outlet dijeda sementara sampai dibuka kembali otomatis.';
+      return 'Bot sedang nonaktif sampai diaktifkan kembali.';
+    }
+
+    function getOutletPauseLine(outlet, isVercelOn, isScheduleBlocked, isSuspended) {
+      if (isSuspended) {
+        return outlet.alasan_penangguhan
+          ? `Dinonaktifkan admin: ${outlet.alasan_penangguhan}`
+          : 'Dinonaktifkan admin.';
+      }
+      if (!isVercelOn && outlet.pause_until) return formatPauseResumeInline(outlet.pause_until);
+      if (isScheduleBlocked) return getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.';
+      if (!isVercelOn) return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
+      return '';
+    }
+
     function renderOutletSchedule(outlet) {
       const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
       const names = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal reguler Shopee</div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].join(' · ') + ' WIB' : 'Tutup'}</span></div>`).join('')}</div>`;
+      return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal reguler Shopee <span>WIB</span></div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].map(formatScheduleRange).join(' · ') : 'Tutup'}</span></div>`).join('')}</div>`;
     }
 
     function isOutletWithinSchedule(outlet, now = new Date()) {
@@ -542,58 +894,81 @@
 
     function renderOutlets(outlets) {
       const container = document.getElementById('outletsList');
+      if (!container) return;
       container.innerHTML = '';
 
+      if (!Array.isArray(outlets) || !outlets.length) {
+        container.innerHTML = '<div class="card-box mitra-empty-state"><strong>Belum ada outlet aktif.</strong><span>Data outlet akan tampil di sini setelah dihubungkan oleh admin.</span></div>';
+        return;
+      }
+
       outlets.forEach(out => {
+        const storeKey = String(out.store_id);
         const isVercelOn = out.vercel_status === 'ON';
         const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
         const isWithinSchedule = isOutletWithinSchedule(out);
         const isScheduleBlocked = !isWithinSchedule;
-        const effectiveVercelOn = isVercelOn && isWithinSchedule;
-        const shopeeStatus = getShopeeStatusPresentation(out.shopee_status);
+        const isTogglePending = pendingToggleStoreIds.has(storeKey);
+        const shopeeStatus = getMitraStatusPresentation(out);
         const isScheduleExpanded = expandedScheduleStores.has(out.store_id);
+        const topStatusTitle = `Status terakhir dari XHR Shopee: ${shopeeStatus.value}`;
+        const pauseLine = getOutletPauseLine(out, isVercelOn, isScheduleBlocked, isSuspended);
+        const scheduleSummary = getOutletScheduleSummary(out);
+        const merchantName = escapeHtml(out.merchant_name || 'Shopee Merchant');
+        const storeName = escapeHtml(out.store_name || out.store_id || 'Outlet');
+        const storeId = escapeHtml(out.store_id || '-');
+        const clockIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3 2"></path></svg>';
+        const pauseRow = pauseLine
+          ? `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(pauseLine)}</span></div>`
+          : '';
         
         const card = document.createElement('div');
-        card.className = 'card-box';
+        card.className = 'card-box mitra-outlet-card';
         card.innerHTML = `
-          <div class="outlet-head">
-            <div>
-              <div class="step-indicator">${out.merchant_name}</div>
-              <div class="outlet-name-row">
-                <h3 class="card-title">${out.store_name}</h3>
-                <span class="${shopeeStatus.className}" title="Status terakhir dari XHR Shopee: ${shopeeStatus.value}">${shopeeStatus.label}</span>
-              </div>
-              <p class="card-subtitle outlet-id">ID ${out.store_id}</p>
+          <div class="mitra-outlet-top">
+            <div class="mitra-outlet-copy">
+              <p class="mitra-outlet-merchant">${merchantName}</p>
+              <h3 class="mitra-outlet-title">${storeName}</h3>
+            </div>
+            <div class="mitra-outlet-side">
+              <p class="mitra-outlet-store-id">ID ${storeId}</p>
+              <span class="${shopeeStatus.className}" title="${escapeHtml(topStatusTitle)}">${escapeHtml(shopeeStatus.label)}</span>
             </div>
           </div>
 
-          ${isSuspended ? `
-            <div style="margin-top: 12px; padding: 10px 12px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; font-size: 12px; color: #be123c; font-weight: 600;">
-              Outlet Ditangguhkan Admin: ${out.alasan_penangguhan || 'Tindakan Admin'}
+          <div class="mitra-outlet-toggle-row">
+            <div class="mitra-outlet-toggle-copy">
+              <strong>Buka otomatis</strong>
+              <span>${escapeHtml(getOutletAutomationDetail(out, isVercelOn, isScheduleBlocked, isSuspended))}</span>
             </div>
-          ` : ''}
-
-          <div class="outlet-control">
-            <div>
-              <div class="control-title-row">
-                <div class="control-title">Buka otomatis</div>
-              </div>
-              ${!isVercelOn && out.pause_until ? `<div class="pause-info-row"><span class="pause-open-pill">${formatPauseOpenTime(out.pause_until)}</span><span class="pause-remaining-pill">${formatRemainingPause(out.pause_until)}</span></div>` : ''}
-              <div class="control-detail">
-                ${isSuspended ? 'Dinonaktifkan oleh Admin' : (isScheduleBlocked ? 'Di luar jadwal operasional' : (isVercelOn ? 'Otomatisasi aktif' : (out.pause_until ? '' : 'Dijeda (sampai dibuka manual)')))}
-              </div>
-            </div>
-            <label class="switch-toggle ${isScheduleBlocked ? 'is-schedule-disabled' : ''}" onclick="handleScheduleToggleAttempt(event, '${out.store_id}')">
-              <input type="checkbox" ${effectiveVercelOn ? 'checked' : ''} ${isSuspended || isScheduleBlocked ? 'disabled' : ''} onchange="toggleVercel('${out.store_id}', this.checked)">
+            <label class="switch-toggle ${isScheduleBlocked ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
+              <input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isSuspended || isScheduleBlocked || isTogglePending ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
               <span class="slider"></span>
             </label>
           </div>
 
-          <button type="button" class="schedule-toggle" onclick="toggleOutletSchedule('${out.store_id}')" aria-expanded="${isScheduleExpanded ? 'true' : 'false'}">
-            <span>${isScheduleExpanded ? 'Sembunyikan jadwal' : 'Lihat jadwal Shopee'}</span>
-            <svg class="schedule-arrow ${isScheduleExpanded ? 'is-expanded' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
-          </button>
-          ${isScheduleExpanded ? renderOutletSchedule(out) : ''}
+          <div class="mitra-outlet-meta">
+            ${pauseRow}
+            <div class="mitra-outlet-meta-row">
+              ${clockIcon}
+              <span><strong>Jam operasional:</strong> ${escapeHtml(scheduleSummary)}</span>
+            </div>
+          </div>
+
+          ${isSuspended ? `<div class="mitra-outlet-alert">${escapeHtml(`Outlet ini dinonaktifkan admin${out.alasan_penangguhan ? `: ${out.alasan_penangguhan}` : '.'}`)}</div>` : ''}
+
+          <div class="mitra-outlet-actions">
+            <button type="button" class="mitra-outlet-integration" onclick="openShopeeFoodOutlet('${storeId}')" aria-label="Buka outlet ShopeeFood untuk store ${storeId}">
+              <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+              <span>Lihat outlet di ShopeeFood</span>
+            </button>
+            <button type="button" class="schedule-toggle" onclick="toggleOutletSchedule('${storeId}')" aria-expanded="${isScheduleExpanded ? 'true' : 'false'}">
+              <span>${isScheduleExpanded ? 'Sembunyikan jadwal' : 'Tampilkan jadwal'}</span>
+              <svg class="schedule-arrow ${isScheduleExpanded ? 'is-expanded' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+          </div>
+
+          ${isScheduleExpanded ? `<div class="outlet-schedule-drawer">${renderOutletSchedule(out)}</div>` : ''}
 
         `;
         container.appendChild(card);
@@ -620,7 +995,32 @@
       }, 2600);
     }
 
+    function beginUserToggle(storeId) {
+      const key = String(storeId);
+      if (pendingToggleStoreIds.has(key)) return false;
+      pendingToggleStoreIds.add(key);
+      renderOutlets(currentUserOutlets);
+      return true;
+    }
+
+    function finishUserToggle(storeId) {
+      const key = String(storeId);
+      pendingToggleStoreIds.delete(key);
+      const deferredEvent = deferredOutletEvents.get(key);
+      deferredOutletEvents.delete(key);
+      if (deferredEvent) {
+        applyUserOutletStateEvent(deferredEvent);
+      } else {
+        renderOutlets(currentUserOutlets);
+      }
+    }
+
     function toggleVercel(storeId, isChecked) {
+      const key = String(storeId);
+      if (pendingToggleStoreIds.has(key) || selectedStoreId || resumeStoreId) {
+        renderOutlets(currentUserOutlets);
+        return;
+      }
       const store = currentUserOutlets.find(s => s.store_id === storeId);
       if (store && (store.is_suspended || store.suspension_status === 'SUSPENDED')) {
         showUserToast(`Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${store.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`, 'error');
@@ -632,6 +1032,8 @@
         renderOutlets(currentUserOutlets);
         return;
       }
+      // Do not leave the checkbox visually ahead of the confirmed server state.
+      renderOutlets(currentUserOutlets);
       if (!isChecked) {
         openPauseModal(storeId, store ? store.store_name : storeId);
       } else {
@@ -640,6 +1042,10 @@
     }
 
     function handleScheduleToggleAttempt(event, storeId) {
+      if (pendingToggleStoreIds.has(String(storeId)) || selectedStoreId || resumeStoreId) {
+        event.preventDefault();
+        return;
+      }
       const store = currentUserOutlets.find(s => s.store_id === storeId);
       if (store && !isOutletWithinSchedule(store)) {
         event.preventDefault();
@@ -835,7 +1241,7 @@
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
       if (durationType === '30_min') return '30 menit';
       if (durationType === '60_min') return '60 menit';
-      if (durationType === 'rest_of_day') return 'sampai akhir hari';
+      if (durationType === 'rest_of_day') return '24 jam';
       return 'sesuai waktu yang dipilih';
     }
 
@@ -844,8 +1250,7 @@
       if (!preview) return;
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
       if (durationType === 'rest_of_day') {
-        const end = new Date();
-        end.setHours(23, 59, 59, 0);
+        const end = new Date(Date.now() + 24 * 60 * 60 * 1000);
         preview.textContent = `Berakhir pada ${formatPauseTargetDate(end)}`;
         return;
       }
@@ -864,14 +1269,16 @@
       preview.textContent = `Berakhir pada ${formatPauseTargetDate(new Date(Date.now() + minutes * 60000))}`;
     }
 
-    function closeModal() {
+    function closeModal(shouldRender = true) {
       if (typeof closeCustomDateTimePicker === 'function') closeCustomDateTimePicker();
       document.getElementById('pauseModal').classList.remove('active');
-      renderOutlets(currentUserOutlets);
+      selectedStoreId = null;
+      if (shouldRender) renderOutlets(currentUserOutlets);
     }
 
     async function confirmPause() {
       if (!selectedStoreId) return;
+      const storeId = selectedStoreId;
 
       const durationType = document.querySelector('input[name="pauseDuration"]:checked').value;
       const customMins = getSelectedPauseMinutes() || 0;
@@ -880,13 +1287,14 @@
         showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
         return;
       }
+      if (!beginUserToggle(storeId)) return;
 
       try {
         const res = await fetch('/api/v1/user/pause', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
-            store_id: selectedStoreId,
+            store_id: storeId,
             duration_type: durationType,
             custom_minutes: customMins,
             custom_until: durationType === 'custom' ? customUntil : null
@@ -895,35 +1303,38 @@
         const data = await res.json();
         if (res.ok && data.success) {
           const durationLabel = getPauseDurationLabel();
-          closeModal();
+          closeModal(false);
           showUserToast(`Outlet ditutup sementara selama ${durationLabel}.`);
           // Refresh the outlet data without losing the current mitra session.
-          doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
+          await doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {
           showUserToast(data.detail || 'Gagal menutup outlet.', 'error');
-          closeModal();
+          closeModal(false);
         }
       } catch (err) {
         showUserToast('Gagal menutup outlet.', 'error');
-        closeModal();
+        closeModal(false);
+      } finally {
+        finishUserToggle(storeId);
       }
     }
 
     async function resumeStore(storeId) {
+      if (!beginUserToggle(storeId)) return;
       try {
         const res = await fetch(`/api/v1/user/resume?store_id=${storeId}`, {method: 'POST'});
         const data = await res.json();
         if (res.ok && data.success) {
           showUserToast('Outlet berhasil dibuka.');
           // Refresh the outlet data without sending the user back to login.
-          doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
+          await doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {
           showUserToast(data.detail || 'Gagal membuka outlet.', 'error');
-          renderOutlets(currentUserOutlets);
         }
       } catch (err) {
         showUserToast('Gagal membuka outlet.', 'error');
-        renderOutlets(currentUserOutlets);
+      } finally {
+        finishUserToggle(storeId);
       }
     }
 
@@ -931,12 +1342,14 @@
       if (!currentUserOutlets.length) return;
       const ids = currentUserOutlets.map(o => o.store_id).join(',');
       const ACTION_LABELS = {
-        'USER_PAUSE_STORE': 'Toko Ditutup Sementara',
-        'USER_RESUME_STORE': 'Toko Dibuka Kembali',
-        'ADMIN_SUSPEND_UPDATE': 'Update Penangguhan Admin',
-        'ADMIN_RENEW_SUBSCRIPTION': 'Perpanjangan Layanan',
-        'ACTION_OPEN': 'Buka Otomatis',
-        'ACTION_CLOSE': 'Tutup Otomatis'
+        'USER_PAUSE_STORE': 'Ditutup sementara',
+        'USER_RESUME_STORE': 'Dibuka kembali manual',
+        'ADMIN_PAUSE_STORE': 'Ditutup oleh admin',
+        'ADMIN_RESUME_STORE': 'Dinyalakan kembali oleh admin',
+        'ADMIN_SUSPEND_UPDATE': 'Status penangguhan diperbarui',
+        'ADMIN_RENEW_SUBSCRIPTION': 'Layanan diperpanjang',
+        'ACTION_OPEN': 'Dibuka otomatis',
+        'ACTION_CLOSE': 'Ditutup otomatis'
       };
 
       try {
@@ -954,50 +1367,78 @@
 
         if (logs.length) {
           logs.slice(0, 5).forEach(l => {
-            const friendlyAction = ACTION_LABELS[l.action] || l.action;
             const timeText = formatIndonesianTime(l.timestamp, false);
-            const isBotAction = ['ACTION_OPEN', 'ACTION_CLOSE'].includes(l.action);
-
-            let friendlyReason = l.reason || '';
-            let botDetailHtml = '';
-            if (friendlyReason.includes('User set store OFF with duration:')) {
-              const match = friendlyReason.match(/duration:\s*([^(]+)/);
-              const durLabel = match ? match[1].trim() : 'Sementara';
-              const untilMatch = friendlyReason.match(/Until\s+([^\)]+)/i);
-              const untilText = untilMatch ? formatIndonesianTime(untilMatch[1].replace(/\s+WIB$/i, ''), false) : '';
-              friendlyReason = `Ditutup mitra selama ${durLabel}${untilText ? ` · menuju ON ${untilText}` : ''}`;
-            } else if (friendlyReason.includes('User manually turned Vercel Toggle ON')) {
-              friendlyReason = 'Dibuka manual dari dashboard';
-            } else if (friendlyReason.includes('Subscription renewed until')) {
-              const parts = friendlyReason.split('until');
-              friendlyReason = `Masa aktif diperpanjang s/d ${parts[1] ? parts[1].trim() : ''}`;
-            } else if (friendlyReason.includes("Admin updated suspension to 'Tidak'")) {
-              friendlyReason = 'Penangguhan dicabut Admin';
-            } else if (friendlyReason.includes("Admin updated suspension to 'Ya'")) {
-              friendlyReason = 'Ditangguhkan Admin';
-            }
-
-            if (isBotAction) {
-              const isClose = l.action === 'ACTION_CLOSE';
-              const untilMatch = friendlyReason.match(/(?:Until|sampai)\s+([^|)]+)/i);
-              const untilText = untilMatch ? formatIndonesianTime(untilMatch[1].replace(/\s+WIB$/i, ''), false) : '';
-              botDetailHtml = isClose
-                ? `<span class="bot-action-time-pill">${timeText}</span><span class="bot-action-info-pill">Ditutup oleh bot${untilText ? ` sampai ${untilText}` : ' sesuai jadwal'}</span>`
-                : `<span class="bot-action-time-pill">${timeText}</span>`;
-            }
+            const actor = getHistoryActorPresentation(l.action);
+            const summary = getHistorySummary(l, ACTION_LABELS);
 
             const item = document.createElement('div');
             item.className = 'history-item';
             item.innerHTML = `
-              <strong>${isBotAction ? '<span class="bot-history-pill">Bot</span> ' : ''}${friendlyAction} · ${l.store_name}</strong>
-              ${isBotAction ? `<div class="bot-history-details">${botDetailHtml}</div>` : `<span>${timeText} · ${friendlyReason}</span>`}
+              <span class="history-role-pill ${actor.className}">${actor.label}</span>
+              <span class="history-time">${escapeHtml(timeText)}</span>
+              <span class="mitra-history-body">
+                <strong>${escapeHtml(summary.title)}</strong>
+                <span>${escapeHtml(summary.subtitle || l.store_name || '-')}</span>
+              </span>
+              <span class="history-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
+              </span>
             `;
             container.appendChild(item);
           });
         } else {
-          container.innerHTML = '<div class="history-item"><span>Belum ada aktivitas.</span></div>';
+          container.innerHTML = '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
         }
       } catch (err) {}
+    }
+
+    function getHistoryActorPresentation(action) {
+      const normalized = String(action || '').toUpperCase();
+      if (['ACTION_OPEN', 'ACTION_CLOSE'].includes(normalized)) {
+        return { label: 'Bot', className: 'is-bot' };
+      }
+      if (normalized.startsWith('ADMIN_')) {
+        return { label: 'Admin', className: 'is-admin' };
+      }
+      if (normalized.startsWith('USER_')) {
+        return { label: 'Merchant', className: 'is-merchant' };
+      }
+      return { label: 'Info', className: 'is-neutral' };
+    }
+
+    function extractDurationLabel(reason) {
+      const match = String(reason || '').match(/duration:\s*([^(]+)/i);
+      return match ? match[1].trim() : '';
+    }
+
+    function getHistorySummary(log, actionLabels) {
+      const action = String(log?.action || '').toUpperCase();
+      const reason = String(log?.reason || '');
+      switch (action) {
+        case 'ACTION_OPEN':
+          return { title: 'Dibuka otomatis', subtitle: log.store_name };
+        case 'ACTION_CLOSE':
+          return { title: 'Ditutup otomatis', subtitle: log.store_name };
+        case 'USER_PAUSE_STORE': {
+          const durationLabel = extractDurationLabel(reason);
+          return {
+            title: durationLabel ? `Ditutup sementara ${durationLabel.toLowerCase()}` : 'Ditutup sementara',
+            subtitle: log.store_name
+          };
+        }
+        case 'USER_RESUME_STORE':
+          return { title: 'Dibuka kembali manual', subtitle: log.store_name };
+        case 'ADMIN_PAUSE_STORE':
+          return { title: /until/i.test(reason) ? 'Ditutup sementara oleh admin' : 'Ditutup oleh admin', subtitle: log.store_name };
+        case 'ADMIN_RESUME_STORE':
+          return { title: 'Dinyalakan kembali oleh admin', subtitle: log.store_name };
+        case 'ADMIN_RENEW_SUBSCRIPTION':
+          return { title: 'Layanan diperpanjang', subtitle: log.store_name };
+        case 'ADMIN_SUSPEND_UPDATE':
+          return { title: /Tidak/i.test(reason) ? 'Penangguhan dicabut admin' : 'Outlet ditangguhkan admin', subtitle: log.store_name };
+        default:
+          return { title: actionLabels[action] || action || 'Aktivitas outlet', subtitle: log.store_name };
+      }
     }
 
     function createLocalBotDemoLogs() {

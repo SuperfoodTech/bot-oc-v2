@@ -29,14 +29,19 @@ class StoreStatusResponse(BaseModel):
     vercel_link: Optional[str] = ""
     vercel_password: Optional[str] = ""
     google_email: Optional[str] = ""
+    special_hours: Optional[str] = ""
     vercel_status: str
     shopee_status: str
+    shopee_regular_hours: Dict = Field(default_factory=dict)
     subscription_status: str
     is_suspended: bool
     alasan_penangguhan: Optional[str] = ""
     pause_until: Optional[str] = None
     last_synced_at: Optional[str] = None
     last_action: Optional[str] = "no change"
+    last_toggle_action_raw: Optional[str] = None
+    last_toggle_reason: Optional[str] = ""
+    last_toggle_at: Optional[str] = None
 
 
 class SyncResponse(BaseModel):
@@ -131,6 +136,6 @@ class UserLoginRequest(BaseModel):
 
 class UserPauseRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
-    duration_type: str = Field(..., description="'30_min', '60_min', 'rest_of_day', or 'custom'")
+    duration_type: str = Field(..., description="'30_min', '60_min', legacy 'rest_of_day' (24 jam), or 'custom'")
     custom_until: Optional[str] = Field(default=None, description="Target pause end time in local ISO format when duration_type is custom")
     custom_minutes: Optional[int] = Field(default=None, description="Legacy custom pause duration in minutes")
