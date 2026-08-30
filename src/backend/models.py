@@ -40,6 +40,7 @@ class StoreStatusResponse(BaseModel):
     alasan_penangguhan: Optional[str] = ""
     pause_until: Optional[str] = None
     pause_mode: Optional[str] = None
+    timezone: Optional[str] = "Asia/Jakarta"
     last_synced_at: Optional[str] = None
     last_action: Optional[str] = "no change"
     last_toggle_action_raw: Optional[str] = None

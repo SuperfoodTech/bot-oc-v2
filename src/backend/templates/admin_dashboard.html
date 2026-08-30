@@ -382,10 +382,10 @@
                   <div class="custom-picker-time">
                     <span>Waktu</span>
                     <div class="custom-picker-time-fields">
-                      <select id="adminCustomPickerHour" aria-label="Jam WIB"></select>
+                      <select id="adminCustomPickerHour" aria-label="Jam outlet"></select>
                       <span>:</span>
                       <select id="adminCustomPickerMinute" aria-label="Menit WIB"></select>
-                      <b>WIB</b>
+                      <b id="adminCustomPickerTimezoneLabel">WIB</b>
                     </div>
                   </div>
                   <div class="custom-picker-actions">
@@ -2002,10 +2002,12 @@
 
     function getTodayOperatingHours(store) {
       const schedule = store.shopee_regular_hours || {};
-      const today = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long' }).format(new Date());
+      const timezone = store.timezone || 'Asia/Jakarta';
+      const timezoneLabel = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? 'WITA' : timezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
+      const today = new Intl.DateTimeFormat('id-ID', { timeZone: timezone, weekday: 'long' }).format(new Date());
       const ranges = schedule[today];
-      if (Array.isArray(ranges) && ranges.length) return `<span class="today-operating-hours"><span class="operating-time">${ranges.join(' · ')} WIB</span><span class="operating-day">${today}</span></span>`;
-      if (typeof ranges === 'string' && ranges.trim()) return `<span class="today-operating-hours"><span class="operating-time">${ranges} WIB</span><span class="operating-day">${today}</span></span>`;
+      if (Array.isArray(ranges) && ranges.length) return `<span class="today-operating-hours"><span class="operating-time">${ranges.join(' · ')} ${timezoneLabel}</span><span class="operating-day">${today}</span></span>`;
+      if (typeof ranges === 'string' && ranges.trim()) return `<span class="today-operating-hours"><span class="operating-time">${ranges} ${timezoneLabel}</span><span class="operating-day">${today}</span></span>`;
       return `<span class="today-operating-hours"><span class="operating-time">Tutup</span><span class="operating-day">${today}</span></span>`;
     }
 
@@ -2070,7 +2072,10 @@
     function parseAdminCustomUntil() {
       const value = document.getElementById('adminCustomUntilInput')?.value || '';
       if (!value) return null;
-      const date = new Date(value);
+      const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
+      const timezone = store?.timezone || 'Asia/Jakarta';
+      const offset = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? '+08:00' : timezone === 'Asia/Jayapura' ? '+09:00' : '+07:00';
+      const date = new Date(`${value}:00${offset}`);
       return Number.isNaN(date.getTime()) ? null : date;
     }
 
@@ -2143,6 +2148,9 @@
     }
 
     function openAdminCustomDateTimePicker() {
+      const selectedStore = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
+      const outletTimezone = selectedStore?.timezone || 'Asia/Jakarta';
+      document.getElementById('adminCustomPickerTimezoneLabel').textContent = outletTimezone === 'Asia/Makassar' || outletTimezone === 'Asia/Ujung_Pandang' ? 'WITA' : outletTimezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
       const existing = parseAdminCustomUntil();
       const selected = existing || new Date(Date.now() + (2 * 60 * 60 * 1000));
       adminPickerDate = new Date(selected);
@@ -2165,7 +2173,8 @@
       const hours = Number(document.getElementById('adminCustomPickerHour').value);
       const minutes = Number(document.getElementById('adminCustomPickerMinute').value);
       const selected = new Date(adminPickerDate.getFullYear(), adminPickerDate.getMonth(), adminPickerDate.getDate(), hours, minutes);
-      if (selected <= new Date()) {
+      document.getElementById('adminCustomUntilInput').value = toAdminDateTimeLocalValue(selected);
+      if (parseAdminCustomUntil() <= new Date()) {
         showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
         return;
       }
@@ -2173,7 +2182,6 @@
         showToast(`Target maksimal ${formatAdminPauseTargetDate(getAdminPauseMaxDate())}.`, 'error');
         return;
       }
-      document.getElementById('adminCustomUntilInput').value = toAdminDateTimeLocalValue(selected);
       document.getElementById('adminCustomUntilDisplay').textContent = `${formatAdminWibDate(selected)} ${formatAdminWibTime(selected)}`;
       closeAdminCustomDateTimePicker();
       updateAdminPauseEndPreview();
@@ -2216,17 +2224,19 @@
     function getNextAdminOperationalSessionDate(store, now = new Date()) {
       const schedule = getAdminScheduleData(store);
       const names = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const timezone = store?.timezone || 'Asia/Jakarta';
       const nowParts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+        timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
       }).formatToParts(now).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
-      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00+07:00`);
-      for (let offset = 1; offset <= 7; offset += 1) {
-        const candidateDate = new Date(baseDate.getTime() + (offset * 24 * 60 * 60 * 1000));
+      const timezoneOffset = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? '+08:00' : timezone === 'Asia/Jayapura' ? '+09:00' : '+07:00';
+      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00${timezoneOffset}`);
+      for (let dayOffset = 1; dayOffset <= 7; dayOffset += 1) {
+        const candidateDate = new Date(baseDate.getTime() + (dayOffset * 24 * 60 * 60 * 1000));
         const candidateParts = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long'
+          timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long'
         }).formatToParts(candidateDate).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
         const candidateDayName = new Intl.DateTimeFormat('id-ID', {
-          timeZone: 'Asia/Jakarta', weekday: 'long'
+          timeZone: timezone, weekday: 'long'
         }).format(candidateDate);
         const intervals = Array.isArray(schedule[candidateDayName])
           ? schedule[candidateDayName]
@@ -2236,17 +2246,17 @@
         if (!starts.length) continue;
         const hour = String(Math.floor(starts[0] / 60)).padStart(2, '0');
         const minute = String(starts[0] % 60).padStart(2, '0');
-        return new Date(`${candidateParts.year}-${candidateParts.month}-${candidateParts.day}T${hour}:${minute}:00+07:00`);
+        return new Date(`${candidateParts.year}-${candidateParts.month}-${candidateParts.day}T${hour}:${minute}:00${timezoneOffset}`);
       }
       return null;
     }
 
-    function formatAdminPauseTargetDate(date) {
+    function formatAdminPauseTargetDate(date, timezone = 'Asia/Jakarta') {
       const parts = new Intl.DateTimeFormat('id-ID', {
-        timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: false
+        timeZone: timezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false, timeZoneName: 'short'
       }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
-      return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} WIB`;
+      return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} ${parts.timeZoneName || 'WIB'}`;
     }
 
     function updateAdminPauseEndPreview() {
@@ -2257,7 +2267,7 @@
         const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
         const nextSession = store && getNextAdminOperationalSessionDate(store);
         preview.textContent = nextSession
-          ? `Buka kembali ${formatAdminPauseTargetDate(nextSession)}`
+          ? `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`
           : 'Buka kembali pada sesi operasional berikutnya';
         return;
       }

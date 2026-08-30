@@ -53,6 +53,7 @@ class MerchantOutlet:
     alasan_penangguhan: str = ""
     tgl_mulai_penangguhan: str = ""
     tgl_berakhir_penangguhan: str = ""
+    timezone: str = "Asia/Jakarta"
 
 def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[MerchantOutlet]:
     """

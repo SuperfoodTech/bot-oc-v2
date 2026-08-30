@@ -33,6 +33,7 @@ from backend import db, realtime, state, worker
 from backend import apps_script
 from backend import vb
 from backend.pause_utils import FULL_DAY_MINUTES, resolve_pause_window
+from core.timezones import normalize_timezone, timezone_for
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
@@ -59,8 +60,9 @@ class VBStatusRequest(BaseModel):
 
 
 def _is_within_shopee_schedule(store: dict, now_dt: datetime) -> bool:
-    """Return whether a store may be manually changed at the current WIB time."""
-    return db.is_within_shopee_schedule(store.get("shopee_regular_hours"), now_dt)
+    """Return whether a store may be manually changed in its local timezone."""
+    local_now = now_dt.astimezone(timezone_for(store.get("timezone")))
+    return db.is_within_shopee_schedule(store.get("shopee_regular_hours"), local_now)
 
 
 def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
@@ -86,6 +88,7 @@ def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
         alasan_penangguhan=store.get("alasan_penangguhan", ""),
         pause_until=store["pause_until"],
         pause_mode=store.get("pause_mode"),
+        timezone=store.get("timezone", "Asia/Jakarta"),
         last_synced_at=store["last_synced_at"],
         last_action=store.get("last_action", "no change"),
         last_toggle_action_raw=store.get("last_toggle_action_raw"),
@@ -772,6 +775,7 @@ def user_pause_store(
             now_dt,
             req.duration_type,
             schedule=store.get("shopee_regular_hours") or {},
+            timezone=normalize_timezone(store.get("timezone")),
             custom_until=req.custom_until,
             custom_minutes=req.custom_minutes,
         )
@@ -815,7 +819,7 @@ def user_pause_store(
         "pause_until": pause_until_str,
         "pause_start_time": pause_start_time_ms,
         "pause_end_time": pause_end_time_ms,
-        "timezone": "Asia/Jakarta (GMT+7)",
+        "timezone": f"{store.get('timezone', 'Asia/Jakarta')}",
         "message": f"Permintaan tutup sementara tersimpan untuk outlet {req.store_id} ({label})."
     }
 
@@ -901,6 +905,7 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
                     now_dt,
                     req.duration_type,
                     schedule=store.get("shopee_regular_hours") or {},
+                    timezone=normalize_timezone(store.get("timezone")),
                     custom_until=req.custom_until,
                     custom_minutes=req.pause_duration_minutes,
                 )
@@ -916,10 +921,11 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
                     now_dt,
                     "rest_of_day",
                     schedule=store.get("shopee_regular_hours") or {},
+                    timezone=normalize_timezone(store.get("timezone")),
                 )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-    pause_until_str = pause_until.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S") if pause_until else ""
+    pause_until_str = pause_until.astimezone(ZoneInfo(normalize_timezone(store.get("timezone")))).strftime("%Y-%m-%d %H:%M:%S") if pause_until else ""
     transition = state.apply_admin_toggle(
         store_id=req.store_id,
         status=next_status,

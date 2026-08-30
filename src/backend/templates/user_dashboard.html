@@ -251,10 +251,10 @@
                   <div class="custom-picker-time">
                     <span>Waktu</span>
                     <div class="custom-picker-time-fields">
-                      <select id="customPickerHour" aria-label="Jam WIB"></select>
+                      <select id="customPickerHour" aria-label="Jam outlet"></select>
                       <span>:</span>
                       <select id="customPickerMinute" aria-label="Menit WIB"></select>
-                      <b>WIB</b>
+                      <b id="customPickerTimezoneLabel">WIB</b>
                     </div>
                   </div>
                   <div class="custom-picker-actions">
@@ -803,12 +803,12 @@
         : reopenText;
     }
 
-    function formatPauseTargetDate(date) {
+    function formatPauseTargetDate(date, timezone = 'Asia/Jakarta') {
       const parts = new Intl.DateTimeFormat('id-ID', {
-        timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: false
+        timeZone: timezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false, timeZoneName: 'short'
       }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
-      return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} WIB`;
+      return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} ${parts.timeZoneName || 'WIB'}`;
     }
 
     function normalizeDesiredOutletState(outlet) {
@@ -981,9 +981,9 @@
       return String(range || '').replace(/:/g, '.');
     }
 
-    function getWibParts(date = new Date()) {
+    function getWibParts(date = new Date(), timezone = 'Asia/Jakarta') {
       const dateParts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Jakarta',
+        timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -992,7 +992,7 @@
         hour12: false
       }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
       const weekday = new Intl.DateTimeFormat('id-ID', {
-        timeZone: 'Asia/Jakarta',
+        timeZone: timezone,
         weekday: 'long'
       }).format(date);
       return { ...dateParts, weekday };
@@ -1000,7 +1000,7 @@
 
     function getOutletScheduleSummary(outlet) {
       const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
-      const today = getWibParts().weekday;
+      const today = getWibParts(new Date(), outlet?.timezone || 'Asia/Jakarta').weekday;
       const todayIntervals = schedule[today] || [];
       const hasAnySchedule = Object.values(schedule).some(intervals => Array.isArray(intervals) && intervals.length);
       if (!hasAnySchedule) return 'Jadwal operasional belum tersedia';
@@ -1337,7 +1337,9 @@
     function parseCustomUntil() {
       const value = document.getElementById('customUntilInput')?.value || '';
       if (!value) return null;
-      const date = new Date(value);
+      const timezone = getSelectedOutletTimezone();
+      const offset = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? '+08:00' : timezone === 'Asia/Jayapura' ? '+09:00' : '+07:00';
+      const date = new Date(`${value}:00${offset}`);
       return Number.isNaN(date.getTime()) ? null : date;
     }
 
@@ -1410,6 +1412,8 @@
     }
 
     function openCustomDateTimePicker() {
+      const outletTimezone = getSelectedOutletTimezone();
+      document.getElementById('customPickerTimezoneLabel').textContent = timezoneShortLabel(outletTimezone);
       const existing = parseCustomUntil();
       const selected = existing || new Date(Date.now() + (2 * 60 * 60 * 1000));
       pickerDate = new Date(selected);
@@ -1440,7 +1444,8 @@
       const hours = Number(document.getElementById('customPickerHour').value);
       const minutes = Number(document.getElementById('customPickerMinute').value);
       const selected = new Date(pickerDate.getFullYear(), pickerDate.getMonth(), pickerDate.getDate(), hours, minutes);
-      if (selected <= new Date()) {
+      document.getElementById('customUntilInput').value = toDateTimeLocalValue(selected);
+      if (parseCustomUntil() <= new Date()) {
         showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
         return;
       }
@@ -1448,8 +1453,7 @@
         showUserToast(`Target maksimal ${formatPauseTargetDate(getPauseMaxDate())}.`, 'error');
         return;
       }
-      document.getElementById('customUntilInput').value = toDateTimeLocalValue(selected);
-      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(selected)} ${formatWibTime(selected)}`;
+      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(selected)} ${formatWibTime(selected)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
       closeCustomDateTimePicker();
       updatePauseEndPreview();
     }
@@ -1459,7 +1463,7 @@
       const until = new Date(start.getTime() + (2 * 60 * 60 * 1000));
       document.getElementById('customStartInput').value = `${formatWibDate(start)} ${formatWibTime(start)}`;
       document.getElementById('customUntilInput').value = toDateTimeLocalValue(until);
-      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(until)} ${formatWibTime(until)}`;
+      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(until)} ${formatWibTime(until)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
     }
 
     function getSelectedPauseMinutes() {
@@ -1480,6 +1484,17 @@
       return document.getElementById('customUntilInput').value;
     }
 
+    function getSelectedOutletTimezone() {
+      const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
+      return outlet?.timezone || 'Asia/Jakarta';
+    }
+
+    function timezoneShortLabel(timezone) {
+      return timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang'
+        ? 'WITA'
+        : timezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
+    }
+
     function getPauseDurationLabel() {
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
       if (durationType === '30_min') return '30 menit';
@@ -1489,12 +1504,14 @@
     }
 
     function getNextOperationalSessionDate(outlet, now = new Date()) {
+      const timezone = outlet?.timezone || 'Asia/Jakarta';
       const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
-      const nowParts = getWibParts(now);
-      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00+07:00`);
-      for (let offset = 1; offset <= 7; offset += 1) {
-        const candidateDate = new Date(baseDate.getTime() + (offset * 24 * 60 * 60 * 1000));
-        const candidateParts = getWibParts(candidateDate);
+      const nowParts = getWibParts(now, timezone);
+      const timezoneOffset = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? '+08:00' : timezone === 'Asia/Jayapura' ? '+09:00' : '+07:00';
+      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00${timezoneOffset}`);
+      for (let dayOffset = 1; dayOffset <= 7; dayOffset += 1) {
+        const candidateDate = new Date(baseDate.getTime() + (dayOffset * 24 * 60 * 60 * 1000));
+        const candidateParts = getWibParts(candidateDate, timezone);
         const interval = (schedule[candidateParts.weekday] || [])
           .map(parseScheduleRange)
           .filter(Boolean)
@@ -1502,7 +1519,7 @@
         if (!interval) continue;
         const hour = String(Math.floor(interval.start / 60)).padStart(2, '0');
         const minute = String(interval.start % 60).padStart(2, '0');
-        return new Date(`${candidateParts.year}-${candidateParts.month}-${candidateParts.day}T${hour}:${minute}:00+07:00`);
+        return new Date(`${candidateParts.year}-${candidateParts.month}-${candidateParts.day}T${hour}:${minute}:00${timezoneOffset}`);
       }
       return null;
     }
@@ -1515,15 +1532,16 @@
         const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
         const nextSession = outlet && getNextOperationalSessionDate(outlet);
         preview.textContent = nextSession
-          ? `Buka kembali ${formatPauseTargetDate(nextSession)}`
+          ? `Buka kembali ${formatPauseTargetDate(nextSession, outlet.timezone || 'Asia/Jakarta')}`
           : 'Buka kembali pada sesi operasional berikutnya';
         return;
       }
       if (durationType === 'custom') {
         const until = parseCustomUntil();
+        const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
         preview.textContent = until
-          ? `Berakhir pada ${formatPauseTargetDate(until)}`
-          : 'Pilih tanggal dan waktu WIB';
+          ? `Berakhir pada ${formatPauseTargetDate(until, outlet?.timezone || 'Asia/Jakarta')}`
+          : 'Pilih tanggal dan waktu outlet';
         return;
       }
       const minutes = getSelectedPauseMinutes();

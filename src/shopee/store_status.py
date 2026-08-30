@@ -140,6 +140,7 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 "order_enabled": order_enabled,
                 "status_str": status_str,
                 "pause_info": pause_time,
+                "timezone": store_data.get("timezone"),
                 "raw": op_data
             }
 

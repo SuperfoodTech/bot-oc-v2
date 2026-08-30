@@ -11,6 +11,7 @@ from typing import Any, Iterable, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from core.sheets import MerchantOutlet, WEEKDAY_MAP
+from core.timezones import DEFAULT_TIMEZONE, timezone_for
 
 ACTION_NO_CHANGE = "NO_CHANGE"
 ACTION_OPEN = "ACTION_OPEN"
@@ -53,6 +54,10 @@ def _get_outlet_value(outlet: Any, key: str, default=None):
     return getattr(outlet, key, default)
 
 
+def outlet_timezone(outlet: Any) -> ZoneInfo:
+    return timezone_for(_get_outlet_value(outlet, "timezone", DEFAULT_TIMEZONE))
+
+
 def _get_outlet_schedule(outlet: Any) -> dict:
     return _get_outlet_value(outlet, "regular_hours") or _get_outlet_value(outlet, "shopee_regular_hours") or {}
 
@@ -88,21 +93,22 @@ def _iter_schedule_ranges(hours_str) -> Iterable[Tuple[int, int]]:
     yield (start_h * 60 + start_m, end_h * 60 + end_m)
 
 
-def _format_local_label(value: datetime) -> str:
-    return value.astimezone(LOCAL_TZ).strftime("%d/%m/%Y %H:%M WIB")
+def _format_local_label(value: datetime, timezone: ZoneInfo = LOCAL_TZ) -> str:
+    return value.astimezone(timezone).strftime("%d/%m/%Y %H:%M %Z")
 
 
 def get_active_pause_until(outlet: Any, current_time: Optional[datetime] = None) -> Optional[datetime]:
-    now_local = _coerce_local_datetime(current_time) or datetime.now(LOCAL_TZ)
-    pause_until = _coerce_local_datetime(_get_outlet_value(outlet, "pause_until"))
+    local_tz = outlet_timezone(outlet)
+    now_local = _coerce_local_datetime(current_time, local_tz) or datetime.now(local_tz)
+    pause_until = _coerce_local_datetime(_get_outlet_value(outlet, "pause_until"), local_tz)
     if not pause_until or pause_until <= now_local:
         return None
     return pause_until
 
 
-def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, not_after: Optional[datetime] = None) -> Optional[datetime]:
-    now_local = _coerce_local_datetime(now_dt) or datetime.now(LOCAL_TZ)
-    deadline = _coerce_local_datetime(not_after)
+def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, not_after: Optional[datetime] = None, timezone: ZoneInfo = LOCAL_TZ) -> Optional[datetime]:
+    now_local = _coerce_local_datetime(now_dt, timezone) or datetime.now(timezone)
+    deadline = _coerce_local_datetime(not_after, timezone)
     schedule = schedule or {}
 
     for day_offset in range(0, 8):
@@ -114,7 +120,7 @@ def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, n
                 candidate_date.year,
                 candidate_date.month,
                 candidate_date.day,
-                tzinfo=now_local.tzinfo,
+                tzinfo=timezone,
             ) + timedelta(minutes=start_minutes)
             if candidate_dt <= now_local:
                 continue
@@ -139,26 +145,28 @@ def get_pause_recheck_delay_seconds(
     nearest_reason = "default interval"
 
     for outlet in outlets or []:
-        pause_until = get_active_pause_until(outlet, current_time=reference_now)
+        local_tz = outlet_timezone(outlet)
+        outlet_now = reference_now.astimezone(local_tz)
+        pause_until = get_active_pause_until(outlet, current_time=outlet_now)
         if not pause_until:
             continue
 
         store_id = _get_outlet_value(outlet, "store_id", "-")
         schedule = _get_outlet_schedule(outlet)
-        next_start = get_next_schedule_start(schedule, reference_now, not_after=pause_until)
+        next_start = get_next_schedule_start(schedule, outlet_now, not_after=pause_until, timezone=local_tz)
 
         if next_start and (nearest_dt is None or next_start < nearest_dt):
             nearest_dt = next_start
             nearest_reason = (
                 f"fast recheck Store {store_id}: sesi reguler berikutnya mulai "
-                f"{next_start.astimezone(LOCAL_TZ).strftime('%H:%M:%S WIB')}"
+                f"{next_start.astimezone(local_tz).strftime('%H:%M:%S %Z')}"
             )
 
         if nearest_dt is None or pause_until < nearest_dt:
             nearest_dt = pause_until
             nearest_reason = (
                 f"fast recheck Store {store_id}: pause sementara berakhir "
-                f"{pause_until.astimezone(LOCAL_TZ).strftime('%H:%M:%S WIB')}"
+                f"{pause_until.astimezone(local_tz).strftime('%H:%M:%S %Z')}"
             )
 
     if nearest_dt is None:
@@ -225,7 +233,8 @@ def evaluate_outlet_status(
     4. Operating Hours (Senin-Minggu) -> If outside or unavailable, silently skip.
     5. Vercel Toggle / Status Utama (On/Off) -> Primary Source of Truth.
     """
-    current_time = _coerce_local_datetime(current_time) or datetime.now(LOCAL_TZ)
+    local_tz = outlet_timezone(outlet)
+    current_time = _coerce_local_datetime(current_time, local_tz) or datetime.now(local_tz)
 
     # Normalize current actual status from Shopee
     aktual_status_raw = (outlet.status_aktual or "").strip().lower()
@@ -248,7 +257,7 @@ def evaluate_outlet_status(
     # 3. Active user/admin pause must survive Shopee's regular schedule breaks.
     active_pause_until = get_active_pause_until(outlet, current_time=current_time)
     if active_pause_until:
-        pause_label = _format_local_label(active_pause_until)
+        pause_label = _format_local_label(active_pause_until, local_tz)
         if is_currently_open:
             return DecisionResult(
                 target_state=TARGET_CLOSE,
@@ -262,7 +271,7 @@ def evaluate_outlet_status(
     today_hours = regular_hours.get(weekday_name, "")
 
     if active_pause_until:
-        pause_label = _format_local_label(active_pause_until)
+        pause_label = _format_local_label(active_pause_until, local_tz)
         if require_regular_schedule and not today_hours:
             return DecisionResult(
                 target_state=TARGET_CLOSE,

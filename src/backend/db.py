@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from zoneinfo import ZoneInfo
 
+from core.timezones import normalize_timezone, timezone_for
+
 import psycopg
 from psycopg.rows import dict_row
 
@@ -78,6 +80,9 @@ def init_db() -> None:
         migration11_path = base_dir / "011_pause_mode.sql"
         if migration11_path.exists():
             conn.execute(migration11_path.read_text(encoding="utf-8"))
+        migration12_path = base_dir / "012_outlet_timezone.sql"
+        if migration12_path.exists():
+            conn.execute(migration12_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -277,11 +282,11 @@ def _is_subscription_active(subscription_status: Optional[str]) -> bool:
     return normalized not in {"expired", "kedaluwarsa", "inactive", "nonaktif"}
 
 
-def _format_pause_until_wib(pause_until) -> str:
+def _format_pause_until_local(pause_until, timezone: str) -> str:
     pause_until_dt = _coerce_pause_until(pause_until)
     if not pause_until_dt:
         return ""
-    return pause_until_dt.strftime("%d/%m/%Y %H:%M WIB")
+    return pause_until_dt.astimezone(timezone_for(timezone)).strftime("%d/%m/%Y %H:%M %Z")
 
 
 def _derive_display_status_bucket(live_state: str, display_toggle_on: bool, desired_state: str) -> str:
@@ -299,14 +304,16 @@ def derive_outlet_runtime_state(
     now_dt: Optional[datetime] = None,
     normalized_schedule: Optional[Dict[str, List[str]]] = None,
 ) -> Dict[str, Any]:
-    now_wib = now_dt or datetime.now(WIB)
+    timezone = normalize_timezone(store.get("timezone"))
+    local_tz = timezone_for(timezone)
+    now_wib = now_dt or datetime.now(local_tz)
     if now_wib.tzinfo is None:
-        now_wib = now_wib.replace(tzinfo=WIB)
+        now_wib = now_wib.replace(tzinfo=local_tz)
     else:
-        now_wib = now_wib.astimezone(WIB)
+        now_wib = now_wib.astimezone(local_tz)
 
     pause_until_dt = _coerce_pause_until(store.get("pause_until"))
-    pause_until_label = _format_pause_until_wib(pause_until_dt)
+    pause_until_label = _format_pause_until_local(pause_until_dt, timezone)
     desired_state = _normalize_desired_state(store.get("vercel_status"), pause_until_dt)
     live_state = _normalize_live_state(store.get("shopee_status"))
     schedule = normalized_schedule if normalized_schedule is not None else normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
@@ -589,9 +596,15 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
             (outlet_ids,),
         ).fetchall()
         pause_mode_map = {row["outlet_id"]: row["pause_mode"] for row in pause_mode_rows}
+        timezone_rows = conn.execute(
+            "SELECT outlet_id, timezone FROM outlet_states WHERE outlet_id = ANY(%s)",
+            (outlet_ids,),
+        ).fetchall()
+        timezone_map = {row["outlet_id"]: normalize_timezone(row["timezone"]) for row in timezone_rows}
         for r in rows:
             r["regular_hours"] = hours_map.get(r["outlet_uuid"], {})
             r["pause_mode"] = pause_mode_map.get(r["outlet_uuid"])
+            r["timezone"] = timezone_map.get(r["outlet_uuid"], "Asia/Jakarta")
             r["special_hours"] = r.get("special_hours") or ""
             r["shopee_status"] = _normalize_persisted_shopee_status(r.get("shopee_status"))
             r["shopee_regular_hours"] = normalize_shopee_regular_hours(r.get("shopee_regular_hours"))
@@ -898,6 +911,14 @@ def update_shopee_actual_status(store_id, status):
 def update_shopee_regular_hours(store_id: str, regular_hours: Dict[str, List[str]]) -> None:
     with get_db_connection() as conn:
         conn.execute("UPDATE outlet_states os SET shopee_regular_hours=%s, last_checked_at=now(), updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (json.dumps(regular_hours), store_id))
+
+
+def update_outlet_timezone(store_id: str, timezone: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE outlet_states os SET timezone=%s, updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s",
+            (normalize_timezone(timezone), store_id),
+        )
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="REGULAR"):
     with get_db_connection() as conn:
         outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
@@ -1025,6 +1046,7 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             # the internal operating-hours table.
             regular_hours=s.get("shopee_regular_hours") or {},
             special_hours=s.get("special_hours", ""),
+            timezone=normalize_timezone(s.get("timezone")),
             status_langganan=s.get("subscription_status", "Aktif"),
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
             pause_until=s.get("pause_until") or "",

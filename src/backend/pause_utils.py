@@ -2,15 +2,18 @@ from datetime import datetime, time, timedelta
 from typing import Iterable, Optional
 from zoneinfo import ZoneInfo
 
+from core.timezones import DEFAULT_TIMEZONE, normalize_timezone
+
 
 WIB = ZoneInfo("Asia/Jakarta")
 FULL_DAY_MINUTES = 24 * 60
 
 
-def _as_local_datetime(value: datetime) -> datetime:
+def _as_local_datetime(value: datetime, timezone: str = DEFAULT_TIMEZONE) -> datetime:
+    local_tz = ZoneInfo(normalize_timezone(timezone))
     if value.tzinfo is None:
-        return value.replace(tzinfo=WIB)
-    return value.astimezone(WIB)
+        return value.replace(tzinfo=local_tz)
+    return value.astimezone(local_tz)
 
 
 def _iter_schedule_ranges(hours: object) -> Iterable[tuple[int, int]]:
@@ -30,12 +33,13 @@ def _iter_schedule_ranges(hours: object) -> Iterable[tuple[int, int]]:
         yield start_hour * 60 + start_minute, end_hour * 60 + end_minute
 
 
-def next_operational_start(schedule: Optional[dict], now_dt: datetime) -> Optional[datetime]:
+def next_operational_start(schedule: Optional[dict], now_dt: datetime, timezone: str = DEFAULT_TIMEZONE) -> Optional[datetime]:
     """Return the first valid operating-session start after today's date."""
     if not schedule:
         return None
 
-    now_local = _as_local_datetime(now_dt)
+    local_tz = ZoneInfo(normalize_timezone(timezone))
+    now_local = _as_local_datetime(now_dt, timezone)
     for day_offset in range(1, 8):
         candidate_date = now_local.date() + timedelta(days=day_offset)
         # Python weekday: Monday=0, Sunday=6. The stored schedule uses names.
@@ -45,7 +49,7 @@ def next_operational_start(schedule: Optional[dict], now_dt: datetime) -> Option
         starts = sorted(start for start, _end in _iter_schedule_ranges(schedule.get(day_name)))
         if starts:
             start_minutes = starts[0]
-            return datetime.combine(candidate_date, time.min, tzinfo=WIB) + timedelta(minutes=start_minutes)
+            return datetime.combine(candidate_date, time.min, tzinfo=local_tz) + timedelta(minutes=start_minutes)
     return None
 
 
@@ -61,11 +65,12 @@ def resolve_pause_window(
     duration_type: str,
     *,
     schedule: Optional[dict] = None,
+    timezone: str = DEFAULT_TIMEZONE,
     custom_until: Optional[str] = None,
     custom_minutes: Optional[int] = None,
     allow_default: bool = True,
 ) -> tuple[datetime, int, str]:
-    now_dt = _as_local_datetime(now_dt)
+    now_dt = _as_local_datetime(now_dt, timezone)
     dtype = (duration_type or "").strip().lower()
 
     if dtype in ("30", "30_min", "30min"):
@@ -79,7 +84,7 @@ def resolve_pause_window(
         return pause_until_dt, duration_mins, "60 Menit"
 
     if dtype in ("rest_of_day", "sepanjang_hari", "today"):
-        pause_until_dt = next_operational_start(schedule, now_dt)
+        pause_until_dt = next_operational_start(schedule, now_dt, timezone)
         if pause_until_dt is None:
             raise ValueError("Jadwal operasional hari berikutnya belum tersedia.")
         duration_mins = max(1, int((pause_until_dt - now_dt).total_seconds() // 60))
@@ -88,7 +93,10 @@ def resolve_pause_window(
     if dtype in ("custom", "waktu_lain"):
         if custom_until:
             try:
-                pause_until_dt = parse_pause_until(custom_until)
+                pause_until_dt = parse_pause_until(
+                    custom_until,
+                    tz=ZoneInfo(normalize_timezone(timezone)),
+                )
             except ValueError as exc:
                 raise ValueError("Target waktu penutupan tidak valid.") from exc
             duration_mins = int((pause_until_dt - now_dt).total_seconds() // 60)
@@ -103,7 +111,7 @@ def resolve_pause_window(
         return pause_until_dt, duration_mins, f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
 
     if allow_default:
-        pause_until_dt = next_operational_start(schedule, now_dt)
+        pause_until_dt = next_operational_start(schedule, now_dt, timezone)
         if pause_until_dt is None:
             raise ValueError("Jadwal operasional hari berikutnya belum tersedia.")
         duration_mins = max(1, int((pause_until_dt - now_dt).total_seconds() // 60))

@@ -16,6 +16,7 @@ from decision import (
     get_active_pause_until,
     get_next_schedule_start,
     is_within_operating_hours,
+    outlet_timezone,
 )
 from sheets import MerchantOutlet, WEEKDAY_MAP
 
@@ -83,7 +84,7 @@ def _today_is_open(outlet: MerchantOutlet, now: datetime) -> tuple[bool, bool]:
 
 
 def derive_outlet_due(outlet: MerchantOutlet, now: Optional[datetime] = None) -> OutletDueState:
-    now = _now(now)
+    now = _now(now).astimezone(outlet_timezone(outlet))
     key = merchant_key(outlet)
     live = (outlet.status_aktual or "UNKNOWN").strip().upper()
     has_schedule, within_schedule = _today_is_open(outlet, now)
@@ -102,7 +103,7 @@ def derive_outlet_due(outlet: MerchantOutlet, now: Optional[datetime] = None) ->
 
     pause_until = get_active_pause_until(outlet, current_time=now)
     if pause_until:
-        next_start = get_next_schedule_start(_schedule(outlet), now, not_after=pause_until)
+        next_start = get_next_schedule_start(_schedule(outlet), now, not_after=pause_until, timezone=outlet_timezone(outlet))
         if next_start:
             return OutletDueState(
                 outlet.store_id, key, next_start, P1_BOUNDARY,
@@ -120,7 +121,7 @@ def derive_outlet_due(outlet: MerchantOutlet, now: Optional[datetime] = None) ->
         )
 
     if not within_schedule:
-        next_start = get_next_schedule_start(_schedule(outlet), now)
+        next_start = get_next_schedule_start(_schedule(outlet), now, timezone=outlet_timezone(outlet))
         if next_start:
             return OutletDueState(
                 outlet.store_id, key, next_start, P2_NEXT_SCHEDULE,

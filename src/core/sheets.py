@@ -62,6 +62,7 @@ class MerchantOutlet:
     pause_until: str = ""
     shopee_regular_hours: dict = field(default_factory=dict)
     hp: str = ""
+    timezone: str = "Asia/Jakarta"
 
 
 def _subscription_status(end_date: str) -> str:

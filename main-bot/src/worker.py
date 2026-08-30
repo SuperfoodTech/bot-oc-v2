@@ -479,6 +479,9 @@ def sync_all_stores(
                 if driver_ready and driver:
                     try:
                         live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
+                        if live_info and live_info.get("timezone"):
+                            outlet.timezone = live_info["timezone"]
+                            db.update_outlet_timezone(outlet.store_id, outlet.timezone)
                         if live_info and live_info.get("status_str") in ("OPEN", "CLOSED"):
                             actual_st = _normalize_live_status(live_info)
                             outlet.status_aktual = actual_st
