@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260829-mitra-dashboard-v54">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260830-mitra-dashboard-v56">
 </head>
 <body x-data="userApp()">
 
@@ -28,7 +28,7 @@
     </header>
 
     <div class="content-body" id="mainContent">
-      <div id="loginSection" class="card-box mitra-login-panel" style="display: block;">
+      <div id="loginSection" class="card-box mitra-login-panel" aria-hidden="false" style="display: block;">
         <div class="mitra-login-stack">
           <div class="mitra-login-hero">
             <div class="mitra-login-copy">
@@ -39,43 +39,37 @@
           </div>
 
           <div class="mitra-login-form">
-            <div class="password-input-wrapper">
-              <span class="password-field-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <rect x="6.5" y="10.5" width="11" height="9" rx="2"></rect>
-                  <path d="M8.5 10.5V8.75a3.5 3.5 0 1 1 7 0v1.75"></path>
-                  <circle cx="12" cy="14.5" r="1"></circle>
-                </svg>
-              </span>
-              <input type="password" id="passcodeInput" class="form-input" placeholder="Kata sandi" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-              </button>
-            </div>
-            <p id="userLoginError" style="color: #BE1A1A; font-size: 13px; margin-top: 8px; font-weight: 500; display: none; text-align: center; line-height: 1.4;"></p>
-            <button class="btn-primary mitra-login-submit" onclick="doLogin()">Masuk</button>
-            <div class="auth-highlights" aria-label="Keunggulan FoodMaster">
-              <article class="auth-highlight">
-                <div class="auth-highlight-icon is-shield">
-                  <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
+            <form class="mitra-login-form-shell" onsubmit="event.preventDefault(); doLogin()" novalidate>
+              <div class="mitra-login-field">
+                <label for="passcodeInput" class="mitra-login-field-label">Kata sandi mitra</label>
+                <div id="passcodeField" class="password-input-wrapper">
+                  <span class="password-field-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="6.5" y="10.5" width="11" height="9" rx="2"></rect>
+                      <path d="M8.5 10.5V8.75a3.5 3.5 0 1 1 7 0v1.75"></path>
+                      <circle cx="12" cy="14.5" r="1"></circle>
+                    </svg>
+                  </span>
+                  <input type="password" id="passcodeInput" class="form-input" placeholder="Masukkan kata sandi" autocomplete="current-password" aria-invalid="false">
+                  <button type="button" id="passcodeToggleBtn" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
                 </div>
-                <div class="auth-highlight-copy">
-                  <strong>Akses aman untuk mitra terdaftar</strong>
-                  <p>Data outlet Anda terlindungi dengan sistem keamanan FoodMaster.</p>
-                </div>
-              </article>
-              <article class="auth-highlight is-automation">
-                <div class="auth-highlight-icon is-shopeefood">
-                  <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
-                </div>
-                <div class="auth-highlight-copy">
-                  <strong>ShopeeFood Auto Open/Close Bot</strong>
-                  <p>Kelola outlet Anda jauh lebih mudah dengan proses operasional outlet yang efisien.</p>
-                </div>
-              </article>
+              </div>
+              <p id="userLoginError" class="mitra-login-error" role="alert" aria-live="assertive" hidden></p>
+              <button id="userLoginSubmitBtn" type="submit" class="btn-primary mitra-login-submit">Masuk</button>
+            </form>
+            <div class="auth-trust-note" aria-label="Informasi akses akun">
+              <div class="auth-trust-note-icon">
+                <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
+              </div>
+              <div class="auth-trust-note-copy">
+                <strong>Akses aman untuk mitra terdaftar</strong>
+                <p>Masuk dengan kata sandi dari admin untuk melihat status outlet dan otomatisasi FoodMaster.</p>
+              </div>
             </div>
             <div class="google-auth-option" style="display: none;">
               <div class="login-divider">ATAU</div>
@@ -94,7 +88,7 @@
         </div>
       </div>
 
-      <div id="dashboardSection" class="dashboard-stack" style="display: none;">
+      <div id="dashboardSection" class="dashboard-stack" aria-hidden="true" hidden style="display: none;">
         <section class="page-intro mitra-dashboard-hero">
           <div class="mitra-hero-copy">
             <div class="mitra-hero-label">Dashboard Mitra</div>
@@ -171,11 +165,11 @@
 
   <div id="userToast" class="user-toast" role="status" aria-live="polite" hidden></div>
 
-  <div class="modal-overlay" id="resumeConfirmModal" aria-hidden="true">
+  <div class="modal-overlay" id="resumeConfirmModal" aria-hidden="true" hidden>
     <div class="modal-card confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="resumeConfirmTitle">
       <div class="step-indicator">Buka outlet</div>
       <h3 class="card-title" id="resumeConfirmTitle">Buka outlet sekarang?</h3>
-      <p class="card-subtitle">Outlet akan dibuka kembali dan dapat menerima pesanan.</p>
+      <p class="card-subtitle">Permintaan buka akan dikirim ke bot untuk diproses sesuai status live outlet.</p>
       <div class="form-actions">
         <button type="button" class="btn-outline" onclick="closeResumeConfirm()">Batal</button>
         <button type="button" class="btn-danger confirm-continue-btn" onclick="confirmResume()">Lanjut</button>
@@ -183,11 +177,11 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="pauseModal">
-    <div class="modal-card pause-modal-card">
+  <div class="modal-overlay" id="pauseModal" aria-hidden="true" hidden>
+    <div class="modal-card pause-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalStoreName">
       <div class="step-indicator">Tutup sementara</div>
       <h3 class="card-title" id="modalStoreName">Pilih durasi</h3>
-      <p class="card-subtitle">Outlet akan dibuka kembali otomatis sesuai durasi yang dipilih.</p>
+      <p class="card-subtitle">Bot akan memproses tutup sementara, lalu membuka kembali otomatis sesuai durasi yang dipilih.</p>
       <div id="pauseEndPreview" class="pause-end-preview" aria-live="polite">Berakhir pada -</div>
 
       <div class="radio-group">
@@ -282,6 +276,16 @@
     let userLoginInFlight = false;
     let pickerDate = null;
     let pickerMonth = null;
+    const USER_LOGIN_BUTTON_LABEL = 'Masuk';
+    const USER_LOGIN_PENDING_LABEL = 'Memeriksa...';
+    const USER_LOGIN_RESTORE_LABEL = 'Memuat dashboard...';
+    const USER_OUTLET_SYNC_REFRESH_MS = 15000;
+    const MITRA_STATUS_TONE_CLASS = {
+      open: 'is-open',
+      closed: 'is-closed',
+      paused: 'is-paused',
+      pending: 'is-pending'
+    };
     const expandedScheduleStores = new Set();
     const localRegularHoursDummy = {
       code: 0,
@@ -303,6 +307,70 @@
       if (!wrapper) return;
       wrapper.classList.toggle('is-auth-view', !isLoggedIn);
       wrapper.classList.toggle('is-dashboard-view', !!isLoggedIn);
+    }
+
+    function setInteractiveVisibility(target, isVisible, displayValue = 'block') {
+      const element = typeof target === 'string' ? document.getElementById(target) : target;
+      if (!element) return;
+      element.hidden = !isVisible;
+      element.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+      if ('inert' in element) element.inert = !isVisible;
+      element.style.display = isVisible ? displayValue : 'none';
+    }
+
+    function setModalVisibility(modalId, isVisible) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.classList.toggle('active', isVisible);
+      setInteractiveVisibility(modal, isVisible, 'flex');
+    }
+
+    function syncUserPanels(isLoggedIn) {
+      setUserViewState(isLoggedIn);
+      setInteractiveVisibility('loginSection', !isLoggedIn, 'block');
+      setInteractiveVisibility('dashboardSection', isLoggedIn, 'flex');
+      if (!isLoggedIn) {
+        setModalVisibility('resumeConfirmModal', false);
+        setModalVisibility('pauseModal', false);
+      }
+    }
+
+    function focusLoginInput(selectText = false) {
+      const input = document.getElementById('passcodeInput');
+      const loginSection = document.getElementById('loginSection');
+      if (!input || !loginSection || loginSection.hidden || input.disabled) return;
+      input.focus({ preventScroll: true });
+      if (selectText) input.select();
+    }
+
+    function setLoginError(message = '') {
+      const errorEl = document.getElementById('userLoginError');
+      const input = document.getElementById('passcodeInput');
+      const field = document.getElementById('passcodeField');
+      const hasError = Boolean(message);
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.hidden = !hasError;
+      }
+      if (input) {
+        input.setAttribute('aria-invalid', hasError ? 'true' : 'false');
+        if (hasError) input.setAttribute('aria-describedby', 'userLoginError');
+        else input.removeAttribute('aria-describedby');
+      }
+      field?.classList.toggle('has-error', hasError);
+    }
+
+    function setLoginPendingState(isPending, label = USER_LOGIN_PENDING_LABEL) {
+      const submitBtn = document.getElementById('userLoginSubmitBtn');
+      const input = document.getElementById('passcodeInput');
+      const toggleBtn = document.getElementById('passcodeToggleBtn');
+      if (submitBtn) {
+        submitBtn.disabled = isPending;
+        submitBtn.textContent = isPending ? label : USER_LOGIN_BUTTON_LABEL;
+        submitBtn.setAttribute('aria-busy', isPending ? 'true' : 'false');
+      }
+      if (input) input.disabled = isPending;
+      if (toggleBtn) toggleBtn.disabled = isPending;
     }
 
     function scrollToAccountNotice() {
@@ -334,6 +402,13 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      const passcodeInput = document.getElementById('passcodeInput');
+      passcodeInput?.addEventListener('input', () => {
+        if (document.getElementById('userLoginError')?.hidden === false) {
+          setLoginError('');
+        }
+      });
+
       document.querySelectorAll('input[name="pauseDuration"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
           document.querySelectorAll('.radio-card').forEach(c => c.classList.remove('active'));
@@ -367,6 +442,16 @@
         }
       }, 5000);
 
+      // The bot runs in a separate process, so silent polling keeps live Shopee
+      // status aligned after a patrol cycle updates the database.
+      setInterval(() => {
+        const hasVisibleDashboard = currentUserOutlets.length && document.getElementById('dashboardSection').style.display !== 'none';
+        if (!hasVisibleDashboard || document.visibilityState !== 'visible') return;
+        if (userLoginInFlight || pendingToggleStoreIds.size || selectedStoreId || resumeStoreId) return;
+        const savedPasscode = activePasscode || sessionStorage.getItem(userSessionKey);
+        if (savedPasscode) doLogin(savedPasscode, true);
+      }, USER_OUTLET_SYNC_REFRESH_MS);
+
       // Google OAuth Redirect Click Event
       document.getElementById('googleLoginBtn').addEventListener('click', () => {
         window.location.href = `/api/v1/auth/google/login?role=merchant&state_url=${encodeURIComponent(window.location.pathname)}`;
@@ -388,54 +473,45 @@
 
       // 2. Google OAuth Error Handler
       if (urlError) {
-        const errorEl = document.getElementById('userLoginError');
-        if (errorEl) {
-          if (urlError === 'email_not_registered') {
-            const email = urlParams.get('email') || '';
-            errorEl.innerText = `Email Google Anda (${email}) belum terdaftar sebagai Mitra. Silakan hubungi CS/Admin.`;
-          } else if (urlError === 'unauthorized_role') {
-            errorEl.innerText = 'Akun Google Anda tidak memiliki akses ke Dashboard Mitra.';
-          } else {
-            errorEl.innerText = 'Login dengan Google gagal. Silakan coba lagi.';
-          }
-          errorEl.style.display = 'block';
+        if (urlError === 'email_not_registered') {
+          const email = urlParams.get('email') || '';
+          setLoginError(`Email Google Anda (${email}) belum terdaftar sebagai Mitra. Silakan hubungi CS/Admin.`);
+        } else if (urlError === 'unauthorized_role') {
+          setLoginError('Akun Google Anda tidak memiliki akses ke Dashboard Mitra.');
+        } else {
+          setLoginError('Login dengan Google gagal. Silakan coba lagi.');
         }
       }
 
       // 3. Regular Session Restore
       const savedPasscode = sessionStorage.getItem(userSessionKey);
       if (savedPasscode) {
-        setUserViewState(true);
+        syncUserPanels(true);
+        setLoginPendingState(true, USER_LOGIN_RESTORE_LABEL);
         doLogin(savedPasscode, true);
       } else {
-        setUserViewState(false);
-        document.getElementById('loginSection').style.display = 'block';
-        document.getElementById('dashboardSection').style.display = 'none';
+        syncUserPanels(false);
+        if (urlError) requestAnimationFrame(() => focusLoginInput(true));
       }
     });
 
     async function doLogin(providedPasscode = null, isAuto = false) {
       const passcode = providedPasscode || document.getElementById('passcodeInput').value.trim();
-      const errorEl = document.getElementById('userLoginError');
-      if (errorEl) errorEl.style.display = 'none';
+      const hadActiveDashboard = currentUserOutlets.length && document.getElementById('dashboardSection').style.display !== 'none';
+      setLoginError('');
 
       if (!passcode) {
         if (!isAuto) {
-          if (errorEl) {
-            errorEl.innerText = 'Mohon masukkan kata sandi mitra!';
-            errorEl.style.display = 'block';
-          } else {
-            alert('Mohon masukkan kata sandi mitra!');
-          }
+          setLoginError('Mohon masukkan kata sandi mitra!');
+          requestAnimationFrame(() => focusLoginInput());
         }
-        setUserViewState(false);
-        document.getElementById('loginSection').style.display = 'block';
-        document.getElementById('dashboardSection').style.display = 'none';
+        syncUserPanels(false);
         return;
       }
 
       if (userLoginInFlight) return;
       userLoginInFlight = true;
+      setLoginPendingState(true, isAuto ? USER_LOGIN_RESTORE_LABEL : USER_LOGIN_PENDING_LABEL);
       try {
         const res = await fetch('/api/v1/user/login', {
           method: 'POST',
@@ -451,9 +527,8 @@
           if (window._appData) {
             window._appData.outlets = data.outlets;
           }
-          setUserViewState(true);
-          document.getElementById('loginSection').style.display = 'none';
-          document.getElementById('dashboardSection').style.display = 'flex';
+          setLoginError('');
+          syncUserPanels(true);
           const accountSummary = getAccountSubscriptionSummary(data.outlets);
           document.getElementById('mitraName').textContent = `Mitra ${data.nama_pemilik}`;
           document.getElementById('subDetails').textContent = accountSummary.details;
@@ -469,28 +544,23 @@
           startUserEventStream();
         } else {
           sessionStorage.removeItem(userSessionKey);
-          setUserViewState(false);
-          document.getElementById('loginSection').style.display = 'block';
-          document.getElementById('dashboardSection').style.display = 'none';
+          syncUserPanels(false);
           if (!isAuto) {
-            if (errorEl) {
-              errorEl.innerText = data.detail || 'Kata sandi tidak valid!';
-              errorEl.style.display = 'block';
-            } else {
-              alert('Kata sandi tidak valid!');
-            }
+            setLoginError(data.detail || 'Kata sandi tidak valid!');
+            requestAnimationFrame(() => focusLoginInput(true));
           }
         }
       } catch (err) {
-        setUserViewState(false);
-        document.getElementById('loginSection').style.display = 'block';
-        document.getElementById('dashboardSection').style.display = 'none';
-        if (errorEl) {
-          errorEl.innerText = 'Gagal menghubungkan ke server.';
-          errorEl.style.display = 'block';
+        if (isAuto && hadActiveDashboard) {
+          renderOutlets(currentUserOutlets);
+        } else {
+          syncUserPanels(false);
+          setLoginError('Gagal menghubungkan ke server.');
+          if (!isAuto) requestAnimationFrame(() => focusLoginInput(true));
         }
       } finally {
         userLoginInFlight = false;
+        setLoginPendingState(false);
       }
     }
 
@@ -498,11 +568,36 @@
       const storeId = String(update.store_id || '');
       const outlet = currentUserOutlets.find(item => String(item.store_id) === storeId);
       if (!outlet) return;
-      outlet.vercel_status = update.vercel_status;
-      outlet.pause_until = update.pause_until || null;
+      [
+        'vercel_status',
+        'shopee_status',
+        'pause_until',
+        'is_suspended',
+        'alasan_penangguhan',
+        'desired_state',
+        'live_state',
+        'bot_phase',
+        'schedule_available',
+        'within_operating_schedule',
+        'display_toggle_on',
+        'display_toggle_disabled',
+        'display_toggle_reason',
+        'display_status_bucket',
+        'display_status_label',
+        'display_status_tone',
+        'display_note'
+      ].forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(update, key)) {
+          outlet[key] = update[key];
+        }
+      });
+      outlet.pause_until = outlet.pause_until || null;
       outlet.last_toggle_action_raw = update.action || outlet.last_toggle_action_raw;
       outlet.last_toggle_reason = update.reason || outlet.last_toggle_reason || '';
       outlet.last_toggle_at = update.changed_at || outlet.last_toggle_at || null;
+      if (Object.prototype.hasOwnProperty.call(update, 'is_suspended')) {
+        outlet.suspension_status = update.is_suspended ? 'SUSPENDED' : 'ACTIVE';
+      }
       if (window._appData) window._appData.outlets = currentUserOutlets;
       renderOutlets(currentUserOutlets);
       fetchHistory();
@@ -705,6 +800,75 @@
       return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} pukul ${parts.hour}:${parts.minute} WIB`;
     }
 
+    function normalizeDesiredOutletState(outlet) {
+      const explicitState = String(outlet?.desired_state || '').trim().toUpperCase();
+      if (['OPEN', 'PAUSE', 'MANUAL_OFF'].includes(explicitState)) return explicitState;
+      return String(outlet?.vercel_status || '').trim().toUpperCase() === 'ON'
+        ? 'OPEN'
+        : (outlet?.pause_until ? 'PAUSE' : 'MANUAL_OFF');
+    }
+
+    function normalizeLiveOutletState(value) {
+      const normalized = String(value || '').trim().toUpperCase();
+      if (normalized === 'ON' || normalized === 'OPEN') return 'OPEN';
+      if (normalized === 'PAUSE') return 'PAUSE';
+      if (normalized === 'CLOSED' || normalized === 'OFF' || normalized === 'CLOSE') return 'CLOSED';
+      return 'UNKNOWN';
+    }
+
+    function getMitraToneClass(tone) {
+      const normalized = String(tone || '').trim().toLowerCase();
+      return MITRA_STATUS_TONE_CLASS[normalized] || 'is-pending';
+    }
+
+    function getOutletStateContext(outlet) {
+      const desiredState = normalizeDesiredOutletState(outlet);
+      const liveState = normalizeLiveOutletState(outlet?.live_state || outlet?.shopee_status);
+      const scheduleAvailable = typeof outlet?.schedule_available === 'boolean'
+        ? outlet.schedule_available
+        : hasUsableSchedule(getOutletSchedule(outlet));
+      const isWithinSchedule = typeof outlet?.within_operating_schedule === 'boolean'
+        ? outlet.within_operating_schedule
+        : (scheduleAvailable && isOutletWithinSchedule(outlet));
+      const isSuspended = Boolean(outlet?.is_suspended || outlet?.suspension_status === 'SUSPENDED');
+      const toggleReason = String(outlet?.display_toggle_reason || '').trim().toUpperCase()
+        || (isSuspended ? 'SUSPENDED' : (!scheduleAvailable ? 'SCHEDULE_UNAVAILABLE' : (!isWithinSchedule ? 'OUTSIDE_SCHEDULE' : 'READY')));
+      const toggleChecked = typeof outlet?.display_toggle_on === 'boolean'
+        ? outlet.display_toggle_on
+        : Boolean(!isSuspended && scheduleAvailable && isWithinSchedule && desiredState === 'OPEN');
+      const toggleDisabled = typeof outlet?.display_toggle_disabled === 'boolean'
+        ? outlet.display_toggle_disabled
+        : Boolean(isSuspended || !scheduleAvailable || !isWithinSchedule);
+      let botPhase = String(outlet?.bot_phase || '').trim().toUpperCase();
+      if (!botPhase) {
+        if (isSuspended) botPhase = 'SUSPENDED';
+        else if (liveState === 'UNKNOWN') botPhase = 'STATUS_UNKNOWN';
+        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && !scheduleAvailable) botPhase = 'SCHEDULE_UNAVAILABLE';
+        else if ((desiredState === 'PAUSE' || desiredState === 'MANUAL_OFF') && liveState === 'OPEN') botPhase = 'PENDING_PAUSE';
+        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && isWithinSchedule) botPhase = 'PENDING_OPEN';
+        else if (desiredState === 'MANUAL_OFF') botPhase = 'AUTOMATION_OFF';
+        else if (desiredState === 'PAUSE' && (liveState === 'PAUSE' || liveState === 'CLOSED')) botPhase = 'IN_SYNC';
+        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED')) botPhase = 'WAITING_SCHEDULE';
+        else botPhase = 'IN_SYNC';
+      }
+      return {
+        liveState,
+        desiredState,
+        botPhase,
+        scheduleAvailable,
+        isWithinSchedule,
+        isSuspended,
+        toggleChecked,
+        toggleDisabled,
+        toggleReason,
+      };
+    }
+
+    function getOutletStatusTooltip(outlet, stateContext) {
+      const liveValue = String(outlet?.shopee_status || stateContext.liveState || 'UNKNOWN').trim().toUpperCase() || 'UNKNOWN';
+      return `Live Shopee: ${liveValue} | Desired bot: ${stateContext.desiredState} | Fase: ${stateContext.botPhase}`;
+    }
+
     function getShopeeStatusPresentation(value) {
       const normalized = String(value || '').trim().toUpperCase();
       const isLocalEnvironment = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
@@ -721,15 +885,37 @@
       return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status };
     }
 
-    function getMitraStatusPresentation(outlet) {
-      const normalized = String(outlet?.shopee_status || '').trim().toUpperCase();
-      if (normalized === 'ON' || normalized === 'OPEN') {
-        return { label: 'Sedang Buka', className: 'mitra-status-pill is-open', value: normalized || 'OPEN' };
+    function getMitraStatusPresentation(outlet, stateContext = getOutletStateContext(outlet)) {
+      const explicitLabel = String(outlet?.display_status_label || '').trim();
+      if (explicitLabel) {
+        return {
+          label: explicitLabel,
+          className: `mitra-status-pill ${getMitraToneClass(outlet?.display_status_tone)}`,
+          value: stateContext.liveState || 'UNKNOWN'
+        };
       }
-      if (normalized === 'PAUSE' || normalized === 'CLOSED' || outlet?.vercel_status === 'OFF') {
-        return { label: 'Sedang Tutup', className: 'mitra-status-pill is-closed', value: normalized || 'CLOSED' };
+      if (stateContext.botPhase === 'SUSPENDED') {
+        return { label: 'Sedang Tutup • Dinonaktifkan admin', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
       }
-      return { label: 'Status Dicek Bot', className: 'mitra-status-pill is-pending', value: normalized || 'UNKNOWN' };
+      if (stateContext.botPhase === 'PENDING_PAUSE') {
+        return { label: 'Sedang Buka • Menunggu bot menutup', className: 'mitra-status-pill is-pending', value: stateContext.liveState };
+      }
+      if (stateContext.botPhase === 'PENDING_OPEN') {
+        return { label: 'Sedang Tutup • Menunggu bot membuka', className: 'mitra-status-pill is-pending', value: stateContext.liveState };
+      }
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') {
+        return { label: 'Sedang Tutup • Di luar jadwal', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
+      }
+      if (stateContext.botPhase === 'AUTOMATION_OFF') {
+        return { label: 'Sedang Tutup • Otomatisasi nonaktif', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
+      }
+      if (stateContext.desiredState === 'PAUSE' && stateContext.liveState === 'PAUSE') {
+        return { label: 'Tutup Sementara', className: 'mitra-status-pill is-paused', value: stateContext.liveState };
+      }
+      if (stateContext.liveState === 'OPEN') {
+        return { label: 'Sedang Buka', className: 'mitra-status-pill is-open', value: stateContext.liveState };
+      }
+      return { label: 'Status sedang dicek bot', className: 'mitra-status-pill is-pending', value: stateContext.liveState || 'UNKNOWN' };
     }
 
     function hasUsableSchedule(schedule) {
@@ -837,24 +1023,67 @@
       return '';
     }
 
-    function getOutletAutomationDetail(outlet, isVercelOn, isScheduleBlocked, isSuspended) {
-      if (isSuspended) return 'Otomatisasi dinonaktifkan oleh admin.';
-      if (isVercelOn && !isScheduleBlocked) return 'Bot mengikuti jam operasional Shopee secara otomatis.';
-      if (isVercelOn && isScheduleBlocked) return 'Bot aktif dan menunggu jadwal buka berikutnya.';
-      if (outlet.pause_until) return 'Outlet dijeda sementara sampai dibuka kembali otomatis.';
-      return 'Bot sedang nonaktif sampai diaktifkan kembali.';
+    function getOutletAutomationDetail(outlet, stateContext = getOutletStateContext(outlet)) {
+      const explicitNote = String(outlet?.display_note || '').trim();
+      if (explicitNote) return explicitNote;
+      if (stateContext.botPhase === 'SUSPENDED') return 'Otomatisasi dinonaktifkan oleh admin.';
+      if (stateContext.botPhase === 'STATUS_UNKNOWN') return 'Status live outlet masih diperiksa bot.';
+      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Jadwal operasional Shopee belum tersedia.';
+      if (stateContext.botPhase === 'PENDING_PAUSE') {
+        return stateContext.desiredState === 'PAUSE'
+          ? 'Permintaan tutup sementara sudah tersimpan. Menunggu bot menutup outlet.'
+          : 'Permintaan menonaktifkan otomatisasi sudah tersimpan. Menunggu bot menutup outlet.';
+      }
+      if (stateContext.botPhase === 'PENDING_OPEN') {
+        return stateContext.isWithinSchedule
+          ? (stateContext.liveState === 'CLOSED'
+              ? 'Outlet tertutup di Shopee padahal toggle aktif. Menunggu bot membuka kembali outlet.'
+              : 'Permintaan buka sudah tersimpan. Menunggu bot membuka outlet.')
+          : 'Permintaan buka sudah tersimpan. Bot akan membuka outlet saat jadwal operasional dimulai.';
+      }
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.';
+      if (stateContext.botPhase === 'AUTOMATION_OFF') return 'Nonaktif sampai diaktifkan kembali.';
+      if (stateContext.desiredState === 'PAUSE') return 'Outlet sedang ditutup sementara.';
+      return 'Outlet mengikuti jam operasional Shopee.';
     }
 
-    function getOutletPauseLine(outlet, isVercelOn, isScheduleBlocked, isSuspended) {
-      if (isSuspended) {
+    function getOutletPauseLine(outlet, stateContext = getOutletStateContext(outlet)) {
+      if (stateContext.isSuspended) {
         return outlet.alasan_penangguhan
           ? `Dinonaktifkan admin: ${outlet.alasan_penangguhan}`
           : 'Dinonaktifkan admin.';
       }
-      if (!isVercelOn && outlet.pause_until) return formatPauseResumeInline(outlet.pause_until);
-      if (isScheduleBlocked) return getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.';
-      if (!isVercelOn) return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
+      if (stateContext.desiredState === 'PAUSE' && outlet.pause_until) {
+        const reopenText = outlet.pause_until ? formatPauseResumeInline(outlet.pause_until) : '';
+        if (stateContext.botPhase !== 'PENDING_PAUSE') return reopenText;
+        return reopenText
+          ? `Permintaan tutup tersimpan. Menunggu giliran bot. ${reopenText}`
+          : 'Permintaan tutup tersimpan. Menunggu giliran bot.';
+      }
+      if (stateContext.botPhase === 'PENDING_OPEN') {
+        return stateContext.isWithinSchedule
+          ? 'Toggle aktif. Menunggu sinkronisasi bot membuka outlet.'
+          : (getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.');
+      }
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') return getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.';
+      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Jadwal operasional Shopee belum tersedia.';
+      if (stateContext.botPhase === 'AUTOMATION_OFF' || (stateContext.desiredState === 'MANUAL_OFF' && stateContext.liveState !== 'OPEN')) {
+        return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
+      }
       return '';
+    }
+
+    function getToggleBlockedMessage(outlet, stateContext = getOutletStateContext(outlet)) {
+      if (stateContext.isSuspended) {
+        return `Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${outlet.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`;
+      }
+      if (stateContext.toggleReason === 'SCHEDULE_UNAVAILABLE') {
+        return 'Jadwal operasional Shopee belum tersedia.';
+      }
+      if (stateContext.toggleReason === 'OUTSIDE_SCHEDULE') {
+        return 'Di luar jadwal operasional';
+      }
+      return 'Aksi belum bisa dilakukan saat ini.';
     }
 
     function renderOutletSchedule(outlet) {
@@ -904,15 +1133,16 @@
 
       outlets.forEach(out => {
         const storeKey = String(out.store_id);
-        const isVercelOn = out.vercel_status === 'ON';
-        const isSuspended = out.is_suspended || out.suspension_status === 'SUSPENDED';
-        const isWithinSchedule = isOutletWithinSchedule(out);
-        const isScheduleBlocked = !isWithinSchedule;
         const isTogglePending = pendingToggleStoreIds.has(storeKey);
-        const shopeeStatus = getMitraStatusPresentation(out);
+        const stateContext = getOutletStateContext(out);
+        const isSuspended = stateContext.isSuspended;
+        const isScheduleBlocked = stateContext.toggleDisabled && !isSuspended;
+        const isToggleOn = stateContext.toggleChecked;
+        const isToggleDisabled = stateContext.toggleDisabled || isTogglePending;
+        const shopeeStatus = getMitraStatusPresentation(out, stateContext);
         const isScheduleExpanded = expandedScheduleStores.has(out.store_id);
-        const topStatusTitle = `Status terakhir dari XHR Shopee: ${shopeeStatus.value}`;
-        const pauseLine = getOutletPauseLine(out, isVercelOn, isScheduleBlocked, isSuspended);
+        const topStatusTitle = getOutletStatusTooltip(out, stateContext);
+        const pauseLine = getOutletPauseLine(out, stateContext);
         const scheduleSummary = getOutletScheduleSummary(out);
         const merchantName = escapeHtml(out.merchant_name || 'Shopee Merchant');
         const storeName = escapeHtml(out.store_name || out.store_id || 'Outlet');
@@ -939,10 +1169,10 @@
           <div class="mitra-outlet-toggle-row">
             <div class="mitra-outlet-toggle-copy">
               <strong>Buka otomatis</strong>
-              <span>${escapeHtml(getOutletAutomationDetail(out, isVercelOn, isScheduleBlocked, isSuspended))}</span>
+              <span>${escapeHtml(getOutletAutomationDetail(out, stateContext))}</span>
             </div>
-            <label class="switch-toggle ${isScheduleBlocked ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
-              <input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isSuspended || isScheduleBlocked || isTogglePending ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
+            <label class="switch-toggle ${isToggleDisabled ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
+              <input type="checkbox" ${isToggleOn ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
               <span class="slider"></span>
             </label>
           </div>
@@ -1022,13 +1252,9 @@
         return;
       }
       const store = currentUserOutlets.find(s => s.store_id === storeId);
-      if (store && (store.is_suspended || store.suspension_status === 'SUSPENDED')) {
-        showUserToast(`Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${store.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`, 'error');
-        renderOutlets(currentUserOutlets);
-        return;
-      }
-      if (store && !isOutletWithinSchedule(store)) {
-        showUserToast('Di luar jadwal operasional', 'error');
+      const stateContext = store ? getOutletStateContext(store) : null;
+      if (store && stateContext?.toggleDisabled) {
+        showUserToast(getToggleBlockedMessage(store, stateContext), 'error');
         renderOutlets(currentUserOutlets);
         return;
       }
@@ -1047,9 +1273,10 @@
         return;
       }
       const store = currentUserOutlets.find(s => s.store_id === storeId);
-      if (store && !isOutletWithinSchedule(store)) {
+      const stateContext = store ? getOutletStateContext(store) : null;
+      if (store && stateContext?.toggleDisabled) {
         event.preventDefault();
-        showUserToast('Di luar jadwal operasional', 'error');
+        showUserToast(getToggleBlockedMessage(store, stateContext), 'error');
       }
     }
 
@@ -1058,16 +1285,12 @@
     function openResumeConfirm(storeId, storeName) {
       resumeStoreId = storeId;
       document.getElementById('resumeConfirmTitle').textContent = `Buka ${storeName}?`;
-      const modal = document.getElementById('resumeConfirmModal');
-      modal.classList.add('active');
-      modal.setAttribute('aria-hidden', 'false');
+      setModalVisibility('resumeConfirmModal', true);
     }
 
     function closeResumeConfirm() {
       resumeStoreId = null;
-      const modal = document.getElementById('resumeConfirmModal');
-      modal.classList.remove('active');
-      modal.setAttribute('aria-hidden', 'true');
+      setModalVisibility('resumeConfirmModal', false);
       renderOutlets(currentUserOutlets);
     }
 
@@ -1083,7 +1306,7 @@
       document.getElementById('modalStoreName').innerText = storeName;
       setCustomDateTimeDefaults();
       updatePauseEndPreview();
-      document.getElementById('pauseModal').classList.add('active');
+      setModalVisibility('pauseModal', true);
     }
 
     function toDateTimeLocalValue(date) {
@@ -1183,12 +1406,20 @@
       document.getElementById('customPickerHour').value = formatWibTime(selected).slice(0, 2);
       document.getElementById('customPickerMinute').value = formatWibTime(selected).slice(3, 5);
       renderPickerCalendar();
-      document.getElementById('customDateTimePicker').hidden = false;
+      const picker = document.getElementById('customDateTimePicker');
+      if (picker) {
+        picker.hidden = false;
+        if ('inert' in picker) picker.inert = false;
+      }
       document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'true');
     }
 
     function closeCustomDateTimePicker() {
-      document.getElementById('customDateTimePicker').hidden = true;
+      const picker = document.getElementById('customDateTimePicker');
+      if (picker) {
+        picker.hidden = true;
+        if ('inert' in picker) picker.inert = true;
+      }
       document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'false');
     }
 
@@ -1271,7 +1502,7 @@
 
     function closeModal(shouldRender = true) {
       if (typeof closeCustomDateTimePicker === 'function') closeCustomDateTimePicker();
-      document.getElementById('pauseModal').classList.remove('active');
+      setModalVisibility('pauseModal', false);
       selectedStoreId = null;
       if (shouldRender) renderOutlets(currentUserOutlets);
     }
@@ -1304,7 +1535,7 @@
         if (res.ok && data.success) {
           const durationLabel = getPauseDurationLabel();
           closeModal(false);
-          showUserToast(`Outlet ditutup sementara selama ${durationLabel}.`);
+          showUserToast(`Permintaan tutup sementara tersimpan untuk ${durationLabel}.`);
           // Refresh the outlet data without losing the current mitra session.
           await doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {
@@ -1325,7 +1556,7 @@
         const res = await fetch(`/api/v1/user/resume?store_id=${storeId}`, {method: 'POST'});
         const data = await res.json();
         if (res.ok && data.success) {
-          showUserToast('Outlet berhasil dibuka.');
+          showUserToast('Permintaan buka outlet tersimpan.');
           // Refresh the outlet data without sending the user back to login.
           await doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {

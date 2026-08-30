@@ -51,11 +51,11 @@ def test_frontend_rendering():
     assert "FoodMaster Admin" in r.text
     log.info("   -> Result: PASSED (Desktop Admin Dashboard Rendered)")
 
-    log.info("   Testing GET /admin/bot (Admin Bot Patrol Monitor)...")
+    log.info("   Testing GET /admin/bot (Admin Bot Activity Dashboard)...")
     r = client.get("/admin/bot", follow_redirects=True)
     assert r.status_code == 200
-    assert "Monitor Bot Patroli" in r.text
-    log.info("   -> Result: PASSED (Desktop Admin Bot Monitor Rendered)")
+    assert "Aktivitas bot" in r.text
+    log.info("   -> Result: PASSED (Desktop Admin Bot Activity Dashboard Rendered)")
 
     # 3. Test User Mobile Page Route (/app)
     log.info("\n3️⃣ Testing GET /app (User Mobile Dashboard)...")

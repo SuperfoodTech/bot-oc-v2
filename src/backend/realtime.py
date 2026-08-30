@@ -60,15 +60,31 @@ def stream(event_filter: EventFilter = None) -> Iterator[str]:
 
 
 def publish_outlet_state_changed(transition: Dict, action: str, actor: str) -> None:
-    publish({
+    payload = {
         "type": "outlet_state_changed",
         "store_id": str(transition["store_id"]),
         "store_name": transition.get("store_name", ""),
         "owner_name": transition.get("owner_name", ""),
         "vercel_status": transition["vercel_status"],
+        "shopee_status": transition.get("shopee_status"),
+        "is_suspended": transition.get("is_suspended"),
+        "alasan_penangguhan": transition.get("alasan_penangguhan", ""),
         "pause_until": transition.get("pause_until"),
+        "desired_state": transition.get("desired_state"),
+        "live_state": transition.get("live_state"),
+        "bot_phase": transition.get("bot_phase"),
+        "schedule_available": transition.get("schedule_available"),
+        "within_operating_schedule": transition.get("within_operating_schedule"),
+        "display_toggle_on": transition.get("display_toggle_on"),
+        "display_toggle_disabled": transition.get("display_toggle_disabled"),
+        "display_toggle_reason": transition.get("display_toggle_reason"),
+        "display_status_bucket": transition.get("display_status_bucket"),
+        "display_status_label": transition.get("display_status_label"),
+        "display_status_tone": transition.get("display_status_tone"),
+        "display_note": transition.get("display_note"),
         "action": action,
         "actor": actor,
         "changed_at": transition.get("changed_at"),
         "reason": transition.get("reason", ""),
-    })
+    }
+    publish(payload)

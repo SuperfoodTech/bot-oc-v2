@@ -33,6 +33,7 @@ from core.network import is_internet_available
 import db
 import worker
 import browser
+import scheduler
 
 log = get_logger("daemon")
 
@@ -204,10 +205,58 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
         cycle_count += 1
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log.info(f"\n🔄 [CYCLE #{cycle_count}] Running sync evaluation at {now_str}...")
+        next_sleep_seconds = interval_seconds
+        next_sleep_reason = "default interval"
 
         try:
-            result = worker.sync_all_stores(execute_actions=not dry_run)
+            # Dispatch one merchant group at a time. Re-read runtime state after
+            # every group so a newly detected mismatch can move to the front.
+            processed_keys = set()
+            cycle_actions = []
+            total_stores_processed = 0
+            last_result = {}
+            while RUNNING:
+                current_outlets = db.fetch_merchant_outlets_from_db()
+                queue = scheduler.build_queue(current_outlets)
+                available = [item for item in queue if item.merchant_key not in processed_keys]
+                selected = scheduler.select_next_group(available)
+                if selected is None:
+                    next_sleep_seconds = scheduler.seconds_until_next(queue, fallback_seconds=interval_seconds)
+                    next_sleep_reason = "merchant group berikutnya jatuh tempo"
+                    break
+
+                log.info(
+                    "🏬 [MERCHANT SCHEDULER] Dispatching %s outlets for '%s' (Account: %s, P%d)...",
+                    len(selected.due_store_ids) or 1,
+                    selected.portal_name,
+                    selected.username,
+                    selected.priority,
+                )
+                last_result = worker.sync_all_stores(
+                    execute_actions=not dry_run,
+                    default_interval_seconds=interval_seconds,
+                    target_groups={selected.merchant_key},
+                )
+                processed_keys.add(selected.merchant_key)
+                cycle_actions.extend(last_result.get("actions_taken", []))
+                total_stores_processed += last_result.get("total_stores_processed", 0)
+
+                # A single --once invocation dispatches one merchant group. In
+                # continuous mode the loop drains each currently due group.
+                if once:
+                    break
+
+            result = {
+                "success": True,
+                "total_stores_processed": total_stores_processed,
+                "actions_taken": cycle_actions,
+                "next_wake_hint_seconds": next_sleep_seconds,
+                "next_wake_hint_reason": next_sleep_reason,
+                "processed_merchant_groups": last_result.get("processed_merchant_groups", []),
+            }
             log.info(f"  ✅ Cycle #{cycle_count} Finished. Stores Processed: {result['total_stores_processed']}")
+            next_sleep_seconds = max(1, int(result.get("next_wake_hint_seconds") or interval_seconds))
+            next_sleep_reason = result.get("next_wake_hint_reason") or "default interval"
             
             try:
                 import bot_api
@@ -232,9 +281,15 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             log.info(f"🏁 Daemon single cycle execution completed.")
             break
 
-        log.info(f"⏳ Waiting {interval_seconds} seconds until next cycle...")
+        if next_sleep_seconds < interval_seconds:
+            log.info(
+                f"⏳ Waiting {next_sleep_seconds} seconds until next cycle "
+                f"({next_sleep_reason})..."
+            )
+        else:
+            log.info(f"⏳ Waiting {next_sleep_seconds} seconds until next cycle...")
         # Sleep in 1-second chunks for responsive SIGINT handling + countdown tracking
-        for remaining in range(interval_seconds, 0, -1):
+        for remaining in range(next_sleep_seconds, 0, -1):
             if not RUNNING:
                 break
             try:

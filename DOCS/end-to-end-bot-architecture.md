@@ -4,6 +4,8 @@
 > Seluruh alur, file, dan payload yang terdokumentasi dalam berkas ini **TELAH DIUJI & BEKERJA 100% SUKSES**.
 > **DILARANG MENGUBAH / MEMODIFIKASI** struktur file core, endpoint API, payload request, maupun kontrol navigasi di bawah ini tanpa arahan spesifik dari pemilik proyek.
 
+Dokumen detail untuk jalur `fetch/XHR` ada di [fetch-xhr-scraping-eksekusi-api.md](./fetch-xhr-scraping-eksekusi-api.md). Gunakan dokumen itu bila ingin melihat pemisahan antara endpoint read-only, action API, artefak header/payload/response, dan alur verifikasi pasca-eksekusi.
+
 ---
 
 ## 1. 📌 File Terproteksi (Immutable Files)

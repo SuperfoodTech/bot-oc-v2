@@ -6,7 +6,7 @@ import json
 import secrets
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from zoneinfo import ZoneInfo
 
 import psycopg
@@ -15,6 +15,27 @@ from psycopg.rows import dict_row
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://foodmaster:change-me-in-env@localhost:5435/foodmaster")
 BOT_USERNAME = os.getenv("SHOPEE_BOT_USERNAME", "auto7313")
 BOT_PASSWORD = os.getenv("SHOPEE_BOT_PASSWORD", "Auto@7313")
+WIB = ZoneInfo("Asia/Jakarta")
+WEEKDAY_NAMES = {
+    0: "Senin",
+    1: "Selasa",
+    2: "Rabu",
+    3: "Kamis",
+    4: "Jumat",
+    5: "Sabtu",
+    6: "Minggu",
+}
+SCHEDULE_DAY_NAMES = {
+    1: "Senin",
+    2: "Selasa",
+    3: "Rabu",
+    4: "Kamis",
+    5: "Jumat",
+    6: "Sabtu",
+    7: "Minggu",
+}
+SCHEDULE_DAY_ORDER = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
+SCHEDULE_RANGE_RE = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
 
 
 def get_db_connection():
@@ -47,6 +68,9 @@ def init_db() -> None:
         migration8_path = base_dir / "008_vb_brand_pause_until.sql"
         if migration8_path.exists():
             conn.execute(migration8_path.read_text(encoding="utf-8"))
+        migration9_path = base_dir / "009_expand_shopee_actual_status.sql"
+        if migration9_path.exists():
+            conn.execute(migration9_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -68,6 +92,319 @@ def init_db() -> None:
             (admin_username, admin_password),
         )
         conn.execute("INSERT INTO bot_accounts (username,password_plain,name) VALUES (%s,%s,%s) ON CONFLICT (username) DO UPDATE SET password_plain=EXCLUDED.password_plain,updated_at=now()", (BOT_USERNAME, BOT_PASSWORD, "Bot Satpam Utama"))
+
+
+def _coerce_pause_until(value) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        pause_until_dt = value
+    else:
+        raw_value = str(value).strip()
+        if not raw_value:
+            return None
+        try:
+            pause_until_dt = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if pause_until_dt.tzinfo is None:
+        return pause_until_dt.replace(tzinfo=WIB)
+    return pause_until_dt.astimezone(WIB)
+
+
+def _empty_schedule_map() -> Dict[str, List[str]]:
+    return {day_name: [] for day_name in SCHEDULE_DAY_ORDER}
+
+
+def _normalize_schedule_interval(value) -> Optional[str]:
+    if isinstance(value, dict):
+        try:
+            start = max(0, int(value.get("start_relative_sec", 0)))
+            end = max(0, int(value.get("end_relative_sec", 0)))
+        except (TypeError, ValueError):
+            return None
+        if end <= start:
+            return None
+        return f"{start // 3600:02d}:{(start % 3600) // 60:02d}-{end // 3600:02d}:{(end % 3600) // 60:02d}"
+
+    raw_value = str(value or "").strip().replace(".", ":")
+    if not raw_value or raw_value.lower() in {"tutup", "closed", "close", "off", "nonaktif"}:
+        return None
+    match = SCHEDULE_RANGE_RE.match(raw_value)
+    if not match:
+        return None
+    start_hour, start_minute, end_hour, end_minute = map(int, match.groups())
+    if (
+        start_hour not in range(24)
+        or end_hour not in range(24)
+        or start_minute not in range(60)
+        or end_minute not in range(60)
+    ):
+        return None
+    return f"{start_hour:02d}:{start_minute:02d}-{end_hour:02d}:{end_minute:02d}"
+
+
+def _append_schedule_intervals(target: Dict[str, List[str]], day_name: str, raw_value) -> None:
+    if day_name not in target:
+        return
+    if isinstance(raw_value, (list, tuple)):
+        for item in raw_value:
+            _append_schedule_intervals(target, day_name, item)
+        return
+    normalized = _normalize_schedule_interval(raw_value)
+    if normalized and normalized not in target[day_name]:
+        target[day_name].append(normalized)
+
+
+def normalize_shopee_regular_hours(raw_schedule) -> Dict[str, List[str]]:
+    schedule = raw_schedule
+    if isinstance(schedule, str):
+        stripped = schedule.strip()
+        if not stripped:
+            return {}
+        try:
+            schedule = json.loads(stripped)
+        except json.JSONDecodeError:
+            return {}
+
+    normalized = _empty_schedule_map()
+
+    if isinstance(schedule, dict) and isinstance(schedule.get("regular_hours"), list):
+        schedule = schedule.get("regular_hours") or []
+
+    if isinstance(schedule, list):
+        for day in schedule:
+            if not isinstance(day, dict):
+                continue
+            try:
+                day_name = SCHEDULE_DAY_NAMES.get(int(day.get("weekday", 0)))
+            except (TypeError, ValueError):
+                day_name = None
+            if not day_name or not day.get("config_enabled"):
+                continue
+            _append_schedule_intervals(normalized, day_name, day.get("intervals") or [])
+        return {key: value for key, value in normalized.items() if value}
+
+    if isinstance(schedule, dict):
+        for day_name in SCHEDULE_DAY_ORDER:
+            _append_schedule_intervals(normalized, day_name, schedule.get(day_name))
+        return {key: value for key, value in normalized.items() if value}
+
+    return {}
+
+
+def has_usable_shopee_schedule(raw_schedule) -> bool:
+    schedule = normalize_shopee_regular_hours(raw_schedule)
+    return any(schedule.values())
+
+
+def _parse_schedule_range(range_text: str) -> Optional[Tuple[int, int]]:
+    match = SCHEDULE_RANGE_RE.match(str(range_text or "").strip())
+    if not match:
+        return None
+    start_hour, start_minute, end_hour, end_minute = map(int, match.groups())
+    return (start_hour * 60 + start_minute, end_hour * 60 + end_minute)
+
+
+def _is_within_normalized_schedule(schedule: Dict[str, List[str]], now_dt: datetime) -> bool:
+    day_name = WEEKDAY_NAMES.get(now_dt.weekday(), "Senin")
+    intervals = schedule.get(day_name) or []
+    if not intervals:
+        return False
+    current_minutes = (now_dt.hour * 60) + now_dt.minute
+    for interval in intervals:
+        parsed = _parse_schedule_range(interval)
+        if not parsed:
+            continue
+        start_minutes, end_minutes = parsed
+        if start_minutes <= end_minutes:
+            if start_minutes <= current_minutes <= end_minutes:
+                return True
+        elif current_minutes >= start_minutes or current_minutes <= end_minutes:
+            return True
+    return False
+
+
+def is_within_shopee_schedule(raw_schedule, now_dt: Optional[datetime] = None) -> bool:
+    now_wib = now_dt or datetime.now(WIB)
+    if now_wib.tzinfo is None:
+        now_wib = now_wib.replace(tzinfo=WIB)
+    else:
+        now_wib = now_wib.astimezone(WIB)
+    schedule = normalize_shopee_regular_hours(raw_schedule)
+    if not schedule:
+        return False
+    return _is_within_normalized_schedule(schedule, now_wib)
+
+
+def _normalize_persisted_shopee_status(value) -> str:
+    normalized = str(value or "").strip().upper()
+    if normalized in {"ON", "OPEN"}:
+        return "ON"
+    if normalized == "PAUSE":
+        return "PAUSE"
+    if normalized in {"OFF", "CLOSED", "CLOSE"}:
+        return "CLOSED"
+    return "UNKNOWN"
+
+
+def _normalize_live_state(value) -> str:
+    normalized = _normalize_persisted_shopee_status(value)
+    if normalized == "ON":
+        return "OPEN"
+    if normalized == "PAUSE":
+        return "PAUSE"
+    if normalized == "CLOSED":
+        return "CLOSED"
+    return "UNKNOWN"
+
+
+def _normalize_desired_state(vercel_status, pause_until) -> str:
+    if str(vercel_status or "").strip().upper() == "ON":
+        return "OPEN"
+    return "PAUSE" if _coerce_pause_until(pause_until) else "MANUAL_OFF"
+
+
+def _is_subscription_active(subscription_status: Optional[str]) -> bool:
+    normalized = str(subscription_status or "").strip().lower()
+    return normalized not in {"expired", "kedaluwarsa", "inactive", "nonaktif"}
+
+
+def _format_pause_until_wib(pause_until) -> str:
+    pause_until_dt = _coerce_pause_until(pause_until)
+    if not pause_until_dt:
+        return ""
+    return pause_until_dt.strftime("%d/%m/%Y %H:%M WIB")
+
+
+def _derive_display_status_bucket(live_state: str, display_toggle_on: bool, desired_state: str) -> str:
+    if live_state == "OPEN":
+        return "open"
+    if live_state in {"PAUSE", "CLOSED"}:
+        return "closed"
+    if display_toggle_on:
+        return "open"
+    return "open" if desired_state == "OPEN" else "closed"
+
+
+def derive_outlet_runtime_state(
+    store: Dict[str, Any],
+    now_dt: Optional[datetime] = None,
+    normalized_schedule: Optional[Dict[str, List[str]]] = None,
+) -> Dict[str, Any]:
+    now_wib = now_dt or datetime.now(WIB)
+    if now_wib.tzinfo is None:
+        now_wib = now_wib.replace(tzinfo=WIB)
+    else:
+        now_wib = now_wib.astimezone(WIB)
+
+    pause_until_dt = _coerce_pause_until(store.get("pause_until"))
+    pause_until_label = _format_pause_until_wib(pause_until_dt)
+    desired_state = _normalize_desired_state(store.get("vercel_status"), pause_until_dt)
+    live_state = _normalize_live_state(store.get("shopee_status"))
+    schedule = normalized_schedule if normalized_schedule is not None else normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
+    schedule_available = any((schedule or {}).values())
+    within_schedule = schedule_available and _is_within_normalized_schedule(schedule, now_wib)
+    is_suspended = bool(store.get("is_suspended")) or str(store.get("suspension_status") or "").upper() == "SUSPENDED"
+    subscription_active = _is_subscription_active(store.get("subscription_status"))
+
+    if is_suspended:
+        bot_phase = "SUSPENDED"
+        status_label = "Sedang Tutup • Dinonaktifkan admin"
+        status_tone = "closed"
+        display_note = (
+            "Outlet dinonaktifkan admin. Menunggu bot menutup outlet di Shopee."
+            if live_state == "OPEN"
+            else "Otomatisasi dinonaktifkan oleh admin."
+        )
+    elif live_state == "UNKNOWN":
+        bot_phase = "STATUS_UNKNOWN"
+        status_label = "Status sedang dicek bot"
+        status_tone = "pending"
+        display_note = "Status live outlet masih diperiksa bot."
+    elif desired_state == "OPEN" and live_state in {"PAUSE", "CLOSED"} and not schedule_available:
+        bot_phase = "SCHEDULE_UNAVAILABLE"
+        status_label = "Status sedang dicek bot"
+        status_tone = "pending"
+        display_note = "Jadwal operasional Shopee belum tersedia. Bot masih mencocokkan status outlet."
+    elif desired_state in {"PAUSE", "MANUAL_OFF"} and live_state == "OPEN":
+        bot_phase = "PENDING_PAUSE"
+        status_label = "Sedang Buka • Menunggu bot menutup"
+        status_tone = "pending"
+        display_note = (
+            "Permintaan tutup sementara sudah tersimpan. Menunggu bot menutup outlet."
+            if desired_state == "PAUSE"
+            else "Permintaan menonaktifkan otomatisasi sudah tersimpan. Menunggu bot menutup outlet."
+        )
+    elif desired_state == "OPEN" and live_state in {"PAUSE", "CLOSED"} and within_schedule:
+        bot_phase = "PENDING_OPEN"
+        status_label = "Sedang Tutup • Menunggu bot membuka"
+        status_tone = "pending"
+        if live_state == "CLOSED":
+            display_note = "Outlet tertutup di Shopee padahal toggle aktif. Menunggu bot membuka kembali outlet."
+        else:
+            display_note = "Permintaan buka sudah tersimpan. Menunggu bot membuka outlet."
+    elif desired_state == "MANUAL_OFF":
+        bot_phase = "AUTOMATION_OFF"
+        status_label = "Sedang Tutup • Otomatisasi nonaktif"
+        status_tone = "closed"
+        display_note = (
+            "Otomatisasi tidak aktif karena masa layanan outlet sudah berakhir."
+            if not subscription_active
+            else "Nonaktif sampai diaktifkan kembali."
+        )
+    elif desired_state == "PAUSE" and live_state in {"PAUSE", "CLOSED"}:
+        bot_phase = "IN_SYNC"
+        status_label = "Tutup Sementara"
+        status_tone = "paused"
+        display_note = (
+            f"Buka kembali otomatis pada {pause_until_label}."
+            if pause_until_label
+            else "Outlet sedang ditutup sementara."
+        )
+    elif desired_state == "OPEN" and live_state in {"PAUSE", "CLOSED"} and not within_schedule:
+        bot_phase = "WAITING_SCHEDULE"
+        status_label = "Sedang Tutup • Di luar jadwal"
+        status_tone = "closed"
+        display_note = "Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai."
+    elif desired_state == "OPEN" and live_state == "OPEN":
+        bot_phase = "IN_SYNC"
+        status_label = "Sedang Buka"
+        status_tone = "open"
+        display_note = "Outlet mengikuti jam operasional Shopee."
+    else:
+        bot_phase = "STATUS_UNKNOWN"
+        status_label = "Status sedang dicek bot"
+        status_tone = "pending"
+        display_note = "Status outlet sedang dicocokkan ulang oleh bot."
+
+    if is_suspended:
+        display_toggle_reason = "SUSPENDED"
+    elif not schedule_available:
+        display_toggle_reason = "SCHEDULE_UNAVAILABLE"
+    elif not within_schedule:
+        display_toggle_reason = "OUTSIDE_SCHEDULE"
+    else:
+        display_toggle_reason = "READY"
+
+    display_toggle_on = bool(desired_state == "OPEN" and schedule_available and within_schedule and not is_suspended)
+    display_toggle_disabled = bool(is_suspended or not schedule_available or not within_schedule)
+    display_status_bucket = _derive_display_status_bucket(live_state, display_toggle_on, desired_state)
+
+    return {
+        "desired_state": desired_state,
+        "live_state": live_state,
+        "bot_phase": bot_phase,
+        "schedule_available": schedule_available,
+        "within_operating_schedule": within_schedule,
+        "display_toggle_on": display_toggle_on,
+        "display_toggle_disabled": display_toggle_disabled,
+        "display_toggle_reason": display_toggle_reason,
+        "display_status_bucket": display_status_bucket,
+        "display_status_label": status_label,
+        "display_status_tone": status_tone,
+        "display_note": display_note,
+    }
 
 
 def get_system_setting(key: str, default_val: str = "") -> str:
@@ -173,7 +510,7 @@ def save_or_update_store(store_id: str, store_name: str, merchant_name: str, acc
             shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, account_password or BOT_PASSWORD)).fetchone()["id"]
         outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,long_name,special_hours,is_active) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,is_active=EXCLUDED.is_active,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, store_name or store_id, special_hours, is_active)).fetchone()
         outlet_id = outlet["id"]
-        conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), (shopee_status or "UNKNOWN").upper(), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
+        conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), _normalize_persisted_shopee_status(shopee_status), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
         code = (paket or "3_MONTHS").upper().replace(" ", "_")
         code = code if code in {"3_MONTHS", "6_MONTHS", "12_MONTHS"} else "3_MONTHS"
         plan = conn.execute("SELECT id, total_months FROM subscription_plans WHERE code=%s", (code,)).fetchone()
@@ -211,7 +548,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,%s AS account_username,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     # Virtual Brand outlets are controlled exclusively through vb_brands and
     # must not appear in the regular outlet dashboard or bot-oc worker scope.
@@ -222,6 +559,7 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
         rows = [dict(row) for row in conn.execute(query, (BOT_USERNAME, *params)).fetchall()]
         if not rows:
             return []
+        now_dt = datetime.now(WIB)
         outlet_ids = [r["outlet_uuid"] for r in rows]
         hours_rows = conn.execute(
             "SELECT outlet_id, weekday, open_time::text, close_time::text, is_closed FROM operating_hours WHERE outlet_id = ANY(%s)",
@@ -242,7 +580,10 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
         for r in rows:
             r["regular_hours"] = hours_map.get(r["outlet_uuid"], {})
             r["special_hours"] = r.get("special_hours") or ""
+            r["shopee_status"] = _normalize_persisted_shopee_status(r.get("shopee_status"))
+            r["shopee_regular_hours"] = normalize_shopee_regular_hours(r.get("shopee_regular_hours"))
             r["last_action"] = format_last_action(r.get("last_action_raw"))
+            r.update(derive_outlet_runtime_state(r, now_dt=now_dt, normalized_schedule=r["shopee_regular_hours"]))
         return rows
 
 
@@ -376,10 +717,7 @@ def admin_create_account(username, password, google_email=None):
         row = conn.execute("INSERT INTO dashboard_accounts (username,password_plain,role,is_active,google_email) VALUES (%s,%s,'ADMIN',true,%s) RETURNING id,username,role,is_active,google_email", (username, password, email_clean)).fetchone()
     return dict(row)
 def update_vercel_toggle(store_id, status, pause_until=None):
-    if isinstance(pause_until, str) and pause_until.strip():
-        pause_until = datetime.fromisoformat(pause_until.replace("Z", "+00:00"))
-        if pause_until.tzinfo is None:
-            pause_until = pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+    pause_until = _coerce_pause_until(pause_until)
     with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_until, store_id))
 
 
@@ -398,10 +736,7 @@ def _apply_toggle_transaction(
     if normalized_status not in {"ON", "OFF"}:
         return {"success": False, "code": "invalid_status", "detail": "Status toggle tidak valid."}
 
-    if isinstance(pause_until, str) and pause_until.strip():
-        pause_until = datetime.fromisoformat(pause_until.replace("Z", "+00:00"))
-        if pause_until.tzinfo is None:
-            pause_until = pause_until.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+    pause_until = _coerce_pause_until(pause_until)
 
     with get_db_connection() as conn:
         row = conn.execute(
@@ -542,7 +877,7 @@ def admin_edit_outlet(store_id: str, nama_pemilik: Optional[str] = None, nama_po
         return True
 
 def update_shopee_actual_status(store_id, status):
-    with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET shopee_actual_status=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (status.upper(), store_id))
+    with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET shopee_actual_status=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (_normalize_persisted_shopee_status(status), store_id))
 
 def update_shopee_regular_hours(store_id: str, regular_hours: Dict[str, List[str]]) -> None:
     with get_db_connection() as conn:
@@ -656,9 +991,9 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             paket=s.get("paket", "3 Bulan"),
             tanggal_mulai_layanan=s.get("tanggal_mulai_layanan", ""),
             tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
-            hp="",
+            hp=s.get("shopee_phone", ""),
             username=s.get("account_username", "auto7313"),
-            password="",
+            password=s.get("shopee_password", ""),
             nama_pemilik=s.get("nama_pemilik", ""),
             nama_portal=s.get("merchant_name", ""),
             merchant_id=str(s.get("store_id", "")),

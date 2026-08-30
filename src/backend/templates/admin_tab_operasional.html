@@ -6,14 +6,43 @@
         <article class="metric-card metric-card-closed"><div class="metric-card-icon"><img src="/static/icons/closed-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Sedang Tutup</span><strong id="metricClosed">0</strong></div></article>
         <article class="metric-card metric-card-subscription"><div class="metric-card-icon"><img src="/static/icons/crown-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Subscription Aktif</span><strong id="metricSubscription">0</strong></div></article>
       </div>
+      <div class="mobile-summary-strip d-md-none" id="mobileSummaryStrip" aria-label="Quick filter outlet">
+        <button type="button" class="mobile-summary-segment is-active" data-summary-filter="all" aria-pressed="true" onclick="setOutletSummaryFilter('all')">
+          <span class="mobile-summary-label">Semua:</span>
+          <strong id="metricChipAllCount">0</strong>
+        </button>
+        <button type="button" class="mobile-summary-segment" data-summary-filter="open" aria-pressed="false" onclick="setOutletSummaryFilter('open')">
+          <span class="mobile-summary-label">Buka:</span>
+          <strong id="metricChipOpenCount">0</strong>
+        </button>
+        <button type="button" class="mobile-summary-segment" data-summary-filter="closed" aria-pressed="false" onclick="setOutletSummaryFilter('closed')">
+          <span class="mobile-summary-label">Tutup:</span>
+          <strong id="metricChipClosedCount">0</strong>
+        </button>
+        <button type="button" class="mobile-summary-segment" data-summary-filter="subscription" aria-pressed="false" onclick="setOutletSummaryFilter('subscription')">
+          <span class="mobile-summary-label">Subs Aktif:</span>
+          <strong id="metricChipSubscriptionCount">0</strong>
+        </button>
+      </div>
       <div class="outlet-filter-card">
-        <div class="table-heading">
+        <div class="mobile-outlet-toolbar d-md-none">
+          <label class="mobile-outlet-search" for="mobileSearchInput">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            <input type="search" id="mobileSearchInput" placeholder="Cari outlet atau Store ID" aria-label="Cari outlet, pemilik, atau Store ID" oninput="handleMobileOutletSearch(this.value)">
+          </label>
+          <button class="mobile-filter-trigger" id="mobileFilterTrigger" type="button" onclick="openMobileFilterSheet()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.5 7.5v4.5l-3 1.5v-6z"/></svg>
+            <span>Filter</span>
+            <span class="mobile-filter-badge" id="mobileFilterBadge" hidden>0</span>
+          </button>
+        </div>
+        <div class="table-heading desktop-outlet-filter-heading d-none d-md-flex">
           <div class="table-heading-actions">
             <div class="outlet-filter-toolbar">
               <label class="filter-field"><span>Nama pemilik</span><select id="ownerFilter" class="form-input filter-select" aria-label="Filter nama pemilik" onchange="filterTable()"><option value="">Semua pemilik</option></select></label>
               <label class="filter-field"><span>Nama outlet</span><select id="outletFilter" class="form-input filter-select" aria-label="Filter nama outlet" onchange="filterTable()"><option value="">Semua outlet</option></select></label>
               <label class="filter-field"><span>Store ID</span><select id="storeIdFilter" class="form-input filter-select" aria-label="Filter Store ID" onchange="filterTable()"><option value="">Semua Store ID</option></select></label>
-              <label class="filter-field"><span>Status</span><select id="statusFilter" class="form-input filter-select" aria-label="Filter status" onchange="filterTable()"><option value="">Semua status</option><option value="open">Open</option><option value="paused">Paused</option></select></label>
+              <label class="filter-field"><span>Status</span><select id="statusFilter" class="form-input filter-select" aria-label="Filter status" onchange="filterTable()"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="closed">Sedang Tutup</option></select></label>
               <label class="filter-field"><span>Subscription</span><select id="subscriptionFilter" class="form-input filter-select" aria-label="Filter subscription" onchange="filterTable()"><option value="">Semua subscription</option><option value="active">Aktif</option><option value="expired">Expired</option></select></label>
               <label class="filter-field"><span>Paket</span><select id="packageFilter" class="form-input filter-select" aria-label="Filter paket" onchange="filterTable()"><option value="">Semua paket</option></select></label>
               <button class="btn-outline btn-compact reset-filter-button" type="button" onclick="resetOutletFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>Reset filter</button>
@@ -48,8 +77,12 @@
           <div class="mobile-empty-state">Memuat data outlet...</div>
         </div>
       </div>
-      <aside class="outlet-detail-panel" id="outletDetailPanel" aria-labelledby="outletDetailTitle" hidden>
+      <aside class="outlet-detail-panel" id="outletDetailPanel" aria-labelledby="outletDetailTitle" aria-modal="true" role="dialog" tabindex="-1" hidden>
         <div class="outlet-detail-panel-head">
+          <button type="button" class="outlet-detail-back d-md-none" onclick="closeOutletDetail()" aria-label="Kembali ke daftar outlet">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            <span>Kembali</span>
+          </button>
           <h2 id="outletDetailTitle">Detail Outlet</h2>
           <div class="outlet-detail-panel-actions">
             <button type="button" class="outlet-detail-close" onclick="closeOutletDetail()" aria-label="Tutup detail outlet">×</button>
@@ -58,5 +91,29 @@
         <div id="outletDetailContent"></div>
       </aside>
       <div class="outlet-detail-backdrop" id="outletDetailBackdrop" onclick="closeOutletDetail()" hidden></div>
+      </div>
+      <div class="modal-overlay mobile-filter-sheet-overlay d-md-none" id="mobileFilterSheet" aria-hidden="true" onclick="handleMobileFilterSheetBackdrop(event)">
+        <div class="mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileFilterSheetTitle">
+          <div class="mobile-filter-sheet-handle" aria-hidden="true"></div>
+          <div class="mobile-filter-sheet-header">
+            <div>
+              <div class="step-indicator">Filter outlet</div>
+              <h2 id="mobileFilterSheetTitle">Atur filter lanjutan</h2>
+            </div>
+            <button type="button" class="mobile-filter-sheet-close" onclick="closeMobileFilterSheet()" aria-label="Tutup filter">×</button>
+          </div>
+          <div class="mobile-filter-sheet-body">
+            <label class="filter-field"><span>Nama pemilik</span><select id="mobileOwnerFilter" class="form-input mobile-sheet-select" aria-label="Filter nama pemilik"><option value="">Semua pemilik</option></select></label>
+            <label class="filter-field"><span>Nama outlet</span><select id="mobileOutletFilter" class="form-input mobile-sheet-select" aria-label="Filter nama outlet"><option value="">Semua outlet</option></select></label>
+            <label class="filter-field"><span>Store ID</span><select id="mobileStoreIdFilter" class="form-input mobile-sheet-select" aria-label="Filter Store ID"><option value="">Semua Store ID</option></select></label>
+            <label class="filter-field"><span>Status</span><select id="mobileStatusFilter" class="form-input mobile-sheet-select" aria-label="Filter status"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="closed">Sedang Tutup</option></select></label>
+            <label class="filter-field"><span>Subscription</span><select id="mobileSubscriptionFilter" class="form-input mobile-sheet-select" aria-label="Filter subscription"><option value="">Semua subscription</option><option value="active">Aktif</option><option value="expired">Expired</option></select></label>
+            <label class="filter-field"><span>Paket</span><select id="mobilePackageFilter" class="form-input mobile-sheet-select" aria-label="Filter paket"><option value="">Semua paket</option></select></label>
+          </div>
+          <div class="mobile-filter-sheet-footer">
+            <button class="btn-outline" type="button" onclick="resetMobileFilterSheet()">Reset</button>
+            <button class="btn-primary" type="button" onclick="applyMobileFilterSheet()">Terapkan Filter</button>
+          </div>
+        </div>
       </div>
     </div>

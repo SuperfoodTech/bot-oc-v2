@@ -16,7 +16,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260829-admin-console-v40">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260830-admin-console-v47">
 </head>
 
 <body x-data="adminApp()">
@@ -30,6 +30,12 @@
       <nav class="admin-sidebar-nav">
         <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets" onclick="switchTab('outlets')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9 20v-6h6v6"/></svg><span>Agency</span></button>
         <button class="tab-btn" :class="{ 'active': currentTab === 'vb' }" id="tabBtnVB" onclick="switchTab('vb')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 9 3 3-3 3m5 0h3"/></svg><span>Virtual Brand</span></button>
+        <button class="mobile-fetch-nav d-md-none" id="mobileFetchButton" type="button" onclick="triggerMobileNavFetch()" aria-label="Fetch data Agency" title="Fetch data Agency">
+          <span class="mobile-fetch-nav-core" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          </span>
+          <span class="mobile-fetch-nav-label">Fetch</span>
+        </button>
         <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs" onclick="switchTab('logs')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Logs</span></button>
         <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings" onclick="switchTab('settings')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l1.5-1.2-1.6-2.7-1.8.7a7 7 0 0 0-2-1.2L14.8 4h-3.2l-.3 2.4a7 7 0 0 0-2 1.2l-1.8-.7-1.6 2.7 1.5 1.2A7 7 0 0 0 7.3 12c0 .4 0 .8.1 1.2l-1.5 1.2 1.6 2.7 1.8-.7a7 7 0 0 0 2 1.2l.3 2.4h3.2l.3-2.4a7 7 0 0 0 2-1.2l1.8.7 1.6-2.7-1.5-1.2c.1-.4.1-.8.1-1.2Z"/></svg><span>Settings</span></button>
       </nav>
@@ -45,7 +51,7 @@
         <div class="admin-actions">
           <label class="admin-header-search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-            <input type="search" id="searchInput" placeholder="Cari nama outlet, pemilik, atau Store ID..." oninput="filterTable()">
+            <input type="search" id="searchInput" placeholder="Cari outlet / pemilik / Store ID" aria-label="Cari outlet, pemilik, atau Store ID" oninput="filterTable()">
           </label>
           <button class="btn-primary fetch-sheet-button" type="button" id="fetchSheetHeader" onclick="fetchSheetData()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M8 17h8"/><path d="m16 12 2 2 2-2"/></svg>
@@ -418,8 +424,25 @@
     let autoRefreshTimer = null;
     let adminEventSource = null;
     let storeFetchGeneration = 0;
+    const ADMIN_OUTLET_SYNC_REFRESH_MS = 15000;
     const pendingAdminToggleStoreIds = new Set();
     const deferredAdminOutletEvents = new Map();
+    const OUTLET_FILTER_FIELD_MAP = {
+      ownerFilter: 'mobileOwnerFilter',
+      outletFilter: 'mobileOutletFilter',
+      storeIdFilter: 'mobileStoreIdFilter',
+      statusFilter: 'mobileStatusFilter',
+      subscriptionFilter: 'mobileSubscriptionFilter',
+      packageFilter: 'mobilePackageFilter'
+    };
+    const OUTLET_SUMMARY_FILTER_KEYS = ['all', 'open', 'closed', 'subscription'];
+    let activeOutletSummaryFilter = 'all';
+    let outletDetailActiveStoreId = '';
+    let outletDetailRestoreFocusEl = null;
+
+    function getAdminPageUrl() {
+      return new URL(window.location.href);
+    }
 
     function adminApp() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -515,26 +538,403 @@
       alert(title + ': ' + msg);
     }
 
+    function setControlValue(id, value = '') {
+      const element = document.getElementById(id);
+      if (element) element.value = value;
+    }
+
+    function isMobileAdminViewport() {
+      return window.matchMedia('(max-width: 767.98px)').matches;
+    }
+
+    function getAdminActiveTab() {
+      return window._appData?.currentTab || currentTab || 'outlets';
+    }
+
+    function getRequestedOutletDetailStoreId() {
+      const url = getAdminPageUrl();
+      const tabParam = url.searchParams.get('tab') || 'outlets';
+      if (tabParam !== 'outlets') return '';
+      return String(url.searchParams.get('store') || '').trim();
+    }
+
+    function setOutletDetailUrl(storeId, historyMode = 'push') {
+      const url = getAdminPageUrl();
+      url.searchParams.set('tab', 'outlets');
+      if (storeId) {
+        url.searchParams.set('store', String(storeId));
+      } else {
+        url.searchParams.delete('store');
+      }
+      if (url.toString() === window.location.href) return;
+      const state = {
+        ...(window.history.state || {}),
+        tab: 'outlets',
+        store: storeId ? String(storeId) : null,
+        outletDetail: Boolean(storeId)
+      };
+      window.history[`${historyMode}State`](state, '', url);
+    }
+
+    function getOutletDetailPanelElements() {
+      return {
+        panel: document.getElementById('outletDetailPanel'),
+        backdrop: document.getElementById('outletDetailBackdrop'),
+        content: document.getElementById('outletDetailContent')
+      };
+    }
+
+    function getOutletDetailTrigger(storeId = outletDetailActiveStoreId) {
+      const requestedId = String(storeId || '');
+      if (!requestedId) return null;
+      return [...document.querySelectorAll('.outlet-data-row[data-store-id], .admin-mobile-outlet-card[data-store-id]')]
+        .find(element => element.dataset.storeId === requestedId) || null;
+    }
+
+    function isOutletDetailOpen() {
+      const panel = document.getElementById('outletDetailPanel');
+      return Boolean(panel && !panel.hidden && panel.classList.contains('is-open'));
+    }
+
+    function getOutletDetailBackgroundElements() {
+      return [
+        document.querySelector('.admin-sidebar'),
+        document.querySelector('.admin-page-header'),
+        document.querySelector('#paneOutlets .stats-grid'),
+        document.getElementById('mobileSummaryStrip'),
+        document.querySelector('#paneOutlets .outlet-filter-card'),
+        document.querySelector('#paneOutlets .table-card.outlet-section')
+      ].filter(Boolean);
+    }
+
+    function setOutletDetailBackgroundElementState(element, isHidden) {
+      if (!element) return;
+      if (isHidden) {
+        if (!Object.prototype.hasOwnProperty.call(element.dataset, 'outletDetailPrevAriaHidden')) {
+          const previousValue = element.getAttribute('aria-hidden');
+          element.dataset.outletDetailPrevAriaHidden = previousValue === null ? '__none__' : previousValue;
+        }
+        element.setAttribute('aria-hidden', 'true');
+        element.setAttribute('inert', '');
+        return;
+      }
+      element.removeAttribute('inert');
+      const previousValue = element.dataset.outletDetailPrevAriaHidden;
+      if (previousValue === undefined) {
+        element.removeAttribute('aria-hidden');
+        return;
+      }
+      if (previousValue === '__none__') {
+        element.removeAttribute('aria-hidden');
+      } else {
+        element.setAttribute('aria-hidden', previousValue);
+      }
+      delete element.dataset.outletDetailPrevAriaHidden;
+    }
+
+    function setOutletDetailBackgroundState(isOpen) {
+      getOutletDetailBackgroundElements().forEach(element => setOutletDetailBackgroundElementState(element, isOpen));
+    }
+
+    function syncOutletDetailSelection(storeId = '') {
+      document.querySelectorAll('.outlet-data-row.is-selected, .admin-mobile-outlet-card.is-selected')
+        .forEach(element => element.classList.remove('is-selected'));
+      const trigger = getOutletDetailTrigger(storeId);
+      if (trigger) trigger.classList.add('is-selected');
+    }
+
+    function focusOutletDetailInitialControl(panel) {
+      if (!panel) return;
+      const selector = isMobileAdminViewport()
+        ? '.outlet-detail-back, .outlet-detail-accordion, .outlet-detail-actions a, .outlet-detail-actions button, .outlet-detail-close'
+        : '.outlet-detail-close, .outlet-detail-accordion, .outlet-detail-actions a, .outlet-detail-actions button';
+      const focusTarget = panel.querySelector(selector) || panel;
+      if (focusTarget instanceof HTMLElement) {
+        focusTarget.focus({ preventScroll: true });
+      }
+    }
+
+    function getOutletDetailFocusableElements(panel) {
+      if (!panel) return [];
+      return [...panel.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.hidden && (element.offsetParent !== null || element === document.activeElement));
+    }
+
+    function handleOutletDetailKeydown(event) {
+      if (!isOutletDetailOpen() || document.querySelector('.modal-overlay.active')) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeOutletDetail();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const { panel } = getOutletDetailPanelElements();
+      if (!panel) return;
+      const focusableElements = getOutletDetailFocusableElements(panel);
+      if (!focusableElements.length) {
+        event.preventDefault();
+        panel.focus({ preventScroll: true });
+        return;
+      }
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+      if (!panel.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastElement : firstElement).focus();
+        return;
+      }
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    function syncOutletDetailFromLocation({ restoreFocus = false } = {}) {
+      const requestedStoreId = getRequestedOutletDetailStoreId();
+      if (getAdminActiveTab() !== 'outlets') {
+        closeOutletDetail({ updateHistory: false, restoreFocus });
+        return;
+      }
+      if (!requestedStoreId) {
+        closeOutletDetail({ updateHistory: false, restoreFocus });
+        return;
+      }
+      if (!allStores.length) return;
+      const storeExists = allStores.some(store => String(store.store_id) === requestedStoreId);
+      if (!storeExists) {
+        closeOutletDetail({ updateHistory: false, restoreFocus: false });
+        setOutletDetailUrl('', 'replace');
+        return;
+      }
+      openOutletDetail(requestedStoreId, { updateHistory: false, focusPanel: !isOutletDetailOpen() });
+    }
+
+    function syncMobileFetchButton(tabName = getAdminActiveTab()) {
+      const button = document.getElementById('mobileFetchButton');
+      const label = button?.querySelector('.mobile-fetch-nav-label');
+      if (!button || !label) return;
+
+      const isLoading = button.classList.contains('is-loading');
+      const isSupportedTab = tabName === 'outlets' || tabName === 'vb';
+      const contextLabel = tabName === 'vb' ? 'Fetch data Virtual Brand' : 'Fetch data Agency';
+
+      button.dataset.context = tabName;
+      button.classList.toggle('is-inactive', !isSupportedTab);
+      button.setAttribute('aria-label', isSupportedTab ? contextLabel : 'Fetch tidak tersedia di tab ini');
+      button.title = isSupportedTab ? contextLabel : 'Fetch tidak tersedia di tab ini';
+      label.textContent = isLoading ? label.textContent : 'Fetch';
+      button.disabled = isLoading || !isSupportedTab;
+    }
+
+    async function triggerMobileNavFetch() {
+      const tabName = getAdminActiveTab();
+      if (tabName === 'vb') {
+        await importVBData();
+        return;
+      }
+      if (tabName === 'outlets') {
+        await fetchSheetData();
+        return;
+      }
+    }
+
+    function syncSearchInputs(sourceId = 'searchInput') {
+      const desktopInput = document.getElementById('searchInput');
+      const mobileInput = document.getElementById('mobileSearchInput');
+      const source = sourceId === 'mobileSearchInput' ? mobileInput : desktopInput;
+      const value = source ? source.value : '';
+      if (desktopInput && desktopInput !== source) desktopInput.value = value;
+      if (mobileInput && mobileInput !== source) mobileInput.value = value;
+    }
+
+    function syncMobileFilterSelectsFromDesktop(force = false) {
+      const sheetIsOpen = document.getElementById('mobileFilterSheet')?.classList.contains('active');
+      if (sheetIsOpen && !force) return;
+      Object.entries(OUTLET_FILTER_FIELD_MAP).forEach(([desktopId, mobileId]) => {
+        const desktop = document.getElementById(desktopId);
+        const mobile = document.getElementById(mobileId);
+        if (!desktop || !mobile) return;
+        mobile.value = desktop.value;
+      });
+    }
+
+    function syncDesktopFilterSelectsFromMobile() {
+      Object.entries(OUTLET_FILTER_FIELD_MAP).forEach(([desktopId, mobileId]) => {
+        const desktop = document.getElementById(desktopId);
+        const mobile = document.getElementById(mobileId);
+        if (!desktop || !mobile) return;
+        desktop.value = mobile.value;
+      });
+    }
+
+    function handleMobileOutletSearch(value) {
+      setControlValue('searchInput', value);
+      setControlValue('mobileSearchInput', value);
+      filterTable('mobileSearchInput');
+    }
+
+    function getActiveOutletFilters() {
+      const value = id => document.getElementById(id)?.value || '';
+      return {
+        query: (document.getElementById('searchInput')?.value || '').toLowerCase().trim(),
+        owner: value('ownerFilter'),
+        outlet: value('outletFilter'),
+        storeId: value('storeIdFilter'),
+        status: value('statusFilter'),
+        subscription: value('subscriptionFilter'),
+        paket: value('packageFilter')
+      };
+    }
+
+    function matchesOutletBaseFilters(store, filters) {
+      const statusCategory = getAdminStatusCategory(store);
+      return (
+        (!filters.query || [store.nama_pemilik, store.store_name, store.store_id, store.merchant_name].some(value => String(value || '').toLowerCase().includes(filters.query))) &&
+        (!filters.owner || store.nama_pemilik === filters.owner) &&
+        (!filters.outlet || store.store_name === filters.outlet) &&
+        (!filters.storeId || String(store.store_id) === filters.storeId) &&
+        (!filters.status || statusCategory === filters.status) &&
+        (!filters.subscription || (filters.subscription === 'active' ? isStoreSubscriptionActive(store) : !isStoreSubscriptionActive(store))) &&
+        (!filters.paket || store.paket === filters.paket)
+      );
+    }
+
+    function matchesOutletSummaryFilter(store, summaryFilter = activeOutletSummaryFilter) {
+      if (!isMobileAdminViewport()) return true;
+      const statusCategory = getAdminStatusCategory(store);
+      if (summaryFilter === 'open') return statusCategory === 'open';
+      if (summaryFilter === 'closed') return statusCategory === 'closed';
+      if (summaryFilter === 'subscription') return isStoreSubscriptionActive(store);
+      return true;
+    }
+
+    function updateOutletSummaryStrip(stores) {
+      const statusCategories = stores.map(store => getAdminStatusCategory(store));
+      const summaryCounts = {
+        all: stores.length,
+        open: statusCategories.filter(value => value === 'open').length,
+        closed: statusCategories.filter(value => value === 'closed').length,
+        subscription: stores.filter(isStoreSubscriptionActive).length
+      };
+      const countTargets = {
+        all: 'metricChipAllCount',
+        open: 'metricChipOpenCount',
+        closed: 'metricChipClosedCount',
+        subscription: 'metricChipSubscriptionCount'
+      };
+
+      Object.entries(countTargets).forEach(([key, id]) => {
+        const countEl = document.getElementById(id);
+        if (countEl) countEl.innerText = summaryCounts[key];
+        const button = document.querySelector(`.mobile-summary-segment[data-summary-filter="${key}"]`);
+        if (!button) return;
+        const isActive = key === activeOutletSummaryFilter;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+      });
+    }
+
+    function updateMobileFilterBadge(filters = getActiveOutletFilters()) {
+      const count = [filters.owner, filters.outlet, filters.storeId, filters.status, filters.subscription, filters.paket].filter(Boolean).length;
+      const badge = document.getElementById('mobileFilterBadge');
+      const trigger = document.getElementById('mobileFilterTrigger');
+      if (badge) {
+        badge.innerText = count;
+        badge.hidden = count === 0;
+      }
+      if (trigger) trigger.classList.toggle('has-active-filters', count > 0);
+    }
+
+    function setOutletSummaryFilter(filterKey) {
+      if (!OUTLET_SUMMARY_FILTER_KEYS.includes(filterKey)) return;
+      activeOutletSummaryFilter = filterKey;
+      filterTable();
+    }
+
+    function openMobileFilterSheet() {
+      const sheet = document.getElementById('mobileFilterSheet');
+      if (!sheet) return;
+      syncSearchInputs('searchInput');
+      syncMobileFilterSelectsFromDesktop(true);
+      sheet.classList.add('active');
+      sheet.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('mobile-filter-sheet-open');
+    }
+
+    function closeMobileFilterSheet() {
+      const sheet = document.getElementById('mobileFilterSheet');
+      if (!sheet) return;
+      sheet.classList.remove('active');
+      sheet.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('mobile-filter-sheet-open');
+    }
+
+    function handleMobileFilterSheetBackdrop(event) {
+      if (event.target?.id === 'mobileFilterSheet') closeMobileFilterSheet();
+    }
+
+    function resetMobileFilterSheet() {
+      Object.values(OUTLET_FILTER_FIELD_MAP).forEach(id => setControlValue(id, ''));
+    }
+
+    function applyMobileFilterSheet() {
+      syncDesktopFilterSelectsFromMobile();
+      setupCustomFilterDropdowns();
+      filterTable();
+      closeMobileFilterSheet();
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       showTableSkeleton();
       loadStoresData();
       startAdminEventStream();
       loadAdminProfile();
       setInterval(fetchBotStatus, 15000);
+      autoRefreshTimer = window.setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        if (getAdminActiveTab() !== 'outlets' || pendingAdminToggleStoreIds.size) return;
+        loadStoresData(true);
+      }, ADMIN_OUTLET_SYNC_REFRESH_MS);
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
-      if (tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam)) {
-        switchTab(tabParam);
+      syncMobileFetchButton(tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) ? tabParam : 'outlets');
+      if (tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) && tabParam !== 'outlets') {
+        switchTab(tabParam, { skipHistory: true });
       }
     });
 
-    window.addEventListener('popstate', (e) => {
+    window.addEventListener('resize', () => {
+      if (window.matchMedia('(min-width: 768px)').matches) {
+        closeMobileFilterSheet();
+        if (activeOutletSummaryFilter !== 'all') {
+          activeOutletSummaryFilter = 'all';
+          filterTable();
+        }
+      }
+      if (isOutletDetailOpen()) setOutletDetailBackgroundState(true);
+      syncMobileFetchButton();
+    });
+
+    document.addEventListener('keydown', event => {
+      handleOutletDetailKeydown(event);
+      if (event.defaultPrevented) return;
+      if (event.key === 'Escape') closeMobileFilterSheet();
+    });
+
+    window.addEventListener('popstate', () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || 'outlets';
-      if (['outlets', 'vb', 'logs', 'settings'].includes(tabParam)) {
-        switchTab(tabParam);
+      if (['outlets', 'vb', 'logs', 'settings'].includes(tabParam) && tabParam !== getAdminActiveTab()) {
+        switchTab(tabParam, { skipHistory: true });
+      } else {
+        syncMobileFetchButton(tabParam);
       }
+      syncOutletDetailFromLocation({ restoreFocus: true });
     });
 
     document.addEventListener("alpine:initialized", () => {
@@ -542,15 +942,21 @@
     });
 
 
-    function switchTab(tabName) {
+    function switchTab(tabName, options = {}) {
+      const { skipHistory = false } = options;
+      currentTab = tabName;
       if (window._appData) window._appData.currentTab = tabName;
+      syncMobileFetchButton(tabName);
       const contentWrapper = document.querySelector('.admin-main > .desktop-wrapper');
       const isSettingsTab = tabName === 'settings';
       if (contentWrapper) {
         contentWrapper.classList.toggle('is-settings-active', isSettingsTab);
         contentWrapper.scrollTop = 0;
       }
-      if (tabName !== 'outlets') closeOutletDetail();
+      if (tabName !== 'outlets') {
+        closeOutletDetail({ updateHistory: false, restoreFocus: false });
+        closeMobileFilterSheet();
+      }
       const pageCopy = {
         outlets: ['Agency Outlet Management', ''],
         vb: ['Virtual Brand Management', ''],
@@ -567,11 +973,14 @@
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
-      try {
-        const url = new URL(window.location);
-        url.searchParams.set('tab', tabName);
-        window.history.pushState({ tab: tabName }, '', url);
-      } catch (e) {}
+      if (!skipHistory) {
+        try {
+          const url = new URL(window.location);
+          url.searchParams.set('tab', tabName);
+          url.searchParams.delete('store');
+          window.history.pushState({ tab: tabName }, '', url);
+        } catch (e) {}
+      }
 
       if (tabName === 'outlets') {
         const btn = document.getElementById('tabBtnOutlets');
@@ -616,8 +1025,9 @@
         if (requestGeneration !== storeFetchGeneration) return;
         allStores = stores;
         if (window._appData) window._appData.allStores = allStores;
-        renderAdminTable(allStores);
         updateMetrics(allStores);
+        filterTable();
+        syncOutletDetailFromLocation();
       } catch (err) {
         if (requestGeneration !== storeFetchGeneration) return;
         console.error("Error loading stores:", err);
@@ -870,8 +1280,28 @@
     }
 
     async function importVBData() {
-      const button = document.getElementById('vbImportButton');
-      if (button) { button.disabled = true; button.textContent = 'Import...'; }
+      const buttons = [
+        {
+          element: document.getElementById('vbImportButton'),
+          label: document.getElementById('vbImportButton'),
+          loadingText: 'Import...',
+          resetText: 'Fetch data'
+        }
+      ];
+      if (getAdminActiveTab() === 'vb') {
+        buttons.push({
+          element: document.getElementById('mobileFetchButton'),
+          label: document.getElementById('mobileFetchButton')?.querySelector('.mobile-fetch-nav-label'),
+          loadingText: 'Sync...',
+          resetText: 'Fetch'
+        });
+      }
+      buttons.forEach(({ element, label, loadingText }) => {
+        if (!element) return;
+        element.disabled = true;
+        element.classList.add('is-loading');
+        if (label) label.textContent = loadingText;
+      });
       try {
         const data = await safeFetchJson('/api/v1/admin/vb/import', { method: 'POST' });
         const summary = data.summary || {};
@@ -886,17 +1316,37 @@
       } catch (err) {
         showErrorModal('Import VB gagal', err.message);
       } finally {
-        if (button) { button.disabled = false; button.textContent = 'Import VB'; }
+        buttons.forEach(({ element, label, resetText }) => {
+          if (!element) return;
+          element.disabled = false;
+          element.classList.remove('is-loading');
+          if (label) label.textContent = resetText;
+        });
+        syncMobileFetchButton();
       }
     }
 
     async function fetchSheetData() {
-      const button = document.getElementById('fetchSheetHeader');
-      const label = button ? button.querySelector('.fetch-label') : null;
-      if (button) {
-        button.disabled = true;
-        if (label) label.textContent = 'Fetching...';
-      }
+      const buttons = [
+        {
+          element: document.getElementById('fetchSheetHeader'),
+          label: document.getElementById('fetchSheetHeader')?.querySelector('.fetch-label'),
+          loadingText: 'Fetching...',
+          resetText: 'Fetch dari Sheet'
+        },
+        {
+          element: document.getElementById('mobileFetchButton'),
+          label: document.getElementById('mobileFetchButton')?.querySelector('.mobile-fetch-nav-label'),
+          loadingText: 'Sync...',
+          resetText: 'Fetch'
+        }
+      ];
+      buttons.forEach(({ element, label, loadingText }) => {
+        if (!element) return;
+        element.disabled = true;
+        element.classList.add('is-loading');
+        if (label) label.textContent = loadingText;
+      });
       try {
         const data = await safeFetchJson('/api/v1/admin/sync-source', { method: 'POST' });
         const summary = data.summary || {};
@@ -905,10 +1355,13 @@
       } catch (err) {
         showErrorModal('Fetch Google Sheet gagal', err.message);
       } finally {
-        if (button) {
-          button.disabled = false;
-          if (label) label.textContent = 'Fetch dari Sheet';
-        }
+        buttons.forEach(({ element, label, resetText }) => {
+          if (!element) return;
+          element.disabled = false;
+          element.classList.remove('is-loading');
+          if (label) label.textContent = resetText;
+        });
+        syncMobileFetchButton();
       }
     }
 
@@ -962,6 +1415,7 @@
             <span class="skeleton skeleton-block skeleton-block-wide"></span>
           </div>
         </article>`).join('');
+      updateOutletSummaryStrip([]);
     }
 
 
@@ -981,17 +1435,12 @@
     function updateMetrics(stores) {
       const outletCount = document.getElementById('tabOutletCount');
       if (outletCount) outletCount.innerText = stores.length;
-      const isActiveSubscription = store => {
-        const expiry = store.tanggal_berakhir_layanan;
-        if (!expiry) return false;
-        const date = new Date(String(expiry).includes('T') ? expiry : `${expiry}T23:59:59`);
-        return !Number.isNaN(date.getTime()) && date >= new Date();
-      };
       const metric = id => document.getElementById(id);
+      const statusCategories = stores.map(store => getAdminStatusCategory(store));
       if (metric('metricTotal')) metric('metricTotal').innerText = stores.length;
-      if (metric('metricOpen')) metric('metricOpen').innerText = stores.filter(s => s.vercel_status === 'ON').length;
-      if (metric('metricClosed')) metric('metricClosed').innerText = stores.filter(s => s.vercel_status !== 'ON').length;
-      if (metric('metricSubscription')) metric('metricSubscription').innerText = stores.filter(isActiveSubscription).length;
+      if (metric('metricOpen')) metric('metricOpen').innerText = statusCategories.filter(value => value === 'open').length;
+      if (metric('metricClosed')) metric('metricClosed').innerText = statusCategories.filter(value => value === 'closed').length;
+      if (metric('metricSubscription')) metric('metricSubscription').innerText = stores.filter(isStoreSubscriptionActive).length;
       populateOutletFilters(stores);
       fetchBotStatus();
     }
@@ -1002,18 +1451,24 @@
 
     function populateOutletFilters(stores) {
       const fields = {
-        ownerFilter: ['nama_pemilik', 'Nama pemilik'], outletFilter: ['store_name', 'Nama outlet'],
-        storeIdFilter: ['store_id', 'Store ID'], packageFilter: ['paket', 'Paket']
+        ownerFilter: ['nama_pemilik', 'Semua pemilik'],
+        outletFilter: ['store_name', 'Semua outlet'],
+        storeIdFilter: ['store_id', 'Semua Store ID'],
+        packageFilter: ['paket', 'Semua paket']
       };
       Object.entries(fields).forEach(([id, [key, label]]) => {
-        const select = document.getElementById(id);
-        if (!select) return;
-        const current = select.value;
         const values = [...new Set(stores.map(s => String(s[key] || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
-        select.innerHTML = `<option value="">${label}</option>` + values.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
-        if (values.includes(current)) select.value = current;
+        [id, OUTLET_FILTER_FIELD_MAP[id]].forEach(selectId => {
+          const select = document.getElementById(selectId);
+          if (!select) return;
+          const current = select.value;
+          select.innerHTML = `<option value="">${label}</option>` + values.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+          if (values.includes(current)) select.value = current;
+        });
       });
+      syncMobileFilterSelectsFromDesktop();
       setupCustomFilterDropdowns();
+      updateMobileFilterBadge();
     }
 
     function setupCustomFilterDropdowns() {
@@ -1208,12 +1663,170 @@
       return { label: 'Shopee: Status belum tersedia', className: 'outlet-shopee-status is-unknown', value: status || 'UNKNOWN' };
     }
 
-    function getAdminPauseSummary(store) {
-      if (store.vercel_status === 'ON') {
-        return { value: 'Tidak sedang pause', note: 'Toggle outlet sedang aktif.' };
+    const ADMIN_STATUS_TONE_CLASS = Object.freeze({
+      open: 'is-success',
+      paused: 'is-warning',
+      closed: 'is-danger',
+      pending: 'is-info'
+    });
+
+    function normalizeAdminDesiredState(store) {
+      const explicitState = String(store?.desired_state || '').trim().toUpperCase();
+      if (['OPEN', 'PAUSE', 'MANUAL_OFF'].includes(explicitState)) return explicitState;
+      return String(store?.vercel_status || '').trim().toUpperCase() === 'ON'
+        ? 'OPEN'
+        : (store?.pause_until ? 'PAUSE' : 'MANUAL_OFF');
+    }
+
+    function normalizeAdminLiveState(value) {
+      const normalized = String(value || '').trim().toUpperCase();
+      if (normalized === 'ON' || normalized === 'OPEN') return 'OPEN';
+      if (normalized === 'PAUSE') return 'PAUSE';
+      if (normalized === 'CLOSED' || normalized === 'OFF' || normalized === 'CLOSE') return 'CLOSED';
+      return 'UNKNOWN';
+    }
+
+    function getAdminDesiredStateLabel(value) {
+      if (value === 'OPEN') return 'Buka mengikuti jadwal';
+      if (value === 'PAUSE') return 'Pause sementara';
+      if (value === 'MANUAL_OFF') return 'Otomatisasi nonaktif';
+      return 'Belum diketahui';
+    }
+
+    function getAdminLiveStateLabel(value) {
+      if (value === 'OPEN') return 'Sedang buka';
+      if (value === 'PAUSE') return 'Tutup sementara';
+      if (value === 'CLOSED') return 'Sedang tutup';
+      return 'Status belum tersedia';
+    }
+
+    function getAdminBotPhaseLabel(value) {
+      const labels = {
+        SUSPENDED: 'Dinonaktifkan admin',
+        STATUS_UNKNOWN: 'Sedang dicek bot',
+        SCHEDULE_UNAVAILABLE: 'Jadwal belum tersedia',
+        PENDING_PAUSE: 'Menunggu bot menutup',
+        PENDING_OPEN: 'Menunggu bot membuka',
+        WAITING_SCHEDULE: 'Menunggu jadwal buka',
+        AUTOMATION_OFF: 'Otomatisasi nonaktif',
+        IN_SYNC: 'Sudah sinkron'
+      };
+      return labels[value] || 'Belum diketahui';
+    }
+
+    function getAdminStateContext(store) {
+      const desiredState = normalizeAdminDesiredState(store);
+      const liveState = normalizeAdminLiveState(store?.live_state || store?.shopee_status);
+      const isSuspended = Boolean(store?.is_suspended || String(store?.suspension_status || '').trim().toUpperCase() === 'SUSPENDED');
+      const scheduleAvailable = typeof store?.schedule_available === 'boolean' ? store.schedule_available : null;
+      const isWithinSchedule = typeof store?.within_operating_schedule === 'boolean' ? store.within_operating_schedule : null;
+      let botPhase = String(store?.bot_phase || '').trim().toUpperCase();
+      if (!botPhase) {
+        if (isSuspended) botPhase = 'SUSPENDED';
+        else if (liveState === 'UNKNOWN') botPhase = 'STATUS_UNKNOWN';
+        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && scheduleAvailable === false) botPhase = 'SCHEDULE_UNAVAILABLE';
+        else if ((desiredState === 'PAUSE' || desiredState === 'MANUAL_OFF') && liveState === 'OPEN') botPhase = 'PENDING_PAUSE';
+        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && isWithinSchedule === false) botPhase = 'WAITING_SCHEDULE';
+        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED')) botPhase = 'PENDING_OPEN';
+        else if (desiredState === 'MANUAL_OFF') botPhase = 'AUTOMATION_OFF';
+        else if (desiredState === 'PAUSE' && (liveState === 'PAUSE' || liveState === 'CLOSED')) botPhase = 'IN_SYNC';
+        else if (liveState === 'OPEN') botPhase = 'IN_SYNC';
+        else botPhase = 'STATUS_UNKNOWN';
+      }
+      return { desiredState, liveState, botPhase, isSuspended, scheduleAvailable, isWithinSchedule };
+    }
+
+    function getAdminStatusToneClass(tone) {
+      const normalized = String(tone || '').trim().toLowerCase();
+      return ADMIN_STATUS_TONE_CLASS[normalized] || 'is-warning';
+    }
+
+    function getAdminStatusPresentation(store, stateContext = getAdminStateContext(store)) {
+      const explicitLabel = String(store?.display_status_label || '').trim();
+      const explicitNote = String(store?.display_note || '').trim();
+      const build = (label, tone, note = explicitNote || '') => ({
+        label,
+        tone: String(tone || '').trim().toLowerCase() || 'pending',
+        note,
+        className: `table-status ${getAdminStatusToneClass(tone)}`,
+        value: stateContext.liveState || 'UNKNOWN'
+      });
+      if (explicitLabel) return build(explicitLabel, store?.display_status_tone, explicitNote);
+      if (stateContext.botPhase === 'SUSPENDED') {
+        return build('Sedang Tutup • Dinonaktifkan admin', 'closed', 'Otomatisasi dinonaktifkan oleh admin.');
+      }
+      if (stateContext.botPhase === 'PENDING_PAUSE') {
+        return build('Sedang Buka • Menunggu bot menutup', 'pending', 'Permintaan tutup tersimpan. Menunggu bot menutup outlet.');
+      }
+      if (stateContext.botPhase === 'PENDING_OPEN') {
+        return build('Sedang Tutup • Menunggu bot membuka', 'pending', 'Permintaan buka tersimpan. Menunggu bot membuka outlet.');
+      }
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') {
+        return build('Sedang Tutup • Di luar jadwal', 'closed', 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.');
+      }
+      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') {
+        return build('Status sedang dicek bot', 'pending', 'Jadwal operasional Shopee belum tersedia. Bot masih mencocokkan status outlet.');
+      }
+      if (stateContext.botPhase === 'AUTOMATION_OFF') {
+        return build('Sedang Tutup • Otomatisasi nonaktif', 'closed', 'Otomatisasi tetap mati sampai diaktifkan kembali.');
+      }
+      if (stateContext.desiredState === 'PAUSE' && stateContext.liveState === 'PAUSE') {
+        return build('Tutup Sementara', 'paused', 'Outlet sedang ditutup sementara.');
+      }
+      if (stateContext.liveState === 'OPEN') {
+        return build('Sedang Buka', 'open', 'Outlet mengikuti jam operasional Shopee.');
+      }
+      if (stateContext.liveState === 'CLOSED') {
+        return build('Sedang Tutup', 'closed', 'Outlet tidak sedang aktif di Shopee.');
+      }
+      return build('Status sedang dicek bot', 'pending', 'Status live outlet masih diperiksa bot.');
+    }
+
+    function getAdminStatusSubtext(store, stateContext = getAdminStateContext(store)) {
+      if (stateContext.botPhase === 'SUSPENDED') return 'Dinonaktifkan admin.';
+      if (stateContext.botPhase === 'STATUS_UNKNOWN' || stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Sedang dicek bot.';
+      if (stateContext.botPhase === 'PENDING_PAUSE') return 'Menunggu bot menutup.';
+      if (stateContext.botPhase === 'PENDING_OPEN') return 'Menunggu bot membuka.';
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Di luar jadwal.';
+      if (stateContext.botPhase === 'AUTOMATION_OFF') return 'Otomatisasi nonaktif.';
+      if (stateContext.desiredState === 'PAUSE' && store.pause_until) return getPauseDetail(store.pause_until);
+      if (stateContext.desiredState === 'PAUSE') return 'Tutup sementara.';
+      if (stateContext.liveState === 'OPEN') return 'Sinkron dengan Shopee.';
+      return 'Status terakhir mengikuti Shopee.';
+    }
+
+    function getAdminStatusCategory(store, statusPresentation = getAdminStatusPresentation(store), stateContext = getAdminStateContext(store)) {
+      const explicitBucket = String(store?.display_status_bucket || '').trim().toLowerCase();
+      if (explicitBucket === 'open' || explicitBucket === 'closed') return explicitBucket;
+      if (stateContext.liveState === 'OPEN') return 'open';
+      if (stateContext.liveState === 'PAUSE' || stateContext.liveState === 'CLOSED') return 'closed';
+      if (typeof store?.display_toggle_on === 'boolean') return store.display_toggle_on ? 'open' : 'closed';
+      const label = String(statusPresentation?.label || '').trim().toLowerCase();
+      return label.startsWith('sedang buka') ? 'open' : 'closed';
+    }
+
+    function getAdminStatusTooltip(store, stateContext = getAdminStateContext(store)) {
+      return `Live Shopee: ${getAdminLiveStateLabel(stateContext.liveState)} | Desired bot: ${getAdminDesiredStateLabel(stateContext.desiredState)} | Fase: ${getAdminBotPhaseLabel(stateContext.botPhase)}`;
+    }
+
+    function getAdminDesiredToggleOn(store, stateContext = getAdminStateContext(store)) {
+      return stateContext.desiredState === 'OPEN';
+    }
+
+    function getAdminPauseSummary(store, stateContext = getAdminStateContext(store)) {
+      if (stateContext.desiredState === 'OPEN') {
+        return {
+          value: 'Tidak sedang pause',
+          note: stateContext.botPhase === 'WAITING_SCHEDULE'
+            ? 'Tidak ada pause manual. Outlet menunggu jadwal buka berikutnya.'
+            : 'Tidak ada pause manual tersimpan.'
+        };
       }
       if (store.pause_until) {
         return { value: formatActionDateTime(store.pause_until, true), note: getPauseDetail(store.pause_until) };
+      }
+      if (stateContext.desiredState === 'MANUAL_OFF') {
+        return { value: 'Sampai dibuka manual', note: 'Otomatisasi nonaktif sampai diaktifkan kembali.' };
       }
       return { value: 'Sampai dibuka manual', note: 'Belum ada target buka otomatis.' };
     }
@@ -1258,8 +1871,8 @@
       }
 
       sortedStores.forEach(s => {
-        const isVercelOn = s.vercel_status === 'ON';
-        const statusClass = isVercelOn ? 'is-success' : 'is-warning';
+        const stateContext = getAdminStateContext(s);
+        const isDesiredOpen = getAdminDesiredToggleOn(s, stateContext);
         const isTogglePending = pendingAdminToggleStoreIds.has(String(s.store_id));
         const ownerName = s.nama_pemilik || 'Fando';
         const storeName = escapeHtml(detailValue(s.store_name, 'Outlet'));
@@ -1269,7 +1882,10 @@
         const servicePeriod = formatServicePeriod(s.tanggal_mulai_layanan, s.tanggal_berakhir_layanan);
         const serviceRemaining = getServiceRemainingTime(s.tanggal_berakhir_layanan);
         const shopeeStatus = getAdminShopeeStatusPresentation(s.shopee_status);
-        const pauseSummary = getAdminPauseSummary(s);
+        const statusPresentation = getAdminStatusPresentation(s, stateContext);
+        const statusSubtext = getAdminStatusSubtext(s, stateContext);
+        const statusTooltip = escapeHtml(getAdminStatusTooltip(s, stateContext));
+        const pauseSummary = getAdminPauseSummary(s, stateContext);
         const toggleSummary = getAdminActionSummary(s);
         const actionDetailNote = toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.';
         const toggleMetaText = isTogglePending
@@ -1292,16 +1908,20 @@
           </td>
           <td>${todaySchedule}</td>
           <td>
-            <span class="table-status ${statusClass}">${isVercelOn ? 'Buka' : 'Paused'}</span>
-            ${isVercelOn ? '' : `<small class="table-cell-note">${getPauseDetail(s.pause_until)}</small>`}
+            <div class="admin-status-summary">
+              <span class="${statusPresentation.className}" title="${statusTooltip}">${escapeHtml(statusPresentation.label)}</span>
+              ${statusSubtext ? `<small class="table-cell-note">${escapeHtml(statusSubtext)}</small>` : ''}
+            </div>
           </td>
           <td>${getAdminActionMarkup(s)}</td>
           <td><span class="service-period"><strong>${formatServicePeriod(s.tanggal_mulai_layanan, s.tanggal_berakhir_layanan)}</strong><small>${getServiceRemainingTime(s.tanggal_berakhir_layanan)}</small></span></td>
-          <td><label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet"><input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
+          <td><label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet"><input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
         `;
         tr.classList.add('outlet-data-row');
         tr.tabIndex = 0;
+        tr.dataset.storeId = String(s.store_id);
         tr.setAttribute('role', 'button');
+        tr.setAttribute('aria-haspopup', 'dialog');
         tr.setAttribute('aria-label', `Lihat detail ${s.store_name || 'outlet'}`);
         tr.addEventListener('click', event => { if (!event.target.closest('a,button,input,label')) openOutletDetail(s.store_id); });
         tr.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openOutletDetail(s.store_id); } });
@@ -1320,8 +1940,10 @@
               </div>
             </div>
             <div class="admin-mobile-outlet-side">
-              <span class="table-status ${statusClass}">${isVercelOn ? 'Buka' : 'Paused'}</span>
-              <small class="admin-mobile-status-note">${escapeHtml(isVercelOn ? 'Toggle outlet sedang aktif.' : getPauseDetail(s.pause_until))}</small>
+              <div class="admin-status-summary admin-status-summary-mobile">
+                <span class="${statusPresentation.className}" title="${statusTooltip}">${escapeHtml(statusPresentation.label)}</span>
+                <small class="admin-mobile-status-note">${escapeHtml(statusSubtext)}</small>
+              </div>
               <span class="admin-mobile-card-disclosure" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
               </span>
@@ -1353,7 +1975,7 @@
               <span>${escapeHtml(toggleMetaText)}</span>
             </div>
             <label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet">
-              <input type="checkbox" ${isVercelOn ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
+              <input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
               <span class="slider"></span>
             </label>
           </div>
@@ -1367,12 +1989,15 @@
           </div>
         `;
         mobileCard.tabIndex = 0;
+        mobileCard.dataset.storeId = String(s.store_id);
         mobileCard.setAttribute('role', 'button');
+        mobileCard.setAttribute('aria-haspopup', 'dialog');
         mobileCard.setAttribute('aria-label', `Lihat detail ${s.store_name || 'outlet'}`);
         mobileCard.addEventListener('click', event => { if (!event.target.closest('a,button,input,label')) openOutletDetail(s.store_id); });
         mobileCard.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openOutletDetail(s.store_id); } });
         mobileList.appendChild(mobileCard);
       });
+      syncOutletDetailSelection(outletDetailActiveStoreId);
     }
 
     function getTodayOperatingHours(store) {
@@ -1625,7 +2250,7 @@
       document.getElementById('adminPauseModal').classList.remove('active');
       document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'true');
       selectedAdminPauseStoreId = null;
-      if (shouldRender) renderAdminTable(allStores);
+      if (shouldRender) filterTable();
     }
 
     async function confirmAdminPause() {
@@ -1641,7 +2266,7 @@
       if (pendingAdminToggleStoreIds.has(String(storeId))) return;
       pendingAdminToggleStoreIds.add(String(storeId));
       closeAdminPauseModal(false);
-      renderAdminTable(allStores);
+      filterTable();
 
       try {
         const res = await fetch('/api/v1/user/pause', {
@@ -1687,15 +2312,42 @@
       }
       // Invalidate older fetches so a stale response cannot undo this event.
       storeFetchGeneration += 1;
-      store.vercel_status = update.vercel_status;
-      store.pause_until = update.pause_until || null;
+      [
+        'vercel_status',
+        'shopee_status',
+        'pause_until',
+        'is_suspended',
+        'alasan_penangguhan',
+        'desired_state',
+        'live_state',
+        'bot_phase',
+        'schedule_available',
+        'within_operating_schedule',
+        'display_toggle_on',
+        'display_toggle_disabled',
+        'display_toggle_reason',
+        'display_status_bucket',
+        'display_status_label',
+        'display_status_tone',
+        'display_note'
+      ].forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(update, key)) {
+          store[key] = update[key];
+        }
+      });
+      store.pause_until = store.pause_until || null;
       store.last_toggle_action_raw = update.action || store.last_toggle_action_raw;
-      store.last_toggle_reason = update.reason || store.last_toggle_reason || '';
+      if (Object.prototype.hasOwnProperty.call(update, 'reason')) {
+        store.last_toggle_reason = update.reason || '';
+      }
       store.last_toggle_at = update.changed_at || store.last_toggle_at || null;
       store.last_synced_at = update.changed_at || store.last_synced_at;
+      if (Object.prototype.hasOwnProperty.call(update, 'is_suspended')) {
+        store.suspension_status = update.is_suspended ? 'SUSPENDED' : 'ACTIVE';
+      }
       if (window._appData) window._appData.allStores = allStores;
-      renderAdminTable(allStores);
       updateMetrics(allStores);
+      filterTable();
     }
 
     function handleAdminOutletStateEvent(update) {
@@ -1715,7 +2367,7 @@
       if (deferredEvent) {
         applyAdminOutletStateEvent(deferredEvent);
       } else {
-        renderAdminTable(allStores);
+        filterTable();
       }
     }
 
@@ -1723,13 +2375,13 @@
       const key = String(storeId);
       if (pendingAdminToggleStoreIds.has(key)) return;
       if (!isChecked) {
-        renderAdminTable(allStores);
+        filterTable();
         const store = allStores.find(item => String(item.store_id) === key);
         openAdminPauseModal(storeId, store?.store_name || storeId);
         return;
       }
       pendingAdminToggleStoreIds.add(key);
-      renderAdminTable(allStores);
+      filterTable();
       try {
         await safeFetchJson('/api/v1/toggle', {
           method: 'POST',
@@ -1841,33 +2493,63 @@
       }, OUTLET_DETAIL_ANIMATION_MS);
     }
 
-    function openOutletDetail(storeId) {
+    function openOutletDetail(storeId, options = {}) {
+      const { updateHistory = true, focusPanel = true } = options;
       const store = allStores.find(item => String(item.store_id) === String(storeId));
-      const panel = document.getElementById('outletDetailPanel');
-      const content = document.getElementById('outletDetailContent');
-      if (!store || !panel || !content) return;
-      const isOpen = store.vercel_status === 'ON';
+      const { panel, backdrop, content } = getOutletDetailPanelElements();
+      if (!store || !panel || !content) {
+        if (updateHistory) setOutletDetailUrl('', 'replace');
+        return;
+      }
+      closeMobileFilterSheet();
+      const wasOpen = isOutletDetailOpen();
+      const nextStoreId = String(storeId);
+      const shouldResetScroll = !wasOpen || outletDetailActiveStoreId !== nextStoreId;
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement && !panel.contains(activeElement) && activeElement !== document.body) {
+        outletDetailRestoreFocusEl = activeElement;
+      } else if (!outletDetailRestoreFocusEl || !document.contains(outletDetailRestoreFocusEl)) {
+        outletDetailRestoreFocusEl = getOutletDetailTrigger(nextStoreId);
+      }
+      if (updateHistory) {
+        setOutletDetailUrl(nextStoreId, getRequestedOutletDetailStoreId() ? 'replace' : 'push');
+      }
+      outletDetailActiveStoreId = nextStoreId;
+      const stateContext = getAdminStateContext(store);
       const mitraUrl = getMitraDynamicUrl(store.vercel_link, store.nama_pemilik || '-');
-      const statusClass = isOpen ? 'is-success' : 'is-warning';
+      const statusPresentation = getAdminStatusPresentation(store, stateContext);
+      const statusTooltip = escapeHtml(getAdminStatusTooltip(store, stateContext));
       const shopeeStatus = getAdminShopeeStatusPresentation(store.shopee_status);
-      const pauseSummary = getAdminPauseSummary(store);
+      const pauseSummary = getAdminPauseSummary(store, stateContext);
       const subscriptionSummary = getAdminSubscriptionSummary(store);
       const toggleSummary = getAdminActionSummary(store);
       const lastToggleAt = store.last_toggle_at ? formatActionDateTime(store.last_toggle_at, true) : 'Belum ada log toggle';
       const lastSyncedAt = store.last_synced_at ? formatActionDateTime(store.last_synced_at, true) : 'Belum pernah sinkron';
       const detailScheduleRows = getAdminScheduleRowsMarkup(store);
+      const ownerName = escapeHtml(detailValue(store.nama_pemilik, '-'));
+      const merchantName = escapeHtml(detailValue(store.merchant_name || store.nama_portal, '-'));
+      const storeName = escapeHtml(detailValue(store.store_name));
+      const storeIdText = escapeHtml(detailValue(store.store_id));
       document.getElementById('outletDetailTitle').textContent = 'Detail Outlet';
       content.innerHTML = `
-        <div class="outlet-detail-status"><span class="table-status ${statusClass}">${isOpen ? 'Sedang Buka' : 'Sedang Tutup'}</span></div>
+        <div class="outlet-detail-status">
+          <span class="${statusPresentation.className}" title="${statusTooltip}">${escapeHtml(statusPresentation.label)}</span>
+          ${statusPresentation.note ? `<p class="outlet-detail-status-note">${escapeHtml(statusPresentation.note)}</p>` : ''}
+        </div>
         <div class="outlet-detail-identity">
           <div class="outlet-detail-identity-copy">
-            <h3>${store.store_name || '-'}</h3>
-            <p class="outlet-detail-store-id">Store ID&nbsp; ${store.store_id || '-'}</p>
+            <div class="outlet-detail-eyebrow">${ownerName}</div>
+            <h3>${storeName}</h3>
+            <p class="outlet-detail-store-id">Store ID&nbsp; ${storeIdText}</p>
+            <div class="outlet-detail-context">
+              <span>${merchantName}</span>
+            </div>
           </div>
           <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
         </div>
         <dl class="outlet-detail-list">
           <div><dt>Status live Shopee</dt><dd><span class="${shopeeStatus.className}" title="Nilai status terakhir: ${escapeHtml(shopeeStatus.value)}">${shopeeStatus.label}</span></dd><small>Nilai terakhir yang diterima dari XHR Shopee.</small></div>
+          <div><dt>Kontrak bot</dt><dd>${escapeHtml(getAdminDesiredStateLabel(stateContext.desiredState))}</dd><small>Live: ${escapeHtml(getAdminLiveStateLabel(stateContext.liveState))} · Fase: ${escapeHtml(getAdminBotPhaseLabel(stateContext.botPhase))}</small></div>
           <div><dt>Pause sampai</dt><dd>${escapeHtml(pauseSummary.value)}</dd><small>${escapeHtml(pauseSummary.note)}</small></div>
           <div><dt>Sinkron terakhir</dt><dd>${escapeHtml(lastSyncedAt)}</dd><small>Waktu pembacaan status outlet terakhir oleh backend.</small></div>
           <div><dt>Toggle terakhir</dt><dd>${escapeHtml(toggleSummary.title)}</dd><small>${escapeHtml(toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.')}</small></div>
@@ -1899,44 +2581,65 @@
           String(store.nama_pemilik || '-')
         ));
       }
-      const backdrop = document.getElementById('outletDetailBackdrop');
+      if (shouldResetScroll) panel.scrollTop = 0;
       showOutletDetailPanel(panel, backdrop);
       document.body.classList.add('outlet-detail-open');
-      document.querySelectorAll('.outlet-data-row.is-selected').forEach(row => row.classList.remove('is-selected'));
-      const row = [...document.querySelectorAll('.outlet-data-row')].find(item => item.querySelector('code')?.textContent === String(store.store_id));
-      if (row) row.classList.add('is-selected');
+      setOutletDetailBackgroundState(true);
+      syncOutletDetailSelection(nextStoreId);
+      if (focusPanel) {
+        window.requestAnimationFrame(() => focusOutletDetailInitialControl(panel));
+      }
     }
 
-    function closeOutletDetail() {
-      const panel = document.getElementById('outletDetailPanel');
-      const backdrop = document.getElementById('outletDetailBackdrop');
+    function closeOutletDetail(options = {}) {
+      const { updateHistory = true, restoreFocus = true } = options;
+      if (updateHistory && getRequestedOutletDetailStoreId()) {
+        if (window.history.state?.outletDetail) {
+          window.history.back();
+          return;
+        }
+        setOutletDetailUrl('', 'replace');
+      }
+      const previousStoreId = outletDetailActiveStoreId;
+      const { panel, backdrop } = getOutletDetailPanelElements();
       hideOutletDetailPanel(panel, backdrop);
       document.body.classList.remove('outlet-detail-open');
-      document.querySelectorAll('.outlet-data-row.is-selected').forEach(row => row.classList.remove('is-selected'));
+      setOutletDetailBackgroundState(false);
+      syncOutletDetailSelection();
+      outletDetailActiveStoreId = '';
+      if (restoreFocus) {
+        window.requestAnimationFrame(() => {
+          const focusTarget = (outletDetailRestoreFocusEl instanceof HTMLElement && document.contains(outletDetailRestoreFocusEl))
+            ? outletDetailRestoreFocusEl
+            : getOutletDetailTrigger(previousStoreId);
+          if (focusTarget instanceof HTMLElement) {
+            focusTarget.focus({ preventScroll: true });
+          }
+          outletDetailRestoreFocusEl = null;
+        });
+      } else {
+        outletDetailRestoreFocusEl = null;
+      }
     }
 
-    function filterTable() {
-      const q = document.getElementById('searchInput').value.toLowerCase().trim();
-      const value = id => document.getElementById(id).value;
-      const owner = value('ownerFilter'), outlet = value('outletFilter'), storeId = value('storeIdFilter');
-      const status = value('statusFilter'), subscription = value('subscriptionFilter'), paket = value('packageFilter');
-      const filtered = allStores.filter(s =>
-        (!q || [s.nama_pemilik, s.store_name, s.store_id, s.merchant_name].some(v => String(v || '').toLowerCase().includes(q))) &&
-        (!owner || s.nama_pemilik === owner) && (!outlet || s.store_name === outlet) && (!storeId || String(s.store_id) === storeId) &&
-        (!status || (status === 'open' ? s.vercel_status === 'ON' : s.vercel_status !== 'ON')) &&
-        (!subscription || (subscription === 'active' ? isStoreSubscriptionActive(s) : !isStoreSubscriptionActive(s))) &&
-        (!paket || s.paket === paket)
-      );
+    function filterTable(sourceId = 'searchInput') {
+      syncSearchInputs(sourceId);
+      const filters = getActiveOutletFilters();
+      const baseFiltered = allStores.filter(store => matchesOutletBaseFilters(store, filters));
+      const filtered = baseFiltered.filter(store => matchesOutletSummaryFilter(store));
+      updateOutletSummaryStrip(baseFiltered);
+      updateMobileFilterBadge(filters);
       renderAdminTable(filtered);
     }
 
     function resetOutletFilters() {
-      ['searchInput', 'ownerFilter', 'outletFilter', 'storeIdFilter', 'statusFilter', 'subscriptionFilter', 'packageFilter'].forEach(id => {
-        const element = document.getElementById(id);
-        if (element) element.value = '';
+      activeOutletSummaryFilter = 'all';
+      ['searchInput', 'mobileSearchInput', 'ownerFilter', 'outletFilter', 'storeIdFilter', 'statusFilter', 'subscriptionFilter', 'packageFilter', ...Object.values(OUTLET_FILTER_FIELD_MAP)].forEach(id => {
+        setControlValue(id, '');
       });
       setupCustomFilterDropdowns();
-      renderAdminTable(allStores);
+      updateMobileFilterBadge();
+      filterTable();
     }
 
 

@@ -50,7 +50,7 @@ services:
       dockerfile: main-bot/Dockerfile
     image: foodmaster-bot-runtime:dev
     container_name: fm-bot
-    restart: always
+    restart: on-failure
     depends_on:
       db:
         condition: service_started

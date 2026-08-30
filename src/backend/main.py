@@ -13,7 +13,7 @@ import os
 import subprocess
 import urllib.request
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -49,8 +49,6 @@ from backend.models import (
     UserLoginRequest,
     UserPauseRequest
 )
-from core.decision import is_within_operating_hours
-from core.sheets import WEEKDAY_MAP
 
 
 class VBStatusRequest(BaseModel):
@@ -62,14 +60,76 @@ class VBStatusRequest(BaseModel):
 
 def _is_within_shopee_schedule(store: dict, now_dt: datetime) -> bool:
     """Return whether a store may be manually changed at the current WIB time."""
-    schedule = store.get("shopee_regular_hours")
-    if not isinstance(schedule, dict) or not schedule:
-        return False
-    weekday_name = WEEKDAY_MAP.get(now_dt.weekday(), "Senin")
-    today_hours = schedule.get(weekday_name)
-    if not today_hours:
-        return False
-    return is_within_operating_hours(today_hours, now_dt.time())
+    return db.is_within_shopee_schedule(store.get("shopee_regular_hours"), now_dt)
+
+
+def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
+    return StoreStatusResponse(
+        store_id=store["store_id"],
+        store_name=store["store_name"],
+        merchant_name=store["merchant_name"],
+        nama_portal=store.get("nama_portal", store.get("merchant_name", "")),
+        account_username=store["account_username"],
+        nama_pemilik=store.get("nama_pemilik", ""),
+        paket=store.get("paket", "3 Bulan"),
+        tanggal_mulai_layanan=store.get("tanggal_mulai_layanan", ""),
+        tanggal_berakhir_layanan=store.get("tanggal_berakhir_layanan", ""),
+        vercel_link=store.get("vercel_link", ""),
+        vercel_password=store.get("vercel_password", ""),
+        google_email=store.get("google_email", ""),
+        special_hours=store.get("special_hours", ""),
+        vercel_status=store["vercel_status"],
+        shopee_status=store["shopee_status"],
+        shopee_regular_hours=store.get("shopee_regular_hours") or {},
+        subscription_status=store["subscription_status"],
+        is_suspended=bool(store["is_suspended"]),
+        alasan_penangguhan=store.get("alasan_penangguhan", ""),
+        pause_until=store["pause_until"],
+        last_synced_at=store["last_synced_at"],
+        last_action=store.get("last_action", "no change"),
+        last_toggle_action_raw=store.get("last_toggle_action_raw"),
+        last_toggle_reason=store.get("last_toggle_reason", ""),
+        last_toggle_at=store.get("last_toggle_at"),
+        desired_state=store.get("desired_state"),
+        live_state=store.get("live_state"),
+        bot_phase=store.get("bot_phase"),
+        schedule_available=store.get("schedule_available"),
+        within_operating_schedule=store.get("within_operating_schedule"),
+        display_toggle_on=store.get("display_toggle_on"),
+        display_toggle_disabled=store.get("display_toggle_disabled"),
+        display_toggle_reason=store.get("display_toggle_reason"),
+        display_status_bucket=store.get("display_status_bucket"),
+        display_status_label=store.get("display_status_label"),
+        display_status_tone=store.get("display_status_tone"),
+        display_note=store.get("display_note"),
+    )
+
+
+def _hydrate_outlet_transition(transition: Dict[str, Any]) -> Dict[str, Any]:
+    store_id = str(transition.get("store_id") or "").strip()
+    if not store_id:
+        return dict(transition)
+
+    snapshot = state.get_store_by_id(store_id)
+    if not snapshot:
+        return dict(transition)
+
+    merged = dict(snapshot)
+    merged.update(
+        {
+            "success": transition.get("success", True),
+            "code": transition.get("code"),
+            "detail": transition.get("detail"),
+            "store_id": store_id,
+            "store_name": transition.get("store_name") or snapshot.get("store_name", ""),
+            "owner_name": transition.get("owner_name") or snapshot.get("nama_pemilik", ""),
+            "vercel_status": transition.get("vercel_status", snapshot.get("vercel_status")),
+            "pause_until": transition.get("pause_until", snapshot.get("pause_until")),
+            "changed_at": transition.get("changed_at") or snapshot.get("last_toggle_at"),
+            "reason": transition.get("reason") or snapshot.get("last_toggle_reason", ""),
+        }
+    )
+    return merged
 
 
 # Spreadsheet-backed state has no database startup step.
@@ -392,6 +452,7 @@ def health_check():
 
 @app.get("/api/v1/admin/users", summary="Admin: List All Users & Outlets from PostgreSQL")
 def admin_list_users(admin: dict = Depends(require_admin)):
+    state.sync_expired_user_pauses()
     users_data = state.admin_get_all_users_with_stores()
     return {"success": True, "users": users_data}
 
@@ -732,7 +793,11 @@ def user_pause_store(
     )
     if not transition["success"]:
         raise HTTPException(status_code=403 if transition["code"] in {"suspended", "subscription_expired"} else 404, detail=transition["detail"])
-    realtime.publish_outlet_state_changed(transition, action, "ADMIN" if admin_account else "MITRA")
+    realtime.publish_outlet_state_changed(
+        _hydrate_outlet_transition(transition),
+        action,
+        "ADMIN" if admin_account else "MITRA",
+    )
 
     return {
         "success": True,
@@ -743,7 +808,7 @@ def user_pause_store(
         "pause_start_time": pause_start_time_ms,
         "pause_end_time": pause_end_time_ms,
         "timezone": "Asia/Jakarta (GMT+7)",
-        "message": f"Store {req.store_id} paused for {label}."
+        "message": f"Permintaan tutup sementara tersimpan untuk outlet {req.store_id} ({label})."
     }
 
 
@@ -771,13 +836,17 @@ def user_resume_store(store_id: str = Query(..., description="Target Store ID"))
     )
     if not transition["success"]:
         raise HTTPException(status_code=403 if transition["code"] in {"suspended", "subscription_expired"} else 404, detail=transition["detail"])
-    realtime.publish_outlet_state_changed(transition, "USER_RESUME_STORE", "MITRA")
+    realtime.publish_outlet_state_changed(
+        _hydrate_outlet_transition(transition),
+        "USER_RESUME_STORE",
+        "MITRA",
+    )
 
     return {
         "success": True,
         "store_id": store_id,
         "vercel_status": transition["vercel_status"],
-        "message": f"Store {store_id} Vercel status updated to {transition['vercel_status']}."
+        "message": f"Permintaan buka tersimpan untuk outlet {store_id}."
     }
 
 
@@ -792,72 +861,18 @@ def user_get_history(store_ids: str = Query(..., description="Comma-separated st
 
 @app.get("/api/v1/stores", response_model=List[StoreStatusResponse], summary="Get All Store Statuses")
 def list_stores(admin: dict = Depends(require_admin)):
+    state.sync_expired_user_pauses()
     stores = state.get_all_stores()
-
-    response = []
-    for s in stores:
-        response.append(StoreStatusResponse(
-            store_id=s["store_id"],
-            store_name=s["store_name"],
-            merchant_name=s["merchant_name"],
-            nama_portal=s.get("nama_portal", s.get("merchant_name", "")),
-            account_username=s["account_username"],
-            nama_pemilik=s.get("nama_pemilik", ""),
-            paket=s.get("paket", "3 Bulan"),
-            tanggal_mulai_layanan=s.get("tanggal_mulai_layanan", ""),
-            tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
-            vercel_link=s.get("vercel_link", ""),
-            vercel_password=s.get("vercel_password", ""),
-            google_email=s.get("google_email", ""),
-            special_hours=s.get("special_hours", ""),
-            vercel_status=s["vercel_status"],
-            shopee_status=s["shopee_status"],
-            shopee_regular_hours=s.get("shopee_regular_hours") or {},
-            subscription_status=s["subscription_status"],
-            is_suspended=bool(s["is_suspended"]),
-            alasan_penangguhan=s.get("alasan_penangguhan", ""),
-            pause_until=s["pause_until"],
-            last_synced_at=s["last_synced_at"],
-            last_action=s.get("last_action", "no change"),
-            last_toggle_action_raw=s.get("last_toggle_action_raw"),
-            last_toggle_reason=s.get("last_toggle_reason", ""),
-            last_toggle_at=s.get("last_toggle_at")
-        ))
-    return response
+    return [_build_store_status_response(store) for store in stores]
 
 
 @app.get("/api/v1/stores/{store_id}", response_model=StoreStatusResponse, summary="Get Single Store Status")
 def get_store_detail(store_id: str, admin: dict = Depends(require_admin)):
+    state.sync_expired_user_pauses()
     s = state.get_store_by_id(store_id)
     if not s:
         raise HTTPException(status_code=404, detail=f"Store ID '{store_id}' not found.")
-    return StoreStatusResponse(
-        store_id=s["store_id"],
-        store_name=s["store_name"],
-        merchant_name=s["merchant_name"],
-        nama_portal=s.get("nama_portal", s.get("merchant_name", "")),
-        account_username=s["account_username"],
-        nama_pemilik=s.get("nama_pemilik", ""),
-        paket=s.get("paket", "3 Bulan"),
-        tanggal_mulai_layanan=s.get("tanggal_mulai_layanan", ""),
-        tanggal_berakhir_layanan=s.get("tanggal_berakhir_layanan", ""),
-        vercel_link=s.get("vercel_link", ""),
-        vercel_password=s.get("vercel_password", ""),
-        google_email=s.get("google_email", ""),
-        special_hours=s.get("special_hours", ""),
-        vercel_status=s["vercel_status"],
-        shopee_status=s["shopee_status"],
-        shopee_regular_hours=s.get("shopee_regular_hours") or {},
-        subscription_status=s["subscription_status"],
-        is_suspended=bool(s["is_suspended"]),
-        alasan_penangguhan=s.get("alasan_penangguhan", ""),
-        pause_until=s["pause_until"],
-        last_synced_at=s["last_synced_at"],
-        last_action=s.get("last_action", "no change"),
-        last_toggle_action_raw=s.get("last_toggle_action_raw"),
-        last_toggle_reason=s.get("last_toggle_reason", ""),
-        last_toggle_at=s.get("last_toggle_at")
-    )
+    return _build_store_status_response(s)
 
 
 @app.post("/api/v1/toggle", summary="Toggle Vercel status for store")
@@ -884,7 +899,7 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
     if not transition["success"]:
         raise HTTPException(status_code=404, detail=transition["detail"])
     realtime.publish_outlet_state_changed(
-        transition,
+        _hydrate_outlet_transition(transition),
         "ADMIN_PAUSE_STORE" if next_status == "OFF" else "ADMIN_RESUME_STORE",
         "ADMIN",
     )

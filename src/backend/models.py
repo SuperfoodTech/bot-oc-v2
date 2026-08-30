@@ -42,6 +42,18 @@ class StoreStatusResponse(BaseModel):
     last_toggle_action_raw: Optional[str] = None
     last_toggle_reason: Optional[str] = ""
     last_toggle_at: Optional[str] = None
+    desired_state: Optional[str] = None
+    live_state: Optional[str] = None
+    bot_phase: Optional[str] = None
+    schedule_available: Optional[bool] = None
+    within_operating_schedule: Optional[bool] = None
+    display_toggle_on: Optional[bool] = None
+    display_toggle_disabled: Optional[bool] = None
+    display_toggle_reason: Optional[str] = None
+    display_status_bucket: Optional[str] = None
+    display_status_label: Optional[str] = None
+    display_status_tone: Optional[str] = None
+    display_note: Optional[str] = None
 
 
 class SyncResponse(BaseModel):
