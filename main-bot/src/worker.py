@@ -78,18 +78,32 @@ def _pause_end_time_ms(outlet: MerchantOutlet):
 
 def _normalize_shopee_regular_hours(payload: Dict[str, Any]) -> Dict[str, List[str]]:
     """Convert Shopee regular-hours relative seconds into read-only WIB ranges."""
-    day_names = {1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu", 7: "Minggu"}
+    # Shopee regular-hours API uses 1=Sunday through 7=Saturday.
+    day_names = {1: "Minggu", 2: "Senin", 3: "Selasa", 4: "Rabu", 5: "Kamis", 6: "Jumat", 7: "Sabtu"}
     normalized = {name: [] for name in day_names.values()}
     for day in payload.get("regular_hours", []) if isinstance(payload, dict) else []:
-        name = day_names.get(int(day.get("weekday", 0)))
+        if not isinstance(day, dict):
+            continue
+        try:
+            name = day_names.get(int(day.get("weekday", 0)))
+        except (TypeError, ValueError):
+            continue
         if not name or not day.get("config_enabled"):
             continue
-        for interval in day.get("intervals", []):
-            start = max(0, int(interval.get("start_relative_sec", 0)))
-            end = max(0, int(interval.get("end_relative_sec", 0)))
-            if end <= start:
+        for interval in day.get("intervals", []) or []:
+            if not isinstance(interval, dict):
                 continue
-            normalized[name].append(f"{start // 3600:02d}:{(start % 3600) // 60:02d}-{end // 3600:02d}:{(end % 3600) // 60:02d}")
+            try:
+                start = max(0, int(interval.get("start_relative_sec", 0)))
+                end = max(0, int(interval.get("end_relative_sec", 0)))
+            except (TypeError, ValueError):
+                continue
+            if end <= start or end > 24 * 60 * 60:
+                continue
+            value = f"{start // 3600:02d}:{(start % 3600) // 60:02d}-{end // 3600:02d}:{(end % 3600) // 60:02d}"
+            if value not in normalized[name]:
+                normalized[name].append(value)
+        normalized[name].sort()
     return normalized
 
 
@@ -420,21 +434,27 @@ def sync_all_stores(
                         shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
                         if isinstance(shopee_hours, dict) and "regular_hours" in shopee_hours:
                             normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
-                            outlet.regular_hours = normalized_hours
-                            outlet.shopee_regular_hours = normalized_hours
-
-                            try:
-                                db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
-                            except Exception as persist_err:
+                            if not any(normalized_hours.values()):
                                 log.warning(
-                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Jadwal Shopee Store {outlet.store_id} berhasil diambil "
-                                    f"tetapi gagal disimpan ke DB: {persist_err}"
+                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} "
+                                    "tidak memiliki interval valid. Jadwal terakhir tetap dipakai."
                                 )
                             else:
-                                log.info(
-                                    f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan "
-                                    f"({sum(bool(v) for v in normalized_hours.values())} hari aktif)."
-                                )
+                                outlet.regular_hours = normalized_hours
+                                outlet.shopee_regular_hours = normalized_hours
+
+                                try:
+                                    db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                                except Exception as persist_err:
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Jadwal Shopee Store {outlet.store_id} berhasil diambil "
+                                        f"tetapi gagal disimpan ke DB: {persist_err}"
+                                    )
+                                else:
+                                    log.info(
+                                        f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan "
+                                        f"({sum(bool(v) for v in normalized_hours.values())} hari aktif)."
+                                    )
                         elif shopee_hours is None:
                             log.info(
                                 f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "

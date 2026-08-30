@@ -8,6 +8,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from backend.db import normalize_shopee_regular_hours
 from core.decision import (
     ACTION_CLOSE,
     ACTION_OPEN,
@@ -126,3 +127,42 @@ def test_toggle_on_reopens_closed_store_during_regular_hours():
     assert decision.target_state == TARGET_OPEN
     assert decision.action == ACTION_OPEN
     assert "Vercel Toggle = ON" in decision.reason
+
+
+def test_shopee_schedule_normalizer_preserves_multiple_intervals_per_day():
+    normalized = normalize_shopee_regular_hours({
+        "regular_hours": [
+            {
+                "weekday": 7,
+                "config_enabled": True,
+                "intervals": [
+                    {"start_relative_sec": 43200, "end_relative_sec": 49200},
+                    {"start_relative_sec": 50400, "end_relative_sec": 54000},
+                    {"start_relative_sec": "invalid", "end_relative_sec": 54000},
+                ],
+            }
+        ]
+    })
+
+    assert normalized == {"Sabtu": ["12:00-13:40", "14:00-15:00"]}
+
+
+def test_empty_shopee_schedule_is_not_a_usable_replacement():
+    assert normalize_shopee_regular_hours({"regular_hours": []}) == {}
+
+
+def test_shopee_weekday_mapping_uses_sunday_as_api_day_one():
+    normalized = normalize_shopee_regular_hours({
+        "regular_hours": [
+            {"weekday": 1, "config_enabled": True, "intervals": [
+                {"start_relative_sec": 0, "end_relative_sec": 3600},
+            ]},
+            {"weekday": 7, "config_enabled": True, "intervals": [
+                {"start_relative_sec": 3600, "end_relative_sec": 7200},
+            ]},
+        ]
+    })
+
+    assert normalized["Minggu"] == ["00:00-01:00"]
+    assert normalized["Sabtu"] == ["01:00-02:00"]
+    assert "Senin" not in normalized

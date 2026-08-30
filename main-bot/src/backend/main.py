@@ -7,7 +7,8 @@ FastAPI Backend Application serving REST API endpoints, Admin Desktop Dashboard,
 import sys
 from pathlib import Path
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -38,6 +39,35 @@ from backend.models import (
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 PORT = os.getenv("PORT", "8080")
 PROD_HOST = os.getenv("PROD_HOST", "168.144.143.203")
+
+
+def _next_operational_start(schedule, now_dt):
+    if not schedule:
+        return None
+    local_tz = ZoneInfo("Asia/Jakarta")
+    if now_dt.tzinfo is None:
+        now_dt = now_dt.replace(tzinfo=local_tz)
+    else:
+        now_dt = now_dt.astimezone(local_tz)
+    day_names = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
+    for offset in range(1, 8):
+        date_value = now_dt.date() + timedelta(days=offset)
+        day = day_names[date_value.weekday()]
+        starts = []
+        values = schedule.get(day, []) if isinstance(schedule, dict) else []
+        if not isinstance(values, (list, tuple)):
+            values = [values]
+        for value in values:
+            try:
+                start = str(value).split("-", 1)[0].strip()
+                hour, minute = (int(part) for part in start.split(":", 1))
+                if 0 <= hour < 24 and 0 <= minute < 60:
+                    starts.append(hour * 60 + minute)
+            except (ValueError, TypeError):
+                continue
+        if starts:
+            return datetime.combine(date_value, time.min, tzinfo=local_tz) + timedelta(minutes=min(starts))
+    return None
 
 def get_app_base_url(request: Request = None) -> str:
     """
@@ -318,10 +348,10 @@ def user_pause_store(req: UserPauseRequest):
         duration_mins = 60
         label = "60 Menit"
     elif dtype in ("rest_of_day", "sepanjang_hari", "today"):
-        midnight = datetime(now_dt.year, now_dt.month, now_dt.day, 23, 59, 59)
-        duration_mins = int((midnight - now_dt).total_seconds() // 60)
-        if duration_mins < 10:
-            duration_mins = 60
+        pause_until_dt = _next_operational_start(store.get("shopee_regular_hours"), now_dt)
+        if pause_until_dt is None:
+            raise HTTPException(status_code=422, detail="Jadwal operasional hari berikutnya belum tersedia.")
+        duration_mins = int((pause_until_dt - now_dt.replace(tzinfo=pause_until_dt.tzinfo)).total_seconds() // 60)
         label = "Sepanjang Hari"
     elif dtype in ("custom", "waktu_lain"):
         duration_mins = req.custom_minutes or 120
@@ -330,7 +360,8 @@ def user_pause_store(req: UserPauseRequest):
         duration_mins = 1440
         label = "Default (1 Hari)"
 
-    pause_until_dt = now_dt + timedelta(minutes=duration_mins)
+    if dtype not in ("rest_of_day", "sepanjang_hari", "today"):
+        pause_until_dt = now_dt + timedelta(minutes=duration_mins)
     pause_until_str = pause_until_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     db.update_vercel_toggle(req.store_id, "OFF", pause_until_str)

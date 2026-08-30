@@ -13,7 +13,9 @@ from pydantic import BaseModel, Field
 class ToggleRequest(BaseModel):
     store_id: str = Field(..., description="Target Shopee Store ID")
     status: str = Field(..., description="'ON' or 'OFF'")
-    pause_duration_minutes: Optional[int] = Field(default=1440, description="Pause duration in minutes if status is OFF")
+    pause_duration_minutes: Optional[int] = Field(default=None, description="Legacy explicit pause duration in minutes")
+    duration_type: Optional[str] = Field(default=None, description="'rest_of_day', '30_min', '60_min', or 'custom'")
+    custom_until: Optional[str] = Field(default=None, description="Custom pause end time in local ISO format")
 
 
 class StoreStatusResponse(BaseModel):
@@ -37,6 +39,7 @@ class StoreStatusResponse(BaseModel):
     is_suspended: bool
     alasan_penangguhan: Optional[str] = ""
     pause_until: Optional[str] = None
+    pause_mode: Optional[str] = None
     last_synced_at: Optional[str] = None
     last_action: Optional[str] = "no change"
     last_toggle_action_raw: Optional[str] = None
@@ -148,6 +151,6 @@ class UserLoginRequest(BaseModel):
 
 class UserPauseRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
-    duration_type: str = Field(..., description="'30_min', '60_min', legacy 'rest_of_day' (24 jam), or 'custom'")
+    duration_type: str = Field(..., description="'30_min', '60_min', 'rest_of_day' (sesi pertama hari berikutnya), or 'custom'")
     custom_until: Optional[str] = Field(default=None, description="Target pause end time in local ISO format when duration_type is custom")
     custom_minutes: Optional[int] = Field(default=None, description="Legacy custom pause duration in minutes")

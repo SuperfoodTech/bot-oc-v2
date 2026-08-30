@@ -385,6 +385,7 @@ label {
 
 .outlet-schedule-row {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 6px 0;
@@ -394,10 +395,15 @@ label {
 }
 
 .outlet-schedule-row strong {
-  min-width: 70px;
+  flex: 0 0 70px;
+  min-width: 0;
 }
 
 .outlet-schedule-row span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
   text-align: right;
   font-weight: 700;
 }
@@ -1516,6 +1522,7 @@ input:checked + .slider::before {
 
 .admin-schedule-row {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 7px 0;
@@ -1525,6 +1532,10 @@ input:checked + .slider::before {
 }
 
 .admin-schedule-row span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
   text-align: right;
   font-weight: 700;
 }
@@ -6755,12 +6766,14 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 }
 
 .mobile-wrapper.is-dashboard-view .outlet-schedule-row strong {
-  min-width: 74px;
+  flex-basis: 74px;
 }
 
 .mobile-wrapper.is-dashboard-view .outlet-schedule-row span {
+  min-width: 0;
   color: #475569;
   font-weight: 700;
+  line-height: 1.45;
   text-align: right;
 }
 

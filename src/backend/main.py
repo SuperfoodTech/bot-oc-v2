@@ -32,7 +32,7 @@ from fastapi.templating import Jinja2Templates
 from backend import db, realtime, state, worker
 from backend import apps_script
 from backend import vb
-from backend.pause_utils import resolve_pause_window
+from backend.pause_utils import FULL_DAY_MINUTES, resolve_pause_window
 from backend.models import (
     ToggleRequest,
     StoreStatusResponse,
@@ -85,6 +85,7 @@ def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
         is_suspended=bool(store["is_suspended"]),
         alasan_penangguhan=store.get("alasan_penangguhan", ""),
         pause_until=store["pause_until"],
+        pause_mode=store.get("pause_mode"),
         last_synced_at=store["last_synced_at"],
         last_action=store.get("last_action", "no change"),
         last_toggle_action_raw=store.get("last_toggle_action_raw"),
@@ -489,13 +490,17 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
     if requested == "PAUSED":
         now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
         try:
-            pause_until, _duration_mins, _label = resolve_pause_window(
-                now_dt,
-                req.duration_type or "",
-                custom_until=req.custom_until,
-                custom_minutes=req.custom_minutes,
-                allow_default=False,
-            )
+            if (req.duration_type or "").strip().lower() in {"rest_of_day", "sepanjang_hari", "today"}:
+                # VB brands do not have Shopee operating-hour schedules.
+                pause_until = now_dt + timedelta(minutes=FULL_DAY_MINUTES)
+            else:
+                pause_until, _duration_mins, _label = resolve_pause_window(
+                    now_dt,
+                    req.duration_type or "",
+                    custom_until=req.custom_until,
+                    custom_minutes=req.custom_minutes,
+                    allow_default=False,
+                )
         except ValueError as exc:
             message = str(exc)
             if message == "Durasi pause wajib dipilih.":
@@ -762,9 +767,11 @@ def user_pause_store(
         raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
 
     try:
+        pause_mode = "REST_OF_DAY" if req.duration_type.strip().lower() in {"rest_of_day", "sepanjang_hari", "today"} else ("CUSTOM" if req.duration_type.strip().lower() in {"custom", "waktu_lain"} else "FIXED_DURATION")
         pause_until_dt, duration_mins, label = resolve_pause_window(
             now_dt,
             req.duration_type,
+            schedule=store.get("shopee_regular_hours") or {},
             custom_until=req.custom_until,
             custom_minutes=req.custom_minutes,
         )
@@ -790,6 +797,7 @@ def user_pause_store(
         action=action,
         target_state="CLOSED",
         reason=reason,
+        pause_mode=pause_mode,
     )
     if not transition["success"]:
         raise HTTPException(status_code=403 if transition["code"] in {"suspended", "subscription_expired"} else 404, detail=transition["detail"])
@@ -882,9 +890,35 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
     next_status = req.status.upper()
     pause_until = None
-    if next_status == "OFF" and req.pause_duration_minutes:
-        pause_dt = datetime.now(ZoneInfo("Asia/Jakarta")) + timedelta(minutes=req.pause_duration_minutes)
-        pause_until = pause_dt
+    pause_label = ""
+    pause_mode = None
+    if next_status == "OFF":
+        now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+        try:
+            if req.duration_type:
+                pause_mode = "REST_OF_DAY" if req.duration_type.strip().lower() in {"rest_of_day", "sepanjang_hari", "today"} else "CUSTOM"
+                pause_until, _duration_mins, pause_label = resolve_pause_window(
+                    now_dt,
+                    req.duration_type,
+                    schedule=store.get("shopee_regular_hours") or {},
+                    custom_until=req.custom_until,
+                    custom_minutes=req.pause_duration_minutes,
+                )
+            elif req.pause_duration_minutes is not None:
+                pause_mode = "FIXED_DURATION"
+                if req.pause_duration_minutes <= 0:
+                    raise ValueError("Durasi pause harus lebih besar dari 0 menit.")
+                pause_until = now_dt + timedelta(minutes=req.pause_duration_minutes)
+                pause_label = f"{req.pause_duration_minutes} Menit"
+            else:
+                pause_mode = "REST_OF_DAY"
+                pause_until, _duration_mins, pause_label = resolve_pause_window(
+                    now_dt,
+                    "rest_of_day",
+                    schedule=store.get("shopee_regular_hours") or {},
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     pause_until_str = pause_until.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S") if pause_until else ""
     transition = state.apply_admin_toggle(
         store_id=req.store_id,
@@ -892,7 +926,8 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
         pause_until=pause_until,
         action="ADMIN_PAUSE_STORE" if next_status == "OFF" else "ADMIN_RESUME_STORE",
         target_state="CLOSED" if next_status == "OFF" else "OPEN",
-        reason=(f"Admin {admin.get('username')} set store OFF via Dashboard until {pause_until_str} WIB" if next_status == "OFF" and pause_until_str
+        pause_mode=pause_mode,
+        reason=(f"Admin {admin.get('username')} set store OFF via Dashboard ({pause_label}) until {pause_until_str} WIB" if next_status == "OFF" and pause_until_str
                 else f"Admin {admin.get('username')} set store OFF via Dashboard" if next_status == "OFF"
                 else f"Admin {admin.get('username')} set store ON via Dashboard"),
     )

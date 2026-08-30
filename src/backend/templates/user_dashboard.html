@@ -62,14 +62,25 @@
               <p id="userLoginError" class="mitra-login-error" role="alert" aria-live="assertive" hidden></p>
               <button id="userLoginSubmitBtn" type="submit" class="btn-primary mitra-login-submit">Masuk</button>
             </form>
-            <div class="auth-trust-note" aria-label="Informasi akses akun">
-              <div class="auth-trust-note-icon">
-                <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
-              </div>
-              <div class="auth-trust-note-copy">
-                <strong>Akses aman untuk mitra terdaftar</strong>
-                <p>Masuk dengan kata sandi dari admin untuk melihat status outlet dan otomatisasi FoodMaster.</p>
-              </div>
+            <div class="auth-highlights" aria-label="Keunggulan FoodMaster">
+              <article class="auth-highlight">
+                <div class="auth-highlight-icon is-shield">
+                  <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
+                </div>
+                <div class="auth-highlight-copy">
+                  <strong>Akses aman untuk mitra terdaftar</strong>
+                  <p>Data outlet Anda terlindungi dengan sistem keamanan FoodMaster.</p>
+                </div>
+              </article>
+              <article class="auth-highlight is-automation">
+                <div class="auth-highlight-icon is-shopeefood">
+                  <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+                </div>
+                <div class="auth-highlight-copy">
+                  <strong>ShopeeFood Auto Open/Close Bot</strong>
+                  <p>Kelola outlet Anda jauh lebih mudah dengan proses operasional outlet yang efisien.</p>
+                </div>
+              </article>
             </div>
             <div class="google-auth-option" style="display: none;">
               <div class="login-divider">ATAU</div>
@@ -206,7 +217,7 @@
             <input type="radio" name="pauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta">24 jam</span>
+          <span class="radio-meta">Sesi pertama besok</span>
         </label>
 
         <label class="radio-card">
@@ -938,11 +949,12 @@
 
     function normalizeOutletSchedule(schedule) {
       const names = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const shopeeDayNames = { 1: 'Minggu', 2: 'Senin', 3: 'Selasa', 4: 'Rabu', 5: 'Kamis', 6: 'Jumat', 7: 'Sabtu' };
       const result = {};
       names.forEach(name => { result[name] = []; });
       if (Array.isArray(schedule)) {
         schedule.forEach(day => {
-          const name = names[Number(day.weekday) % 7] || names[Number(day.weekday)];
+          const name = shopeeDayNames[Number(day.weekday)] || names[Number(day.weekday)];
           if (!name || !day.config_enabled) return;
           (day.intervals || []).forEach(interval => {
             const start = Number(interval.start_relative_sec || 0);
@@ -1472,8 +1484,27 @@
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
       if (durationType === '30_min') return '30 menit';
       if (durationType === '60_min') return '60 menit';
-      if (durationType === 'rest_of_day') return '24 jam';
+      if (durationType === 'rest_of_day') return 'sesi pertama besok';
       return 'sesuai waktu yang dipilih';
+    }
+
+    function getNextOperationalSessionDate(outlet, now = new Date()) {
+      const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
+      const nowParts = getWibParts(now);
+      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00+07:00`);
+      for (let offset = 1; offset <= 7; offset += 1) {
+        const candidateDate = new Date(baseDate.getTime() + (offset * 24 * 60 * 60 * 1000));
+        const candidateParts = getWibParts(candidateDate);
+        const interval = (schedule[candidateParts.weekday] || [])
+          .map(parseScheduleRange)
+          .filter(Boolean)
+          .sort((a, b) => a.start - b.start)[0];
+        if (!interval) continue;
+        const hour = String(Math.floor(interval.start / 60)).padStart(2, '0');
+        const minute = String(interval.start % 60).padStart(2, '0');
+        return new Date(`${candidateParts.year}-${candidateParts.month}-${candidateParts.day}T${hour}:${minute}:00+07:00`);
+      }
+      return null;
     }
 
     function updatePauseEndPreview() {
@@ -1481,8 +1512,11 @@
       if (!preview) return;
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
       if (durationType === 'rest_of_day') {
-        const end = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        preview.textContent = `Berakhir pada ${formatPauseTargetDate(end)}`;
+        const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
+        const nextSession = outlet && getNextOperationalSessionDate(outlet);
+        preview.textContent = nextSession
+          ? `Buka kembali ${formatPauseTargetDate(nextSession)}`
+          : 'Buka kembali pada sesi operasional berikutnya';
         return;
       }
       if (durationType === 'custom') {

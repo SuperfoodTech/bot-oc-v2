@@ -69,7 +69,8 @@ def _pause_end_time_ms(outlet: MerchantOutlet):
 
 def _normalize_shopee_regular_hours(payload: Dict[str, Any]) -> Dict[str, List[str]]:
     """Convert Shopee regular-hours relative seconds into read-only WIB ranges."""
-    day_names = {1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu", 7: "Minggu"}
+    # Shopee regular-hours API uses 1=Sunday through 7=Saturday.
+    day_names = {1: "Minggu", 2: "Senin", 3: "Selasa", 4: "Rabu", 5: "Kamis", 6: "Jumat", 7: "Sabtu"}
     normalized = {name: [] for name in day_names.values()}
     for day in payload.get("regular_hours", []) if isinstance(payload, dict) else []:
         name = day_names.get(int(day.get("weekday", 0)))

@@ -38,6 +38,7 @@ import scheduler
 log = get_logger("daemon")
 
 RUNNING = True
+IDLE_REEVALUATION_SECONDS = 30
 
 
 import fcntl
@@ -214,13 +215,21 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             processed_keys = set()
             cycle_actions = []
             total_stores_processed = 0
+            total_outlets_loaded = 0
             last_result = {}
+            initial_patrol_pending = True
             while RUNNING:
                 current_outlets = db.fetch_merchant_outlets_from_db()
+                total_outlets_loaded = max(total_outlets_loaded, len(current_outlets))
                 queue = scheduler.build_queue(current_outlets)
                 available = [item for item in queue if item.merchant_key not in processed_keys]
                 selected = scheduler.select_next_group(available)
+                if selected is None and initial_patrol_pending and available:
+                    # A fresh process must read live state once before trusting
+                    # cached heartbeat due times from the database.
+                    selected = available[0]
                 if selected is None:
+                    initial_patrol_pending = False
                     next_sleep_seconds = scheduler.seconds_until_next(queue, fallback_seconds=interval_seconds)
                     next_sleep_reason = "merchant group berikutnya jatuh tempo"
                     break
@@ -249,14 +258,23 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             result = {
                 "success": True,
                 "total_stores_processed": total_stores_processed,
+                "total_outlets_loaded": total_outlets_loaded,
                 "actions_taken": cycle_actions,
                 "next_wake_hint_seconds": next_sleep_seconds,
                 "next_wake_hint_reason": next_sleep_reason,
                 "processed_merchant_groups": last_result.get("processed_merchant_groups", []),
             }
-            log.info(f"  ✅ Cycle #{cycle_count} Finished. Stores Processed: {result['total_stores_processed']}")
+            log.info(
+                f"  ✅ Cycle #{cycle_count} Finished. Runtime outlets loaded: {result['total_outlets_loaded']} | "
+                f"Stores processed: {result['total_stores_processed']}"
+            )
             next_sleep_seconds = max(1, int(result.get("next_wake_hint_seconds") or interval_seconds))
             next_sleep_reason = result.get("next_wake_hint_reason") or "default interval"
+            if next_sleep_seconds > IDLE_REEVALUATION_SECONDS:
+                # Rebuild the DB-backed queue frequently so dashboard changes
+                # can interrupt a stale heartbeat or boundary hint.
+                next_sleep_seconds = IDLE_REEVALUATION_SECONDS
+                next_sleep_reason = "re-evaluasi state ringan"
             
             try:
                 import bot_api

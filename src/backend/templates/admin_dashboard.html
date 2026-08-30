@@ -348,7 +348,7 @@
             <input type="radio" name="adminPauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta">24 jam</span>
+          <span class="radio-meta">Sesi pertama besok</span>
         </label>
 
         <label class="radio-card">
@@ -2209,8 +2209,36 @@
       const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
       if (durationType === '30_min') return '30 menit';
       if (durationType === '60_min') return '60 menit';
-      if (durationType === 'rest_of_day') return '24 jam';
+      if (durationType === 'rest_of_day') return 'sesi pertama besok';
       return 'sesuai waktu yang dipilih';
+    }
+
+    function getNextAdminOperationalSessionDate(store, now = new Date()) {
+      const schedule = getAdminScheduleData(store);
+      const names = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const nowParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(now).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const baseDate = new Date(`${nowParts.year}-${nowParts.month}-${nowParts.day}T00:00:00+07:00`);
+      for (let offset = 1; offset <= 7; offset += 1) {
+        const candidateDate = new Date(baseDate.getTime() + (offset * 24 * 60 * 60 * 1000));
+        const candidateParts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long'
+        }).formatToParts(candidateDate).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+        const candidateDayName = new Intl.DateTimeFormat('id-ID', {
+          timeZone: 'Asia/Jakarta', weekday: 'long'
+        }).format(candidateDate);
+        const intervals = Array.isArray(schedule[candidateDayName])
+          ? schedule[candidateDayName]
+          : (schedule[candidateDayName] ? [schedule[candidateDayName]] : []);
+        const starts = intervals.map(value => String(value || '').match(/^(\d{1,2}):(\d{2})-/))
+          .filter(Boolean).map(match => Number(match[1]) * 60 + Number(match[2])).sort((a, b) => a - b);
+        if (!starts.length) continue;
+        const hour = String(Math.floor(starts[0] / 60)).padStart(2, '0');
+        const minute = String(starts[0] % 60).padStart(2, '0');
+        return new Date(`${candidateParts.year}-${candidateParts.month}-${candidateParts.day}T${hour}:${minute}:00+07:00`);
+      }
+      return null;
     }
 
     function formatAdminPauseTargetDate(date) {
@@ -2226,8 +2254,11 @@
       if (!preview) return;
       const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
       if (durationType === 'rest_of_day') {
-        const end = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        preview.textContent = `Berakhir pada ${formatAdminPauseTargetDate(end)}`;
+        const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
+        const nextSession = store && getNextAdminOperationalSessionDate(store);
+        preview.textContent = nextSession
+          ? `Buka kembali ${formatAdminPauseTargetDate(nextSession)}`
+          : 'Buka kembali pada sesi operasional berikutnya';
         return;
       }
       if (durationType === 'custom') {

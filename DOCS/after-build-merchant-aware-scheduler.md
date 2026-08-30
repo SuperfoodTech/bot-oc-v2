@@ -216,7 +216,7 @@ setelah boundary terlewati.
 | Dua sync overlap dalam process | `SYNC_LOCK` mencegah eksekusi bersamaan. |
 | Salah merchant atau outlet context | Merchant context dan `storeId` divalidasi sebelum fetch/action. |
 | Session browser mati | Recovery dicoba sebelum melanjutkan. |
-| Fetch jadwal sementara gagal | Jadwal valid terakhir dipertahankan. |
+| Fetch jadwal sementara gagal, kosong, atau malformed | Jadwal valid terakhir dipertahankan; hanya payload dengan interval valid yang boleh menggantikan cache. |
 | Pause expired di dashboard | Endpoint admin menyinkronkan pause expired sebelum response. |
 | Overnight Shopee | Tidak memakai satu interval overnight; lintas tengah malam dibuat dua jadwal. |
 
@@ -248,7 +248,7 @@ ketersediaan jaringan, dan hasil verification action.
 Verifikasi build terakhir:
 
 ```text
-21 passed
+25 passed
 python compile check: berhasil
 git diff --check: bersih
 ```

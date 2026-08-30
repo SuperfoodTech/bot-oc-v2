@@ -26,13 +26,14 @@ WEEKDAY_NAMES = {
     6: "Minggu",
 }
 SCHEDULE_DAY_NAMES = {
-    1: "Senin",
-    2: "Selasa",
-    3: "Rabu",
-    4: "Kamis",
-    5: "Jumat",
-    6: "Sabtu",
-    7: "Minggu",
+    # Shopee regular-hours API uses 1=Sunday through 7=Saturday.
+    1: "Minggu",
+    2: "Senin",
+    3: "Selasa",
+    4: "Rabu",
+    5: "Kamis",
+    6: "Jumat",
+    7: "Sabtu",
 }
 SCHEDULE_DAY_ORDER = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
 SCHEDULE_RANGE_RE = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
@@ -71,6 +72,12 @@ def init_db() -> None:
         migration9_path = base_dir / "009_expand_shopee_actual_status.sql"
         if migration9_path.exists():
             conn.execute(migration9_path.read_text(encoding="utf-8"))
+        migration10_path = base_dir / "010_fix_shopee_weekday_mapping.sql"
+        if migration10_path.exists():
+            conn.execute(migration10_path.read_text(encoding="utf-8"))
+        migration11_path = base_dir / "011_pause_mode.sql"
+        if migration11_path.exists():
+            conn.execute(migration11_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -577,8 +584,14 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
                 hours_map[oid][names[hr["weekday"]]] = f"{ot}-{ct}"
             else:
                 hours_map[oid][names[hr["weekday"]]] = ""
+        pause_mode_rows = conn.execute(
+            "SELECT outlet_id, pause_mode FROM outlet_states WHERE outlet_id = ANY(%s)",
+            (outlet_ids,),
+        ).fetchall()
+        pause_mode_map = {row["outlet_id"]: row["pause_mode"] for row in pause_mode_rows}
         for r in rows:
             r["regular_hours"] = hours_map.get(r["outlet_uuid"], {})
+            r["pause_mode"] = pause_mode_map.get(r["outlet_uuid"])
             r["special_hours"] = r.get("special_hours") or ""
             r["shopee_status"] = _normalize_persisted_shopee_status(r.get("shopee_status"))
             r["shopee_regular_hours"] = normalize_shopee_regular_hours(r.get("shopee_regular_hours"))
@@ -728,6 +741,7 @@ def _apply_toggle_transaction(
     action: str,
     target_state: str,
     reason: str,
+    pause_mode: Optional[str],
     reject_suspended: bool,
     reject_expired_on: bool,
 ) -> Dict[str, Any]:
@@ -779,6 +793,7 @@ def _apply_toggle_transaction(
             UPDATE outlet_states
                SET vercel_status=%s,
                    pause_until=%s,
+                   pause_mode=%s,
                    last_action_at=now(),
                    last_checked_at=now(),
                    updated_at=now()
@@ -786,7 +801,7 @@ def _apply_toggle_transaction(
          RETURNING vercel_status, pause_until::text AS pause_until,
                    last_action_at::text AS changed_at
             """,
-            (effective_status, next_pause_until, row["outlet_id"]),
+            (effective_status, next_pause_until, pause_mode if normalized_status == "OFF" else None, row["outlet_id"]),
         ).fetchone()
         conn.execute(
             """
@@ -813,22 +828,23 @@ def _apply_toggle_transaction(
             "owner_name": row["owner_name"],
             "vercel_status": updated["vercel_status"],
             "pause_until": updated["pause_until"],
+            "pause_mode": pause_mode if normalized_status == "OFF" else None,
             "changed_at": updated["changed_at"],
             "reason": reason,
         }
 
 
-def apply_user_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str) -> Dict[str, Any]:
+def apply_user_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str, pause_mode: Optional[str] = None) -> Dict[str, Any]:
     return _apply_toggle_transaction(
-        store_id, status, pause_until, action, target_state, reason,
+        store_id, status, pause_until, action, target_state, reason, pause_mode,
         reject_suspended=True,
         reject_expired_on=True,
     )
 
 
-def apply_admin_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str) -> Dict[str, Any]:
+def apply_admin_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str, pause_mode: Optional[str] = None) -> Dict[str, Any]:
     return _apply_toggle_transaction(
-        store_id, status, pause_until, action, target_state, reason,
+        store_id, status, pause_until, action, target_state, reason, pause_mode,
         reject_suspended=False,
         reject_expired_on=False,
     )
