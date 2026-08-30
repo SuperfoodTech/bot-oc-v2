@@ -1,7 +1,7 @@
 """
-main-bot/src/logger.py
+main-bot/src/client.py
 ======================
-Re-exports logger utility from central core module (src/core/logger.py).
+Re-exports Shopee Partner client from central core module (src/core/client.py).
 """
 
 import sys
@@ -13,4 +13,4 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from core.logger import *  # noqa: F401, F403
+from core.client import *  # noqa: F401, F403

@@ -15,11 +15,19 @@ def ensure_business_hours_page(driver, store_id: str) -> bool:
         return False
 
     target_url = f"https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}"
-    current_url = str(driver.current_url or "").lower()
+    try:
+        current_url = str(driver.current_url or "").lower()
+    except Exception as exc:
+        log.warning(f"  ⚠️ [NAVIGATE BUSINESS HOURS] Tidak bisa membaca current_url untuk Store {store_id}: {exc}")
+        return False
     
     if f"storeid={store_id}".lower() not in current_url:
         log.info(f"🌐 [NAVIGATE BUSINESS HOURS] Navigasi browser ke menu business hours untuk store {store_id}: {target_url}")
-        driver.get(target_url)
+        try:
+            driver.get(target_url)
+        except Exception as exc:
+            log.warning(f"  ⚠️ [NAVIGATE BUSINESS HOURS] Navigasi gagal untuk Store {store_id}: {exc}")
+            return False
         time.sleep(2.0)
 
     # Verifikasi langsung keterdeteksian menu Business Hours untuk target store_id
@@ -27,16 +35,22 @@ def ensure_business_hours_page(driver, store_id: str) -> bool:
     for attempt in range(1, 4):
         try:
             check_res = driver.execute_script("""
+                var targetStoreId = String(arguments[0] || '').trim().toLowerCase();
                 var bodyText = (document.body ? document.body.innerText : '').toLowerCase();
                 var hasKeywords = bodyText.includes('jam operasional') || bodyText.includes('tutup outlet') || bodyText.includes('buka outlet');
                 var currUrl = window.location.href.toLowerCase();
+                var storeParam = '';
+                try {
+                    storeParam = String(new URL(window.location.href).searchParams.get('storeId') || '').trim().toLowerCase();
+                } catch (e) {}
                 return {
                     url_match: currUrl.includes('business-hours'),
+                    store_match: !!targetStoreId && storeParam === targetStoreId,
                     has_keywords: hasKeywords
                 };
-            """)
+            """, str(store_id))
             
-            if check_res and check_res.get("url_match") and check_res.get("has_keywords"):
+            if check_res and check_res.get("url_match") and check_res.get("store_match") and check_res.get("has_keywords"):
                 is_loaded = True
                 log.info(f"  ✅ [VERIFY BUSINESS HOURS] Outlet Store {store_id} BERHASIL TERDETEKSI & TER-LOAD di menu Business Hours! (URL: {driver.current_url})")
                 break
@@ -63,7 +77,9 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        ensure_business_hours_page(driver, store_id)
+        if not ensure_business_hours_page(driver, store_id):
+            log.warning(f"  ⚠️ [LIVE STORE API] Business Hours page untuk Store {store_id} belum tervalidasi. Skip fetch live state.")
+            return None
 
         log.info(f"📊 [LIVE STORE API] Fetching real-time store state via /api/seller/store for Store {store_id}...")
 
@@ -124,6 +140,7 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 "order_enabled": order_enabled,
                 "status_str": status_str,
                 "pause_info": pause_time,
+                "timezone": store_data.get("timezone"),
                 "raw": op_data
             }
 
@@ -177,7 +194,9 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        ensure_business_hours_page(driver, store_id)
+        if not ensure_business_hours_page(driver, store_id):
+            log.warning(f"  ⚠️ [REGULAR HOURS API] Business Hours page untuk Store {store_id} belum tervalidasi. Skip fetch schedule.")
+            return None
 
         log.info(f"🕒 [PULL REGULAR HOURS] Menarik data jadwal reguler Store {store_id}...")
         res = None
@@ -233,7 +252,9 @@ def pause_store_action(
         return False
 
     try:
-        ensure_business_hours_page(driver, store_id)
+        if not ensure_business_hours_page(driver, store_id):
+            log.warning(f"  ⚠️ [ACTION PAUSE XHR] Business Hours page untuk Store {store_id} belum tervalidasi. Skip pause action.")
+            return False
 
         log.info(f"🌐 [ACTION PAUSE XHR] Executing direct API action for Store {store_id} (UI disabled)...")
 
@@ -289,7 +310,9 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
         return False
 
     try:
-        ensure_business_hours_page(driver, store_id)
+        if not ensure_business_hours_page(driver, store_id):
+            log.warning(f"  ⚠️ [ACTION OPEN XHR] Business Hours page untuk Store {store_id} belum tervalidasi. Skip open action.")
+            return False
 
         log.info(f"🌐 [ACTION OPEN XHR] Executing direct API action for Store {store_id} (UI disabled)...")
 

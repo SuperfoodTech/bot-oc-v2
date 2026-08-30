@@ -143,24 +143,13 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
                COALESCE(b.requested_pause_until, b.pause_until)::text AS brand_pause_until,
                o.store_id, o.long_name, p.name AS portal_name,
                sa.username, sa.password_plain, sa.phone, sa.merchant_id_external,
-               os.shopee_actual_status, os.shopee_regular_hours,
-               COALESCE(s.status, CASE WHEN s.end_date >= CURRENT_DATE THEN 'ACTIVE' ELSE 'EXPIRED' END, 'ACTIVE') AS subscription_status,
-               s.start_date::text AS service_start, s.end_date::text AS service_end,
-               sp.name AS package_name, os.suspension_status, os.suspension_reason
+               os.shopee_actual_status, os.shopee_regular_hours, os.timezone
         FROM vb_brand_outlets bo
         JOIN vb_brands b ON b.id = bo.vb_brand_id AND b.is_active = true
         JOIN outlets o ON o.id = bo.outlet_id AND o.is_active = true
         JOIN portals p ON p.id = o.portal_id AND p.is_active = true
         LEFT JOIN shopee_accounts sa ON sa.id = o.shopee_account_id
         LEFT JOIN outlet_states os ON os.outlet_id = o.id
-        LEFT JOIN LATERAL (
-            SELECT sx.status, sx.start_date, sx.end_date, sx.plan_id
-            FROM subscriptions sx
-            WHERE sx.outlet_id = o.id
-            ORDER BY sx.end_date DESC NULLS LAST
-            LIMIT 1
-        ) s ON true
-        LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
         WHERE o.store_id ~ '^[0-9]+$' AND p.name !~* '^(status|status import|import status)$'
         ORDER BY b.name, p.name, o.store_id
     """
@@ -179,13 +168,12 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             actual = "CLOSED"
         effective = (row.get("effective_status") or "ON").upper()
         target = "ON" if effective == "ON" else "OFF"
-        suspended = (row.get("suspension_status") or "ACTIVE").upper() == "SUSPENDED"
         outlets.append(MerchantOutlet(
             nama_pemilik=row.get("brand_name") or "Virtual Brand",
             kepemilikan="VB",
-            paket=row.get("package_name") or "",
-            tanggal_mulai_layanan=row.get("service_start") or "",
-            tanggal_berakhir_layanan=row.get("service_end") or "",
+            paket="",
+            tanggal_mulai_layanan="",
+            tanggal_berakhir_layanan="",
             username=USERNAME,
             password=PASSWORD,
             hp=row.get("phone") or "",
@@ -198,9 +186,10 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             status_aktual=actual,
             regular_hours=row.get("shopee_regular_hours") or {},
             shopee_regular_hours=row.get("shopee_regular_hours") or {},
-            status_langganan="Aktif" if (row.get("subscription_status") or "").upper() in {"ACTIVE", "AKTIF"} else "Kedaluwarsa",
-            penangguhan="Ya" if suspended else "Tidak",
-            alasan_penangguhan=row.get("suspension_reason") or "",
+            timezone=row.get("timezone") or "Asia/Jakarta",
+            status_langganan="Aktif",
+            penangguhan="Tidak",
+            alasan_penangguhan="",
             pause_until=row.get("brand_pause_until") or "",
         ))
     return outlets
@@ -231,6 +220,18 @@ def update_shopee_actual_status(store_id: str, status: str) -> None:
         )
 
 
+def update_outlet_timezone(store_id: str, timezone: str) -> None:
+    """Persist Shopee's outlet timezone, falling back safely to WIB."""
+    from core.timezones import normalize_timezone
+
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os SET timezone=%s, updated_at=now()
+               FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (normalize_timezone(timezone), store_id),
+        )
+
+
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="VB"):
     """Write copied-worker actions as VB logs without mixing regular bot logs."""
     with connection() as conn:
@@ -240,7 +241,7 @@ def record_log(store_id, store_name, action, target_state, reason, success=True,
         if not outlet:
             return
         state = conn.execute(
-            "SELECT vercel_status, shopee_actual_status, suspension_status FROM outlet_states WHERE outlet_id=%s",
+            "SELECT vercel_status, shopee_actual_status FROM outlet_states WHERE outlet_id=%s",
             (outlet["id"],),
         ).fetchone() or {}
         brand = conn.execute(
@@ -254,7 +255,7 @@ def record_log(store_id, store_name, action, target_state, reason, success=True,
                 success, error_message, reason)
                VALUES (%s,%s,%s,%s,'ACTIVE',%s,%s,%s,%s,%s,%s,%s)""",
             (outlet["id"], mode, brand["vb_brand_id"] if brand else None,
-             state.get("suspension_status", "ACTIVE"), state.get("vercel_status", "OFF"),
+             "ACTIVE", state.get("vercel_status", "OFF"),
              state.get("shopee_actual_status", "UNKNOWN"), target_state, action,
              success, error_message, reason),
         )

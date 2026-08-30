@@ -9,6 +9,7 @@ Unified HTTP client for Shopee Seller API and Shopee Buyer API.
 
 import requests
 from core.logger import get_logger
+from core.timezones import DEFAULT_TIMEZONE, normalize_timezone
 
 log = get_logger("client")
 
@@ -23,9 +24,10 @@ def build_img_url(img_id: str) -> str:
 
 
 class ShopeeClient:
-    def __init__(self, tob_token: str, entity_id: str, extra_cookies: dict = None):
+    def __init__(self, tob_token: str, entity_id: str, extra_cookies: dict = None, timezone: str = DEFAULT_TIMEZONE):
         self.tob_token     = tob_token
         self.extra_cookies = extra_cookies or {}
+        self.timezone = normalize_timezone(timezone)
         # Resolve entity_id: prefer explicit value, fall back to shopee_foody_mid cookie
         self.entity_id = (
             entity_id
@@ -80,7 +82,7 @@ class ShopeeClient:
             "x-merchant-language":  "id",
             "x-merchant-login-from": "12",
             "x-merchant-requestid": str(uuid.uuid4()),
-            "x-merchant-timezone":  "Asia/Jakarta",
+            "x-merchant-timezone":  self.timezone,
             "x-merchant-tob-clientid": "undefined",
             "x-merchant-token":    self.tob_token,
         }
@@ -215,7 +217,7 @@ class ShopeeClient:
             "x-merchant-language": "id",
             "x-merchant-login-from": "12",
             "x-merchant-requestid": "auto-gen-req-id", # usually doesn't aggressively validate UUID formatting 
-            "x-merchant-timezone": "Asia/Jakarta",
+            "x-merchant-timezone": self.timezone,
             "x-merchant-storeid": str(store_id)
         }
         

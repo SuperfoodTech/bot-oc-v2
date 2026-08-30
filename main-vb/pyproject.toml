@@ -1,16 +1,22 @@
 [project]
-name = "foodmaster-main-vb"
-version = "0.1.0"
-description = "FoodMaster Virtual Brand patrol service"
+name = "bot-oc-daemon"
+version = "1.0.0"
+description = "FoodMaster ShopeeFood Automation 24/7 Daemon Bot"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115.0",
-    "psycopg[binary]>=3.2.0",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.2",
+    "python-dotenv>=1.2.2",
     "requests>=2.33.1",
     "selenium",
     "webdriver-manager",
+    "undetected-chromedriver",
+    "rich",
+    "filelock>=3.29.0",
+    "httpx>=0.28.0",
+    "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
 ]
 
 [tool.uv]
-package = false
+managed = true
