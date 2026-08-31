@@ -7512,10 +7512,25 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 }
 
 .mitra-account-meta-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.mitra-account-password-label {
+  color: #64748b;
+}
+
+.mitra-account-password-value {
+  color: #111827;
+  font-family: 'SFMono-Regular', 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .mitra-section-heading {
@@ -9344,4 +9359,37 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 @keyframes mobile-fetch-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* Desktop admin outlets: make the table card own the remaining height and scroll vertically. */
+@media (min-width: 701px) {
+  .admin-shell .admin-main #paneOutlets.active {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .admin-shell .admin-main #paneOutlets.active .outlet-content-layout {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .admin-shell .admin-main #paneOutlets .table-card.outlet-section {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .admin-shell .admin-main #paneOutlets .table-card.outlet-section .table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
 }

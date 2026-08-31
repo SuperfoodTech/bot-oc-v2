@@ -29,13 +29,16 @@ def test_mitra_recent_activity_uses_a_two_row_grid_without_a_fake_chevron():
     assert "grid-template-columns: 58px 82px minmax(0, 1fr) 18px;" not in STYLES
 
 
-def test_mitra_dashboard_prioritizes_outlet_list_over_account_summary():
+def test_mitra_dashboard_keeps_account_summary_above_outlet_list():
     assert 'class="section-heading mitra-section-heading"' in MITRA_TEMPLATE
     assert 'id="outletsList"' in MITRA_TEMPLATE
     assert 'class="card-box mitra-account-summary"' in MITRA_TEMPLATE
-    assert MITRA_TEMPLATE.index('id="outletsList"') < MITRA_TEMPLATE.index('class="card-box mitra-account-summary"')
+    assert MITRA_TEMPLATE.index('class="card-box mitra-account-summary"') < MITRA_TEMPLATE.index('class="section-heading mitra-section-heading"')
+    assert MITRA_TEMPLATE.index('class="card-box mitra-account-summary"') < MITRA_TEMPLATE.index('id="outletsList"')
     assert 'onclick="scrollToAccountNotice()"' not in MITRA_TEMPLATE
     assert 'aria-label="Buka otomatis untuk ${storeName}"' in MITRA_TEMPLATE
+    assert 'id="accountPasscode"' in MITRA_TEMPLATE
+    assert 'Password:' in MITRA_TEMPLATE
 
 
 def test_user_schedule_preview_uses_shopee_weekday_contract():
@@ -100,3 +103,13 @@ def test_admin_agency_has_bulk_actions_below_filter():
     assert 'id="adminBulkPauseButton"' in tab_template
     assert "function toggleAdminBulkSelectionMode()" in dashboard_template
     assert "function openAdminBulkPauseModal()" in dashboard_template
+
+
+def test_admin_outlet_table_uses_a_dedicated_desktop_scroll_region():
+    assert ".admin-shell .admin-main #paneOutlets.active {" in STYLES
+    assert ".admin-shell .admin-main #paneOutlets.active .outlet-content-layout {" in STYLES
+    assert ".admin-shell .admin-main #paneOutlets .table-card.outlet-section {" in STYLES
+    assert ".admin-shell .admin-main #paneOutlets .table-card.outlet-section .table-scroll {" in STYLES
+    assert "overflow-y: auto;" in STYLES
+    assert "scrollbar-gutter: stable;" in STYLES
+    assert "overscroll-behavior: contain;" in STYLES

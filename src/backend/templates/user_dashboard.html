@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-mitra-dashboard-v60">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-mitra-dashboard-v61">
 </head>
 <body x-data="userApp()">
 
@@ -112,16 +112,6 @@
         </section>
 
         <div class="dashboard-content-stack">
-          <div class="section-heading mitra-section-heading">
-            <div class="mitra-section-heading-copy">
-              <h2>Outlet Anda</h2>
-              <p class="mitra-section-caption">Lihat status live dan kelola buka otomatis per outlet.</p>
-            </div>
-            <span class="section-count" id="outletCount">Memuat...</span>
-          </div>
-
-          <div id="outletsList" class="outlet-list"></div>
-
           <section class="card-box mitra-account-summary" aria-label="Ringkasan akun">
             <div class="mitra-account-summary-head">
               <span class="mitra-account-label">Ringkasan akun</span>
@@ -147,9 +137,22 @@
                 </svg>
                 <span id="accountOutletCount">0 outlet</span>
               </span>
-              <span class="mitra-account-meta-note">Akses dan kata sandi dikelola admin FoodMaster.</span>
+              <span class="mitra-account-meta-note">
+                <span class="mitra-account-password-label">Password:</span>
+                <strong class="mitra-account-password-value" id="accountPasscode">-</strong>
+              </span>
             </div>
           </section>
+
+          <div class="section-heading mitra-section-heading">
+            <div class="mitra-section-heading-copy">
+              <h2>Outlet Anda</h2>
+              <p class="mitra-section-caption">Lihat status live dan kelola buka otomatis per outlet.</p>
+            </div>
+            <span class="section-count" id="outletCount">Memuat...</span>
+          </div>
+
+          <div id="outletsList" class="outlet-list"></div>
 
           <div class="card-box mitra-activity-card">
             <div class="card-heading">
@@ -315,6 +318,12 @@
     };
     const currentSlug = window.location.pathname.match(/^\/mitra\/([^/]+)/)?.[1] || '';
     const userSessionKey = currentSlug ? `user_passcode:${currentSlug}` : 'user_passcode:legacy';
+
+    function setAccountPasscode(value = '-') {
+      const passcodeEl = document.getElementById('accountPasscode');
+      if (!passcodeEl) return;
+      passcodeEl.textContent = value || '-';
+    }
 
     function setUserViewState(isLoggedIn) {
       const wrapper = document.querySelector('.mobile-wrapper');
@@ -548,12 +557,15 @@
             subBadge.className = accountSummary.className;
           }
           document.getElementById('accountOutletCount').textContent = formatOutletCount(data.total_outlets);
+          setAccountPasscode(data.passcode || passcode);
           document.getElementById('outletCount').textContent = formatOutletCount(data.total_outlets);
           renderOutlets(data.outlets);
           fetchHistory();
           startUserEventStream();
         } else {
+          activePasscode = '';
           sessionStorage.removeItem(userSessionKey);
+          setAccountPasscode('-');
           syncUserPanels(false);
           if (!isAuto) {
             setLoginError(data.detail || 'Kata sandi tidak valid!');
@@ -564,7 +576,9 @@
         if (isAuto && hadActiveDashboard) {
           renderOutlets(currentUserOutlets);
         } else {
+          activePasscode = '';
           syncUserPanels(false);
+          setAccountPasscode('-');
           setLoginError('Gagal menghubungkan ke server.');
           if (!isAuto) requestAnimationFrame(() => focusLoginInput(true));
         }
