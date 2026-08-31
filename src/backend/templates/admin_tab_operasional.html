@@ -50,6 +50,22 @@
           </div>
         </div>
       </div>
+      <section class="admin-quick-actions" id="adminQuickActions" aria-labelledby="adminQuickActionsTitle">
+        <div class="admin-quick-actions-head">
+          <div>
+            <h3 id="adminQuickActionsTitle">Aksi cepat</h3>
+            <p>Ubah status beberapa outlet sekaligus.</p>
+          </div>
+          <button type="button" class="btn-outline admin-bulk-mode-button" id="adminBulkModeButton" onclick="toggleAdminBulkSelectionMode()">Pilih beberapa</button>
+        </div>
+        <div class="admin-bulk-toolbar" id="adminBulkToolbar" hidden>
+          <span id="adminBulkSelectionSummary" class="admin-bulk-selection-summary">0 dipilih</span>
+          <div class="admin-bulk-actions">
+            <button type="button" class="btn-outline" id="adminBulkOpenButton" onclick="runAdminBulkOpen()" disabled>Buka terpilih</button>
+            <button type="button" class="btn-outline admin-bulk-pause-button" id="adminBulkPauseButton" onclick="openAdminBulkPauseModal()" disabled>Tutup terpilih</button>
+          </div>
+        </div>
+      </section>
       <div class="outlet-content-layout">
       <div class="table-card outlet-section">
         <div class="table-scroll d-none d-md-block">

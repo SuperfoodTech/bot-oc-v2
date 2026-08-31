@@ -90,6 +90,23 @@ def test_closed_outside_schedule_forces_visual_toggle_off_but_keeps_desired_open
     assert derived["display_toggle_reason"] == "OUTSIDE_SCHEDULE"
 
 
+def test_open_live_outside_schedule_is_displayed_as_waiting_schedule():
+    derived = derive_outlet_runtime_state(
+        make_store(
+            vercel_status="ON",
+            shopee_status="ON",
+        ),
+        now_dt=datetime(2026, 8, 30, 23, 0, tzinfo=WIB),
+    )
+
+    assert derived["desired_state"] == "OPEN"
+    assert derived["live_state"] == "OPEN"
+    assert derived["bot_phase"] == "WAITING_SCHEDULE"
+    assert derived["display_status_label"] == "Sedang Tutup • Di luar jadwal"
+    assert derived["display_status_bucket"] == "closed"
+    assert derived["display_toggle_disabled"] is True
+
+
 def test_closed_during_schedule_waits_for_bot_open_when_toggle_active():
     derived = derive_outlet_runtime_state(
         make_store(

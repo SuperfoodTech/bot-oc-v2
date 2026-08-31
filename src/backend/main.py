@@ -892,6 +892,11 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
+    if not _is_within_shopee_schedule(store, datetime.now(ZoneInfo("Asia/Jakarta"))):
+        raise HTTPException(
+            status_code=403,
+            detail="Toggle dikunci di luar jadwal operasional. Outlet akan mengikuti status close dari jadwal Shopee.",
+        )
     next_status = req.status.upper()
     pause_until = None
     pause_label = ""

@@ -34,3 +34,8 @@ def test_admin_fallback_handles_schedule_states_with_mitra_labels():
     assert unavailable_branch in admin_presentation
     assert "Sedang Tutup • Di luar jadwal" in admin_presentation
     assert "Status sedang dicek bot" in admin_presentation
+
+
+def test_admin_toggle_uses_effective_display_state_outside_schedule():
+    assert "typeof store?.display_toggle_on === 'boolean'" in ADMIN_TEMPLATE
+    assert "if (isAdminToggleDisabled(store, stateContext)) return false;" in ADMIN_TEMPLATE

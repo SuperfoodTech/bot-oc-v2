@@ -51,9 +51,9 @@
         <div class="admin-actions">
           <label class="admin-header-search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-            <input type="search" id="searchInput" placeholder="Cari outlet / pemilik / Store ID" aria-label="Cari outlet, pemilik, atau Store ID" oninput="filterTable()">
+            <input type="search" id="searchInput" placeholder="Cari outlet / pemilik / Store ID" aria-label="Cari outlet, pemilik, atau Store ID" oninput="handleHeaderSearchInput()">
           </label>
-          <button class="btn-primary fetch-sheet-button" type="button" id="fetchSheetHeader" onclick="fetchSheetData()">
+          <button class="btn-primary fetch-sheet-button" type="button" id="fetchSheetHeader" onclick="handleHeaderFetchAction()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M8 17h8"/><path d="m16 12 2 2 2-2"/></svg>
             <span class="fetch-label">Fetch dari Sheet</span>
           </button>
@@ -311,9 +311,30 @@
       <div class="radio-group">
         <label class="radio-card active"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30 Menit</span></div><span class="radio-meta">30 mnt</span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span></div><span class="radio-meta">1 jam</span></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta">24 jam</span></label>
+        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta">Sesi pertama besok</span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="custom"><span>Durasi lain</span></div></label>
-        <div id="vbCustomDurationBox" style="display:none; margin-top:6px"><label>Target berakhir<input type="datetime-local" id="vbCustomUntilInput" class="form-input" step="60"></label></div>
+        <div id="vbCustomDurationBox" style="display:none; margin-top:6px">
+          <div class="custom-datetime-fields">
+            <label>Mulai<input type="text" id="vbCustomStartInput" class="form-input" readonly disabled aria-disabled="true"></label>
+            <span class="custom-datetime-arrow" aria-hidden="true">→</span>
+            <label>Target berakhir
+              <div class="custom-picker-anchor">
+                <button type="button" id="vbCustomUntilTrigger" class="custom-picker-trigger" onclick="openVbCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="vbCustomUntilDisplay">Pilih tanggal &amp; waktu</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 9h18"></path></svg>
+                </button>
+                <input type="hidden" id="vbCustomUntilInput" aria-hidden="true">
+                <div id="vbCustomDateTimePicker" class="custom-picker-popover" role="dialog" aria-label="Pilih tanggal dan waktu" hidden>
+                  <div class="custom-picker-header"><button type="button" class="custom-picker-nav" onclick="shiftVbPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button><strong id="vbCustomPickerMonthLabel"></strong><button type="button" class="custom-picker-nav" onclick="shiftVbPickerMonth(1)" aria-label="Bulan berikutnya">›</button></div>
+                  <div class="custom-picker-weekdays" aria-hidden="true"><span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span> Sb</span></div>
+                  <div id="vbCustomPickerCalendar" class="custom-picker-calendar"></div>
+                  <div class="custom-picker-time"><span>Waktu</span><div class="custom-picker-time-fields"><select id="vbCustomPickerHour" aria-label="Jam VB"></select><span>:</span><select id="vbCustomPickerMinute" aria-label="Menit VB"></select><b>WIB</b></div></div>
+                  <div class="custom-picker-actions"><button type="button" class="btn-outline" onclick="closeVbCustomDateTimePicker()">Batal</button><button type="button" class="btn-primary" onclick="applyVbCustomDateTimePicker()">Pilih</button></div>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
       </div>
       <div class="form-actions"><button type="button" class="btn-outline" onclick="closeVbPauseModal()">Batal</button><button type="button" class="btn-primary" onclick="confirmVbPause()">Simpan</button></div>
     </div>
@@ -426,6 +447,8 @@
     let storeFetchGeneration = 0;
     const ADMIN_OUTLET_SYNC_REFRESH_MS = 15000;
     const pendingAdminToggleStoreIds = new Set();
+    const selectedAdminStoreIds = new Set();
+    let adminBulkSelectionMode = false;
     const deferredAdminOutletEvents = new Map();
     const OUTLET_FILTER_FIELD_MAP = {
       ownerFilter: 'mobileOwnerFilter',
@@ -439,6 +462,20 @@
     let activeOutletSummaryFilter = 'all';
     let outletDetailActiveStoreId = '';
     let outletDetailRestoreFocusEl = null;
+    const pendingVBBrandIds = new Set();
+    const vbExpandedBrandIds = new Set();
+    const adminHeaderSearchValues = {
+      outlets: '',
+      vb: '',
+      logs: '',
+      settings: ''
+    };
+    let hasSeededVbExpandedDefaults = false;
+    let vbScheduleDrawerActiveKey = '';
+    let vbScheduleDrawerRestoreFocusEl = null;
+    let vbScheduleDrawerHideTimer = null;
+    let vbScheduleDrawerOpenFrame = null;
+    const VB_SCHEDULE_DRAWER_ANIMATION_MS = 240;
 
     function getAdminPageUrl() {
       return new URL(window.location.href);
@@ -536,6 +573,139 @@
         return;
       }
       alert(title + ': ' + msg);
+    }
+
+    const ADMIN_HEADER_CONFIG = {
+      outlets: {
+        title: 'Agency Outlet Management',
+        breadcrumb: ['Agency', 'Daftar Outlet'],
+        searchVisible: true,
+        searchPlaceholder: 'Cari outlet / pemilik / Store ID',
+        searchLabel: 'Cari outlet, pemilik, atau Store ID',
+        fetchVisible: true,
+        fetchLabel: 'Fetch dari Sheet'
+      },
+      vb: {
+        title: 'Virtual Brand',
+        breadcrumb: ['Virtual Brand', 'Dashboard Grup'],
+        breadcrumbVisible: false,
+        searchVisible: true,
+        searchPlaceholder: 'Cari grup, portal, atau Store ID...',
+        searchLabel: 'Cari grup, portal, atau Store ID',
+        fetchVisible: true,
+        fetchLabel: 'Fetch dari Sheet'
+      },
+      logs: {
+        title: 'Bot Activity Logs',
+        breadcrumb: ['Logs', 'Aktivitas Bot'],
+        breadcrumbVisible: true,
+        searchVisible: false,
+        searchPlaceholder: '',
+        searchLabel: '',
+        fetchVisible: false,
+        fetchLabel: 'Fetch dari Sheet'
+      },
+      settings: {
+        title: 'Admin Settings',
+        breadcrumb: ['Settings', 'Konfigurasi'],
+        breadcrumbVisible: true,
+        searchVisible: false,
+        searchPlaceholder: '',
+        searchLabel: '',
+        fetchVisible: false,
+        fetchLabel: 'Fetch dari Sheet'
+      }
+    };
+
+    function getAdminHeaderSearchInput() {
+      return document.getElementById('searchInput');
+    }
+
+    function rememberAdminHeaderSearch(tabName = currentTab) {
+      const input = getAdminHeaderSearchInput();
+      if (!input || !Object.prototype.hasOwnProperty.call(adminHeaderSearchValues, tabName)) return;
+      adminHeaderSearchValues[tabName] = input.value || '';
+    }
+
+    function syncVbSearchInputs(value, source = 'header') {
+      const nextValue = String(value || '');
+      adminHeaderSearchValues.vb = nextValue;
+      const headerInput = getAdminHeaderSearchInput();
+      const inlineInput = document.getElementById('vbInlineSearchInput');
+
+      if (source !== 'header' && headerInput && headerInput.value !== nextValue) {
+        headerInput.value = nextValue;
+      }
+      if (source !== 'inline' && inlineInput && inlineInput.value !== nextValue) {
+        inlineInput.value = nextValue;
+      }
+    }
+
+    function handleVbInlineSearchInput() {
+      const value = document.getElementById('vbInlineSearchInput')?.value || '';
+      syncVbSearchInputs(value, 'inline');
+      filterVBTable();
+    }
+
+    function handleHeaderSearchInput() {
+      const tabName = getAdminActiveTab();
+      const value = getAdminHeaderSearchInput()?.value || '';
+      if (Object.prototype.hasOwnProperty.call(adminHeaderSearchValues, tabName)) {
+        adminHeaderSearchValues[tabName] = value;
+      }
+
+      if (tabName === 'vb') {
+        syncVbSearchInputs(value, 'header');
+        filterVBTable();
+        return;
+      }
+
+      if (tabName === 'outlets') {
+        filterTable();
+      }
+    }
+
+    async function handleHeaderFetchAction() {
+      const tabName = getAdminActiveTab();
+      if (tabName === 'vb') {
+        await importVBData();
+        return;
+      }
+      if (tabName === 'outlets') {
+        await fetchSheetData();
+      }
+    }
+
+    function syncAdminHeaderForTab(tabName) {
+      const config = ADMIN_HEADER_CONFIG[tabName] || ADMIN_HEADER_CONFIG.outlets;
+      const title = document.getElementById('adminPageTitle');
+      const breadcrumb = document.querySelector('.admin-breadcrumb');
+      const searchWrap = document.querySelector('.admin-header-search');
+      const searchInput = getAdminHeaderSearchInput();
+      const fetchButton = document.getElementById('fetchSheetHeader');
+      const fetchLabel = fetchButton?.querySelector('.fetch-label');
+
+      if (title) title.textContent = config.title;
+      if (breadcrumb) {
+        breadcrumb.innerHTML = `<span>${escapeVBHtml(config.breadcrumb[0])}</span><span aria-hidden="true">›</span><span>${escapeVBHtml(config.breadcrumb[1])}</span>`;
+        breadcrumb.hidden = config.breadcrumbVisible === false;
+      }
+      if (searchWrap) {
+        searchWrap.hidden = !config.searchVisible;
+        searchWrap.setAttribute('aria-hidden', String(!config.searchVisible));
+      }
+      if (searchInput) {
+        searchInput.disabled = !config.searchVisible;
+        searchInput.placeholder = config.searchPlaceholder;
+        searchInput.setAttribute('aria-label', config.searchLabel || 'Cari data');
+        searchInput.value = adminHeaderSearchValues[tabName] || '';
+      }
+      if (fetchButton) {
+        fetchButton.hidden = !config.fetchVisible;
+        fetchButton.disabled = !config.fetchVisible;
+      }
+      if (fetchLabel) fetchLabel.textContent = config.fetchLabel;
+      if (tabName === 'vb') syncVbSearchInputs(adminHeaderSearchValues.vb || '', 'header');
     }
 
     function setControlValue(id, value = '') {
@@ -902,6 +1072,7 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
+      syncAdminHeaderForTab(tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) ? tabParam : 'outlets');
       syncMobileFetchButton(tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) ? tabParam : 'outlets');
       if (tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) && tabParam !== 'outlets') {
         switchTab(tabParam, { skipHistory: true });
@@ -916,12 +1087,18 @@
           filterTable();
         }
       }
+      if (getAdminActiveTab() === 'vb') {
+        const vbFilterDisclosure = document.getElementById('vbFilterDisclosure');
+        if (vbFilterDisclosure && !isMobileAdminViewport() && !vbFilterDisclosure.open) vbFilterDisclosure.open = true;
+        if (vbFilterDisclosure && isMobileAdminViewport() && !Object.values(getActiveVbFilters()).some(Boolean)) vbFilterDisclosure.open = false;
+      }
       if (isOutletDetailOpen()) setOutletDetailBackgroundState(true);
       syncMobileFetchButton();
     });
 
     document.addEventListener('keydown', event => {
       handleOutletDetailKeydown(event);
+      handleVbScheduleDrawerKeydown(event);
       if (event.defaultPrevented) return;
       if (event.key === 'Escape') closeMobileFilterSheet();
     });
@@ -944,6 +1121,7 @@
 
     function switchTab(tabName, options = {}) {
       const { skipHistory = false } = options;
+      rememberAdminHeaderSearch(currentTab);
       currentTab = tabName;
       if (window._appData) window._appData.currentTab = tabName;
       syncMobileFetchButton(tabName);
@@ -957,19 +1135,10 @@
         closeOutletDetail({ updateHistory: false, restoreFocus: false });
         closeMobileFilterSheet();
       }
-      const pageCopy = {
-        outlets: ['Agency Outlet Management', ''],
-        vb: ['Virtual Brand Management', ''],
-        logs: ['Bot Activity Logs', ''],
-        settings: ['Admin Settings', '']
-      };
-      const copy = pageCopy[tabName] || pageCopy.outlets;
-      const title = document.getElementById('adminPageTitle');
-      const description = document.getElementById('adminPageDescription');
-      const fetchButton = document.getElementById('fetchSheetHeader');
-      if (title) title.textContent = copy[0];
-      if (description) description.textContent = copy[1];
-      if (fetchButton) fetchButton.hidden = tabName !== 'outlets';
+      if (tabName !== 'vb') {
+        closeVbScheduleDrawer({ restoreFocus: false });
+      }
+      syncAdminHeaderForTab(tabName);
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
@@ -1028,6 +1197,9 @@
         updateMetrics(allStores);
         filterTable();
         syncOutletDetailFromLocation();
+        if (getAdminActiveTab() === 'vb' && allVBBrands.length) {
+          filterVBTable();
+        }
       } catch (err) {
         if (requestGeneration !== storeFetchGeneration) return;
         console.error("Error loading stores:", err);
@@ -1055,24 +1227,44 @@
     }
 
     let allVBBrands = [];
+    const selectedVbBrandIds = new Set();
+    let selectedVbPauseBrandIds = [];
+    let vbBulkSelectionMode = false;
+    const VB_PORTAL_ORDER = ['superfood', 'wonderfood', 'lokarasa', 'gurame bakar, do eat'];
+
+    function getVbPortalOrder(portalName) {
+      const normalizedName = String(portalName || '').toLowerCase().trim();
+      const index = VB_PORTAL_ORDER.findIndex(name => normalizedName.includes(name));
+      return index === -1 ? VB_PORTAL_ORDER.length : index;
+    }
 
     async function loadVBData(isSilent = false) {
       const body = document.getElementById('vbTableBody');
+      const stats = document.getElementById('vbStatsGrid');
+      const summary = document.getElementById('vbResultsSummary');
       if (!body) return;
-      if (!isSilent) body.innerHTML = '<div class="table-loading-state">Memuat data brand...</div>';
+      if (!isSilent) {
+        body.innerHTML = '<div class="table-loading-state">Memuat data brand...</div>';
+        if (stats) stats.innerHTML = '<div class="table-loading-state">Memuat ringkasan brand...</div>';
+        if (summary) summary.textContent = '';
+      }
       try {
         const res = await fetch('/api/v1/admin/vb/brands');
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Data VB gagal dimuat.');
         allVBBrands = data.brands || [];
-        renderVBTable(allVBBrands);
+        pruneVbExpandedBrands(allVBBrands);
+        seedVbExpandedBrands(allVBBrands);
+        filterVBTable();
       } catch (err) {
+        if (stats) renderVBStats([]);
+        if (summary) summary.textContent = 'Data brand gagal dimuat.';
         body.innerHTML = `<div class="table-loading-state">${escapeVBHtml(err.message)}</div>`;
       }
     }
 
     function vbStatusLabel(status) {
-      return status === 'ON' ? 'ON' : 'PAUSED';
+      return status === 'ON' ? 'ON' : 'OFF';
     }
 
     function escapeVBHtml(value) {
@@ -1081,126 +1273,772 @@
       }[char]));
     }
 
-    function renderVBTable(brands) {
-      const body = document.getElementById('vbTableBody');
-      const count = document.getElementById('tabVBCount');
-      if (!body) return;
-      if (count) count.textContent = brands.length;
-      if (!brands.length) {
-        body.innerHTML = '<div class="table-loading-state">Tidak ada brand VB.</div>';
-        return;
-      }
-      body.innerHTML = '';
-      brands.forEach(brand => {
-        const row = document.createElement('article');
-        row.className = 'vb-brand-card';
-        row.id = `vb-card-${brand.id}`;
-        const brandName = escapeVBHtml(brand.name);
-        
-        const outlets = brand.outlets || [];
-        const grouped = outlets.reduce((acc, outlet) => {
-          const key = outlet.merchant_name || 'Merchant tidak diketahui';
-          acc[key] = acc[key] || [];
-          acc[key].push(outlet.store_id);
-          return acc;
-        }, {});
-        const detailHtml = Object.entries(grouped).map(([merchant, ids]) => `
-          <div class="vb-detail-group">
-            <strong>${escapeVBHtml(merchant)}</strong>
-            <span>${ids.length} outlet: ${ids.map(escapeVBHtml).join(', ')}</span>
-          </div>`).join('') || (outlets.length ? '' : 'Belum ada outlet terhubung.');
+    function seedVbExpandedBrands(brands) {
+      if (hasSeededVbExpandedDefaults) return;
+      const firstBrand = brands[0];
+      if (firstBrand) vbExpandedBrandIds.add(String(firstBrand.id));
+      hasSeededVbExpandedDefaults = true;
+    }
 
-        row.innerHTML = `
-          <div class="vb-brand-card-head">
-            <div>
-              <div class="step-indicator">Virtual Brand</div>
-              <h3>${brandName}</h3>
-              <p>${brand.merchant_count || 0} merchant · ${brand.outlet_count || 0} outlet</p>
-            </div>
-            <div class="vb-brand-toggle"></div>
-          </div>
-          <div class="vb-brand-meta">
-            <span>Status diterapkan: <strong>${vbStatusLabel(brand.applied_status)}</strong></span>
-            <span class="vb-pending">${brand.requested_status ? `Menunggu: ${vbStatusLabel(brand.requested_status)}` : 'Tidak ada perubahan pending'}</span>
-          </div>
-          <div class="vb-brand-detail" id="vb-detail-${brand.id}" data-loaded="${outlets.length ? 'true' : 'false'}">
-            <div class="vb-detail-content">${detailHtml || 'Memuat merchant dan outlet...'}</div>
-          </div>`;
-        const statusCell = row.querySelector('.vb-brand-toggle');
-        const controlWrap = document.createElement('div');
-        controlWrap.className = 'vb-control';
-        const control = document.createElement('input');
-        control.type = 'checkbox';
-        control.checked = (brand.requested_status || brand.applied_status) === 'ON';
-        control.setAttribute('aria-label', `Ubah status ${brand.name}`);
-        const switchLabel = document.createElement('label');
-        switchLabel.className = 'switch-toggle';
-        switchLabel.appendChild(control);
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        switchLabel.appendChild(slider);
-        const controlText = document.createElement('span');
-        controlText.className = 'vb-control-label';
-        controlText.textContent = control.checked ? 'ON' : 'PAUSED';
-        control.addEventListener('change', () => {
-          if (!control.checked) {
-            control.checked = true;
-            openVbPauseModal(brand.id, brand.name);
-            return;
-          }
-          controlText.textContent = 'ON';
-          requestVBStatus(brand.id, 'ON', control);
-        });
-        controlWrap.appendChild(switchLabel);
-        controlWrap.appendChild(controlText);
-        statusCell.appendChild(controlWrap);
-        body.appendChild(row);
-        if (!outlets.length) {
-          loadVBDetail(brand.id);
-        }
+    function pruneVbExpandedBrands(brands) {
+      const validIds = new Set((brands || []).map(brand => String(brand.id)));
+      [...vbExpandedBrandIds].forEach(brandId => {
+        if (!validIds.has(brandId)) vbExpandedBrandIds.delete(brandId);
       });
     }
 
-    async function loadVBDetail(brandId) {
-      const row = document.getElementById(`vb-detail-${brandId}`);
-      if (!row) return;
-      if (row.dataset.loaded === 'true') return;
-      try {
-        const res = await fetch(`/api/v1/admin/vb/brands/${encodeURIComponent(brandId)}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Detail brand gagal dimuat.');
-        const outlets = (data.brand && data.brand.outlets) || [];
-        const grouped = outlets.reduce((acc, outlet) => {
-          const key = outlet.merchant_name || 'Merchant tidak diketahui';
-          acc[key] = acc[key] || [];
-          acc[key].push(outlet.store_id);
-          return acc;
-        }, {});
-        const content = row.querySelector('.vb-detail-content');
-        content.innerHTML = Object.entries(grouped).map(([merchant, ids]) => `
-          <div class="vb-detail-group">
-            <strong>${escapeVBHtml(merchant)}</strong>
-            <span>${ids.length} outlet: ${ids.map(escapeVBHtml).join(', ')}</span>
-          </div>`).join('') || 'Belum ada outlet terhubung.';
-        row.dataset.loaded = 'true';
-      } catch (err) {
-        row.querySelector('.vb-detail-content').textContent = err.message;
+    function getAllStoreMap() {
+      return new Map((allStores || []).map(store => [String(store.store_id || ''), store]));
+    }
+
+    function hasUsableAdminSchedule(store) {
+      if (!store) return false;
+      if (typeof store.schedule_available === 'boolean') return store.schedule_available;
+      const schedule = getAdminScheduleData(store);
+      return Object.values(schedule).some(value => Array.isArray(value) ? value.length > 0 : Boolean(value));
+    }
+
+    function getVbTodayOperatingHours(store) {
+      const timezone = store?.timezone || 'Asia/Jakarta';
+      const timezoneLabel = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? 'WITA' : timezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
+      const dayLabel = new Intl.DateTimeFormat('id-ID', { timeZone: timezone, weekday: 'long' }).format(new Date());
+      if (!store || !hasUsableAdminSchedule(store)) return renderTodayOperatingHoursMarkup([], dayLabel, timezoneLabel);
+      return getTodayOperatingHours(store);
+    }
+
+    function getVbGroupCode(brand) {
+      const brandIndex = allVBBrands.findIndex(item => String(item.id) === String(brand.id));
+      const sequence = brandIndex >= 0 ? brandIndex + 1 : 1;
+      return `VB-${String(sequence).padStart(4, '0')}`;
+    }
+
+    function getVbBrandEffectiveStatus(brand) {
+      return (brand.requested_status || brand.applied_status) === 'ON' ? 'ON' : 'OFF';
+    }
+
+    function getVbBrandMasterStatus(brand) {
+      return brand.is_active === false ? 'NONAKTIF' : 'AKTIF';
+    }
+
+    function getVbBrandPendingNote(brand) {
+      if (!brand.requested_status) return '';
+      const statusLabel = vbStatusLabel(brand.requested_status);
+      if (statusLabel === 'OFF' && brand.requested_pause_until) {
+        return `Menunggu OFF sampai ${formatActionDateTime(brand.requested_pause_until, true)}`;
+      }
+      if (brand.requested_at) {
+        return `Menunggu ${statusLabel} sejak ${formatActionDateTime(brand.requested_at, true)}`;
+      }
+      return `Menunggu ${statusLabel}`;
+    }
+
+    function getVbBrandSupportNote(brand) {
+      const pendingNote = getVbBrandPendingNote(brand);
+      if (pendingNote) return pendingNote;
+      if (brand.last_applied_at) return `Perubahan terakhir diterapkan ${formatActionDateTime(brand.last_applied_at, true)}`;
+      if (brand.last_patrolled_at) return `Patroli terakhir ${formatActionDateTime(brand.last_patrolled_at, true)}`;
+      return 'Satu toggle grup mengontrol semua Store ID valid dalam grup ini.';
+    }
+
+    function getVbBrandActivity(brand) {
+      const pendingNote = getVbBrandPendingNote(brand);
+      if (pendingNote) {
+        return {
+          title: brand.requested_at ? formatActionDateTime(brand.requested_at, true) : 'Menunggu diproses',
+          note: pendingNote
+        };
+      }
+      if (brand.last_applied_at) {
+        return {
+          title: formatActionDateTime(brand.last_applied_at, true),
+          note: 'Terakhir diterapkan oleh bot VB'
+        };
+      }
+      if (brand.last_patrolled_at) {
+        return {
+          title: formatActionDateTime(brand.last_patrolled_at, true),
+          note: 'Patroli terakhir bot VB'
+        };
+      }
+      return {
+        title: 'Belum ada aktivitas',
+        note: 'Menunggu sinkronisasi brand'
+      };
+    }
+
+    function getVbStoreView(outlet, storeMap) {
+      const storeId = String(outlet?.store_id || '').trim();
+      const store = storeMap.get(storeId) || null;
+      const portalName = store?.merchant_name || outlet?.merchant_name || 'Portal tidak diketahui';
+      const storeName = store?.store_name || outlet?.long_name || `Store ID ${storeId}`;
+      const liveSource = store?.live_state || store?.shopee_status || outlet?.shopee_actual_status;
+      const liveState = normalizeAdminLiveState(liveSource);
+      const statusStore = { ...(store || {}), live_state: liveSource, shopee_status: liveSource };
+      return {
+        ...outlet,
+        store,
+        storeId,
+        portalName,
+        storeName,
+        liveState,
+        livePresentation: getAdminShopeeStatusPresentation(liveSource),
+        statusPresentation: getAdminStatusPresentation(statusStore),
+        statusSubtext: getAdminStatusSubtext(statusStore),
+        statusTooltip: getAdminStatusTooltip(statusStore),
+        todayScheduleMarkup: getVbTodayOperatingHours(store),
+        actionSummary: store ? getAdminActionSummary(store) : { title: 'Belum ada aksi', note: '-' }
+      };
+    }
+
+    function buildVbBrandViews(brands = allVBBrands) {
+      const storeMap = getAllStoreMap();
+      return (brands || []).map(brand => {
+        const effectiveStatus = getVbBrandEffectiveStatus(brand);
+        const outlets = (brand.outlets || [])
+          .map((outlet, sourceIndex) => ({ outlet: getVbStoreView(outlet, storeMap), sourceIndex }))
+          .sort((a, b) => getVbPortalOrder(a.outlet.portalName) - getVbPortalOrder(b.outlet.portalName) || a.sourceIndex - b.sourceIndex)
+          .map(item => item.outlet);
+        const statusCounts = outlets.reduce((counts, outlet) => {
+          const failureText = [
+            outlet.statusPresentation?.label,
+            outlet.statusPresentation?.note,
+            outlet.statusSubtext,
+            outlet.store?.last_toggle_reason,
+            outlet.store?.error_message,
+            outlet.store?.patrol_status
+          ].filter(Boolean).join(' ').toLowerCase();
+          const hasPatrolFailure = outlet.store?.patrol_success === false
+            || outlet.store?.last_patrol_success === false
+            || outlet.store?.success === false
+            || /patroli[^.]*gagal|patrol[^.]*fail|patrol[^.]*error|gagal patroli|patrol_failed/.test(failureText);
+          if (hasPatrolFailure) counts.failure += 1;
+          else if (outlet.liveState === 'OPEN') counts.opened += 1;
+          else counts.close += 1;
+          return counts;
+        }, { opened: 0, failure: 0, close: 0 });
+        return {
+          ...brand,
+          groupCode: getVbGroupCode(brand),
+          masterStatus: getVbBrandMasterStatus(brand),
+          effectiveStatus,
+          pendingNote: getVbBrandPendingNote(brand),
+          supportNote: getVbBrandSupportNote(brand),
+          activity: getVbBrandActivity(brand),
+          outlets,
+          visibleOutlets: outlets,
+          visibleStoreCount: outlets.length,
+          visibleMerchantCount: new Set(outlets.map(item => item.portalName).filter(Boolean)).size,
+          openStoreCount: outlets.filter(item => item.liveState === 'OPEN').length,
+          closedStoreCount: outlets.filter(item => item.liveState !== 'OPEN').length,
+          statusCounts
+        };
+      });
+    }
+
+    function getActiveVbFilters() {
+      const queryFromHeader = adminHeaderSearchValues.vb || '';
+      return {
+        query: queryFromHeader.toLowerCase().trim(),
+        group: document.getElementById('vbGroupFilter')?.value || '',
+        masterStatus: (document.getElementById('vbMasterFilter')?.value || '').toUpperCase(),
+        groupStatus: (document.getElementById('vbStatusFilter')?.value || '').toUpperCase(),
+        portal: document.getElementById('vbPortalFilter')?.value || '',
+        storeId: (document.getElementById('vbStoreIdFilter')?.value || '').toLowerCase().trim()
+      };
+    }
+
+    function setVbSelectOptions(selectId, placeholder, options) {
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      const currentValue = select.value;
+      const normalizedOptions = (options || []).filter(option => option && option.value !== undefined && option.value !== null);
+      select.innerHTML = [`<option value="">${escapeVBHtml(placeholder)}</option>`, ...normalizedOptions.map(option => (
+        `<option value="${escapeVBHtml(option.value)}">${escapeVBHtml(option.label)}</option>`
+      ))].join('');
+      if (normalizedOptions.some(option => String(option.value) === currentValue)) {
+        select.value = currentValue;
       }
     }
 
+    function syncVbFilterOptions(brandViews) {
+      setVbSelectOptions('vbGroupFilter', 'Semua grup', brandViews.map(brand => ({
+        value: String(brand.id),
+        label: brand.name || brand.groupCode
+      })));
+      const portals = [...new Set(brandViews.flatMap(brand => brand.outlets.map(outlet => outlet.portalName)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+      setVbSelectOptions('vbPortalFilter', 'Semua portal', portals.map(name => ({ value: name, label: name })));
+    }
+
+    function getFilteredVbBrandViews(brandViews, filters) {
+      return brandViews.reduce((acc, brand) => {
+        const matchesGroup = !filters.group || String(brand.id) === String(filters.group);
+        const matchesMaster = !filters.masterStatus || brand.masterStatus === filters.masterStatus;
+        const matchesStatus = !filters.groupStatus || brand.effectiveStatus === filters.groupStatus;
+        if (!matchesGroup || !matchesMaster || !matchesStatus) return acc;
+
+        const outletScoped = brand.outlets.filter(outlet => (
+          (!filters.portal || outlet.portalName === filters.portal) &&
+          (!filters.storeId || outlet.storeId.toLowerCase().includes(filters.storeId))
+        ));
+        const brandMatchesQuery = !filters.query
+          || (brand.name || '').toLowerCase().includes(filters.query)
+          || brand.groupCode.toLowerCase().includes(filters.query);
+        const queryMatchedOutlets = !filters.query
+          ? outletScoped
+          : outletScoped.filter(outlet => [outlet.portalName, outlet.storeName, outlet.storeId]
+              .some(value => String(value || '').toLowerCase().includes(filters.query)));
+        const visibleOutlets = brandMatchesQuery ? outletScoped : queryMatchedOutlets;
+        const hasOutletFilters = Boolean(filters.portal || filters.storeId);
+        if (hasOutletFilters && !visibleOutlets.length) return acc;
+        const shouldIncludeBrand = brandMatchesQuery || visibleOutlets.length > 0 || (!brand.outlets.length && !hasOutletFilters && !filters.query);
+        if (!shouldIncludeBrand) return acc;
+
+        acc.push({
+          ...brand,
+          visibleOutlets,
+          visibleStoreCount: visibleOutlets.length,
+          visibleMerchantCount: new Set(visibleOutlets.map(item => item.portalName).filter(Boolean)).size,
+          openStoreCount: visibleOutlets.filter(item => item.liveState === 'OPEN').length,
+          closedStoreCount: visibleOutlets.filter(item => item.liveState !== 'OPEN').length
+        });
+        return acc;
+      }, []);
+    }
+
+    function getVbMetricIcon(kind) {
+      const icons = {
+        groups: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"></circle><circle cx="16" cy="9" r="3"></circle><path d="M4 18c0-2.2 1.8-4 4-4s4 1.8 4 4"></path><path d="M12 18c0-2.2 1.8-4 4-4s4 1.8 4 4"></path></svg>',
+        on: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="5"></rect><circle cx="16.5" cy="12" r="3.2"></circle></svg>',
+        off: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="5"></rect><circle cx="7.5" cy="12" r="3.2"></circle></svg>',
+        store: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4z"></path><path d="M2.5 10 5 5h14l2.5 5"></path><path d="M9 14h6"></path></svg>',
+        open: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11H4z"></path><path d="M7 8V5h10v3"></path><path d="M8 14h8"></path></svg>',
+        closed: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11H4z"></path><path d="M7 8V5h10v3"></path><path d="m8 16 8-8"></path></svg>'
+      };
+      return icons[kind] || icons.groups;
+    }
+
+    function formatVbPercent(value, total) {
+      if (!total) return '0%';
+      return `${((value / total) * 100).toFixed(1)}%`;
+    }
+
+    function renderVBStats(brands) {
+      const stats = document.getElementById('vbStatsGrid');
+      if (!stats) return;
+      const totalGroups = brands.length;
+      const groupsOn = brands.filter(brand => brand.effectiveStatus === 'ON').length;
+      const groupsOff = brands.filter(brand => brand.effectiveStatus !== 'ON').length;
+      const totalStores = brands.reduce((sum, brand) => sum + (brand.visibleStoreCount || 0), 0);
+      const openStores = brands.reduce((sum, brand) => sum + (brand.openStoreCount || 0), 0);
+      const closedStores = brands.reduce((sum, brand) => sum + (brand.closedStoreCount || 0), 0);
+      const cards = [
+        {
+          tone: 'is-groups',
+          icon: 'groups',
+          label: 'Total Grup VB',
+          value: totalGroups,
+          detail: totalGroups ? 'Semua grup virtual brand yang tampil.' : 'Belum ada grup VB aktif.'
+        },
+        {
+          tone: 'is-on',
+          icon: 'on',
+          label: 'Grup ON',
+          value: groupsOn,
+          detail: `${formatVbPercent(groupsOn, totalGroups)} dari grup yang tampil`
+        },
+        {
+          tone: 'is-off',
+          icon: 'off',
+          label: 'Grup OFF',
+          value: groupsOff,
+          detail: `${formatVbPercent(groupsOff, totalGroups)} dari grup yang tampil`
+        },
+        {
+          tone: 'is-store',
+          icon: 'store',
+          label: 'Total Store ID',
+          value: totalStores,
+          detail: totalStores ? 'Store ID hasil filter saat ini.' : 'Belum ada Store ID terhubung.'
+        },
+        {
+          tone: 'is-open',
+          icon: 'open',
+          label: 'Store ID Sedang Buka',
+          value: openStores,
+          detail: `${formatVbPercent(openStores, totalStores)} dari Store ID yang tampil`
+        },
+        {
+          tone: 'is-closed',
+          icon: 'closed',
+          label: 'Store ID Sedang Tutup',
+          value: closedStores,
+          detail: `${formatVbPercent(closedStores, totalStores)} dari Store ID yang tampil`
+        }
+      ];
+
+      stats.innerHTML = cards.map(card => `
+        <article class="vb-stat-card ${card.tone}">
+          <span class="vb-stat-icon">${getVbMetricIcon(card.icon)}</span>
+          <div class="vb-stat-copy">
+            <span>${escapeVBHtml(card.label)}</span>
+            <strong>${card.value}</strong>
+            <small>${escapeVBHtml(card.detail)}</small>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderVbQuickActions(brands) {
+      const panel = document.getElementById('vbQuickActions');
+      const summary = document.getElementById('vbBulkSelectionSummary');
+      const openButton = document.getElementById('vbBulkOpenButton');
+      const pauseButton = document.getElementById('vbBulkPauseButton');
+      const toolbar = document.getElementById('vbBulkToolbar');
+      const modeButton = document.getElementById('vbBulkModeButton');
+      if (!panel) return;
+      const validIds = new Set((brands || []).map(brand => String(brand.id)));
+      [...selectedVbBrandIds].forEach(id => { if (!validIds.has(id)) selectedVbBrandIds.delete(id); });
+      panel.hidden = !(brands || []).length;
+      const selectedCount = selectedVbBrandIds.size;
+      if (summary) summary.textContent = `${selectedCount} dipilih`;
+      if (openButton) openButton.disabled = !selectedCount;
+      if (pauseButton) pauseButton.disabled = !selectedCount;
+      if (toolbar) toolbar.hidden = !vbBulkSelectionMode;
+      if (modeButton) modeButton.textContent = vbBulkSelectionMode ? 'Selesai memilih' : 'Pilih beberapa';
+    }
+
+    function toggleVbBulkSelectionMode() {
+      vbBulkSelectionMode = !vbBulkSelectionMode;
+      if (!vbBulkSelectionMode) selectedVbBrandIds.clear();
+      filterVBTable();
+    }
+
+    function toggleVbBulkBrand(brandId, checked) {
+      const id = String(brandId);
+      if (checked) selectedVbBrandIds.add(id);
+      else selectedVbBrandIds.delete(id);
+      filterVBTable();
+    }
+
+    async function runVbBulkOpen() {
+      const brandIds = [...selectedVbBrandIds];
+      if (!brandIds.length) return;
+      selectedVbBrandIds.clear();
+      for (const brandId of brandIds) {
+        const control = document.getElementById(`vb-card-${brandId}`)?.querySelector('input[type="checkbox"]');
+        await requestVBStatus(brandId, 'ON', control);
+      }
+      showToast(`${brandIds.length} brand berhasil diminta untuk dibuka.`, 'success');
+    }
+
+    function openVbBulkPauseModal() {
+      const brandIds = [...selectedVbBrandIds];
+      if (!brandIds.length) return;
+      selectedVbPauseBrandIds = brandIds;
+      selectedVbBrandId = brandIds[0];
+      document.getElementById('vbPauseModalTitle').textContent = `Tutup ${brandIds.length} brand`;
+      setVbCustomDateTimeDefaults();
+      document.querySelectorAll('input[name="vbPauseDuration"]').forEach(radio => {
+        radio.checked = radio.value === '30_min';
+        radio.closest('.radio-card').classList.toggle('active', radio.checked);
+      });
+      document.getElementById('vbCustomDurationBox').style.display = 'none';
+      updateVbPausePreview();
+      document.getElementById('vbPauseModal').classList.add('active');
+      document.getElementById('vbPauseModal').setAttribute('aria-hidden', 'false');
+    }
+
+    function renderVBTable(brands) {
+      const body = document.getElementById('vbTableBody');
+      if (!body) return;
+      if (!brands.length) {
+        body.innerHTML = `<div class="vb-empty-state">
+          <strong>Tidak ada grup yang sesuai</strong>
+          <span>Coba ubah kata kunci atau filter untuk melihat hasil lainnya.</span>
+          <button type="button" class="btn-outline" onclick="resetVbFilters()">Reset filter</button>
+        </div>`;
+        return;
+      }
+
+      body.innerHTML = brands.map(brand => {
+        const isExpanded = vbExpandedBrandIds.has(String(brand.id));
+        const isPending = pendingVBBrandIds.has(String(brand.id));
+        const isOn = brand.effectiveStatus === 'ON';
+        const activity = brand.activity || { title: 'Belum ada aktivitas', note: 'Menunggu sinkronisasi brand' };
+      const outletRows = brand.visibleOutlets.length
+          ? brand.visibleOutlets.map(outlet => {
+              const statusToneClass = outlet.liveState === 'OPEN'
+                ? 'is-open'
+                : (outlet.liveState === 'PAUSE'
+                    ? 'is-paused'
+                    : (outlet.liveState === 'CLOSED' ? 'is-closed' : 'is-unknown'));
+              const outletLabel = outlet.portalName;
+              const portalColorClass = `vb-portal-${Math.min(getVbPortalOrder(outlet.portalName), 3)}`;
+              const statusPresentation = outlet.statusPresentation || { label: 'Status sedang dicek bot', className: 'table-status is-warning' };
+              const statusTooltip = outlet.statusTooltip || 'Status live dan fase bot belum tersedia.';
+              return `
+                <div class="vb-store-row ${portalColorClass}">
+                  <div class="vb-store-main">
+                    <span class="vb-store-field-label">Portal</span>
+                    <div class="vb-store-main-value">
+                      <span class="vb-store-dot ${statusToneClass}" title="${escapeVBHtml(outlet.livePresentation.label)}"></span>
+                      <div class="vb-store-copy">
+                        <strong>${escapeVBHtml(outletLabel)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
+                  <div class="vb-store-status"><span class="vb-store-field-label">Status</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
+                  <div class="vb-store-hours"><span class="vb-store-field-label">Jam Operasional</span>${outlet.todayScheduleMarkup}</div>
+                  <div class="vb-store-actions">
+                    <span class="vb-store-field-label">Aksi</span>
+                    <button type="button" class="btn-outline vb-schedule-button" onclick="openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this)">Lihat jadwal</button>
+                  </div>
+                </div>
+              `;
+            }).join('')
+          : '<div class="vb-store-empty">Tidak ada Store ID yang sesuai di grup ini.</div>';
+
+        return `
+          <article class="vb-brand-card ${isExpanded ? 'is-expanded' : ''}" id="vb-card-${brand.id}">
+            <div class="vb-brand-card-head">
+              <div class="vb-group-identity">
+                ${vbBulkSelectionMode ? `<label class="vb-brand-select"><input type="checkbox" ${selectedVbBrandIds.has(String(brand.id)) ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Pilih brand ${escapeVBHtml(brand.name)}" onchange="toggleVbBulkBrand('${brand.id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
+                <div class="vb-group-eyebrow">Grup VB</div>
+                <h3>${escapeVBHtml(brand.name)}</h3>
+              </div>
+              <div class="vb-group-summary">
+                <div class="vb-group-summary-item">
+                  <span>Opened</span>
+                  <strong class="vb-summary-opened">${brand.statusCounts.opened}</strong>
+                </div>
+                <div class="vb-group-summary-item">
+                  <span>Failure</span>
+                  <strong class="vb-summary-failure">${brand.statusCounts.failure}</strong>
+                </div>
+                <div class="vb-group-summary-item">
+                  <span>Close</span>
+                  <strong class="vb-summary-close">${brand.statusCounts.close}</strong>
+                </div>
+                <div class="vb-group-summary-item">
+                  <span>Total Merchant</span>
+                  <strong>${brand.merchant_count || 0}</strong>
+                </div>
+                <div class="vb-group-summary-item">
+                  <span>Total Store ID</span>
+                  <strong>${brand.outlet_count || 0}</strong>
+                </div>
+                <div class="vb-group-summary-item is-activity">
+                  <span>Aktivitas Terakhir</span>
+                  <strong>${escapeVBHtml(activity.title)}</strong>
+                  <small>${escapeVBHtml(activity.note)}</small>
+                </div>
+              </div>
+              <div class="vb-brand-toggle">
+                <div class="vb-control">
+                  <label class="switch-toggle ${isPending ? 'is-toggle-pending' : ''}" aria-busy="${isPending ? 'true' : 'false'}">
+                    <input type="checkbox" ${isOn ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)">
+                    <span class="slider"></span>
+                  </label>
+                  ${isOn ? '' : '<span class="vb-control-label">OFF</span>'}
+                </div>
+                <button type="button" class="vb-expand-button" aria-label="${isExpanded ? 'Sembunyikan' : 'Tampilkan'} Store ID grup ${escapeVBHtml(brand.name)}" aria-expanded="${isExpanded ? 'true' : 'false'}" onclick="toggleVbBrandDetail('${brand.id}')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="vb-brand-detail" ${isExpanded ? '' : 'hidden'}>
+              <div class="vb-store-table">
+                <div class="vb-store-table-head">
+                  <span>Portal</span>
+                  <span>Store ID</span>
+                  <span>Status</span>
+                  <span>Jam Operasional</span>
+                  <span>Aksi</span>
+                </div>
+                ${outletRows}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function updateVbResultsSummary(brands, totalBrands, filters) {
+      const summary = document.getElementById('vbResultsSummary');
+      if (!summary) return;
+      const totalStores = brands.reduce((sum, brand) => sum + (brand.visibleStoreCount || 0), 0);
+      const hasFilters = Boolean(filters.query || filters.group || filters.masterStatus || filters.groupStatus || filters.portal || filters.storeId);
+      summary.textContent = brands.length
+        ? (hasFilters
+            ? `Menampilkan ${brands.length} dari ${totalBrands} grup · ${totalStores} Store ID`
+            : `Menampilkan ${brands.length} grup · ${totalStores} Store ID`)
+        : '0 grup · Ubah filter untuk melihat hasil lainnya';
+    }
+
     function filterVBTable() {
-      const q = (document.getElementById('vbSearchInput')?.value || '').toLowerCase();
-      renderVBTable(allVBBrands.filter(brand => (brand.name || '').toLowerCase().includes(q)));
+      const allBrandViews = buildVbBrandViews(allVBBrands);
+      syncVbFilterOptions(allBrandViews);
+      setupCustomFilterDropdowns();
+      const filters = getActiveVbFilters();
+      const filteredBrands = getFilteredVbBrandViews(allBrandViews, filters);
+      renderVBStats(filteredBrands);
+      renderVbQuickActions(filteredBrands);
+      updateVbResultsSummary(filteredBrands, allBrandViews.length, filters);
+      renderVBTable(filteredBrands);
+      syncVbScheduleDrawer(filteredBrands);
+      const disclosure = document.getElementById('vbFilterDisclosure');
+      const hasAdvancedFilters = Boolean(filters.group || filters.masterStatus || filters.groupStatus || filters.portal || filters.storeId);
+      if (disclosure && (!isMobileAdminViewport() || hasAdvancedFilters)) disclosure.open = true;
+    }
+
+    function resetVbFilters() {
+      ['vbGroupFilter', 'vbMasterFilter', 'vbStatusFilter', 'vbPortalFilter', 'vbStoreIdFilter', 'vbInlineSearchInput'].forEach(id => {
+        setControlValue(id, '');
+      });
+      syncVbSearchInputs('', 'inline');
+      filterVBTable();
+    }
+
+    function handleVbToggleChange(brandId, control) {
+      const brand = allVBBrands.find(item => String(item.id) === String(brandId));
+      if (!brand || !control) return;
+      if (!control.checked) {
+        control.checked = true;
+        openVbPauseModal(brand.id, brand.name);
+        return;
+      }
+      requestVBStatus(brand.id, 'ON', control);
+    }
+
+    function toggleVbBrandDetail(brandId) {
+      const card = document.getElementById(`vb-card-${brandId}`);
+      const detail = card?.querySelector('.vb-brand-detail');
+      const button = card?.querySelector('.vb-expand-button');
+      if (!detail || !button) return;
+      const isExpanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', String(!isExpanded));
+      detail.hidden = isExpanded;
+      card.classList.toggle('is-expanded', !isExpanded);
+      if (isExpanded) vbExpandedBrandIds.delete(String(brandId));
+      else vbExpandedBrandIds.add(String(brandId));
+    }
+
+    function getVbScheduleDrawerElements() {
+      return {
+        panel: document.getElementById('vbScheduleDrawer'),
+        backdrop: document.getElementById('vbScheduleDrawerBackdrop'),
+        content: document.getElementById('vbScheduleDrawerContent')
+      };
+    }
+
+    function isVbScheduleDrawerOpen() {
+      const panel = document.getElementById('vbScheduleDrawer');
+      return Boolean(panel && !panel.hidden && panel.classList.contains('is-open'));
+    }
+
+    function clearVbScheduleDrawerAnimationTimers() {
+      if (vbScheduleDrawerHideTimer) {
+        window.clearTimeout(vbScheduleDrawerHideTimer);
+        vbScheduleDrawerHideTimer = null;
+      }
+      if (vbScheduleDrawerOpenFrame) {
+        window.cancelAnimationFrame(vbScheduleDrawerOpenFrame);
+        vbScheduleDrawerOpenFrame = null;
+      }
+    }
+
+    function showVbScheduleDrawer(panel, backdrop) {
+      if (!panel) return;
+      const alreadyOpen = !panel.hidden && panel.classList.contains('is-open');
+      clearVbScheduleDrawerAnimationTimers();
+      panel.hidden = false;
+      panel.setAttribute('aria-hidden', 'false');
+      if (backdrop) backdrop.hidden = false;
+      if (alreadyOpen) {
+        if (backdrop) backdrop.classList.add('is-open');
+        return;
+      }
+      panel.classList.remove('is-open');
+      if (backdrop) backdrop.classList.remove('is-open');
+      void panel.offsetWidth;
+      vbScheduleDrawerOpenFrame = window.requestAnimationFrame(() => {
+        panel.classList.add('is-open');
+        if (backdrop) backdrop.classList.add('is-open');
+        vbScheduleDrawerOpenFrame = null;
+      });
+    }
+
+    function hideVbScheduleDrawer(panel, backdrop) {
+      if (!panel) return;
+      clearVbScheduleDrawerAnimationTimers();
+      panel.classList.remove('is-open');
+      panel.setAttribute('aria-hidden', 'true');
+      if (backdrop) backdrop.classList.remove('is-open');
+      vbScheduleDrawerHideTimer = window.setTimeout(() => {
+        panel.hidden = true;
+        if (backdrop) backdrop.hidden = true;
+        vbScheduleDrawerHideTimer = null;
+      }, VB_SCHEDULE_DRAWER_ANIMATION_MS);
+    }
+
+    function renderVbScheduleDrawerContent(brand, outlet) {
+      const store = outlet.store;
+      const groupStatusClass = brand.effectiveStatus === 'ON' ? 'is-on' : 'is-off';
+      const shopeeStatus = outlet.livePresentation;
+      const actionSummary = outlet.actionSummary || { title: 'Belum ada aksi', note: '-' };
+      const scheduleMarkup = hasUsableAdminSchedule(store)
+        ? getAdminScheduleRowsMarkup(store)
+        : '<div class="vb-schedule-empty">Jadwal reguler Shopee belum tersedia untuk Store ID ini.</div>';
+
+      return `
+        <div class="vb-schedule-meta">
+          <span class="vb-status-pill ${groupStatusClass}">Grup ${brand.effectiveStatus}</span>
+          <span class="vb-drawer-chip">${escapeVBHtml(brand.name)}</span>
+          <span class="vb-drawer-chip">${escapeVBHtml(outlet.portalName)}</span>
+        </div>
+        <div class="vb-schedule-focus-grid">
+          <div class="vb-schedule-focus-card">
+            <span>Jam operasional hari ini</span>
+            <div>${outlet.todayScheduleMarkup}</div>
+          </div>
+          <div class="vb-schedule-focus-card">
+            <span>Status live Shopee</span>
+            <strong>${escapeVBHtml(shopeeStatus.label)}</strong>
+            <small>Nilai terakhir yang diterima dashboard admin.</small>
+          </div>
+          <div class="vb-schedule-focus-card">
+            <span>Aktivitas terakhir</span>
+            <strong>${escapeVBHtml(actionSummary.title)}</strong>
+            <small>${escapeVBHtml(actionSummary.note)}</small>
+          </div>
+        </div>
+        <div class="vb-schedule-panel">
+          <div class="vb-schedule-panel-head">
+            <strong>Jadwal reguler Shopee</strong>
+            <span>Tampilan 7 hari</span>
+          </div>
+          <div class="vb-schedule-rows">${scheduleMarkup}</div>
+        </div>
+      `;
+    }
+
+    function getVbScheduleDrawerFocusableElements(panel) {
+      if (!panel) return [];
+      return [...panel.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.hidden && (element.offsetParent !== null || element === document.activeElement));
+    }
+
+    function updateVbScheduleDrawer(brand, outlet) {
+      const title = document.getElementById('vbScheduleDrawerTitle');
+      const subtitle = document.getElementById('vbScheduleDrawerSubtitle');
+      const { content } = getVbScheduleDrawerElements();
+      if (title) title.textContent = outlet.storeName || `Store ID ${outlet.storeId}`;
+      if (subtitle) subtitle.textContent = `${brand.name} · Store ID ${outlet.storeId}`;
+      if (content) content.innerHTML = renderVbScheduleDrawerContent(brand, outlet);
+    }
+
+    function openVbScheduleDrawer(brandId, storeId, trigger = null) {
+      const brandViews = buildVbBrandViews(allVBBrands);
+      const brand = brandViews.find(item => String(item.id) === String(brandId));
+      const outlet = brand?.outlets.find(item => String(item.storeId) === String(storeId));
+      const { panel, backdrop } = getVbScheduleDrawerElements();
+      if (!brand || !outlet || !panel) return;
+      vbScheduleDrawerActiveKey = `${brand.id}:${outlet.storeId}`;
+      const activeElement = document.activeElement;
+      if (trigger instanceof HTMLElement) {
+        vbScheduleDrawerRestoreFocusEl = trigger;
+      } else if (activeElement instanceof HTMLElement && activeElement !== document.body) {
+        vbScheduleDrawerRestoreFocusEl = activeElement;
+      }
+      updateVbScheduleDrawer(brand, outlet);
+      showVbScheduleDrawer(panel, backdrop);
+      document.body.classList.add('vb-schedule-open');
+      window.requestAnimationFrame(() => panel.focus({ preventScroll: true }));
+    }
+
+    function closeVbScheduleDrawer(options = {}) {
+      const { restoreFocus = true } = options;
+      const { panel, backdrop } = getVbScheduleDrawerElements();
+      hideVbScheduleDrawer(panel, backdrop);
+      document.body.classList.remove('vb-schedule-open');
+      vbScheduleDrawerActiveKey = '';
+      if (restoreFocus) {
+        window.requestAnimationFrame(() => {
+          if (vbScheduleDrawerRestoreFocusEl instanceof HTMLElement && document.contains(vbScheduleDrawerRestoreFocusEl)) {
+            vbScheduleDrawerRestoreFocusEl.focus({ preventScroll: true });
+          }
+          vbScheduleDrawerRestoreFocusEl = null;
+        });
+      } else {
+        vbScheduleDrawerRestoreFocusEl = null;
+      }
+    }
+
+    function handleVbScheduleDrawerBackdrop(event) {
+      if (event.target?.id === 'vbScheduleDrawerBackdrop') {
+        closeVbScheduleDrawer();
+      }
+    }
+
+    function handleVbScheduleDrawerKeydown(event) {
+      if (!isVbScheduleDrawerOpen() || document.querySelector('.modal-overlay.active')) return;
+      const { panel } = getVbScheduleDrawerElements();
+      if (!panel) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeVbScheduleDrawer();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = getVbScheduleDrawerFocusableElements(panel);
+      if (!focusable.length) {
+        event.preventDefault();
+        panel.focus({ preventScroll: true });
+        return;
+      }
+      const firstElement = focusable[0];
+      const lastElement = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+      if (!panel.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastElement : firstElement).focus();
+        return;
+      }
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    function syncVbScheduleDrawer(filteredBrands) {
+      if (!vbScheduleDrawerActiveKey) return;
+      const [brandId, storeId] = vbScheduleDrawerActiveKey.split(':');
+      const brand = (filteredBrands || []).find(item => String(item.id) === String(brandId));
+      const outlet = brand?.visibleOutlets.find(item => String(item.storeId) === String(storeId));
+      if (!brand || !outlet) {
+        closeVbScheduleDrawer({ restoreFocus: false });
+        return;
+      }
+      updateVbScheduleDrawer(brand, outlet);
     }
 
     let selectedVbBrandId = null;
 
+    let vbPickerDate = null;
+    let vbPickerMonth = null;
+
     function openVbPauseModal(brandId, brandName) {
       selectedVbBrandId = brandId;
+      selectedVbPauseBrandIds = [String(brandId)];
       document.getElementById('vbPauseModalTitle').textContent = `Tutup ${brandName}`;
       const now = new Date();
       const until = new Date(now.getTime() + 30 * 60000);
-      document.getElementById('vbCustomUntilInput').value = toVbDateTimeLocal(until);
+      setVbCustomDateTimeDefaults();
       document.querySelectorAll('input[name="vbPauseDuration"]').forEach(radio => {
         radio.checked = radio.value === '30_min';
         radio.closest('.radio-card').classList.toggle('active', radio.checked);
@@ -1212,7 +2050,9 @@
     }
 
     function closeVbPauseModal() {
+      closeVbCustomDateTimePicker();
       selectedVbBrandId = null;
+      selectedVbPauseBrandIds = [];
       const modal = document.getElementById('vbPauseModal');
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
@@ -1221,6 +2061,109 @@
     function toVbDateTimeLocal(date) {
       const pad = value => String(value).padStart(2, '0');
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function formatVbDate(date) {
+      return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    }
+
+    function formatVbTime(date) {
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function getVbPauseMaxDate() {
+      const now = new Date();
+      const targetMonth = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+      const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+      return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), Math.min(now.getDate(), lastDay), 23, 59, 59, 999);
+    }
+
+    function getVbDateKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function populateVbPickerTimeOptions() {
+      const hour = document.getElementById('vbCustomPickerHour');
+      const minute = document.getElementById('vbCustomPickerMinute');
+      if (!hour || !minute || hour.options.length) return;
+      for (let value = 0; value < 24; value += 1) {
+        hour.insertAdjacentHTML('beforeend', `<option value="${String(value).padStart(2, '0')}">${String(value).padStart(2, '0')}</option>`);
+      }
+      for (let value = 0; value < 60; value += 1) {
+        minute.insertAdjacentHTML('beforeend', `<option value="${String(value).padStart(2, '0')}">${String(value).padStart(2, '0')}</option>`);
+      }
+    }
+
+    function renderVbPickerCalendar() {
+      const calendar = document.getElementById('vbCustomPickerCalendar');
+      const label = document.getElementById('vbCustomPickerMonthLabel');
+      if (!calendar || !label || !vbPickerDate || !vbPickerMonth) return;
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      label.textContent = `${months[vbPickerMonth.getMonth()]} ${vbPickerMonth.getFullYear()}`;
+      calendar.innerHTML = '';
+      for (let index = 0; index < new Date(vbPickerMonth.getFullYear(), vbPickerMonth.getMonth(), 1).getDay(); index += 1) calendar.appendChild(document.createElement('span'));
+      const daysInMonth = new Date(vbPickerMonth.getFullYear(), vbPickerMonth.getMonth() + 1, 0).getDate();
+      const todayKey = getVbDateKey(new Date());
+      const maxDateKey = getVbDateKey(getVbPauseMaxDate());
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = new Date(vbPickerMonth.getFullYear(), vbPickerMonth.getMonth(), day);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = day;
+        const dateKey = getVbDateKey(date);
+        button.disabled = dateKey < todayKey || dateKey > maxDateKey;
+        if (date.toDateString() === vbPickerDate.toDateString()) button.classList.add('is-selected');
+        if (dateKey === todayKey) button.classList.add('is-today');
+        button.onclick = () => { vbPickerDate.setDate(day); renderVbPickerCalendar(); };
+        calendar.appendChild(button);
+      }
+    }
+
+    function shiftVbPickerMonth(offset) {
+      vbPickerMonth = new Date(vbPickerMonth.getFullYear(), vbPickerMonth.getMonth() + offset, 1);
+      renderVbPickerCalendar();
+    }
+
+    function openVbCustomDateTimePicker() {
+      const existing = document.getElementById('vbCustomUntilInput').value;
+      const selected = existing ? new Date(existing) : new Date(Date.now() + 2 * 60 * 60000);
+      vbPickerDate = Number.isNaN(selected.getTime()) ? new Date(Date.now() + 2 * 60 * 60000) : selected;
+      vbPickerMonth = new Date(vbPickerDate.getFullYear(), vbPickerDate.getMonth(), 1);
+      populateVbPickerTimeOptions();
+      document.getElementById('vbCustomPickerHour').value = formatVbTime(vbPickerDate).slice(0, 2);
+      document.getElementById('vbCustomPickerMinute').value = formatVbTime(vbPickerDate).slice(3, 5);
+      renderVbPickerCalendar();
+      document.getElementById('vbCustomDateTimePicker').hidden = false;
+      document.getElementById('vbCustomUntilTrigger').setAttribute('aria-expanded', 'true');
+    }
+
+    function closeVbCustomDateTimePicker() {
+      const picker = document.getElementById('vbCustomDateTimePicker');
+      const trigger = document.getElementById('vbCustomUntilTrigger');
+      if (picker) picker.hidden = true;
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    function applyVbCustomDateTimePicker() {
+      if (!vbPickerDate) return;
+      const selected = new Date(vbPickerDate.getFullYear(), vbPickerDate.getMonth(), vbPickerDate.getDate(), Number(document.getElementById('vbCustomPickerHour').value), Number(document.getElementById('vbCustomPickerMinute').value));
+      if (selected <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
+      if (getVbDateKey(selected) > getVbDateKey(getVbPauseMaxDate())) {
+        showToast(`Target maksimal ${formatVbDate(getVbPauseMaxDate())}.`, 'error');
+        return;
+      }
+      document.getElementById('vbCustomUntilInput').value = toVbDateTimeLocal(selected);
+      document.getElementById('vbCustomUntilDisplay').textContent = `${formatVbDate(selected)} ${formatVbTime(selected)}`;
+      closeVbCustomDateTimePicker();
+      updateVbPausePreview();
+    }
+
+    function setVbCustomDateTimeDefaults() {
+      const start = new Date();
+      const until = new Date(start.getTime() + 2 * 60 * 60000);
+      document.getElementById('vbCustomStartInput').value = `${formatVbDate(start)} ${formatVbTime(start)}`;
+      document.getElementById('vbCustomUntilInput').value = toVbDateTimeLocal(until);
+      document.getElementById('vbCustomUntilDisplay').textContent = `${formatVbDate(until)} ${formatVbTime(until)}`;
     }
 
     function getVbPauseEnd() {
@@ -1236,6 +2179,10 @@
       const end = getVbPauseEnd();
       const preview = document.getElementById('vbPauseEndPreview');
       if (!end || Number.isNaN(end.getTime())) { preview.textContent = 'Pilih tanggal & waktu WIB'; return; }
+      if (document.querySelector('input[name="vbPauseDuration"]:checked')?.value === 'rest_of_day') {
+        preview.textContent = 'Buka kembali pada sesi operasional berikutnya';
+        return;
+      }
       preview.textContent = `Berakhir pada ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`;
     }
 
@@ -1248,19 +2195,27 @@
     document.addEventListener('input', event => { if (event.target.id === 'vbCustomUntilInput') updateVbPausePreview(); });
 
     async function confirmVbPause() {
-      if (!selectedVbBrandId) return;
-      const brandId = selectedVbBrandId;
+      const brandIds = selectedVbPauseBrandIds.length
+        ? [...selectedVbPauseBrandIds]
+        : (selectedVbBrandId ? [selectedVbBrandId] : []);
+      if (!brandIds.length) return;
       const end = getVbPauseEnd();
       if (!end || Number.isNaN(end.getTime()) || end <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       const customUntil = document.getElementById('vbCustomUntilInput').value;
-      const control = document.getElementById('vb-card-' + brandId)?.querySelector('input[type="checkbox"]');
       closeVbPauseModal();
-      await requestVBStatus(brandId, 'PAUSED', control, { duration_type: type, custom_until: type === 'custom' ? customUntil : null });
+      for (const brandId of brandIds) {
+        const control = document.getElementById('vb-card-' + brandId)?.querySelector('input[type="checkbox"]');
+        await requestVBStatus(brandId, 'PAUSED', control, { duration_type: type, custom_until: type === 'custom' ? customUntil : null });
+      }
+      selectedVbBrandIds.clear();
+      showToast(`${brandIds.length} brand berhasil diminta untuk ditutup.`, 'success');
     }
 
     async function requestVBStatus(brandId, status, control, duration = {}) {
-      control.disabled = true;
+      pendingVBBrandIds.add(String(brandId));
+      if (control) control.disabled = true;
+      if (getAdminActiveTab() === 'vb') filterVBTable();
       try {
         const res = await fetch(`/api/v1/admin/vb/brands/${encodeURIComponent(brandId)}/status`, {
           method: 'PATCH',
@@ -1275,19 +2230,22 @@
         showErrorModal('Status VB gagal disimpan', err.message);
         await loadVBData(true);
       } finally {
-        control.disabled = false;
+        pendingVBBrandIds.delete(String(brandId));
+        if (control) control.disabled = false;
+        if (getAdminActiveTab() === 'vb') filterVBTable();
       }
     }
 
     async function importVBData() {
-      const buttons = [
-        {
-          element: document.getElementById('vbImportButton'),
-          label: document.getElementById('vbImportButton'),
+      const buttons = [];
+      if (getAdminActiveTab() === 'vb') {
+        buttons.push({
+          element: document.getElementById('fetchSheetHeader'),
+          label: document.getElementById('fetchSheetHeader')?.querySelector('.fetch-label'),
           loadingText: 'Import...',
-          resetText: 'Fetch data'
-        }
-      ];
+          resetText: 'Fetch dari Sheet'
+        });
+      }
       if (getAdminActiveTab() === 'vb') {
         buttons.push({
           element: document.getElementById('mobileFetchButton'),
@@ -1472,7 +2430,7 @@
     }
 
     function setupCustomFilterDropdowns() {
-      document.querySelectorAll('.outlet-filter-card .filter-select').forEach(select => {
+      document.querySelectorAll('.outlet-filter-card .filter-select, .vb-filter-card .filter-select').forEach(select => {
         let wrapper = select.previousElementSibling;
         if (!wrapper || !wrapper.classList.contains('custom-filter')) {
           wrapper = document.createElement('div');
@@ -1810,7 +2768,25 @@
     }
 
     function getAdminDesiredToggleOn(store, stateContext = getAdminStateContext(store)) {
+      // Visual toggle follows effective runtime state, not retained desired state.
+      // Desired OPEN is retained outside schedule for the next operating session.
+      if (typeof store?.display_toggle_on === 'boolean') return store.display_toggle_on;
+      if (isAdminToggleDisabled(store, stateContext)) return false;
       return stateContext.desiredState === 'OPEN';
+    }
+
+    function isAdminToggleDisabled(store, stateContext = getAdminStateContext(store)) {
+      return store?.display_toggle_disabled === true
+        || stateContext.botPhase === 'WAITING_SCHEDULE'
+        || stateContext.botPhase === 'SCHEDULE_UNAVAILABLE'
+        || stateContext.botPhase === 'SUSPENDED';
+    }
+
+    function getAdminToggleDisabledReason(store, stateContext = getAdminStateContext(store)) {
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Toggle dikunci di luar jadwal operasional.';
+      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Toggle dikunci sampai jadwal operasional tersedia.';
+      if (stateContext.botPhase === 'SUSPENDED') return 'Toggle dikunci karena outlet dinonaktifkan admin.';
+      return 'Toggle dikunci oleh aturan jadwal operasional.';
     }
 
     function getAdminPauseSummary(store, stateContext = getAdminStateContext(store)) {
@@ -1874,6 +2850,8 @@
         const stateContext = getAdminStateContext(s);
         const isDesiredOpen = getAdminDesiredToggleOn(s, stateContext);
         const isTogglePending = pendingAdminToggleStoreIds.has(String(s.store_id));
+        const isToggleDisabled = isTogglePending || isAdminToggleDisabled(s, stateContext);
+        const toggleDisabledReason = getAdminToggleDisabledReason(s, stateContext);
         const ownerName = s.nama_pemilik || 'Fando';
         const storeName = escapeHtml(detailValue(s.store_name, 'Outlet'));
         const storeId = escapeHtml(detailValue(s.store_id));
@@ -1888,6 +2866,7 @@
         const pauseSummary = getAdminPauseSummary(s, stateContext);
         const toggleSummary = getAdminActionSummary(s);
         const actionDetailNote = toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.';
+        const isBulkSelected = selectedAdminStoreIds.has(String(s.store_id));
         const toggleMetaText = isTogglePending
           ? 'Menyimpan perubahan...'
           : (toggleSummary.note && toggleSummary.note !== '-'
@@ -1898,7 +2877,10 @@
 
         tr.innerHTML = `
           <td>
-            <strong>${ownerName}</strong>
+            <div class="admin-table-owner-cell">
+              ${adminBulkSelectionMode ? `<label class="admin-store-select"><input type="checkbox" ${isBulkSelected ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} aria-label="Pilih outlet ${storeName}" onchange="toggleAdminBulkStore('${s.store_id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
+              <strong>${ownerName}</strong>
+            </div>
             <small class="compact-meta compact-meta-merchant">${s.merchant_name}</small>
           </td>
           <td>${s.merchant_name}</td>
@@ -1915,7 +2897,7 @@
           </td>
           <td>${getAdminActionMarkup(s)}</td>
           <td><span class="service-period"><strong>${formatServicePeriod(s.tanggal_mulai_layanan, s.tanggal_berakhir_layanan)}</strong><small>${getServiceRemainingTime(s.tanggal_berakhir_layanan)}</small></span></td>
-          <td><label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet"><input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
+          <td><label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="${isToggleDisabled ? escapeHtml(toggleDisabledReason) : 'Toggle outlet'}"><input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
         `;
         tr.classList.add('outlet-data-row');
         tr.tabIndex = 0;
@@ -1931,6 +2913,7 @@
         mobileCard.className = 'mobile-outlet-card admin-mobile-outlet-card';
         mobileCard.innerHTML = `
           <div class="admin-mobile-outlet-head">
+            ${adminBulkSelectionMode ? `<label class="admin-store-select"><input type="checkbox" ${isBulkSelected ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} aria-label="Pilih outlet ${storeName}" onchange="toggleAdminBulkStore('${s.store_id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
             <div class="admin-mobile-outlet-copy">
               <div class="admin-mobile-outlet-owner">${ownerNameText}</div>
               <h3>${storeName}</h3>
@@ -1974,8 +2957,8 @@
               <strong>Toggle outlet</strong>
               <span>${escapeHtml(toggleMetaText)}</span>
             </div>
-            <label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="Toggle outlet">
-              <input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
+            <label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="${isToggleDisabled ? escapeHtml(toggleDisabledReason) : 'Toggle outlet'}">
+              <input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
               <span class="slider"></span>
             </label>
           </div>
@@ -2000,15 +2983,27 @@
       syncOutletDetailSelection(outletDetailActiveStoreId);
     }
 
+    function renderTodayOperatingHoursMarkup(ranges, dayLabel, timezoneLabel) {
+      const values = Array.isArray(ranges)
+        ? ranges.map(value => String(value || '').trim()).filter(Boolean)
+        : (typeof ranges === 'string' && ranges.trim() ? [ranges.trim()] : []);
+      const safeDayLabel = escapeHtml(dayLabel);
+
+      if (!values.length) {
+        return `<span class="today-operating-hours"><span class="operating-time">Tutup</span><span class="operating-meta"><span class="operating-day">${safeDayLabel}</span></span></span>`;
+      }
+
+      const timeLines = values.map(range => `<span class="operating-time">${escapeHtml(range)}</span>`).join('');
+      return `<span class="today-operating-hours">${timeLines}<span class="operating-meta"><span class="operating-day">${safeDayLabel}</span><span class="operating-timezone">${escapeHtml(timezoneLabel)}</span></span></span>`;
+    }
+
     function getTodayOperatingHours(store) {
       const schedule = store.shopee_regular_hours || {};
       const timezone = store.timezone || 'Asia/Jakarta';
       const timezoneLabel = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? 'WITA' : timezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
       const today = new Intl.DateTimeFormat('id-ID', { timeZone: timezone, weekday: 'long' }).format(new Date());
       const ranges = schedule[today];
-      if (Array.isArray(ranges) && ranges.length) return `<span class="today-operating-hours"><span class="operating-time">${ranges.join(' · ')} ${timezoneLabel}</span><span class="operating-day">${today}</span></span>`;
-      if (typeof ranges === 'string' && ranges.trim()) return `<span class="today-operating-hours"><span class="operating-time">${ranges} ${timezoneLabel}</span><span class="operating-day">${today}</span></span>`;
-      return `<span class="today-operating-hours"><span class="operating-time">Tutup</span><span class="operating-day">${today}</span></span>`;
+      return renderTodayOperatingHoursMarkup(ranges, today, timezoneLabel);
     }
 
     function formatServicePeriod(start, end) {
@@ -2043,12 +3038,14 @@
     }
 
     let selectedAdminPauseStoreId = null;
+    let selectedAdminPauseStoreIds = [];
     let adminPickerDate = null;
     let adminPickerMonth = null;
 
     function openAdminPauseModal(storeId, storeName) {
       if (pendingAdminToggleStoreIds.has(String(storeId))) return;
       selectedAdminPauseStoreId = storeId;
+      selectedAdminPauseStoreIds = [String(storeId)];
       document.getElementById('adminModalStoreName').innerText = storeName;
       setAdminCustomDateTimeDefaults();
       updateAdminPauseEndPreview();
@@ -2291,12 +3288,13 @@
       document.getElementById('adminPauseModal').classList.remove('active');
       document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'true');
       selectedAdminPauseStoreId = null;
+      selectedAdminPauseStoreIds = [];
       if (shouldRender) filterTable();
     }
 
     async function confirmAdminPause() {
       if (!selectedAdminPauseStoreId) return;
-      const storeId = selectedAdminPauseStoreId;
+      const storeIds = selectedAdminPauseStoreIds.length ? [...selectedAdminPauseStoreIds] : [String(selectedAdminPauseStoreId)];
       const durationType = document.querySelector('input[name="adminPauseDuration"]:checked').value;
       const customMins = getAdminSelectedPauseMinutes() || 0;
       const customUntil = getAdminCustomUntilValue();
@@ -2304,34 +3302,40 @@
         showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
         return;
       }
-      if (pendingAdminToggleStoreIds.has(String(storeId))) return;
-      pendingAdminToggleStoreIds.add(String(storeId));
+      const eligibleStoreIds = storeIds.filter(storeId => !pendingAdminToggleStoreIds.has(String(storeId)));
+      if (!eligibleStoreIds.length) return;
+      eligibleStoreIds.forEach(storeId => pendingAdminToggleStoreIds.add(String(storeId)));
       closeAdminPauseModal(false);
       filterTable();
 
-      try {
-        const res = await fetch('/api/v1/user/pause', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            store_id: storeId,
-            duration_type: durationType,
-            custom_minutes: customMins,
-            custom_until: durationType === 'custom' ? customUntil : null
-          })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          showToast(`Outlet dijeda selama ${getAdminPauseDurationLabel()}.`, 'success');
-          await loadStoresData(true);
-        } else {
-          throw new Error(data.detail || 'Gagal menutup outlet.');
+      let successCount = 0;
+      let lastError = '';
+      for (const storeId of eligibleStoreIds) {
+        try {
+          const res = await fetch('/api/v1/user/pause', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              store_id: storeId,
+              duration_type: durationType,
+              custom_minutes: customMins,
+              custom_until: durationType === 'custom' ? customUntil : null
+            })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) successCount += 1;
+          else lastError = data.detail || 'Gagal menutup outlet.';
+        } catch (err) {
+          lastError = err.message || 'Gagal menutup outlet.';
+        } finally {
+          finishAdminToggle(storeId);
         }
-      } catch (err) {
-        showToast(err.message || 'Gagal menutup outlet.', 'error');
-      } finally {
-        finishAdminToggle(storeId);
       }
+      if (successCount) showToast(`${successCount} outlet dijeda selama ${getAdminPauseDurationLabel()}.`, 'success');
+      if (lastError && !successCount) showToast(lastError, 'error');
+      selectedAdminStoreIds.clear();
+      updateAdminBulkToolbar();
+      await loadStoresData(true);
     }
 
     document.addEventListener('change', event => {
@@ -2415,9 +3419,13 @@
     async function toggleAdminOutlet(storeId, isChecked, toggle) {
       const key = String(storeId);
       if (pendingAdminToggleStoreIds.has(key)) return;
+      const store = allStores.find(item => String(item.store_id) === key);
+      if (store && isAdminToggleDisabled(store)) {
+        filterTable();
+        return;
+      }
       if (!isChecked) {
         filterTable();
-        const store = allStores.find(item => String(item.store_id) === key);
         openAdminPauseModal(storeId, store?.store_name || storeId);
         return;
       }
@@ -2661,6 +3669,61 @@
       } else {
         outletDetailRestoreFocusEl = null;
       }
+    }
+
+    function updateAdminBulkToolbar() {
+      const toolbar = document.getElementById('adminBulkToolbar');
+      const summary = document.getElementById('adminBulkSelectionSummary');
+      const openButton = document.getElementById('adminBulkOpenButton');
+      const pauseButton = document.getElementById('adminBulkPauseButton');
+      const count = selectedAdminStoreIds.size;
+      if (toolbar) toolbar.hidden = !adminBulkSelectionMode;
+      if (summary) summary.textContent = `${count} dipilih`;
+      if (openButton) openButton.disabled = count === 0;
+      if (pauseButton) pauseButton.disabled = count === 0;
+      const modeButton = document.getElementById('adminBulkModeButton');
+      if (modeButton) modeButton.textContent = adminBulkSelectionMode ? 'Selesai memilih' : 'Pilih beberapa';
+    }
+
+    function toggleAdminBulkSelectionMode() {
+      adminBulkSelectionMode = !adminBulkSelectionMode;
+      if (!adminBulkSelectionMode) selectedAdminStoreIds.clear();
+      updateAdminBulkToolbar();
+      filterTable();
+    }
+
+    function toggleAdminBulkStore(storeId, checked) {
+      const key = String(storeId);
+      if (checked) selectedAdminStoreIds.add(key);
+      else selectedAdminStoreIds.delete(key);
+      updateAdminBulkToolbar();
+    }
+
+    function openAdminBulkPauseModal() {
+      const storeIds = [...selectedAdminStoreIds].filter(storeId => !pendingAdminToggleStoreIds.has(storeId));
+      if (!storeIds.length) return;
+      selectedAdminPauseStoreId = storeIds[0];
+      selectedAdminPauseStoreIds = storeIds;
+      document.getElementById('adminModalStoreName').textContent = `Tutup ${storeIds.length} outlet`;
+      setAdminCustomDateTimeDefaults();
+      document.querySelectorAll('input[name="adminPauseDuration"]').forEach(radio => {
+        radio.checked = radio.value === '30_min';
+        radio.closest('.radio-card').classList.toggle('active', radio.checked);
+      });
+      document.getElementById('adminCustomDurationBox').style.display = 'none';
+      updateAdminPauseEndPreview();
+      document.getElementById('adminPauseModal').classList.add('active');
+      document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'false');
+    }
+
+    async function runAdminBulkOpen() {
+      const storeIds = [...selectedAdminStoreIds].filter(storeId => !pendingAdminToggleStoreIds.has(storeId));
+      if (!storeIds.length) return;
+      for (const storeId of storeIds) {
+        await toggleAdminOutlet(storeId, true, null);
+      }
+      selectedAdminStoreIds.clear();
+      updateAdminBulkToolbar();
     }
 
     function filterTable(sourceId = 'searchInput') {

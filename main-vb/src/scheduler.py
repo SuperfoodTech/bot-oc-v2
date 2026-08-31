@@ -56,6 +56,7 @@ class MerchantQueueItem:
     due_at: datetime
     priority: int
     due_store_ids: tuple[str, ...]
+    outlet_count: int
     actionable_count: int
     reasons: tuple[str, ...]
 
@@ -160,6 +161,7 @@ def build_queue(outlets: Iterable[MerchantOutlet], now: Optional[datetime] = Non
             due_at=earliest,
             priority=priority,
             due_store_ids=tuple(state.store_id for state in due_states),
+            outlet_count=len(states),
             actionable_count=sum(state.actionable for state in states if state.due_at <= now),
             reasons=tuple(dict.fromkeys(state.reason for state in states)),
         ))

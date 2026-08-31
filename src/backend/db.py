@@ -358,6 +358,14 @@ def derive_outlet_runtime_state(
             display_note = "Outlet tertutup di Shopee padahal toggle aktif. Menunggu bot membuka kembali outlet."
         else:
             display_note = "Permintaan buka sudah tersimpan. Menunggu bot membuka outlet."
+    elif desired_state == "OPEN" and not within_schedule:
+        bot_phase = "WAITING_SCHEDULE"
+        status_label = "Sedang Tutup • Di luar jadwal"
+        status_tone = "closed"
+        display_note = (
+            "Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai. "
+            "Status live Shopee tetap ditampilkan terpisah."
+        )
     elif desired_state == "MANUAL_OFF":
         bot_phase = "AUTOMATION_OFF"
         status_label = "Sedang Tutup • Otomatisasi nonaktif"
@@ -403,7 +411,11 @@ def derive_outlet_runtime_state(
 
     display_toggle_on = bool(desired_state == "OPEN" and schedule_available and within_schedule and not is_suspended)
     display_toggle_disabled = bool(is_suspended or not schedule_available or not within_schedule)
-    display_status_bucket = _derive_display_status_bucket(live_state, display_toggle_on, desired_state)
+    display_status_bucket = (
+        "closed"
+        if desired_state == "OPEN" and schedule_available and not within_schedule
+        else _derive_display_status_bucket(live_state, display_toggle_on, desired_state)
+    )
 
     return {
         "desired_state": desired_state,

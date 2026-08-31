@@ -1,21 +1,88 @@
 {# ── TAB PANE: VIRTUAL BRAND ── #}
 <div class="tab-pane" :class="{ 'active': currentTab === 'vb' }" id="paneVB">
-  <div class="vb-panel">
-    <div class="vb-heading">
-      <div>
-        <div class="step-indicator">Virtual Brand</div>
-        <h2>Daftar Brand</h2>
-        <p class="card-subtitle mb-0">Satu status mengendalikan seluruh Store ID dalam brand tersebut.</p>
-      </div>
-      <div class="table-heading-actions">
-        <input type="search" id="vbSearchInput" class="form-input vb-search" placeholder="Cari brand" oninput="filterVBTable()">
-        <button class="btn-primary btn-compact" type="button" id="vbImportButton" onclick="importVBData()">Fetch data</button>
-      </div>
-    </div>
-    <div id="vbImportSummary" class="vb-import-summary" role="status" aria-live="polite"></div>
+  <div class="vb-page-shell">
+    <div class="vb-panel">
+      <div id="vbImportSummary" class="vb-import-summary" role="status" aria-live="polite"></div>
 
-    <div id="vbTableBody" class="vb-brand-list">
-      <div class="table-loading-state">Memuat data brand...</div>
+      <section id="vbStatsGrid" class="vb-stat-grid" aria-live="polite">
+        <div class="table-loading-state">Memuat ringkasan brand...</div>
+      </section>
+
+      <details class="vb-filter-disclosure" id="vbFilterDisclosure">
+        <summary><span>Filter lanjutan</span><small>Grup, status, portal, dan Store ID</small></summary>
+        <section class="vb-filter-card">
+          <div class="vb-filter-grid">
+          <label class="filter-field">
+            <span>Nama Grup</span>
+            <select id="vbGroupFilter" class="form-input filter-select" onchange="filterVBTable()">
+              <option value="">Semua grup</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Status Master</span>
+            <select id="vbMasterFilter" class="form-input filter-select" onchange="filterVBTable()">
+              <option value="">Semua status</option>
+              <option value="AKTIF">Aktif</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Status Grup</span>
+            <select id="vbStatusFilter" class="form-input filter-select" onchange="filterVBTable()">
+              <option value="">Semua status</option>
+              <option value="ON">ON</option>
+              <option value="OFF">OFF</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Portal</span>
+            <select id="vbPortalFilter" class="form-input filter-select" onchange="filterVBTable()">
+              <option value="">Semua portal</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Store ID</span>
+            <input type="search" id="vbStoreIdFilter" class="form-input" placeholder="Cari Store ID" oninput="filterVBTable()">
+          </label>
+            <button class="btn-outline reset-filter-button vb-reset-button" type="button" onclick="resetVbFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>Reset Filter</button>
+          </div>
+        </section>
+      </details>
+
+      <section class="vb-quick-actions" id="vbQuickActions" hidden aria-labelledby="vbQuickActionsTitle">
+        <div class="vb-quick-actions-head">
+          <div>
+            <h3 id="vbQuickActionsTitle">Aksi cepat</h3>
+            <p>Ubah status beberapa brand sekaligus.</p>
+          </div>
+          <button type="button" class="btn-outline vb-bulk-mode-button" id="vbBulkModeButton" onclick="toggleVbBulkSelectionMode()">Pilih beberapa</button>
+        </div>
+        <div class="vb-bulk-toolbar" id="vbBulkToolbar" hidden>
+          <span id="vbBulkSelectionSummary" class="vb-bulk-selection-summary">0 dipilih</span>
+          <div class="vb-bulk-actions">
+            <button type="button" class="btn-outline" id="vbBulkOpenButton" onclick="runVbBulkOpen()" disabled>Buka terpilih</button>
+            <button type="button" class="btn-outline vb-bulk-pause-button" id="vbBulkPauseButton" onclick="openVbBulkPauseModal()" disabled>Tutup terpilih</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="vbResultsSummary" class="vb-results-summary" aria-live="polite"></div>
+
+      <div id="vbTableBody" class="vb-brand-list">
+        <div class="table-loading-state">Memuat data brand...</div>
+      </div>
     </div>
   </div>
+
+  <div class="vb-schedule-backdrop" id="vbScheduleDrawerBackdrop" hidden onclick="handleVbScheduleDrawerBackdrop(event)"></div>
+  <aside class="vb-schedule-drawer" id="vbScheduleDrawer" hidden aria-hidden="true" aria-labelledby="vbScheduleDrawerTitle" tabindex="-1">
+    <div class="vb-schedule-drawer-head">
+      <div class="vb-schedule-drawer-copy">
+        <div class="step-indicator">Jadwal Store ID</div>
+        <h3 id="vbScheduleDrawerTitle">Jadwal outlet</h3>
+        <p id="vbScheduleDrawerSubtitle">Pilih Store ID untuk melihat jadwal.</p>
+      </div>
+      <button type="button" class="vb-schedule-close" aria-label="Tutup drawer jadwal" onclick="closeVbScheduleDrawer()">×</button>
+    </div>
+    <div id="vbScheduleDrawerContent" class="vb-schedule-drawer-content"></div>
+  </aside>
 </div>

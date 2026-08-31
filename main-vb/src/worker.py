@@ -428,6 +428,7 @@ def sync_all_stores(
                 )
                 outlet.regular_hours = last_known_regular_hours
                 outlet.shopee_regular_hours = last_known_regular_hours
+                schedule_identity_valid = True
 
                 if driver_ready and driver:
                     try:
@@ -465,6 +466,12 @@ def sync_all_stores(
                                 f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
                                 "Tetap memakai jadwal terakhir yang valid."
                             )
+                    except store_status.StoreIdentityMismatch as identity_err:
+                        schedule_identity_valid = False
+                        log.error(
+                            f"  ❌ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: {identity_err}. "
+                            "Tidak ada decision/action yang dijalankan memakai jadwal yang tidak terpercaya."
+                        )
                     except Exception as hours_err:
                         log.warning(
                             f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
@@ -493,6 +500,9 @@ def sync_all_stores(
 
                 watched_outlets.append(outlet)
 
+                if not schedule_identity_valid:
+                    continue
+
                 decision = evaluate_outlet_status(
                     outlet,
                     current_time=datetime.now(local_tz),
@@ -512,6 +522,7 @@ def sync_all_stores(
                     exec_ok = execute_outlet_shopee_action(outlet, decision.action)
                     expected_st = "ON" if decision.target_state == "OPEN" else "PAUSE"
                     verification_note = ""
+                    verification_ok = False
 
                     if exec_ok:
                         driver_ready = _ensure_group_session_ready(f"post action verify Store {outlet.store_id}")
@@ -545,6 +556,8 @@ def sync_all_stores(
                                     _request_post_action_recheck(
                                         f"post-action verify mismatch untuk Store {outlet.store_id}: live {verified_st}, expected {expected_st}"
                                     )
+                                else:
+                                    verification_ok = True
                             else:
                                 verification_note = " | Verification: pending recheck"
                                 log.warning(
@@ -560,7 +573,11 @@ def sync_all_stores(
                             f"retry action Store {outlet.store_id}: eksekusi {decision.action} gagal"
                         )
 
-                    reason_text = f"{decision.reason} | Shopee Action: {'SUCCESS' if exec_ok else 'FAILED'}{verification_note}"
+                    action_success = exec_ok and verification_ok
+                    action_result = "SUCCESS" if exec_ok else "FAILED"
+                    if exec_ok and not verification_ok:
+                        action_result = "VERIFICATION_MISMATCH"
+                    reason_text = f"{decision.reason} | Shopee Action: {action_result}{verification_note}"
                     actions_taken.append({
                         "store_id": outlet.store_id,
                         "store_name": outlet.nama_panjang_outlet,
@@ -575,8 +592,8 @@ def sync_all_stores(
                         action=decision.action,
                         target_state=decision.target_state,
                         reason=reason_text,
-                        success=exec_ok,
-                        error_message=None if exec_ok else reason_text,
+                        success=action_success,
+                        error_message=None if action_success else reason_text,
                     )
 
         db.record_log(
@@ -609,7 +626,7 @@ def sync_all_stores(
 
         return {
             "success": True,
-            "total_stores_processed": len(outlets),
+            "total_stores_processed": sum(len(group) for group in grouped_outlets.values()),
             "actions_taken": actions_taken,
             "processed_merchant_groups": [
                 {"username": username, "portal_name": portal_name}

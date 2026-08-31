@@ -214,6 +214,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             # every group so a newly detected mismatch can move to the front.
             processed_keys = set()
             cycle_actions = []
+            cycle_merchant_groups = []
             total_stores_processed = 0
             total_outlets_loaded = 0
             last_result = {}
@@ -236,7 +237,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
 
                 log.info(
                     "🏬 [MERCHANT SCHEDULER] Dispatching %s outlets for '%s' (Account: %s, P%d)...",
-                    len(selected.due_store_ids) or 1,
+                    selected.outlet_count,
                     selected.portal_name,
                     selected.username,
                     selected.priority,
@@ -248,6 +249,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 )
                 processed_keys.add(selected.merchant_key)
                 cycle_actions.extend(last_result.get("actions_taken", []))
+                cycle_merchant_groups.extend(last_result.get("processed_merchant_groups", []))
                 total_stores_processed += last_result.get("total_stores_processed", 0)
 
                 # A single --once invocation dispatches one merchant group. In
@@ -262,7 +264,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 "actions_taken": cycle_actions,
                 "next_wake_hint_seconds": next_sleep_seconds,
                 "next_wake_hint_reason": next_sleep_reason,
-                "processed_merchant_groups": last_result.get("processed_merchant_groups", []),
+                "processed_merchant_groups": cycle_merchant_groups,
             }
             log.info(
                 f"  ✅ Cycle #{cycle_count} Finished. Runtime outlets loaded: {result['total_outlets_loaded']} | "

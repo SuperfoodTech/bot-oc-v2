@@ -6,6 +6,10 @@ from selenium.webdriver.common.by import By
 
 log = logging.getLogger(__name__)
 
+
+class StoreIdentityMismatch(Exception):
+    """Raised when Shopee returns data for a different store than requested."""
+
 def ensure_business_hours_page(driver, store_id: str) -> bool:
     """
     Navigates Chrome browser to the exact Business Hours URL for store_id and verifies if the Business Hours menu is fully loaded.
@@ -116,6 +120,22 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
         if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
             data = res["data"]
             store_data = data.get("store", {})
+            requested_store_id = str(store_id).strip()
+            response_store_id = str(store_data.get("id") or "").strip() if isinstance(store_data, dict) else ""
+            log.info(
+                f"  🔍 [LIVE STORE IDENTITY] requested_store_id={requested_store_id} "
+                f"response_store_id={response_store_id or 'missing'}"
+            )
+            if response_store_id != requested_store_id:
+                log.error(
+                    f"  ❌ [LIVE STORE REJECTED] Store ID mismatch: "
+                    f"requested={requested_store_id}, response={response_store_id or 'missing'}. "
+                    "Live state tidak dipakai."
+                )
+                raise StoreIdentityMismatch(
+                    f"live-store requested={requested_store_id}, response={response_store_id or 'missing'}"
+                )
+
             op_data = data.get("opening_status", {})
 
             display_status = op_data.get("display_opening_status", op_data.get("opening_status", store_data.get("opening_status", 0)))
@@ -179,6 +199,8 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
             log.info("  ✅ [LIVE DOM STATUS] Badge/DOM status detected -> Store is CLOSED.")
             return {"opening_status": 3, "order_enabled": 0, "status_str": "CLOSED", "raw": {"source": "partner_dom_badge"}}
 
+    except StoreIdentityMismatch:
+        raise
     except Exception as e:
         log.warning(f"⚠️ Pengecekan status toko gagal untuk store {store_id}: {e}")
 
@@ -227,9 +249,28 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
 
         log.info(f"  🔍 [REGULAR HOURS API RESPONSE] Store {store_id} | Response: {res.get('code') if isinstance(res, dict) else None}")
         if isinstance(res, dict) and res.get("code") == 0:
-            reg_hours = res.get("data", {}).get("regular_hours", [])
+            data = res.get("data")
+            response_store_id = str(data.get("store_id") or "").strip() if isinstance(data, dict) else ""
+            requested_store_id = str(store_id).strip()
+            log.info(
+                f"  🔍 [REGULAR HOURS IDENTITY] requested_store_id={requested_store_id} "
+                f"response_store_id={response_store_id or 'missing'}"
+            )
+            if response_store_id != requested_store_id:
+                log.error(
+                    f"  ❌ [REGULAR HOURS REJECTED] Store ID mismatch: "
+                    f"requested={requested_store_id}, response={response_store_id or 'missing'}. "
+                    "Jadwal tidak disimpan dan jadwal terakhir yang valid tetap dipakai."
+                )
+                raise StoreIdentityMismatch(
+                    f"regular-hours requested={requested_store_id}, response={response_store_id or 'missing'}"
+                )
+
+            reg_hours = data.get("regular_hours", [])
             log.info(f"  ✅ [PULL REGULAR HOURS SUCCESS] Berhasil menarik data jadwal reguler ({len(reg_hours)} hari terkonfigurasi).")
-            return res.get("data")
+            return data
+    except StoreIdentityMismatch:
+        raise
     except Exception as e:
         log.warning(f"⚠️ Gagal menarik data jadwal reguler untuk store {store_id}: {e}")
 
