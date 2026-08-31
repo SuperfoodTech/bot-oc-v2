@@ -16,7 +16,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-admin-console-v52">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-admin-console-v54">
 </head>
 
 <body x-data="adminApp()">
@@ -47,7 +47,7 @@
     </aside>
     <main class="admin-main">
       <header class="admin-page-header">
-        <div class="admin-heading-copy"><h1 class="page-title" id="adminPageTitle">Agency Outlet Management</h1><p class="admin-breadcrumb"><span>Agency</span><span aria-hidden="true">›</span><span>Daftar Outlet</span></p></div>
+        <div class="admin-heading-copy"><h1 class="page-title" id="adminPageTitle">Agency Outlet Management</h1><p class="admin-breadcrumb" hidden><span>Agency</span><span aria-hidden="true">›</span><span>Daftar Outlet</span></p></div>
         <div class="admin-actions">
           <label class="admin-header-search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
@@ -586,6 +586,7 @@
       outlets: {
         title: 'Agency Outlet Management',
         breadcrumb: ['Agency', 'Daftar Outlet'],
+        breadcrumbVisible: false,
         searchVisible: true,
         searchPlaceholder: 'Cari outlet / pemilik / Store ID',
         searchLabel: 'Cari outlet, pemilik, atau Store ID',
@@ -1152,8 +1153,10 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
-      syncAdminHeaderForTab(tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) ? tabParam : 'outlets');
-      syncMobileFetchButton(tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) ? tabParam : 'outlets');
+      const initialTab = tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) ? tabParam : 'outlets';
+      syncAdminHeaderForTab(initialTab);
+      syncMobileFetchButton(initialTab);
+      syncDesktopWrapperScrollState(initialTab);
       if (tabParam && ['outlets', 'vb', 'logs', 'settings'].includes(tabParam) && tabParam !== 'outlets') {
         switchTab(tabParam, { skipHistory: true });
       }
@@ -1203,6 +1206,16 @@
       fetchBotStatus();
     });
 
+    function syncDesktopWrapperScrollState(tabName = getAdminActiveTab()) {
+      const contentWrapper = document.querySelector('.admin-main > .desktop-wrapper');
+      if (!contentWrapper) return null;
+
+      const isSettingsTab = tabName === 'settings';
+      const isGlobalScrollTab = tabName === 'settings' || tabName === 'outlets';
+      contentWrapper.classList.toggle('is-global-scroll-active', isGlobalScrollTab);
+      contentWrapper.classList.toggle('is-settings-active', isSettingsTab);
+      return contentWrapper;
+    }
 
     function switchTab(tabName, options = {}) {
       const { skipHistory = false } = options;
@@ -1210,10 +1223,8 @@
       currentTab = tabName;
       if (window._appData) window._appData.currentTab = tabName;
       syncMobileFetchButton(tabName);
-      const contentWrapper = document.querySelector('.admin-main > .desktop-wrapper');
-      const isSettingsTab = tabName === 'settings';
+      const contentWrapper = syncDesktopWrapperScrollState(tabName);
       if (contentWrapper) {
-        contentWrapper.classList.toggle('is-settings-active', isSettingsTab);
         contentWrapper.scrollTop = 0;
       }
       if (tabName !== 'outlets') {

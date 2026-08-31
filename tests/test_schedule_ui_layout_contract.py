@@ -105,11 +105,19 @@ def test_admin_agency_has_bulk_actions_below_filter():
     assert "function openAdminBulkPauseModal()" in dashboard_template
 
 
-def test_admin_outlet_table_uses_a_dedicated_desktop_scroll_region():
-    assert ".admin-shell .admin-main #paneOutlets.active {" in STYLES
-    assert ".admin-shell .admin-main #paneOutlets.active .outlet-content-layout {" in STYLES
-    assert ".admin-shell .admin-main #paneOutlets .table-card.outlet-section {" in STYLES
-    assert ".admin-shell .admin-main #paneOutlets .table-card.outlet-section .table-scroll {" in STYLES
-    assert "overflow-y: auto;" in STYLES
+def test_admin_outlet_table_uses_global_desktop_scroll_region():
+    dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+
+    assert ".admin-shell .admin-main > .desktop-wrapper.is-global-scroll-active {" in STYLES
+    assert ".admin-shell .admin-main > .desktop-wrapper.is-global-scroll-active #paneOutlets.active .outlet-content-layout {" in STYLES
+    assert ".admin-shell .admin-main > .desktop-wrapper.is-global-scroll-active #paneOutlets .table-card.outlet-section {" in STYLES
+    assert ".admin-shell .admin-main > .desktop-wrapper.is-global-scroll-active #paneOutlets .table-card.outlet-section .table-scroll {" in STYLES
+    assert "overflow-y: visible;" in STYLES
     assert "scrollbar-gutter: stable;" in STYLES
     assert "overscroll-behavior: contain;" in STYLES
+    assert "function syncDesktopWrapperScrollState" in dashboard_template
+    assert "syncDesktopWrapperScrollState(initialTab);" in dashboard_template
+    assert 'class="admin-breadcrumb" hidden' in dashboard_template
+    assert "breadcrumbVisible: false" in dashboard_template
+    assert ".admin-shell .admin-main #adminTable tbody td:nth-child(1) .admin-table-owner-cell {" in STYLES
+    assert "justify-content: center;" in STYLES
