@@ -157,6 +157,21 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
         apply_all_pending_statuses(conn)
         rows = conn.execute(query).fetchall()
 
+    # A Store ID may be linked to more than one active brand. Patrol it once
+    # per portal and use the most restrictive desired state to avoid duplicate
+    # actions or an ON row overriding an OFF row.
+    unique_rows = {}
+    for row in rows:
+        store_id = str(row.get("store_id") or "").strip()
+        existing = unique_rows.get(store_id)
+        if existing is None:
+            unique_rows[store_id] = row
+            continue
+        if str(row.get("effective_status") or "ON").upper() != "ON":
+            existing["effective_status"] = row.get("effective_status")
+            existing["brand_pause_until"] = row.get("brand_pause_until")
+    rows = list(unique_rows.values())
+
     outlets = []
     for row in rows:
         store_id = str(row.get("store_id") or "").strip()

@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260830-mitra-dashboard-v56">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-mitra-dashboard-v60">
 </head>
 <body x-data="userApp()">
 
@@ -104,7 +104,7 @@
           <div class="mitra-hero-copy">
             <div class="mitra-hero-label">Dashboard Mitra</div>
             <h1 class="page-title">Kelola outlet Anda</h1>
-            <p class="page-description">Pantau status dan kelola operasional outlet Anda dengan mudah.</p>
+            <p class="page-description">Pantau status live dan buka otomatis dari satu layar.</p>
           </div>
           <div class="mitra-hero-art" aria-hidden="true">
             <img class="mitra-hero-shop" src="/static/icons/shop-outlet-red.svg" alt="">
@@ -112,41 +112,44 @@
         </section>
 
         <div class="dashboard-content-stack">
-          <button type="button" class="card-box mitra-account-card" onclick="scrollToAccountNotice()">
-            <span class="mitra-account-avatar" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M12 13.25a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 13.25Z"></path>
-                <path d="M5 19.5a7 7 0 0 1 14 0"></path>
-              </svg>
-            </span>
-            <span class="mitra-account-copy">
-              <span class="mitra-account-label">Akun</span>
-              <span class="mitra-account-heading">
-                <span class="card-title" id="mitraName">Mitra Fando</span>
-                <span class="badge badge-open" id="subBadge">Aktif</span>
-              </span>
-              <span class="card-subtitle" id="subDetails">Aktif hingga 01 Nov 2026</span>
-              <span class="mitra-account-meta">
-                <span class="mitra-account-meta-item">
-                  <svg viewBox="0 0 16 16">
-                    <path d="M3 1L0 4v1s2 1 4 1 4-1 4-1 2 1 4 1 4-1 4-1V4l-3-3H3Z"></path>
-                    <path d="M1 15V7.52C1.82 7.76 2.88 8 4 8c1.3 0 2.53-.32 3.38-.6.23-.08.43-.15.62-.22.18.07.39.14.62.22.85.28 2.08.6 3.38.6 1.12 0 2.18-.24 3-.48V15H7v-5H4v5H1Zm11-5h-2v3h2v-3Z"></path>
-                  </svg>
-                  <span id="accountOutletCount">0 outlet</span>
-                </span>
-              </span>
-            </span>
-            <span class="mitra-account-chevron" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
-            </span>
-          </button>
-
           <div class="section-heading mitra-section-heading">
-            <h2>Outlet Anda</h2>
+            <div class="mitra-section-heading-copy">
+              <h2>Outlet Anda</h2>
+              <p class="mitra-section-caption">Lihat status live dan kelola buka otomatis per outlet.</p>
+            </div>
             <span class="section-count" id="outletCount">Memuat...</span>
           </div>
 
           <div id="outletsList" class="outlet-list"></div>
+
+          <section class="card-box mitra-account-summary" aria-label="Ringkasan akun">
+            <div class="mitra-account-summary-head">
+              <span class="mitra-account-label">Ringkasan akun</span>
+              <span class="badge badge-open" id="subBadge">Aktif</span>
+            </div>
+            <div class="mitra-account-summary-body">
+              <span class="mitra-account-avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 13.25a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 13.25Z"></path>
+                  <path d="M5 19.5a7 7 0 0 1 14 0"></path>
+                </svg>
+              </span>
+              <span class="mitra-account-copy">
+                <span class="card-title" id="mitraName">Mitra Fando</span>
+                <span class="card-subtitle" id="subDetails">Aktif hingga 01 Nov 2026</span>
+              </span>
+            </div>
+            <div class="mitra-account-meta">
+              <span class="mitra-account-meta-item">
+                <svg viewBox="0 0 16 16">
+                  <path d="M3 1L0 4v1s2 1 4 1 4-1 4-1 2 1 4 1 4-1 4-1V4l-3-3H3Z"></path>
+                  <path d="M1 15V7.52C1.82 7.76 2.88 8 4 8c1.3 0 2.53-.32 3.38-.6.23-.08.43-.15.62-.22.18.07.39.14.62.22.85.28 2.08.6 3.38.6 1.12 0 2.18-.24 3-.48V15H7v-5H4v5H1Zm11-5h-2v3h2v-3Z"></path>
+                </svg>
+                <span id="accountOutletCount">0 outlet</span>
+              </span>
+              <span class="mitra-account-meta-note">Akses dan kata sandi dikelola admin FoodMaster.</span>
+            </div>
+          </section>
 
           <div class="card-box mitra-activity-card">
             <div class="card-heading">
@@ -382,10 +385,6 @@
       }
       if (input) input.disabled = isPending;
       if (toggleBtn) toggleBtn.disabled = isPending;
-    }
-
-    function scrollToAccountNotice() {
-      document.getElementById('accountNotice')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function getShopeeFoodStoreUrl(storeId) {
@@ -1184,7 +1183,7 @@
               <span>${escapeHtml(getOutletAutomationDetail(out, stateContext))}</span>
             </div>
             <label class="switch-toggle ${isToggleDisabled ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
-              <input type="checkbox" ${isToggleOn ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
+              <input type="checkbox" aria-label="Buka otomatis untuk ${storeName}" ${isToggleOn ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
               <span class="slider"></span>
             </label>
           </div>
@@ -1621,8 +1620,17 @@
       }
     }
 
+    function renderHistoryEmptyState(message = 'Belum ada aktivitas.') {
+      const container = document.getElementById('historyLogs');
+      if (!container) return;
+      container.innerHTML = `<div class="history-item is-empty"><span>${escapeHtml(message)}</span></div>`;
+    }
+
     async function fetchHistory() {
-      if (!currentUserOutlets.length) return;
+      if (!currentUserOutlets.length) {
+        renderHistoryEmptyState('Aktivitas akan muncul setelah outlet dihubungkan oleh admin.');
+        return;
+      }
       const ids = currentUserOutlets.map(o => o.store_id).join(',');
       const ACTION_LABELS = {
         'USER_PAUSE_STORE': 'Ditutup sementara',
@@ -1639,6 +1647,7 @@
         const res = await fetch(`/api/v1/user/history?store_ids=${ids}`);
         const data = await res.json();
         const container = document.getElementById('historyLogs');
+        if (!container) return;
         container.innerHTML = '';
 
         let logs = Array.isArray(data.logs) ? data.logs : [];
@@ -1663,16 +1672,15 @@
                 <strong>${escapeHtml(summary.title)}</strong>
                 <span>${escapeHtml(summary.subtitle || l.store_name || '-')}</span>
               </span>
-              <span class="history-chevron" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg>
-              </span>
             `;
             container.appendChild(item);
           });
         } else {
-          container.innerHTML = '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
+          renderHistoryEmptyState('Belum ada aktivitas.');
         }
-      } catch (err) {}
+      } catch (err) {
+        renderHistoryEmptyState('Aktivitas belum bisa dimuat. Coba lagi beberapa saat.');
+      }
     }
 
     function getHistoryActorPresentation(action) {

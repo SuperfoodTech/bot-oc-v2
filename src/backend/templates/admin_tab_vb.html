@@ -8,6 +8,18 @@
         <div class="table-loading-state">Memuat ringkasan brand...</div>
       </section>
 
+      <div class="mobile-outlet-toolbar vb-mobile-toolbar d-md-none">
+        <label class="mobile-outlet-search vb-mobile-search" for="vbInlineSearchInput">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+          <input type="search" id="vbInlineSearchInput" placeholder="Cari grup atau Store ID" aria-label="Cari grup, portal, atau Store ID" oninput="handleVbInlineSearchInput()">
+        </label>
+        <button class="mobile-filter-trigger vb-mobile-filter-trigger" id="vbMobileFilterTrigger" type="button" onclick="openVbMobileFilterSheet()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.5 7.5v4.5l-3 1.5v-6z"/></svg>
+          <span>Filter</span>
+          <span class="mobile-filter-badge" id="vbMobileFilterBadge" hidden>0</span>
+        </button>
+      </div>
+
       <details class="vb-filter-disclosure" id="vbFilterDisclosure">
         <summary><span>Filter lanjutan</span><small>Grup, status, portal, dan Store ID</small></summary>
         <section class="vb-filter-card">
@@ -63,12 +75,71 @@
             <button type="button" class="btn-outline vb-bulk-pause-button" id="vbBulkPauseButton" onclick="openVbBulkPauseModal()" disabled>Tutup terpilih</button>
           </div>
         </div>
+        <p class="vb-bulk-selection-hint" id="vbBulkSelectionHint" hidden>Pilih grup pada kartu di bawah untuk menampilkan aksi massal.</p>
       </section>
 
       <div id="vbResultsSummary" class="vb-results-summary" aria-live="polite"></div>
 
       <div id="vbTableBody" class="vb-brand-list">
         <div class="table-loading-state">Memuat data brand...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vb-mobile-bulk-bar d-md-none" id="vbMobileBulkBar" hidden aria-live="polite">
+    <span id="vbMobileBulkSelectionSummary" class="vb-bulk-selection-summary">0 dipilih</span>
+    <div class="vb-bulk-actions">
+      <button type="button" class="btn-outline" id="vbMobileBulkOpenButton" onclick="runVbBulkOpen()" disabled>Buka terpilih</button>
+      <button type="button" class="btn-outline vb-bulk-pause-button" id="vbMobileBulkPauseButton" onclick="openVbBulkPauseModal()" disabled>Tutup terpilih</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay mobile-filter-sheet-overlay d-md-none" id="vbMobileFilterSheet" aria-hidden="true" onclick="handleVbMobileFilterSheetBackdrop(event)">
+    <div class="mobile-filter-sheet vb-mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="vbMobileFilterSheetTitle">
+      <div class="mobile-filter-sheet-handle" aria-hidden="true"></div>
+      <div class="mobile-filter-sheet-header">
+        <div>
+          <div class="step-indicator">Filter VB</div>
+          <h2 id="vbMobileFilterSheetTitle">Atur filter Virtual Brand</h2>
+        </div>
+        <button type="button" class="mobile-filter-sheet-close" onclick="closeVbMobileFilterSheet()" aria-label="Tutup filter Virtual Brand">×</button>
+      </div>
+      <div class="mobile-filter-sheet-body">
+        <label class="filter-field">
+          <span>Nama Grup</span>
+          <select id="mobileVbGroupFilter" class="form-input mobile-sheet-select" aria-label="Filter nama grup VB">
+            <option value="">Semua grup</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>Status Master</span>
+          <select id="mobileVbMasterFilter" class="form-input mobile-sheet-select" aria-label="Filter status master VB">
+            <option value="">Semua status</option>
+            <option value="AKTIF">Aktif</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>Status Grup</span>
+          <select id="mobileVbStatusFilter" class="form-input mobile-sheet-select" aria-label="Filter status grup VB">
+            <option value="">Semua status</option>
+            <option value="ON">ON</option>
+            <option value="OFF">OFF</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>Portal</span>
+          <select id="mobileVbPortalFilter" class="form-input mobile-sheet-select" aria-label="Filter portal VB">
+            <option value="">Semua portal</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>Store ID</span>
+          <input type="search" id="mobileVbStoreIdFilter" class="form-input vb-mobile-sheet-input" placeholder="Cari Store ID" aria-label="Filter Store ID VB">
+        </label>
+      </div>
+      <div class="mobile-filter-sheet-footer">
+        <button class="btn-outline" type="button" onclick="resetVbMobileFilterSheet()">Reset</button>
+        <button class="btn-primary" type="button" onclick="applyVbMobileFilterSheet()">Terapkan Filter</button>
       </div>
     </div>
   </div>

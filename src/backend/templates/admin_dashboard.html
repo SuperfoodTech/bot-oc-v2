@@ -16,7 +16,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260830-admin-console-v47">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-admin-console-v51">
 </head>
 
 <body x-data="adminApp()">
@@ -458,6 +458,13 @@
       subscriptionFilter: 'mobileSubscriptionFilter',
       packageFilter: 'mobilePackageFilter'
     };
+    const VB_FILTER_FIELD_MAP = {
+      vbGroupFilter: 'mobileVbGroupFilter',
+      vbMasterFilter: 'mobileVbMasterFilter',
+      vbStatusFilter: 'mobileVbStatusFilter',
+      vbPortalFilter: 'mobileVbPortalFilter',
+      vbStoreIdFilter: 'mobileVbStoreIdFilter'
+    };
     const OUTLET_SUMMARY_FILTER_KEYS = ['all', 'open', 'closed', 'subscription'];
     let activeOutletSummaryFilter = 'all';
     let outletDetailActiveStoreId = '';
@@ -685,6 +692,7 @@
       const fetchButton = document.getElementById('fetchSheetHeader');
       const fetchLabel = fetchButton?.querySelector('.fetch-label');
 
+      if (document.body) document.body.dataset.adminTab = tabName;
       if (title) title.textContent = config.title;
       if (breadcrumb) {
         breadcrumb.innerHTML = `<span>${escapeVBHtml(config.breadcrumb[0])}</span><span aria-hidden="true">›</span><span>${escapeVBHtml(config.breadcrumb[1])}</span>`;
@@ -1058,6 +1066,78 @@
       closeMobileFilterSheet();
     }
 
+    function isVbMobileFilterSheetOpen() {
+      return document.getElementById('vbMobileFilterSheet')?.classList.contains('active');
+    }
+
+    function syncVbMobileFilterSelectsFromDesktop(force = false) {
+      const sheetIsOpen = isVbMobileFilterSheetOpen();
+      if (sheetIsOpen && !force) return;
+      Object.entries(VB_FILTER_FIELD_MAP).forEach(([desktopId, mobileId]) => {
+        const desktop = document.getElementById(desktopId);
+        const mobile = document.getElementById(mobileId);
+        if (!desktop || !mobile) return;
+        mobile.value = desktop.value;
+      });
+    }
+
+    function syncVbDesktopFilterSelectsFromMobile() {
+      Object.entries(VB_FILTER_FIELD_MAP).forEach(([desktopId, mobileId]) => {
+        const desktop = document.getElementById(desktopId);
+        const mobile = document.getElementById(mobileId);
+        if (!desktop || !mobile) return;
+        desktop.value = mobile.value;
+      });
+    }
+
+    function getActiveVbAdvancedFilterCount(filters = getActiveVbFilters()) {
+      return [filters.group, filters.masterStatus, filters.groupStatus, filters.portal, filters.storeId].filter(Boolean).length;
+    }
+
+    function updateVbMobileFilterBadge(filters = getActiveVbFilters()) {
+      const count = getActiveVbAdvancedFilterCount(filters);
+      const badge = document.getElementById('vbMobileFilterBadge');
+      const trigger = document.getElementById('vbMobileFilterTrigger');
+      if (badge) {
+        badge.innerText = count;
+        badge.hidden = count === 0;
+      }
+      if (trigger) trigger.classList.toggle('has-active-filters', count > 0);
+    }
+
+    function openVbMobileFilterSheet() {
+      if (!isMobileAdminViewport()) return;
+      const sheet = document.getElementById('vbMobileFilterSheet');
+      if (!sheet) return;
+      syncVbMobileFilterSelectsFromDesktop(true);
+      sheet.classList.add('active');
+      sheet.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('mobile-filter-sheet-open');
+    }
+
+    function closeVbMobileFilterSheet() {
+      const sheet = document.getElementById('vbMobileFilterSheet');
+      if (!sheet) return;
+      sheet.classList.remove('active');
+      sheet.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('mobile-filter-sheet-open');
+    }
+
+    function handleVbMobileFilterSheetBackdrop(event) {
+      if (event.target?.id === 'vbMobileFilterSheet') closeVbMobileFilterSheet();
+    }
+
+    function resetVbMobileFilterSheet() {
+      Object.values(VB_FILTER_FIELD_MAP).forEach(id => setControlValue(id, ''));
+    }
+
+    function applyVbMobileFilterSheet() {
+      syncVbDesktopFilterSelectsFromMobile();
+      setupCustomFilterDropdowns();
+      filterVBTable();
+      closeVbMobileFilterSheet();
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       showTableSkeleton();
       loadStoresData();
@@ -1082,6 +1162,8 @@
     window.addEventListener('resize', () => {
       if (window.matchMedia('(min-width: 768px)').matches) {
         closeMobileFilterSheet();
+        closeVbMobileFilterSheet();
+        document.body.classList.remove('vb-mobile-bulk-open');
         if (activeOutletSummaryFilter !== 'all') {
           activeOutletSummaryFilter = 'all';
           filterTable();
@@ -1089,8 +1171,8 @@
       }
       if (getAdminActiveTab() === 'vb') {
         const vbFilterDisclosure = document.getElementById('vbFilterDisclosure');
-        if (vbFilterDisclosure && !isMobileAdminViewport() && !vbFilterDisclosure.open) vbFilterDisclosure.open = true;
-        if (vbFilterDisclosure && isMobileAdminViewport() && !Object.values(getActiveVbFilters()).some(Boolean)) vbFilterDisclosure.open = false;
+        if (vbFilterDisclosure) vbFilterDisclosure.open = !isMobileAdminViewport();
+        if (allVBBrands.length) filterVBTable();
       }
       if (isOutletDetailOpen()) setOutletDetailBackgroundState(true);
       syncMobileFetchButton();
@@ -1100,7 +1182,10 @@
       handleOutletDetailKeydown(event);
       handleVbScheduleDrawerKeydown(event);
       if (event.defaultPrevented) return;
-      if (event.key === 'Escape') closeMobileFilterSheet();
+      if (event.key === 'Escape') {
+        closeMobileFilterSheet();
+        closeVbMobileFilterSheet();
+      }
     });
 
     window.addEventListener('popstate', () => {
@@ -1137,6 +1222,8 @@
       }
       if (tabName !== 'vb') {
         closeVbScheduleDrawer({ restoreFocus: false });
+        closeVbMobileFilterSheet();
+        document.body.classList.remove('vb-mobile-bulk-open');
       }
       syncAdminHeaderForTab(tabName);
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1366,9 +1453,45 @@
       };
     }
 
+    function getVbStatusCounts(outlets = []) {
+      return (outlets || []).reduce((counts, outlet) => {
+        const failureText = [
+          outlet.statusPresentation?.label,
+          outlet.statusPresentation?.note,
+          outlet.statusSubtext,
+          outlet.store?.last_toggle_reason,
+          outlet.store?.error_message,
+          outlet.store?.patrol_status
+        ].filter(Boolean).join(' ').toLowerCase();
+        const hasPatrolFailure = outlet.store?.patrol_success === false
+          || outlet.store?.last_patrol_success === false
+          || outlet.store?.success === false
+          || /patroli[^.]*gagal|patrol[^.]*fail|patrol[^.]*error|gagal patroli|patrol_failed/.test(failureText);
+        if (hasPatrolFailure) counts.failure += 1;
+        else if (outlet.liveState === 'OPEN') counts.opened += 1;
+        else counts.close += 1;
+        return counts;
+      }, { opened: 0, failure: 0, close: 0 });
+    }
+
     function getVbStoreView(outlet, storeMap) {
       const storeId = String(outlet?.store_id || '').trim();
-      const store = storeMap.get(storeId) || null;
+      // VB outlets are excluded from the Agency feed. Use the VB API's
+      // per-outlet schedule instead of falling back to another outlet.
+      const store = storeMap.get(storeId) || {
+        store_id: storeId,
+        store_name: outlet?.long_name || `Store ID ${storeId}`,
+        merchant_name: outlet?.merchant_name || 'Portal tidak diketahui',
+        shopee_status: outlet?.shopee_actual_status || 'UNKNOWN',
+        shopee_regular_hours: outlet?.shopee_regular_hours || {},
+        timezone: outlet?.timezone || 'Asia/Jakarta',
+        vercel_status: outlet?.vercel_status || 'ON',
+        desired_state: outlet?.desired_state,
+        live_state: outlet?.live_state,
+        bot_phase: outlet?.bot_phase,
+        schedule_available: outlet?.schedule_available,
+        within_operating_schedule: outlet?.within_operating_schedule,
+      };
       const portalName = store?.merchant_name || outlet?.merchant_name || 'Portal tidak diketahui';
       const storeName = store?.store_name || outlet?.long_name || `Store ID ${storeId}`;
       const liveSource = store?.live_state || store?.shopee_status || outlet?.shopee_actual_status;
@@ -1398,24 +1521,6 @@
           .map((outlet, sourceIndex) => ({ outlet: getVbStoreView(outlet, storeMap), sourceIndex }))
           .sort((a, b) => getVbPortalOrder(a.outlet.portalName) - getVbPortalOrder(b.outlet.portalName) || a.sourceIndex - b.sourceIndex)
           .map(item => item.outlet);
-        const statusCounts = outlets.reduce((counts, outlet) => {
-          const failureText = [
-            outlet.statusPresentation?.label,
-            outlet.statusPresentation?.note,
-            outlet.statusSubtext,
-            outlet.store?.last_toggle_reason,
-            outlet.store?.error_message,
-            outlet.store?.patrol_status
-          ].filter(Boolean).join(' ').toLowerCase();
-          const hasPatrolFailure = outlet.store?.patrol_success === false
-            || outlet.store?.last_patrol_success === false
-            || outlet.store?.success === false
-            || /patroli[^.]*gagal|patrol[^.]*fail|patrol[^.]*error|gagal patroli|patrol_failed/.test(failureText);
-          if (hasPatrolFailure) counts.failure += 1;
-          else if (outlet.liveState === 'OPEN') counts.opened += 1;
-          else counts.close += 1;
-          return counts;
-        }, { opened: 0, failure: 0, close: 0 });
         return {
           ...brand,
           groupCode: getVbGroupCode(brand),
@@ -1430,7 +1535,7 @@
           visibleMerchantCount: new Set(outlets.map(item => item.portalName).filter(Boolean)).size,
           openStoreCount: outlets.filter(item => item.liveState === 'OPEN').length,
           closedStoreCount: outlets.filter(item => item.liveState !== 'OPEN').length,
-          statusCounts
+          statusCounts: getVbStatusCounts(outlets)
         };
       });
     }
@@ -1461,13 +1566,18 @@
     }
 
     function syncVbFilterOptions(brandViews) {
-      setVbSelectOptions('vbGroupFilter', 'Semua grup', brandViews.map(brand => ({
+      const groupOptions = brandViews.map(brand => ({
         value: String(brand.id),
         label: brand.name || brand.groupCode
-      })));
+      }));
+      setVbSelectOptions('vbGroupFilter', 'Semua grup', groupOptions);
+      setVbSelectOptions('mobileVbGroupFilter', 'Semua grup', groupOptions);
       const portals = [...new Set(brandViews.flatMap(brand => brand.outlets.map(outlet => outlet.portalName)).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
-      setVbSelectOptions('vbPortalFilter', 'Semua portal', portals.map(name => ({ value: name, label: name })));
+      const portalOptions = portals.map(name => ({ value: name, label: name }));
+      setVbSelectOptions('vbPortalFilter', 'Semua portal', portalOptions);
+      setVbSelectOptions('mobileVbPortalFilter', 'Semua portal', portalOptions);
+      syncVbMobileFilterSelectsFromDesktop();
     }
 
     function getFilteredVbBrandViews(brandViews, filters) {
@@ -1500,7 +1610,8 @@
           visibleStoreCount: visibleOutlets.length,
           visibleMerchantCount: new Set(visibleOutlets.map(item => item.portalName).filter(Boolean)).size,
           openStoreCount: visibleOutlets.filter(item => item.liveState === 'OPEN').length,
-          closedStoreCount: visibleOutlets.filter(item => item.liveState !== 'OPEN').length
+          closedStoreCount: visibleOutlets.filter(item => item.liveState !== 'OPEN').length,
+          statusCounts: getVbStatusCounts(visibleOutlets)
         });
         return acc;
       }, []);
@@ -1538,42 +1649,42 @@
           icon: 'groups',
           label: 'Total Grup VB',
           value: totalGroups,
-          detail: totalGroups ? 'Semua grup virtual brand yang tampil.' : 'Belum ada grup VB aktif.'
+          detail: totalGroups ? 'Grup yang tampil saat ini.' : 'Belum ada grup VB aktif.'
         },
         {
           tone: 'is-on',
           icon: 'on',
-          label: 'Grup ON',
+          label: 'Grup Aktif',
           value: groupsOn,
-          detail: `${formatVbPercent(groupsOn, totalGroups)} dari grup yang tampil`
+          detail: `${formatVbPercent(groupsOn, totalGroups)} siap dijalankan`
         },
         {
           tone: 'is-off',
           icon: 'off',
-          label: 'Grup OFF',
+          label: 'Grup Nonaktif',
           value: groupsOff,
-          detail: `${formatVbPercent(groupsOff, totalGroups)} dari grup yang tampil`
+          detail: `${formatVbPercent(groupsOff, totalGroups)} sedang berhenti`
         },
         {
           tone: 'is-store',
           icon: 'store',
           label: 'Total Store ID',
           value: totalStores,
-          detail: totalStores ? 'Store ID hasil filter saat ini.' : 'Belum ada Store ID terhubung.'
+          detail: totalStores ? 'Store ID hasil filter.' : 'Belum ada Store ID terhubung.'
         },
         {
           tone: 'is-open',
           icon: 'open',
-          label: 'Store ID Sedang Buka',
+          label: 'Store Live Buka',
           value: openStores,
-          detail: `${formatVbPercent(openStores, totalStores)} dari Store ID yang tampil`
+          detail: `${formatVbPercent(openStores, totalStores)} live Shopee`
         },
         {
           tone: 'is-closed',
           icon: 'closed',
-          label: 'Store ID Sedang Tutup',
+          label: 'Store Live Tutup',
           value: closedStores,
-          detail: `${formatVbPercent(closedStores, totalStores)} dari Store ID yang tampil`
+          detail: `${formatVbPercent(closedStores, totalStores)} belum aktif`
         }
       ];
 
@@ -1596,16 +1707,30 @@
       const pauseButton = document.getElementById('vbBulkPauseButton');
       const toolbar = document.getElementById('vbBulkToolbar');
       const modeButton = document.getElementById('vbBulkModeButton');
+      const hint = document.getElementById('vbBulkSelectionHint');
+      const mobileBar = document.getElementById('vbMobileBulkBar');
+      const mobileSummary = document.getElementById('vbMobileBulkSelectionSummary');
+      const mobileOpenButton = document.getElementById('vbMobileBulkOpenButton');
+      const mobilePauseButton = document.getElementById('vbMobileBulkPauseButton');
       if (!panel) return;
       const validIds = new Set((brands || []).map(brand => String(brand.id)));
       [...selectedVbBrandIds].forEach(id => { if (!validIds.has(id)) selectedVbBrandIds.delete(id); });
       panel.hidden = !(brands || []).length;
       const selectedCount = selectedVbBrandIds.size;
+      const isMobile = isMobileAdminViewport();
+      const showDesktopToolbar = vbBulkSelectionMode && !isMobile && selectedCount > 0;
+      const showMobileToolbar = vbBulkSelectionMode && isMobile && selectedCount > 0;
       if (summary) summary.textContent = `${selectedCount} dipilih`;
+      if (mobileSummary) mobileSummary.textContent = `${selectedCount} dipilih`;
       if (openButton) openButton.disabled = !selectedCount;
       if (pauseButton) pauseButton.disabled = !selectedCount;
-      if (toolbar) toolbar.hidden = !vbBulkSelectionMode;
+      if (mobileOpenButton) mobileOpenButton.disabled = !selectedCount;
+      if (mobilePauseButton) mobilePauseButton.disabled = !selectedCount;
+      if (toolbar) toolbar.hidden = !showDesktopToolbar;
+      if (hint) hint.hidden = !(vbBulkSelectionMode && selectedCount === 0);
+      if (mobileBar) mobileBar.hidden = !showMobileToolbar;
       if (modeButton) modeButton.textContent = vbBulkSelectionMode ? 'Selesai memilih' : 'Pilih beberapa';
+      document.body.classList.toggle('vb-mobile-bulk-open', showMobileToolbar);
     }
 
     function toggleVbBulkSelectionMode() {
@@ -1625,11 +1750,25 @@
       const brandIds = [...selectedVbBrandIds];
       if (!brandIds.length) return;
       selectedVbBrandIds.clear();
+      vbBulkSelectionMode = false;
+      if (getAdminActiveTab() === 'vb') filterVBTable();
+      let successCount = 0;
+      const failedBrands = [];
       for (const brandId of brandIds) {
         const control = document.getElementById(`vb-card-${brandId}`)?.querySelector('input[type="checkbox"]');
-        await requestVBStatus(brandId, 'ON', control);
+        const result = await requestVBStatus(brandId, 'ON', control, {}, { silentSuccess: true, silentError: true });
+        if (result.success) successCount += 1;
+        else failedBrands.push(allVBBrands.find(item => String(item.id) === String(brandId))?.name || `Brand ${brandId}`);
       }
-      showToast(`${brandIds.length} brand berhasil diminta untuk dibuka.`, 'success');
+      if (successCount) {
+        const message = successCount === brandIds.length
+          ? `${successCount} brand berhasil diminta untuk dibuka.`
+          : `${successCount} dari ${brandIds.length} brand berhasil diminta untuk dibuka.`;
+        showToast(message, 'success');
+      }
+      if (failedBrands.length) {
+        showErrorModal('Sebagian brand gagal dibuka', `Coba lagi untuk: ${failedBrands.join(', ')}`);
+      }
     }
 
     function openVbBulkPauseModal() {
@@ -1666,7 +1805,7 @@
         const isPending = pendingVBBrandIds.has(String(brand.id));
         const isOn = brand.effectiveStatus === 'ON';
         const activity = brand.activity || { title: 'Belum ada aktivitas', note: 'Menunggu sinkronisasi brand' };
-      const outletRows = brand.visibleOutlets.length
+        const outletRows = brand.visibleOutlets.length
           ? brand.visibleOutlets.map(outlet => {
               const statusToneClass = outlet.liveState === 'OPEN'
                 ? 'is-open'
@@ -1689,7 +1828,7 @@
                     </div>
                   </div>
                   <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
-                  <div class="vb-store-status"><span class="vb-store-field-label">Status</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
+                  <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
                   <div class="vb-store-hours"><span class="vb-store-field-label">Jam Operasional</span>${outlet.todayScheduleMarkup}</div>
                   <div class="vb-store-actions">
                     <span class="vb-store-field-label">Aksi</span>
@@ -1707,27 +1846,31 @@
                 ${vbBulkSelectionMode ? `<label class="vb-brand-select"><input type="checkbox" ${selectedVbBrandIds.has(String(brand.id)) ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Pilih brand ${escapeVBHtml(brand.name)}" onchange="toggleVbBulkBrand('${brand.id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
                 <div class="vb-group-eyebrow">Grup VB</div>
                 <h3>${escapeVBHtml(brand.name)}</h3>
+                <div class="vb-group-context">
+                  <span class="vb-status-pill ${isOn ? 'is-on' : 'is-off'}">Grup ${isOn ? 'ON' : 'OFF'}</span>
+                </div>
+                ${brand.pendingNote ? `<p class="vb-group-note is-pending">${escapeVBHtml(brand.pendingNote)}</p>` : ''}
               </div>
               <div class="vb-group-summary">
                 <div class="vb-group-summary-item">
-                  <span>Opened</span>
+                  <span>Live Buka</span>
                   <strong class="vb-summary-opened">${brand.statusCounts.opened}</strong>
                 </div>
                 <div class="vb-group-summary-item">
-                  <span>Failure</span>
+                  <span>Perlu cek</span>
                   <strong class="vb-summary-failure">${brand.statusCounts.failure}</strong>
                 </div>
                 <div class="vb-group-summary-item">
-                  <span>Close</span>
+                  <span>Live Tutup</span>
                   <strong class="vb-summary-close">${brand.statusCounts.close}</strong>
                 </div>
                 <div class="vb-group-summary-item">
-                  <span>Total Merchant</span>
-                  <strong>${brand.merchant_count || 0}</strong>
+                  <span>Merchant</span>
+                  <strong>${brand.visibleMerchantCount || 0}</strong>
                 </div>
                 <div class="vb-group-summary-item">
-                  <span>Total Store ID</span>
-                  <strong>${brand.outlet_count || 0}</strong>
+                  <span>Store ID</span>
+                  <strong>${brand.visibleStoreCount || 0}</strong>
                 </div>
                 <div class="vb-group-summary-item is-activity">
                   <span>Aktivitas Terakhir</span>
@@ -1782,6 +1925,7 @@
       syncVbFilterOptions(allBrandViews);
       setupCustomFilterDropdowns();
       const filters = getActiveVbFilters();
+      updateVbMobileFilterBadge(filters);
       const filteredBrands = getFilteredVbBrandViews(allBrandViews, filters);
       renderVBStats(filteredBrands);
       renderVbQuickActions(filteredBrands);
@@ -1789,8 +1933,8 @@
       renderVBTable(filteredBrands);
       syncVbScheduleDrawer(filteredBrands);
       const disclosure = document.getElementById('vbFilterDisclosure');
-      const hasAdvancedFilters = Boolean(filters.group || filters.masterStatus || filters.groupStatus || filters.portal || filters.storeId);
-      if (disclosure && (!isMobileAdminViewport() || hasAdvancedFilters)) disclosure.open = true;
+      if (disclosure) disclosure.open = !isMobileAdminViewport();
+      syncVbMobileFilterSelectsFromDesktop();
     }
 
     function resetVbFilters() {
@@ -2199,23 +2343,50 @@
         ? [...selectedVbPauseBrandIds]
         : (selectedVbBrandId ? [selectedVbBrandId] : []);
       if (!brandIds.length) return;
+      const useAggregateFeedback = brandIds.length > 1 || vbBulkSelectionMode;
       const end = getVbPauseEnd();
       if (!end || Number.isNaN(end.getTime()) || end <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       const customUntil = document.getElementById('vbCustomUntilInput').value;
+      if (useAggregateFeedback) {
+        selectedVbBrandIds.clear();
+        vbBulkSelectionMode = false;
+      }
       closeVbPauseModal();
+      if (useAggregateFeedback && getAdminActiveTab() === 'vb') filterVBTable();
+      let successCount = 0;
+      const failedBrands = [];
       for (const brandId of brandIds) {
         const control = document.getElementById('vb-card-' + brandId)?.querySelector('input[type="checkbox"]');
-        await requestVBStatus(brandId, 'PAUSED', control, { duration_type: type, custom_until: type === 'custom' ? customUntil : null });
+        const result = await requestVBStatus(
+          brandId,
+          'PAUSED',
+          control,
+          { duration_type: type, custom_until: type === 'custom' ? customUntil : null },
+          useAggregateFeedback ? { silentSuccess: true, silentError: true } : {}
+        );
+        if (result.success) successCount += 1;
+        else failedBrands.push(allVBBrands.find(item => String(item.id) === String(brandId))?.name || `Brand ${brandId}`);
       }
-      selectedVbBrandIds.clear();
-      showToast(`${brandIds.length} brand berhasil diminta untuk ditutup.`, 'success');
+      if (useAggregateFeedback) {
+        if (successCount) {
+          const message = successCount === brandIds.length
+            ? `${successCount} brand berhasil diminta untuk ditutup.`
+            : `${successCount} dari ${brandIds.length} brand berhasil diminta untuk ditutup.`;
+          showToast(message, 'success');
+        }
+        if (failedBrands.length) {
+          showErrorModal('Sebagian brand gagal ditutup', `Coba lagi untuk: ${failedBrands.join(', ')}`);
+        }
+      }
     }
 
-    async function requestVBStatus(brandId, status, control, duration = {}) {
+    async function requestVBStatus(brandId, status, control, duration = {}, options = {}) {
+      const { silentSuccess = false, silentError = false } = options;
       pendingVBBrandIds.add(String(brandId));
       if (control) control.disabled = true;
       if (getAdminActiveTab() === 'vb') filterVBTable();
+      let result = { success: false, message: '', error: '' };
       try {
         const res = await fetch(`/api/v1/admin/vb/brands/${encodeURIComponent(brandId)}/status`, {
           method: 'PATCH',
@@ -2224,16 +2395,19 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Status VB gagal disimpan.');
-        showToast(data.message || 'Perubahan VB disimpan.', 'success');
+        result = { success: true, message: data.message || 'Perubahan VB disimpan.', error: '' };
+        if (!silentSuccess) showToast(result.message, 'success');
         await loadVBData(true);
       } catch (err) {
-        showErrorModal('Status VB gagal disimpan', err.message);
+        result = { success: false, message: '', error: err.message };
+        if (!silentError) showErrorModal('Status VB gagal disimpan', err.message);
         await loadVBData(true);
       } finally {
         pendingVBBrandIds.delete(String(brandId));
         if (control) control.disabled = false;
         if (getAdminActiveTab() === 'vb') filterVBTable();
       }
+      return result;
     }
 
     async function importVBData() {
@@ -2699,6 +2873,27 @@
       return ADMIN_STATUS_TONE_CLASS[normalized] || 'is-warning';
     }
 
+    function simplifyAdminStatusLabel(label, stateContext) {
+      const normalized = String(label || '').trim().toLowerCase();
+      if (!normalized) return '';
+      if (normalized.includes('menunggu bot menutup')) return 'Menunggu bot menutup';
+      if (normalized.includes('menunggu bot membuka')) return 'Menunggu bot membuka';
+      if (normalized.includes('di luar jadwal')) return 'Menunggu jadwal operasional';
+      if (normalized.includes('dinonaktifkan admin')) return 'Dinonaktifkan admin';
+      if (normalized.includes('otomatisasi nonaktif')) return 'Otomatisasi nonaktif';
+      if (normalized.includes('tutup sementara')) return 'Tutup sementara';
+      if (normalized.includes('sedang buka')) return 'Sedang buka';
+      if (normalized.includes('sedang tutup')) return 'Sedang tutup';
+      return String(label || '').trim() || getAdminLiveStateLabel(stateContext?.liveState);
+    }
+
+    function getAdminLiveSupportText(liveState) {
+      if (liveState === 'OPEN') return 'Live Shopee masih buka.';
+      if (liveState === 'PAUSE') return 'Live Shopee sedang pause.';
+      if (liveState === 'CLOSED') return 'Live Shopee sedang tutup.';
+      return 'Status live masih diperiksa.';
+    }
+
     function getAdminStatusPresentation(store, stateContext = getAdminStateContext(store)) {
       const explicitLabel = String(store?.display_status_label || '').trim();
       const explicitNote = String(store?.display_note || '').trim();
@@ -2709,47 +2904,49 @@
         className: `table-status ${getAdminStatusToneClass(tone)}`,
         value: stateContext.liveState || 'UNKNOWN'
       });
-      if (explicitLabel) return build(explicitLabel, store?.display_status_tone, explicitNote);
+      if (explicitLabel) return build(simplifyAdminStatusLabel(explicitLabel, stateContext), store?.display_status_tone, explicitNote);
       if (stateContext.botPhase === 'SUSPENDED') {
-        return build('Sedang Tutup • Dinonaktifkan admin', 'closed', 'Otomatisasi dinonaktifkan oleh admin.');
+        return build('Dinonaktifkan admin', 'closed', 'Otomatisasi dinonaktifkan oleh admin.');
       }
       if (stateContext.botPhase === 'PENDING_PAUSE') {
-        return build('Sedang Buka • Menunggu bot menutup', 'pending', 'Permintaan tutup tersimpan. Menunggu bot menutup outlet.');
+        return build('Menunggu bot menutup', 'pending', 'Permintaan tutup tersimpan. Menunggu bot menutup outlet.');
       }
       if (stateContext.botPhase === 'PENDING_OPEN') {
-        return build('Sedang Tutup • Menunggu bot membuka', 'pending', 'Permintaan buka tersimpan. Menunggu bot membuka outlet.');
+        return build('Menunggu bot membuka', 'pending', 'Permintaan buka tersimpan. Menunggu bot membuka outlet.');
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') {
-        return build('Sedang Tutup • Di luar jadwal', 'closed', 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.');
+        return build('Menunggu jadwal operasional', 'closed', 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.');
       }
       if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') {
-        return build('Status sedang dicek bot', 'pending', 'Jadwal operasional Shopee belum tersedia. Bot masih mencocokkan status outlet.');
+        return build('Jadwal belum tersedia', 'pending', 'Jadwal operasional Shopee belum tersedia. Bot masih mencocokkan status outlet.');
       }
       if (stateContext.botPhase === 'AUTOMATION_OFF') {
-        return build('Sedang Tutup • Otomatisasi nonaktif', 'closed', 'Otomatisasi tetap mati sampai diaktifkan kembali.');
+        return build('Otomatisasi nonaktif', 'closed', 'Otomatisasi tetap mati sampai diaktifkan kembali.');
       }
       if (stateContext.desiredState === 'PAUSE' && stateContext.liveState === 'PAUSE') {
-        return build('Tutup Sementara', 'paused', 'Outlet sedang ditutup sementara.');
+        return build('Tutup sementara', 'paused', 'Outlet sedang ditutup sementara.');
       }
       if (stateContext.liveState === 'OPEN') {
-        return build('Sedang Buka', 'open', 'Outlet mengikuti jam operasional Shopee.');
+        return build('Sedang buka', 'open', 'Outlet mengikuti jam operasional Shopee.');
       }
       if (stateContext.liveState === 'CLOSED') {
-        return build('Sedang Tutup', 'closed', 'Outlet tidak sedang aktif di Shopee.');
+        return build('Sedang tutup', 'closed', 'Outlet tidak sedang aktif di Shopee.');
       }
       return build('Status sedang dicek bot', 'pending', 'Status live outlet masih diperiksa bot.');
     }
 
     function getAdminStatusSubtext(store, stateContext = getAdminStateContext(store)) {
-      if (stateContext.botPhase === 'SUSPENDED') return 'Dinonaktifkan admin.';
-      if (stateContext.botPhase === 'STATUS_UNKNOWN' || stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Sedang dicek bot.';
-      if (stateContext.botPhase === 'PENDING_PAUSE') return 'Menunggu bot menutup.';
-      if (stateContext.botPhase === 'PENDING_OPEN') return 'Menunggu bot membuka.';
-      if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Di luar jadwal.';
-      if (stateContext.botPhase === 'AUTOMATION_OFF') return 'Otomatisasi nonaktif.';
-      if (stateContext.desiredState === 'PAUSE' && store.pause_until) return getPauseDetail(store.pause_until);
-      if (stateContext.desiredState === 'PAUSE') return 'Tutup sementara.';
-      if (stateContext.liveState === 'OPEN') return 'Sinkron dengan Shopee.';
+      if (stateContext.botPhase === 'SUSPENDED') return 'Outlet tidak akan berubah sampai admin mengaktifkannya lagi.';
+      if (stateContext.botPhase === 'STATUS_UNKNOWN') return 'Status live masih diperiksa.';
+      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Jadwal Shopee belum tersedia di dashboard.';
+      if (stateContext.botPhase === 'PENDING_PAUSE') return getAdminLiveSupportText(stateContext.liveState);
+      if (stateContext.botPhase === 'PENDING_OPEN') return getAdminLiveSupportText(stateContext.liveState);
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Akan aktif lagi saat jam operasional dimulai.';
+      if (stateContext.botPhase === 'AUTOMATION_OFF') return 'Tidak akan berubah sampai dinyalakan lagi.';
+      if (stateContext.desiredState === 'PAUSE' && store.pause_until) return `Buka otomatis ${getPauseDetail(store.pause_until)}.`;
+      if (stateContext.desiredState === 'PAUSE') return 'Menunggu dibuka kembali secara manual.';
+      if (stateContext.liveState === 'OPEN') return 'Live Shopee sedang buka.';
+      if (stateContext.liveState === 'CLOSED') return 'Live Shopee sedang tutup.';
       return 'Status terakhir mengikuti Shopee.';
     }
 

@@ -126,7 +126,7 @@ def warmup_all_account_sessions():
         if not username or username in processed_accounts:
             continue
 
-        # Exclude usernames not in whitelist (username != auto7313)
+        # Exclude usernames not in the configured VB whitelist.
         if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
             log.info(f"  ⏭️ [STARTUP WARMUP] Excluding account '{username}' (username != auto7313).")
             continue
@@ -160,7 +160,7 @@ def warmup_all_account_sessions():
 def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
-    Excludes execution if outlet.username != auto7313.
+    Excludes execution if outlet.username is not in the configured VB whitelist.
     """
     # Exclude accounts not in ALLOWED_USERNAMES whitelist
     if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
@@ -429,6 +429,7 @@ def sync_all_stores(
                 outlet.regular_hours = last_known_regular_hours
                 outlet.shopee_regular_hours = last_known_regular_hours
                 schedule_identity_valid = True
+                schedule_fetch_valid = False
 
                 if driver_ready and driver:
                     try:
@@ -443,6 +444,7 @@ def sync_all_stores(
                             else:
                                 outlet.regular_hours = normalized_hours
                                 outlet.shopee_regular_hours = normalized_hours
+                                schedule_fetch_valid = True
 
                                 try:
                                     db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
@@ -484,6 +486,7 @@ def sync_all_stores(
                     )
 
                 if driver_ready and driver:
+                    live_identity_valid = True
                     try:
                         live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
                         if live_info and live_info.get("timezone"):
@@ -493,14 +496,26 @@ def sync_all_stores(
                             actual_st = _normalize_live_status(live_info)
                             outlet.status_aktual = actual_st
                             db.update_shopee_actual_status(outlet.store_id, actual_st)
+                    except store_status.StoreIdentityMismatch as identity_err:
+                        live_identity_valid = False
+                        log.error(
+                            f"  ❌ [LIVE STATE QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: {identity_err}. "
+                            "Tidak ada decision/action yang dijalankan memakai live state yang tidak terpercaya."
+                        )
                     except Exception as st_err:
                         log.debug(f"  ⚠️ Live Shopee status query skipped for Store {outlet.store_id}: {st_err}")
                 else:
+                    live_identity_valid = True
                     log.debug(f"  ⚠️ Live Shopee status query skipped for Store {outlet.store_id}: browser session belum siap")
 
                 watched_outlets.append(outlet)
 
-                if not schedule_identity_valid:
+                if not schedule_identity_valid or not schedule_fetch_valid or not live_identity_valid:
+                    if schedule_identity_valid and not schedule_fetch_valid:
+                        log.warning(
+                            f"  ⚠️ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: "
+                            "fetch jadwal reguler belum berhasil. Tidak memakai jadwal cache untuk action."
+                        )
                     continue
 
                 decision = evaluate_outlet_status(

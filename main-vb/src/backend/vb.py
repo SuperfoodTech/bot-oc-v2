@@ -9,8 +9,7 @@ from typing import Any
 import requests
 from psycopg.types.json import Jsonb
 
-from backend.db import derive_outlet_runtime_state, get_db_connection, normalize_shopee_regular_hours
-from core.timezones import normalize_timezone
+from backend.db import get_db_connection
 
 VB_SHEET_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
@@ -21,33 +20,12 @@ VB_OWNER_NAME = "VB"
 VB_ACCOUNT_USERNAME = "auto7313"
 
 
-def _store_control_map(conn) -> dict[str, dict[str, Any]]:
-    """Return one conservative desired state for each Store ID across brands."""
-    rows = conn.execute(
-        """SELECT o.store_id,
-                  COUNT(*) AS brand_count,
-                  BOOL_AND(COALESCE(b.requested_status, b.applied_status, 'ON')='ON') AS all_on
-           FROM vb_brand_outlets bo
-           JOIN vb_brands b ON b.id=bo.vb_brand_id AND b.is_active=true
-           JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
-           GROUP BY o.store_id"""
-    ).fetchall()
-    return {
-        str(row["store_id"]): {
-            "status": "ON" if row["all_on"] else "OFF",
-            "brand_count": int(row["brand_count"] or 0),
-        }
-        for row in rows
-    }
-
-
 def normalize_brand(name: str) -> str:
     return " ".join((name or "").strip().split()).casefold()
 
 
 def list_brands() -> list[dict[str, Any]]:
     with get_db_connection() as conn:
-        store_controls = _store_control_map(conn)
         rows = list(conn.execute(
             """SELECT b.id, b.name, b.applied_status, b.requested_status,
                       b.requested_at, b.pause_until, b.requested_pause_until,
@@ -59,7 +37,7 @@ def list_brands() -> list[dict[str, Any]]:
         for row in rows:
             stores = list(conn.execute(
                 """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                          os.shopee_actual_status, os.shopee_regular_hours, os.timezone
+                          os.shopee_actual_status
                    FROM vb_brand_outlets bo
                    JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
                    JOIN portals p ON p.id=o.portal_id AND p.is_active=true
@@ -70,17 +48,6 @@ def list_brands() -> list[dict[str, Any]]:
                    ORDER BY p.name, o.store_id""",
                 (row["id"],),
             ).fetchall())
-            for store in stores:
-                control = store_controls.get(str(store["store_id"]), {})
-                effective_status = control.get("status", "ON")
-                store["shopee_regular_hours"] = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
-                store["timezone"] = normalize_timezone(store.get("timezone"))
-                store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
-                store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
-                store["duplicate_brand_count"] = control.get("brand_count", 1)
-                store["duplicate_brand_warning"] = control.get("brand_count", 1) > 1
-                store["pause_until"] = row.get("requested_pause_until") or row.get("pause_until")
-                store.update(derive_outlet_runtime_state(store))
             row["outlets"] = stores
             row["outlet_count"] = len(stores)
             row["merchant_count"] = len({s["merchant_name"] for s in stores if s.get("merchant_name")})
@@ -89,7 +56,6 @@ def list_brands() -> list[dict[str, Any]]:
 
 def brand_detail(brand_id: str) -> dict[str, Any] | None:
     with get_db_connection() as conn:
-        store_controls = _store_control_map(conn)
         brand = conn.execute(
             "SELECT id, name, applied_status, requested_status, requested_at, pause_until, requested_pause_until, last_applied_at, last_patrolled_at FROM vb_brands WHERE id=%s AND is_active=true",
             (brand_id,),
@@ -98,7 +64,7 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
             return None
         stores = list(conn.execute(
             """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                      os.shopee_actual_status, os.shopee_regular_hours, os.timezone
+                      os.shopee_actual_status
                FROM vb_brand_outlets bo
                JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
                JOIN portals p ON p.id=o.portal_id AND p.is_active=true
@@ -108,17 +74,6 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
                  AND p.name !~* '^(status|status import|import status)$'
                ORDER BY p.name, o.store_id""", (brand_id,)
         ).fetchall())
-        for store in stores:
-            control = store_controls.get(str(store["store_id"]), {})
-            effective_status = control.get("status", "ON")
-            store["shopee_regular_hours"] = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
-            store["timezone"] = normalize_timezone(store.get("timezone"))
-            store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
-            store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
-            store["duplicate_brand_count"] = control.get("brand_count", 1)
-            store["duplicate_brand_warning"] = control.get("brand_count", 1) > 1
-            store["pause_until"] = brand.get("requested_pause_until") or brand.get("pause_until")
-            store.update(derive_outlet_runtime_state(store))
         return {**brand, "outlets": stores}
 
 

@@ -6,8 +6,18 @@ ADMIN_TEMPLATE = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").r
 MITRA_TEMPLATE = (PROJECT_ROOT / "src/backend/templates/user_dashboard.html").read_text()
 
 
-def test_admin_and_mitra_share_the_same_runtime_status_labels():
-    labels = [
+def test_admin_and_mitra_expose_the_same_runtime_status_concepts():
+    admin_labels = [
+        "Dinonaktifkan admin",
+        "Menunggu bot menutup",
+        "Menunggu bot membuka",
+        "Menunggu jadwal operasional",
+        "Otomatisasi nonaktif",
+        "Tutup sementara",
+        "Sedang buka",
+        "Status sedang dicek bot",
+    ]
+    mitra_labels = [
         "Sedang Tutup • Dinonaktifkan admin",
         "Sedang Buka • Menunggu bot menutup",
         "Sedang Tutup • Menunggu bot membuka",
@@ -18,8 +28,9 @@ def test_admin_and_mitra_share_the_same_runtime_status_labels():
         "Status sedang dicek bot",
     ]
 
-    for label in labels:
+    for label in admin_labels:
         assert label in ADMIN_TEMPLATE
+    for label in mitra_labels:
         assert label in MITRA_TEMPLATE
 
 
@@ -32,7 +43,7 @@ def test_admin_fallback_handles_schedule_states_with_mitra_labels():
 
     assert schedule_branch in admin_presentation
     assert unavailable_branch in admin_presentation
-    assert "Sedang Tutup • Di luar jadwal" in admin_presentation
+    assert "Menunggu jadwal operasional" in admin_presentation
     assert "Status sedang dicek bot" in admin_presentation
 
 
