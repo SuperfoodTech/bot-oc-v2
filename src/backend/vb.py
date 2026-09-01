@@ -45,6 +45,21 @@ def normalize_brand(name: str) -> str:
     return " ".join((name or "").strip().split()).casefold()
 
 
+def pick_pause_reference_outlet(outlets: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    normalized_outlets: list[dict[str, Any]] = []
+    for outlet in outlets or []:
+        candidate = dict(outlet)
+        candidate["shopee_regular_hours"] = normalize_shopee_regular_hours(candidate.get("shopee_regular_hours"))
+        candidate["timezone"] = normalize_timezone(candidate.get("timezone"))
+        normalized_outlets.append(candidate)
+    if not normalized_outlets:
+        return None
+    for candidate in normalized_outlets:
+        if any((candidate.get("shopee_regular_hours") or {}).values()):
+            return candidate
+    return normalized_outlets[0]
+
+
 def list_brands() -> list[dict[str, Any]]:
     with get_db_connection() as conn:
         store_controls = _store_control_map(conn)
@@ -59,7 +74,11 @@ def list_brands() -> list[dict[str, Any]]:
         for row in rows:
             stores = list(conn.execute(
                 """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                          os.shopee_actual_status, os.shopee_regular_hours, os.timezone
+                          os.shopee_actual_status, os.shopee_regular_hours, os.timezone,
+                          os.schedule_fetch_status,
+                          os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
+                          os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
+                          COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error
                    FROM vb_brand_outlets bo
                    JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
                    JOIN portals p ON p.id=o.portal_id AND p.is_active=true
@@ -98,7 +117,11 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
             return None
         stores = list(conn.execute(
             """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                      os.shopee_actual_status, os.shopee_regular_hours, os.timezone
+                      os.shopee_actual_status, os.shopee_regular_hours, os.timezone,
+                      os.schedule_fetch_status,
+                      os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
+                      os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
+                      COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error
                FROM vb_brand_outlets bo
                JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
                JOIN portals p ON p.id=o.portal_id AND p.is_active=true

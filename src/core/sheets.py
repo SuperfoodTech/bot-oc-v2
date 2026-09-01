@@ -61,6 +61,10 @@ class MerchantOutlet:
     # Stored local end time for a user-requested temporary pause.
     pause_until: str = ""
     shopee_regular_hours: dict = field(default_factory=dict)
+    schedule_fetch_status: str = "NOT_FETCHED_YET"
+    schedule_fetch_attempted_at: str = ""
+    schedule_fetch_succeeded_at: str = ""
+    schedule_fetch_error: str = ""
     hp: str = ""
     timezone: str = "Asia/Jakarta"
 

@@ -18,11 +18,13 @@ __pycache__/
 credentials.json
 
 # ── Data caches & browser profiles ─
+src/data/
+src/data
 src/data/**
-src/data/chrome_profile
-src/data/chrome_profile/**
-src/data/chrome_profile*
-src/data/session*.json
+**/src/data/**
+data/
+data/**
+**/data/**
 main-bot/data/chrome_profile*
 main-bot/data/session*.json
 src/data/output/
@@ -66,4 +68,3 @@ src/daemon.lock
 docker-compose.yml
 Dockerfile*
 *.md
-!src/backend/templates/*.html

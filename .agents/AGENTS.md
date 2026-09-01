@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.10.3`.
+Latest documented release: `1.10.6`.
+
+Tab logs dan tab settings admin wajib menggunakan container internal masing-masing
+(`.logs-page-shell`, `.settings-page-shell`) dengan `height: 100%` dan `overflow-y: auto`
+pada mode desktop agar tidak memicu scroll global pada window/body serta menjaga agar
+bagian atas kartu pengaturan tidak terpotong.
 
 Service `bot-vb` wajib menggunakan `HEADLESS=true` pada deployment Docker.
 Jangan menambahkan release yang mengubahnya ke `false`, karena server tidak

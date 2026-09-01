@@ -69,8 +69,15 @@ def test_backend_endpoints():
     }
     resp = client.post("/api/v1/toggle", json=toggle_payload)
     if resp.status_code == 403:
-        assert "di luar jadwal operasional" in resp.json()["detail"].lower()
-        log.info("   -> Result: PASSED (Toggle correctly locked outside operating schedule)")
+        detail = resp.json()["detail"].lower()
+        allowed_details = [
+            "di luar jadwal operasional",
+            "menunggu bot fetch jadwal",
+            "belum berhasil fetch jadwal operasional shopee",
+            "jadwal operasional shopee belum diatur",
+        ]
+        assert any(fragment in detail for fragment in allowed_details)
+        log.info("   -> Result: PASSED (Toggle correctly locked by schedule guard)")
         return
     assert resp.status_code == 200
     toggle_data = resp.json()

@@ -4306,6 +4306,26 @@ body.vb-schedule-open {
 }
 
 /* Unified bot logs */
+.logs-page-shell {
+  min-height: 0;
+}
+
+@media (min-width: 701px) {
+  #paneLogs.active {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .logs-page-shell {
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 8px;
+    padding-bottom: 24px;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
+}
+
 .logs-intro,
 .logs-section-head,
 .logs-bot-card-head,
@@ -4562,7 +4582,26 @@ body.vb-schedule-open {
 :root[data-theme="dark"] .stat-card:nth-child(1) { background: #4A0D0D; }
 :root[data-theme="dark"] .stat-card:nth-child(2) { background: #2e4132; }
 :root[data-theme="dark"] .stat-card:nth-child(3) { background: #493c27; }
-:root[data-theme="dark"] .stat-card:nth-child(4) { background: #2d2324; }
+/* Admin Settings */
+.settings-page-shell {
+  min-height: 0;
+}
+
+@media (min-width: 701px) {
+  #paneSettings.active {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .settings-page-shell {
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 8px;
+    padding-bottom: 40px;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
+}
 
 .settings-card {
   max-width: 680px;
@@ -4572,20 +4611,34 @@ body.vb-schedule-open {
   border-radius: 18px;
   box-shadow: var(--shadow);
 }
-.settings-card h2 { margin: 8px 0 4px; color: var(--ink); }
+.settings-card .step-indicator {
+  display: inline-block;
+  color: #991515;
+  background: #fae6e4;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.settings-card h2 { margin: 4px 0 6px; color: #111827; font-size: 22px; font-weight: 800; }
+.settings-card .card-subtitle { color: #4b5563; font-size: 13px; margin: 0 0 20px; }
 .settings-account-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 24px 0;
-  padding: 16px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  margin: 20px 0 24px;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
 }
-.settings-account-row strong { display: block; margin-top: 4px; color: var(--ink); }
-.settings-label { display: block; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-.settings-role { padding: 7px 10px; border-radius: 8px; background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.settings-account-row strong { display: block; margin-top: 2px; color: #111827; font-size: 15px; font-weight: 800; }
+.settings-label { display: block; color: #4b5563; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.settings-role { padding: 6px 12px; border-radius: 6px; background: #111827; color: #ffffff; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
 .admin-login-page { min-height: 100vh; background: var(--canvas); }
 .admin-login-page,
 .admin-login-page * {
@@ -4910,14 +4963,19 @@ body.vb-schedule-open {
   #logsTable .log-action-badge { white-space: normal; }
 }
 .settings-section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
-.settings-section-title { margin-bottom: 12px; color: var(--ink); font-size: 13px; font-weight: 800; }
-.settings-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
-.settings-form-grid label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.settings-form-grid .form-input { margin-top: 7px; text-transform: none; letter-spacing: normal; }
-.settings-message { min-height: 18px; margin: 10px 0 0; color: var(--muted); font-size: 12px; }
-.admin-account-list { display: grid; gap: 8px; }
-.admin-account-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--subtle); border-radius: 10px; color: var(--ink); }
-.admin-account-item span { color: var(--muted); font-size: 12px; }
+.settings-section-title { margin-bottom: 14px; color: #111827; font-size: 14px; font-weight: 800; }
+.settings-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+.settings-form-grid label { display: block; color: #1f2937 !important; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.settings-form-grid .form-input { width: 100%; margin-top: 0; text-transform: none; letter-spacing: normal; }
+.settings-message { min-height: 18px; margin: 10px 0 0; color: #16a34a; font-size: 12px; font-weight: 600; }
+.admin-account-list { display: flex; flex-direction: column; gap: 8px; }
+.admin-account-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; color: #111827; }
+.admin-account-info strong { display: block; color: #111827; font-size: 13.5px; font-weight: 700; }
+.admin-account-email { margin-top: 2px; font-size: 11.5px; color: #4b5563; }
+.admin-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.admin-status-badge.is-active { background: #dcfce7; color: #15803d; }
+.admin-status-badge.is-inactive { background: #f1f5f9; color: #64748b; }
+.btn-logout-action { margin-top: 24px; }
 @media (max-width: 640px) {
   .settings-form-grid { grid-template-columns: 1fr; }
   .settings-card { padding: 22px; }
@@ -7210,13 +7268,6 @@ body.vb-schedule-open {
     scrollbar-gutter: stable;
     overscroll-behavior: contain;
   }
-  .admin-shell .admin-main > .desktop-wrapper.is-settings-active #paneSettings.active {
-    min-height: 100%;
-    padding-bottom: 28px;
-  }
-  .admin-shell .admin-main > .desktop-wrapper.is-settings-active .settings-card {
-    margin-bottom: 8px;
-  }
 }
 
 /* Mitra login screen: keep the auth experience flat on white so it does not
@@ -8783,7 +8834,11 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   }
 
   #paneVB.active,
-  .vb-page-shell {
+  .vb-page-shell,
+  #paneLogs.active,
+  .logs-page-shell,
+  #paneSettings.active,
+  .settings-page-shell {
     height: auto;
     overflow: visible;
     padding-bottom: calc(104px + env(safe-area-inset-bottom));

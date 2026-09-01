@@ -1,46 +1,48 @@
 {# ── TAB PANE: UNIFIED BOT LOGS ── #}
 <div class="tab-pane" :class="{ 'active': currentTab === 'logs' }" id="paneLogs">
-  <section class="logs-intro">
-    <div>
-      <div class="bot-log-eyebrow">Observability</div>
-      <h2>Aktivitas bot</h2>
-      <p id="botLastSyncText">Memuat ringkasan aktivitas...</p>
-    </div>
-    <div class="logs-filter-controls">
-      <select id="logModeFilter" class="form-input" onchange="loadFullBotLogs()" aria-label="Filter bot">
-        <option value="">Semua bot</option>
-        <option value="REGULAR">Bot O/C</option>
-        <option value="VB">Virtual Brand</option>
-      </select>
-      <input type="search" id="logSearchInput" class="form-input" placeholder="Cari Store ID, brand, merchant" oninput="loadFullBotLogs()">
-    </div>
-  </section>
+  <div class="logs-page-shell">
+    <section class="logs-intro">
+      <div>
+        <div class="bot-log-eyebrow">Observability</div>
+        <h2>Aktivitas bot</h2>
+        <p id="botLastSyncText">Memuat ringkasan aktivitas...</p>
+      </div>
+      <div class="logs-filter-controls">
+        <select id="logModeFilter" class="form-input" onchange="loadFullBotLogs()" aria-label="Filter bot">
+          <option value="">Semua bot</option>
+          <option value="REGULAR">Bot O/C</option>
+          <option value="VB">Virtual Brand</option>
+        </select>
+        <input type="search" id="logSearchInput" class="form-input" placeholder="Cari Store ID, brand, merchant" oninput="loadFullBotLogs()">
+      </div>
+    </section>
 
-  <section class="logs-summary-grid" aria-label="Ringkasan bot">
-    <article class="logs-bot-card">
-      <div class="logs-bot-card-head"><h3>Bot O/C</h3><span class="logs-bot-badge">REGULAR</span></div>
-      <div class="logs-bot-stat"><strong id="regularLogCount">0</strong><span>event 24 jam</span></div>
-      <p id="regularLogLast">Belum ada aktivitas</p>
-    </article>
-    <article class="logs-bot-card logs-bot-card-vb">
-      <div class="logs-bot-card-head"><h3>Virtual Brand</h3><span class="logs-bot-badge">VB</span></div>
-      <div class="logs-bot-stat"><strong id="vbLogCount">0</strong><span>event perubahan 24 jam</span></div>
-      <p id="vbLogLast">Belum ada aktivitas</p>
-    </article>
-  </section>
+    <section class="logs-summary-grid" aria-label="Ringkasan bot">
+      <article class="logs-bot-card">
+        <div class="logs-bot-card-head"><h3>Bot O/C</h3><span class="logs-bot-badge">REGULAR</span></div>
+        <div class="logs-bot-stat"><strong id="regularLogCount">0</strong><span>event 24 jam</span></div>
+        <p id="regularLogLast">Belum ada aktivitas</p>
+      </article>
+      <article class="logs-bot-card logs-bot-card-vb">
+        <div class="logs-bot-card-head"><h3>Virtual Brand</h3><span class="logs-bot-badge">VB</span></div>
+        <div class="logs-bot-stat"><strong id="vbLogCount">0</strong><span>event perubahan 24 jam</span></div>
+        <p id="vbLogLast">Belum ada aktivitas</p>
+      </article>
+    </section>
 
-  <section class="logs-section logs-errors-section">
-    <div class="logs-section-head">
-      <div><h3>Error yang perlu ditelusuri</h3><p>Hanya error per Store ID yang ditampilkan di sini.</p></div>
-      <span class="logs-section-count" id="logErrorCount">0</span>
-    </div>
-    <div id="logsErrorList" class="logs-error-list"><div class="table-loading-state">Memuat error...</div></div>
-  </section>
+    <section class="logs-section logs-errors-section">
+      <div class="logs-section-head">
+        <div><h3>Error yang perlu ditelusuri</h3><p>Hanya error per Store ID yang ditampilkan di sini.</p></div>
+        <span class="logs-section-count" id="logErrorCount">0</span>
+      </div>
+      <div id="logsErrorList" class="logs-error-list"><div class="table-loading-state">Memuat error...</div></div>
+    </section>
 
-  <section class="logs-section">
-    <div class="logs-section-head">
-      <div><h3>Perubahan terbaru</h3><p>Ringkasan perubahan dari kedua bot.</p></div>
-    </div>
-    <div id="fullLogsTableBody" class="logs-event-list"><div class="table-loading-state">Memuat aktivitas...</div></div>
-  </section>
+    <section class="logs-section">
+      <div class="logs-section-head">
+        <div><h3>Perubahan terbaru</h3><p>Ringkasan perubahan dari kedua bot.</p></div>
+      </div>
+      <div id="fullLogsTableBody" class="logs-event-list"><div class="table-loading-state">Memuat aktivitas...</div></div>
+    </section>
+  </div>
 </div>

@@ -11,9 +11,19 @@ from psycopg.types.json import Jsonb
 
 from config import DATABASE_URL, USERNAME, PASSWORD
 
+SCHEDULE_FETCH_NOT_FETCHED_YET = "NOT_FETCHED_YET"
+SCHEDULE_FETCH_RETRYING = "FETCH_RETRYING"
+SCHEDULE_FETCH_EMPTY = "FETCHED_EMPTY"
+SCHEDULE_FETCH_READY = "READY"
+
 
 def connection():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+
+
+def _clean_schedule_fetch_error(value) -> str | None:
+    raw_value = str(value or "").strip()
+    return raw_value or None
 
 
 def apply_all_pending_statuses(conn) -> list[dict[str, Any]]:
@@ -143,7 +153,11 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
                COALESCE(b.requested_pause_until, b.pause_until)::text AS brand_pause_until,
                o.store_id, o.long_name, p.name AS portal_name,
                sa.username, sa.password_plain, sa.phone, sa.merchant_id_external,
-               os.shopee_actual_status, os.shopee_regular_hours, os.timezone
+               os.shopee_actual_status, os.shopee_regular_hours, os.timezone,
+               os.schedule_fetch_status,
+               os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
+               os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
+               COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error
         FROM vb_brand_outlets bo
         JOIN vb_brands b ON b.id = bo.vb_brand_id AND b.is_active = true
         JOIN outlets o ON o.id = bo.outlet_id AND o.is_active = true
@@ -206,25 +220,70 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             penangguhan="Tidak",
             alasan_penangguhan="",
             pause_until=row.get("brand_pause_until") or "",
+            schedule_fetch_status=row.get("schedule_fetch_status") or SCHEDULE_FETCH_NOT_FETCHED_YET,
+            schedule_fetch_attempted_at=row.get("schedule_fetch_attempted_at") or "",
+            schedule_fetch_succeeded_at=row.get("schedule_fetch_succeeded_at") or "",
+            schedule_fetch_error=row.get("schedule_fetch_error") or "",
         ))
     return outlets
 
 
 def update_shopee_regular_hours(store_id: str, regular_hours: dict) -> None:
+    from backend.db import normalize_shopee_regular_hours
+
+    normalized_hours = normalize_shopee_regular_hours(regular_hours)
+    if not any((normalized_hours or {}).values()):
+        mark_schedule_fetch_empty(store_id)
+        return
     with connection() as conn:
         conn.execute(
             """UPDATE outlet_states os SET shopee_regular_hours=%s,
+               schedule_fetch_status=%s,
+               schedule_fetch_attempted_at=now(),
+               schedule_fetch_succeeded_at=now(),
+               schedule_fetch_error=NULL,
                last_checked_at=now(), updated_at=now()
                FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
-            (Jsonb(regular_hours), store_id),
+            (Jsonb(normalized_hours), SCHEDULE_FETCH_READY, store_id),
+        )
+
+
+def mark_schedule_fetch_empty(store_id: str) -> None:
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os SET shopee_regular_hours=%s,
+               schedule_fetch_status=%s,
+               schedule_fetch_attempted_at=now(),
+               schedule_fetch_succeeded_at=now(),
+               schedule_fetch_error=NULL,
+               last_checked_at=now(), updated_at=now()
+               FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (Jsonb({}), SCHEDULE_FETCH_EMPTY, store_id),
+        )
+
+
+def mark_schedule_fetch_retry(store_id: str, error_message: str | None) -> None:
+    error_text = _clean_schedule_fetch_error(error_message) or "Bot belum berhasil fetch jadwal Shopee."
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os SET schedule_fetch_status=%s,
+               schedule_fetch_attempted_at=now(),
+               schedule_fetch_error=%s,
+               last_checked_at=now(), updated_at=now()
+               FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (SCHEDULE_FETCH_RETRYING, error_text, store_id),
         )
 
 
 def update_shopee_actual_status(store_id: str, status: str) -> None:
-    # outlet_states deliberately stores OFF for Shopee CLOSED because CLOSED
-    # is not one of the column's allowed persisted values.
-    persisted = "OFF" if str(status).upper() in {"CLOSED", "CLOSE"} else str(status).upper()
-    if persisted not in {"ON", "PAUSE", "OFF", "UNKNOWN"}:
+    normalized = str(status or "").strip().upper()
+    if normalized in {"ON", "OPEN"}:
+        persisted = "ON"
+    elif normalized == "PAUSE":
+        persisted = "PAUSE"
+    elif normalized in {"OFF", "CLOSED", "CLOSE"}:
+        persisted = "CLOSED"
+    else:
         persisted = "UNKNOWN"
     with connection() as conn:
         conn.execute(

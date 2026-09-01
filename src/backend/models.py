@@ -50,6 +50,10 @@ class StoreStatusResponse(BaseModel):
     live_state: Optional[str] = None
     bot_phase: Optional[str] = None
     schedule_available: Optional[bool] = None
+    schedule_fetch_status: Optional[str] = None
+    schedule_fetch_attempted_at: Optional[str] = None
+    schedule_fetch_succeeded_at: Optional[str] = None
+    schedule_fetch_error: Optional[str] = None
     within_operating_schedule: Optional[bool] = None
     display_toggle_on: Optional[bool] = None
     display_toggle_disabled: Optional[bool] = None
@@ -152,6 +156,6 @@ class UserLoginRequest(BaseModel):
 
 class UserPauseRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
-    duration_type: str = Field(..., description="'30_min', '60_min', 'rest_of_day' (sesi pertama hari berikutnya), or 'custom'")
+    duration_type: str = Field(..., description="'30_min', '60_min', 'rest_of_day' (sesi operasional outlet berikutnya), or 'custom'")
     custom_until: Optional[str] = Field(default=None, description="Target pause end time in local ISO format when duration_type is custom")
     custom_minutes: Optional[int] = Field(default=None, description="Legacy custom pause duration in minutes")

@@ -16,7 +16,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260831-admin-console-v54">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260901-settings-visible-v56">
 </head>
 
 <body x-data="adminApp()">
@@ -311,7 +311,7 @@
       <div class="radio-group">
         <label class="radio-card active"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30 Menit</span></div><span class="radio-meta">30 mnt</span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span></div><span class="radio-meta">1 jam</span></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta">Sesi pertama besok</span></label>
+        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta" id="vbRestOfDayMeta">Ikuti jadwal outlet</span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="custom"><span>Durasi lain</span></div></label>
         <div id="vbCustomDurationBox" style="display:none; margin-top:6px">
           <div class="custom-datetime-fields">
@@ -369,7 +369,7 @@
             <input type="radio" name="adminPauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta">Sesi pertama besok</span>
+          <span class="radio-meta" id="adminRestOfDayMeta">Ikuti jadwal outlet</span>
         </label>
 
         <label class="radio-card">
@@ -1210,10 +1210,9 @@
       const contentWrapper = document.querySelector('.admin-main > .desktop-wrapper');
       if (!contentWrapper) return null;
 
-      const isSettingsTab = tabName === 'settings';
-      const isGlobalScrollTab = tabName === 'settings' || tabName === 'outlets';
+      const isGlobalScrollTab = tabName === 'outlets';
       contentWrapper.classList.toggle('is-global-scroll-active', isGlobalScrollTab);
-      contentWrapper.classList.toggle('is-settings-active', isSettingsTab);
+      contentWrapper.classList.toggle('is-settings-active', false);
       return contentWrapper;
     }
 
@@ -1266,6 +1265,8 @@
         const pane = document.getElementById('paneLogs');
         if (btn) btn.classList.add('active');
         if (pane) pane.classList.add('active');
+        const logsShell = pane ? pane.querySelector('.logs-page-shell') : null;
+        if (logsShell) logsShell.scrollTop = 0;
         fetchBotActivity();
         loadFullBotLogs();
       } else if (tabName === 'settings') {
@@ -1273,6 +1274,9 @@
         const pane = document.getElementById('paneSettings');
         if (btn) btn.classList.add('active');
         if (pane) pane.classList.add('active');
+        const settingsShell = pane ? pane.querySelector('.settings-page-shell') : null;
+        if (settingsShell) settingsShell.scrollTop = 0;
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         loadAdminProfile();
       }
     }
@@ -2187,12 +2191,62 @@
     let vbPickerDate = null;
     let vbPickerMonth = null;
 
+    function getSelectedVbPauseBrandIds() {
+      return selectedVbPauseBrandIds.length
+        ? [...selectedVbPauseBrandIds]
+        : (selectedVbBrandId ? [String(selectedVbBrandId)] : []);
+    }
+
+    function getVbPauseReferenceStore(brandId) {
+      const brand = (allVBBrands || []).find(item => String(item.id) === String(brandId));
+      if (!brand) return null;
+      const storeMap = getAllStoreMap();
+      const outletViews = (brand.outlets || [])
+        .map((outlet, sourceIndex) => ({ outlet: getVbStoreView(outlet, storeMap), sourceIndex }))
+        .sort((a, b) => getVbPortalOrder(a.outlet.portalName) - getVbPortalOrder(b.outlet.portalName) || a.sourceIndex - b.sourceIndex)
+        .map(item => item.outlet);
+      const outletWithSchedule = outletViews.find(item => hasUsableAdminSchedule(item.store));
+      return (outletWithSchedule || outletViews[0])?.store || null;
+    }
+
+    function getSelectedVbPauseReferenceStore() {
+      const brandIds = getSelectedVbPauseBrandIds();
+      return brandIds.length ? getVbPauseReferenceStore(brandIds[0]) : null;
+    }
+
+    function updateVbRestOfDayMeta() {
+      const meta = document.getElementById('vbRestOfDayMeta');
+      if (!meta) return;
+      const store = getSelectedVbPauseReferenceStore();
+      const nextSession = store && getNextAdminOperationalSessionDate(store);
+      meta.textContent = nextSession
+        ? formatAdminRestOfDayMeta(nextSession, store.timezone || 'Asia/Jakarta')
+        : 'Ikuti jadwal outlet';
+    }
+
+    function getVbPauseDurationLabel(brandCount = getSelectedVbPauseBrandIds().length) {
+      const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
+      if (type === '30_min') return 'selama 30 menit';
+      if (type === '60_min') return 'selama 60 menit';
+      if (type === 'rest_of_day') {
+        if ((brandCount || 0) > 1) return 'mengikuti jadwal outlet referensi masing-masing brand';
+        const store = getSelectedVbPauseReferenceStore();
+        const nextSession = store && getNextAdminOperationalSessionDate(store);
+        return nextSession
+          ? `sampai ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`
+          : 'mengikuti jadwal outlet referensi';
+      }
+      const value = document.getElementById('vbCustomUntilInput').value;
+      const until = value ? new Date(value) : null;
+      return until && !Number.isNaN(until.getTime())
+        ? `sampai ${until.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`
+        : 'sesuai waktu yang dipilih';
+    }
+
     function openVbPauseModal(brandId, brandName) {
       selectedVbBrandId = brandId;
       selectedVbPauseBrandIds = [String(brandId)];
       document.getElementById('vbPauseModalTitle').textContent = `Tutup ${brandName}`;
-      const now = new Date();
-      const until = new Date(now.getTime() + 30 * 60000);
       setVbCustomDateTimeDefaults();
       document.querySelectorAll('input[name="vbPauseDuration"]').forEach(radio => {
         radio.checked = radio.value === '30_min';
@@ -2325,19 +2379,35 @@
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       if (type === '30_min') return new Date(Date.now() + 30 * 60000);
       if (type === '60_min') return new Date(Date.now() + 60 * 60000);
-      if (type === 'rest_of_day') return new Date(Date.now() + 24 * 60 * 60 * 1000);
+      if (type === 'rest_of_day') {
+        const store = getSelectedVbPauseReferenceStore();
+        return store ? getNextAdminOperationalSessionDate(store) : null;
+      }
       const value = document.getElementById('vbCustomUntilInput').value;
       return value ? new Date(value) : null;
     }
 
     function updateVbPausePreview() {
-      const end = getVbPauseEnd();
       const preview = document.getElementById('vbPauseEndPreview');
-      if (!end || Number.isNaN(end.getTime())) { preview.textContent = 'Pilih tanggal & waktu WIB'; return; }
-      if (document.querySelector('input[name="vbPauseDuration"]:checked')?.value === 'rest_of_day') {
-        preview.textContent = 'Buka kembali pada sesi operasional berikutnya';
+      updateVbRestOfDayMeta();
+      const durationType = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
+      if (durationType === 'rest_of_day') {
+        const brandCount = getSelectedVbPauseBrandIds().length;
+        const store = getSelectedVbPauseReferenceStore();
+        const nextSession = store && getNextAdminOperationalSessionDate(store);
+        if (!nextSession) {
+          preview.textContent = brandCount > 1
+            ? 'Setiap brand mengikuti jadwal outlet referensi masing-masing saat jadwal tersedia.'
+            : 'Jadwal outlet referensi belum tersedia.';
+          return;
+        }
+        preview.textContent = brandCount > 1
+          ? `Preview brand pertama: buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}. Brand lain mengikuti jadwal masing-masing.`
+          : `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`;
         return;
       }
+      const end = getVbPauseEnd();
+      if (!end || Number.isNaN(end.getTime())) { preview.textContent = 'Pilih tanggal & waktu WIB'; return; }
       preview.textContent = `Berakhir pada ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`;
     }
 
@@ -2350,15 +2420,19 @@
     document.addEventListener('input', event => { if (event.target.id === 'vbCustomUntilInput') updateVbPausePreview(); });
 
     async function confirmVbPause() {
-      const brandIds = selectedVbPauseBrandIds.length
-        ? [...selectedVbPauseBrandIds]
-        : (selectedVbBrandId ? [selectedVbBrandId] : []);
+      const brandIds = getSelectedVbPauseBrandIds();
       if (!brandIds.length) return;
       const useAggregateFeedback = brandIds.length > 1 || vbBulkSelectionMode;
-      const end = getVbPauseEnd();
-      if (!end || Number.isNaN(end.getTime()) || end <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
+      const end = getVbPauseEnd();
+      const invalidEnd = !end || Number.isNaN(end.getTime()) || end <= new Date();
+      if (type !== 'rest_of_day' && invalidEnd) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
+      if (type === 'rest_of_day' && brandIds.length === 1 && invalidEnd) {
+        showToast('Jadwal outlet referensi belum tersedia untuk menghitung auto-buka.', 'error');
+        return;
+      }
       const customUntil = document.getElementById('vbCustomUntilInput').value;
+      const successLabel = getVbPauseDurationLabel(brandIds.length);
       if (useAggregateFeedback) {
         selectedVbBrandIds.clear();
         vbBulkSelectionMode = false;
@@ -2374,18 +2448,18 @@
           'PAUSED',
           control,
           { duration_type: type, custom_until: type === 'custom' ? customUntil : null },
-          useAggregateFeedback ? { silentSuccess: true, silentError: true } : {}
+          { silentSuccess: true, silentError: useAggregateFeedback }
         );
         if (result.success) successCount += 1;
         else failedBrands.push(allVBBrands.find(item => String(item.id) === String(brandId))?.name || `Brand ${brandId}`);
       }
+      if (successCount) {
+        const message = successCount === brandIds.length
+          ? `${successCount} brand berhasil diminta untuk ditutup ${successLabel}.`
+          : `${successCount} dari ${brandIds.length} brand berhasil diminta untuk ditutup ${successLabel}.`;
+        showToast(message, 'success');
+      }
       if (useAggregateFeedback) {
-        if (successCount) {
-          const message = successCount === brandIds.length
-            ? `${successCount} brand berhasil diminta untuk ditutup.`
-            : `${successCount} dari ${brandIds.length} brand berhasil diminta untuk ditutup.`;
-          showToast(message, 'success');
-        }
         if (failedBrands.length) {
           showErrorModal('Sebagian brand gagal ditutup', `Coba lagi untuk: ${failedBrands.join(', ')}`);
         }
@@ -2847,7 +2921,11 @@
       const labels = {
         SUSPENDED: 'Dinonaktifkan admin',
         STATUS_UNKNOWN: 'Sedang dicek bot',
-        SCHEDULE_UNAVAILABLE: 'Jadwal belum tersedia',
+        NOT_FETCHED_YET: 'Menunggu fetch jadwal',
+        FETCH_RETRYING: 'Gagal fetch jadwal, bot akan coba lagi',
+        FETCHED_EMPTY: 'Jadwal Shopee belum diatur',
+        WAITING_SCHEDULE_FETCH: 'Menunggu fetch jadwal',
+        SCHEDULE_UNAVAILABLE: 'Menunggu fetch jadwal',
         PENDING_PAUSE: 'Menunggu bot menutup',
         PENDING_OPEN: 'Menunggu bot membuka',
         WAITING_SCHEDULE: 'Menunggu jadwal buka',
@@ -2857,17 +2935,29 @@
       return labels[value] || 'Belum diketahui';
     }
 
+    function normalizeAdminScheduleFetchStatus(store, scheduleAvailable) {
+      if (scheduleAvailable === true) return 'READY';
+      let status = String(store?.schedule_fetch_status || '').trim().toUpperCase();
+      if (status === 'WAITING_SCHEDULE_FETCH' || status === 'SCHEDULE_UNAVAILABLE') status = 'NOT_FETCHED_YET';
+      if (status === 'NOT_FETCHED_YET' || status === 'FETCH_RETRYING' || status === 'FETCHED_EMPTY') return status;
+      if (store?.schedule_fetch_succeeded_at && !String(store?.schedule_fetch_error || '').trim()) return 'FETCHED_EMPTY';
+      if (store?.schedule_fetch_attempted_at || String(store?.schedule_fetch_error || '').trim()) return 'FETCH_RETRYING';
+      return 'NOT_FETCHED_YET';
+    }
+
     function getAdminStateContext(store) {
       const desiredState = normalizeAdminDesiredState(store);
       const liveState = normalizeAdminLiveState(store?.live_state || store?.shopee_status);
       const isSuspended = Boolean(store?.is_suspended || String(store?.suspension_status || '').trim().toUpperCase() === 'SUSPENDED');
       const scheduleAvailable = typeof store?.schedule_available === 'boolean' ? store.schedule_available : null;
       const isWithinSchedule = typeof store?.within_operating_schedule === 'boolean' ? store.within_operating_schedule : null;
+      const scheduleFetchStatus = normalizeAdminScheduleFetchStatus(store, scheduleAvailable);
       let botPhase = String(store?.bot_phase || '').trim().toUpperCase();
+      if (botPhase === 'SCHEDULE_UNAVAILABLE' || botPhase === 'WAITING_SCHEDULE_FETCH') botPhase = scheduleFetchStatus;
       if (!botPhase) {
         if (isSuspended) botPhase = 'SUSPENDED';
+        else if (desiredState === 'OPEN' && scheduleAvailable === false) botPhase = scheduleFetchStatus;
         else if (liveState === 'UNKNOWN') botPhase = 'STATUS_UNKNOWN';
-        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && scheduleAvailable === false) botPhase = 'SCHEDULE_UNAVAILABLE';
         else if ((desiredState === 'PAUSE' || desiredState === 'MANUAL_OFF') && liveState === 'OPEN') botPhase = 'PENDING_PAUSE';
         else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && isWithinSchedule === false) botPhase = 'WAITING_SCHEDULE';
         else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED')) botPhase = 'PENDING_OPEN';
@@ -2876,7 +2966,7 @@
         else if (liveState === 'OPEN') botPhase = 'IN_SYNC';
         else botPhase = 'STATUS_UNKNOWN';
       }
-      return { desiredState, liveState, botPhase, isSuspended, scheduleAvailable, isWithinSchedule };
+      return { desiredState, liveState, botPhase, isSuspended, scheduleAvailable, scheduleFetchStatus, isWithinSchedule };
     }
 
     function getAdminStatusToneClass(tone) {
@@ -2889,6 +2979,9 @@
       if (!normalized) return '';
       if (normalized.includes('menunggu bot menutup')) return 'Menunggu bot menutup';
       if (normalized.includes('menunggu bot membuka')) return 'Menunggu bot membuka';
+      if (normalized.includes('menunggu fetch jadwal')) return 'Menunggu fetch jadwal';
+      if (normalized.includes('gagal fetch jadwal')) return 'Gagal fetch jadwal, bot akan coba lagi';
+      if (normalized.includes('jadwal shopee belum diatur')) return 'Jadwal Shopee belum diatur';
       if (normalized.includes('di luar jadwal')) return 'Menunggu jadwal operasional';
       if (normalized.includes('dinonaktifkan admin')) return 'Dinonaktifkan admin';
       if (normalized.includes('otomatisasi nonaktif')) return 'Otomatisasi nonaktif';
@@ -2928,8 +3021,14 @@
       if (stateContext.botPhase === 'WAITING_SCHEDULE') {
         return build('Menunggu jadwal operasional', 'closed', 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.');
       }
-      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') {
-        return build('Jadwal belum tersedia', 'pending', 'Jadwal operasional Shopee belum tersedia. Bot masih mencocokkan status outlet.');
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') {
+        return build('Menunggu fetch jadwal', 'pending', 'Toggle aktif. Bot menunggu fetch jadwal operasional Shopee sebelum memproses outlet.');
+      }
+      if (stateContext.botPhase === 'FETCH_RETRYING') {
+        return build('Gagal fetch jadwal, bot akan coba lagi', 'pending', 'Toggle aktif. Bot belum berhasil fetch jadwal operasional Shopee dan akan mencoba lagi saat patroli berikutnya.');
+      }
+      if (stateContext.botPhase === 'FETCHED_EMPTY') {
+        return build('Jadwal Shopee belum diatur', 'closed', 'Toggle aktif, tetapi jadwal operasional Shopee belum diatur di Shopee sehingga bot belum bisa memproses outlet.');
       }
       if (stateContext.botPhase === 'AUTOMATION_OFF') {
         return build('Otomatisasi nonaktif', 'closed', 'Otomatisasi tetap mati sampai diaktifkan kembali.');
@@ -2949,7 +3048,9 @@
     function getAdminStatusSubtext(store, stateContext = getAdminStateContext(store)) {
       if (stateContext.botPhase === 'SUSPENDED') return 'Outlet tidak akan berubah sampai admin mengaktifkannya lagi.';
       if (stateContext.botPhase === 'STATUS_UNKNOWN') return 'Status live masih diperiksa.';
-      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Jadwal Shopee belum tersedia di dashboard.';
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle aktif sambil menunggu jadwal Shopee pertama kali di-fetch.';
+      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Toggle aktif. Bot akan retry fetch jadwal pada patroli berikutnya.';
+      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Toggle aktif, tetapi jadwal operasional Shopee outlet ini belum diatur.';
       if (stateContext.botPhase === 'PENDING_PAUSE') return getAdminLiveSupportText(stateContext.liveState);
       if (stateContext.botPhase === 'PENDING_OPEN') return getAdminLiveSupportText(stateContext.liveState);
       if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Akan aktif lagi saat jam operasional dimulai.';
@@ -2979,6 +3080,7 @@
       // Visual toggle follows effective runtime state, not retained desired state.
       // Desired OPEN is retained outside schedule for the next operating session.
       if (typeof store?.display_toggle_on === 'boolean') return store.display_toggle_on;
+      if (stateContext.botPhase === 'NOT_FETCHED_YET' || stateContext.botPhase === 'FETCH_RETRYING' || stateContext.botPhase === 'FETCHED_EMPTY') return stateContext.desiredState === 'OPEN';
       if (isAdminToggleDisabled(store, stateContext)) return false;
       return stateContext.desiredState === 'OPEN';
     }
@@ -2986,13 +3088,17 @@
     function isAdminToggleDisabled(store, stateContext = getAdminStateContext(store)) {
       return store?.display_toggle_disabled === true
         || stateContext.botPhase === 'WAITING_SCHEDULE'
-        || stateContext.botPhase === 'SCHEDULE_UNAVAILABLE'
+        || stateContext.botPhase === 'NOT_FETCHED_YET'
+        || stateContext.botPhase === 'FETCH_RETRYING'
+        || stateContext.botPhase === 'FETCHED_EMPTY'
         || stateContext.botPhase === 'SUSPENDED';
     }
 
     function getAdminToggleDisabledReason(store, stateContext = getAdminStateContext(store)) {
       if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Toggle dikunci di luar jadwal operasional.';
-      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Toggle dikunci sampai jadwal operasional tersedia.';
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle dikunci sambil menunggu bot fetch jadwal operasional Shopee.';
+      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Toggle dikunci karena bot belum berhasil fetch jadwal operasional Shopee.';
+      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Toggle dikunci karena jadwal operasional Shopee belum diatur di Shopee.';
       if (stateContext.botPhase === 'SUSPENDED') return 'Toggle dikunci karena outlet dinonaktifkan admin.';
       return 'Toggle dikunci oleh aturan jadwal operasional.';
     }
@@ -3003,7 +3109,13 @@
           value: 'Tidak sedang pause',
           note: stateContext.botPhase === 'WAITING_SCHEDULE'
             ? 'Tidak ada pause manual. Outlet menunggu jadwal buka berikutnya.'
-            : 'Tidak ada pause manual tersimpan.'
+            : (stateContext.botPhase === 'NOT_FETCHED_YET'
+                ? 'Tidak ada pause manual. Bot sedang mengambil jadwal Shopee pertama untuk outlet ini.'
+                : (stateContext.botPhase === 'FETCH_RETRYING'
+                    ? 'Tidak ada pause manual. Bot belum berhasil fetch jadwal Shopee dan akan mencoba lagi.'
+                    : (stateContext.botPhase === 'FETCHED_EMPTY'
+                        ? 'Tidak ada pause manual. Jadwal operasional Shopee outlet ini belum diatur.'
+                        : 'Tidak ada pause manual tersimpan.')))
         };
       }
       if (store.pause_until) {
@@ -3418,12 +3530,49 @@
       return document.getElementById('adminCustomUntilInput').value;
     }
 
+    function getAdminTimezoneShortLabel(timezone) {
+      return timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang'
+        ? 'WITA'
+        : timezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
+    }
+
+    function formatAdminRestOfDayMeta(date, timezone = 'Asia/Jakarta') {
+      const parts = new Intl.DateTimeFormat('id-ID', {
+        timeZone: timezone,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZoneName: 'short'
+      }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      return `${parts.weekday} ${parts.hour}:${parts.minute} ${parts.timeZoneName || getAdminTimezoneShortLabel(timezone)}`;
+    }
+
+    function updateAdminRestOfDayMeta() {
+      const meta = document.getElementById('adminRestOfDayMeta');
+      if (!meta) return;
+      const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
+      const nextSession = store && getNextAdminOperationalSessionDate(store);
+      meta.textContent = nextSession
+        ? formatAdminRestOfDayMeta(nextSession, store.timezone || 'Asia/Jakarta')
+        : 'Ikuti jadwal outlet';
+    }
+
     function getAdminPauseDurationLabel() {
       const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
-      if (durationType === '30_min') return '30 menit';
-      if (durationType === '60_min') return '60 menit';
-      if (durationType === 'rest_of_day') return 'sesi pertama besok';
-      return 'sesuai waktu yang dipilih';
+      if (durationType === '30_min') return 'selama 30 menit';
+      if (durationType === '60_min') return 'selama 60 menit';
+      const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
+      const timezone = store?.timezone || 'Asia/Jakarta';
+      if (durationType === 'rest_of_day') {
+        if ((selectedAdminPauseStoreIds || []).length > 1) return 'mengikuti jadwal masing-masing outlet';
+        const nextSession = store && getNextAdminOperationalSessionDate(store);
+        return nextSession
+          ? `sampai ${formatAdminPauseTargetDate(nextSession, timezone)}`
+          : 'mengikuti jadwal outlet';
+      }
+      const until = parseAdminCustomUntil();
+      return until ? `sampai ${formatAdminPauseTargetDate(until, timezone)}` : 'sesuai waktu yang dipilih';
     }
 
     function getNextAdminOperationalSessionDate(store, now = new Date()) {
@@ -3467,19 +3616,23 @@
     function updateAdminPauseEndPreview() {
       const preview = document.getElementById('adminPauseEndPreview');
       if (!preview) return;
+      updateAdminRestOfDayMeta();
       const durationType = document.querySelector('input[name="adminPauseDuration"]:checked')?.value;
       if (durationType === 'rest_of_day') {
         const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
         const nextSession = store && getNextAdminOperationalSessionDate(store);
         preview.textContent = nextSession
-          ? `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`
-          : 'Buka kembali pada sesi operasional berikutnya';
+          ? (selectedAdminPauseStoreIds.length > 1
+              ? `Preview outlet pertama: buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}. Outlet lain mengikuti jadwal masing-masing.`
+              : `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`)
+          : 'Buka kembali mengikuti jadwal operasional outlet berikutnya';
         return;
       }
       if (durationType === 'custom') {
         const until = parseAdminCustomUntil();
+        const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
         preview.textContent = until
-          ? `Berakhir pada ${formatAdminPauseTargetDate(until)}`
+          ? `Berakhir pada ${formatAdminPauseTargetDate(until, store?.timezone || 'Asia/Jakarta')}`
           : 'Pilih tanggal dan waktu WIB';
         return;
       }
@@ -3510,6 +3663,7 @@
         showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
         return;
       }
+      const successLabel = getAdminPauseDurationLabel();
       const eligibleStoreIds = storeIds.filter(storeId => !pendingAdminToggleStoreIds.has(String(storeId)));
       if (!eligibleStoreIds.length) return;
       eligibleStoreIds.forEach(storeId => pendingAdminToggleStoreIds.add(String(storeId)));
@@ -3539,7 +3693,7 @@
           finishAdminToggle(storeId);
         }
       }
-      if (successCount) showToast(`${successCount} outlet dijeda selama ${getAdminPauseDurationLabel()}.`, 'success');
+      if (successCount) showToast(`${successCount} outlet berhasil dijeda ${successLabel}.`, 'success');
       if (lastError && !successCount) showToast(lastError, 'error');
       selectedAdminStoreIds.clear();
       updateAdminBulkToolbar();
@@ -3575,6 +3729,10 @@
         'live_state',
         'bot_phase',
         'schedule_available',
+        'schedule_fetch_status',
+        'schedule_fetch_attempted_at',
+        'schedule_fetch_succeeded_at',
+        'schedule_fetch_error',
         'within_operating_schedule',
         'display_toggle_on',
         'display_toggle_disabled',
@@ -4419,14 +4577,16 @@
         const res = await fetch('/api/v1/admin/accounts');
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal memuat akun admin.');
-        list.innerHTML = data.accounts.map(account => `
-          <div class="admin-account-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line);">
-            <div>
-              <strong>${account.username}</strong>
-              <div style="font-size: 11px; color: var(--ink-light);">${account.google_email ? account.google_email : 'Tidak ada Google Email'}</div>
+        list.innerHTML = (data.accounts || []).map(account => `
+          <div class="admin-account-item">
+            <div class="admin-account-info">
+              <strong>${escapeVBHtml(account.username)}</strong>
+              <div class="admin-account-email">${account.google_email ? escapeVBHtml(account.google_email) : 'Tidak ada Google Email'}</div>
             </div>
-            <span class="settings-role" style="font-size: 10px;">${account.is_active ? 'Aktif' : 'Nonaktif'}</span>
-          </div>`).join('') || '<span>Belum ada akun admin.</span>';
+            <span class="admin-status-badge ${account.is_active ? 'is-active' : 'is-inactive'}">
+              ${account.is_active ? 'Aktif' : 'Nonaktif'}
+            </span>
+          </div>`).join('') || '<div class="logs-empty-state">Belum ada akun admin.</div>';
       } catch (err) {
         list.innerText = err.message;
       }

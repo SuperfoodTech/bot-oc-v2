@@ -32,7 +32,7 @@ from fastapi.templating import Jinja2Templates
 from backend import db, realtime, state, worker
 from backend import apps_script
 from backend import vb
-from backend.pause_utils import FULL_DAY_MINUTES, resolve_pause_window
+from backend.pause_utils import resolve_pause_window
 from core.timezones import normalize_timezone, timezone_for
 from backend.models import (
     ToggleRequest,
@@ -63,6 +63,25 @@ def _is_within_shopee_schedule(store: dict, now_dt: datetime) -> bool:
     """Return whether a store may be manually changed in its local timezone."""
     local_now = now_dt.astimezone(timezone_for(store.get("timezone")))
     return db.is_within_shopee_schedule(store.get("shopee_regular_hours"), local_now)
+
+
+def _get_schedule_gate_detail(store: dict, now_dt: datetime) -> Optional[str]:
+    """Return a user-facing block reason when manual actions are gated by schedule state."""
+    toggle_reason = str(store.get("display_toggle_reason") or "").strip().upper()
+    fetch_status = str(store.get("schedule_fetch_status") or "").strip().upper()
+    if toggle_reason == "FETCHED_EMPTY" or fetch_status == "FETCHED_EMPTY":
+        return "Toggle dikunci karena jadwal operasional Shopee belum diatur di Shopee."
+    if toggle_reason == "FETCH_RETRYING" or fetch_status == "FETCH_RETRYING":
+        return "Toggle dikunci karena bot belum berhasil fetch jadwal operasional Shopee."
+    if (
+        toggle_reason in {"WAITING_SCHEDULE_FETCH", "NOT_FETCHED_YET"}
+        or fetch_status == "NOT_FETCHED_YET"
+        or store.get("schedule_available") is False
+    ):
+        return "Toggle dikunci sambil menunggu bot fetch jadwal operasional Shopee."
+    if toggle_reason == "OUTSIDE_SCHEDULE" or not _is_within_shopee_schedule(store, now_dt):
+        return "Di luar jadwal operasional"
+    return None
 
 
 def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
@@ -98,6 +117,10 @@ def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
         live_state=store.get("live_state"),
         bot_phase=store.get("bot_phase"),
         schedule_available=store.get("schedule_available"),
+        schedule_fetch_status=store.get("schedule_fetch_status"),
+        schedule_fetch_attempted_at=store.get("schedule_fetch_attempted_at"),
+        schedule_fetch_succeeded_at=store.get("schedule_fetch_succeeded_at"),
+        schedule_fetch_error=store.get("schedule_fetch_error"),
         within_operating_schedule=store.get("within_operating_schedule"),
         display_toggle_on=store.get("display_toggle_on"),
         display_toggle_disabled=store.get("display_toggle_disabled"),
@@ -490,16 +513,31 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
     if requested not in {"ON", "PAUSED"}:
         raise HTTPException(status_code=422, detail="Status VB harus ON atau PAUSED.")
     pause_until = None
+    duration_type = (req.duration_type or "").strip().lower()
     if requested == "PAUSED":
         now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
         try:
-            if (req.duration_type or "").strip().lower() in {"rest_of_day", "sepanjang_hari", "today"}:
-                # VB brands do not have Shopee operating-hour schedules.
-                pause_until = now_dt + timedelta(minutes=FULL_DAY_MINUTES)
+            if duration_type in {"rest_of_day", "sepanjang_hari", "today"}:
+                brand = vb.brand_detail(str(brand_id))
+                if not brand:
+                    raise HTTPException(status_code=404, detail="Brand VB tidak ditemukan.")
+                reference_outlet = vb.pick_pause_reference_outlet(brand.get("outlets"))
+                if not reference_outlet or not any((reference_outlet.get("shopee_regular_hours") or {}).values()):
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Jadwal operasional outlet referensi brand ini belum tersedia.",
+                    )
+                pause_until, _duration_mins, _label = resolve_pause_window(
+                    now_dt,
+                    duration_type,
+                    schedule=reference_outlet.get("shopee_regular_hours") or {},
+                    timezone=normalize_timezone(reference_outlet.get("timezone")),
+                    allow_default=False,
+                )
             else:
                 pause_until, _duration_mins, _label = resolve_pause_window(
                     now_dt,
-                    req.duration_type or "",
+                    duration_type,
                     custom_until=req.custom_until,
                     custom_minutes=req.custom_minutes,
                     allow_default=False,
@@ -766,8 +804,10 @@ def user_pause_store(
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
     now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
-    if not admin_account and not _is_within_shopee_schedule(store, now_dt):
-        raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
+    if not admin_account:
+        schedule_gate_detail = _get_schedule_gate_detail(store, now_dt)
+        if schedule_gate_detail:
+            raise HTTPException(status_code=403, detail=schedule_gate_detail)
 
     try:
         pause_mode = "REST_OF_DAY" if req.duration_type.strip().lower() in {"rest_of_day", "sepanjang_hari", "today"} else ("CUSTOM" if req.duration_type.strip().lower() in {"custom", "waktu_lain"} else "FIXED_DURATION")
@@ -835,8 +875,9 @@ def user_resume_store(store_id: str = Query(..., description="Target Store ID"))
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
     now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
-    if not _is_within_shopee_schedule(store, now_dt):
-        raise HTTPException(status_code=403, detail="Di luar jadwal operasional")
+    schedule_gate_detail = _get_schedule_gate_detail(store, now_dt)
+    if schedule_gate_detail:
+        raise HTTPException(status_code=403, detail=schedule_gate_detail)
 
     transition = state.apply_user_toggle(
         store_id=store_id,
@@ -892,10 +933,15 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
-    if not _is_within_shopee_schedule(store, datetime.now(ZoneInfo("Asia/Jakarta"))):
+    schedule_gate_detail = _get_schedule_gate_detail(store, datetime.now(ZoneInfo("Asia/Jakarta")))
+    if schedule_gate_detail:
         raise HTTPException(
             status_code=403,
-            detail="Toggle dikunci di luar jadwal operasional. Outlet akan mengikuti status close dari jadwal Shopee.",
+            detail=(
+                "Toggle dikunci sambil menunggu bot fetch jadwal operasional Shopee."
+                if schedule_gate_detail != "Di luar jadwal operasional"
+                else "Toggle dikunci di luar jadwal operasional. Outlet akan mengikuti status close dari jadwal Shopee."
+            ),
         )
     next_status = req.status.upper()
     pause_until = None

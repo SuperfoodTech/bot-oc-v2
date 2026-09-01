@@ -602,6 +602,10 @@
         'live_state',
         'bot_phase',
         'schedule_available',
+        'schedule_fetch_status',
+        'schedule_fetch_attempted_at',
+        'schedule_fetch_succeeded_at',
+        'schedule_fetch_error',
         'within_operating_schedule',
         'display_toggle_on',
         'display_toggle_disabled',
@@ -845,6 +849,16 @@
       return MITRA_STATUS_TONE_CLASS[normalized] || 'is-pending';
     }
 
+    function normalizeScheduleFetchStatus(outlet, scheduleAvailable) {
+      if (scheduleAvailable) return 'READY';
+      let status = String(outlet?.schedule_fetch_status || '').trim().toUpperCase();
+      if (status === 'WAITING_SCHEDULE_FETCH' || status === 'SCHEDULE_UNAVAILABLE') status = 'NOT_FETCHED_YET';
+      if (status === 'NOT_FETCHED_YET' || status === 'FETCH_RETRYING' || status === 'FETCHED_EMPTY') return status;
+      if (outlet?.schedule_fetch_succeeded_at && !String(outlet?.schedule_fetch_error || '').trim()) return 'FETCHED_EMPTY';
+      if (outlet?.schedule_fetch_attempted_at || String(outlet?.schedule_fetch_error || '').trim()) return 'FETCH_RETRYING';
+      return 'NOT_FETCHED_YET';
+    }
+
     function getOutletStateContext(outlet) {
       const desiredState = normalizeDesiredOutletState(outlet);
       const liveState = normalizeLiveOutletState(outlet?.live_state || outlet?.shopee_status);
@@ -855,19 +869,22 @@
         ? outlet.within_operating_schedule
         : (scheduleAvailable && isOutletWithinSchedule(outlet));
       const isSuspended = Boolean(outlet?.is_suspended || outlet?.suspension_status === 'SUSPENDED');
-      const toggleReason = String(outlet?.display_toggle_reason || '').trim().toUpperCase()
-        || (isSuspended ? 'SUSPENDED' : (!scheduleAvailable ? 'SCHEDULE_UNAVAILABLE' : (!isWithinSchedule ? 'OUTSIDE_SCHEDULE' : 'READY')));
+      const scheduleFetchStatus = normalizeScheduleFetchStatus(outlet, scheduleAvailable);
+      let toggleReason = String(outlet?.display_toggle_reason || '').trim().toUpperCase()
+        || (isSuspended ? 'SUSPENDED' : (!scheduleAvailable ? scheduleFetchStatus : (!isWithinSchedule ? 'OUTSIDE_SCHEDULE' : 'READY')));
+      if (toggleReason === 'SCHEDULE_UNAVAILABLE' || toggleReason === 'WAITING_SCHEDULE_FETCH') toggleReason = scheduleFetchStatus;
       const toggleChecked = typeof outlet?.display_toggle_on === 'boolean'
         ? outlet.display_toggle_on
-        : Boolean(!isSuspended && scheduleAvailable && isWithinSchedule && desiredState === 'OPEN');
+        : Boolean(!isSuspended && desiredState === 'OPEN' && (!scheduleAvailable || isWithinSchedule));
       const toggleDisabled = typeof outlet?.display_toggle_disabled === 'boolean'
         ? outlet.display_toggle_disabled
         : Boolean(isSuspended || !scheduleAvailable || !isWithinSchedule);
       let botPhase = String(outlet?.bot_phase || '').trim().toUpperCase();
+      if (botPhase === 'SCHEDULE_UNAVAILABLE' || botPhase === 'WAITING_SCHEDULE_FETCH') botPhase = scheduleFetchStatus;
       if (!botPhase) {
         if (isSuspended) botPhase = 'SUSPENDED';
+        else if (desiredState === 'OPEN' && !scheduleAvailable) botPhase = scheduleFetchStatus;
         else if (liveState === 'UNKNOWN') botPhase = 'STATUS_UNKNOWN';
-        else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && !scheduleAvailable) botPhase = 'SCHEDULE_UNAVAILABLE';
         else if ((desiredState === 'PAUSE' || desiredState === 'MANUAL_OFF') && liveState === 'OPEN') botPhase = 'PENDING_PAUSE';
         else if (desiredState === 'OPEN' && (liveState === 'PAUSE' || liveState === 'CLOSED') && isWithinSchedule) botPhase = 'PENDING_OPEN';
         else if (desiredState === 'MANUAL_OFF') botPhase = 'AUTOMATION_OFF';
@@ -880,6 +897,7 @@
         desiredState,
         botPhase,
         scheduleAvailable,
+        scheduleFetchStatus,
         isWithinSchedule,
         isSuspended,
         toggleChecked,
@@ -926,6 +944,15 @@
       }
       if (stateContext.botPhase === 'PENDING_OPEN') {
         return { label: 'Sedang Tutup • Menunggu bot membuka', className: 'mitra-status-pill is-pending', value: stateContext.liveState };
+      }
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') {
+        return { label: 'Menunggu fetch jadwal', className: 'mitra-status-pill is-pending', value: stateContext.liveState };
+      }
+      if (stateContext.botPhase === 'FETCH_RETRYING') {
+        return { label: 'Gagal fetch jadwal, bot akan coba lagi', className: 'mitra-status-pill is-pending', value: stateContext.liveState };
+      }
+      if (stateContext.botPhase === 'FETCHED_EMPTY') {
+        return { label: 'Jadwal Shopee belum diatur', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') {
         return { label: 'Sedang Tutup • Di luar jadwal', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
@@ -1053,7 +1080,9 @@
       if (explicitNote) return explicitNote;
       if (stateContext.botPhase === 'SUSPENDED') return 'Otomatisasi dinonaktifkan oleh admin.';
       if (stateContext.botPhase === 'STATUS_UNKNOWN') return 'Status live outlet masih diperiksa bot.';
-      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Jadwal operasional Shopee belum tersedia.';
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle aktif. Bot menunggu fetch jadwal operasional Shopee sebelum memproses outlet.';
+      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Toggle aktif. Bot belum berhasil fetch jadwal operasional Shopee dan akan mencoba lagi saat patroli berikutnya.';
+      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Toggle aktif, tetapi jadwal operasional Shopee belum diatur di Shopee sehingga bot belum bisa memproses outlet.';
       if (stateContext.botPhase === 'PENDING_PAUSE') {
         return stateContext.desiredState === 'PAUSE'
           ? 'Permintaan tutup sementara sudah tersimpan. Menunggu bot menutup outlet.'
@@ -1091,7 +1120,9 @@
           : (getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.');
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') return getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.';
-      if (stateContext.botPhase === 'SCHEDULE_UNAVAILABLE') return 'Jadwal operasional Shopee belum tersedia.';
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle aktif. Menunggu bot fetch jadwal operasional Shopee.';
+      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Toggle aktif. Bot akan mencoba fetch jadwal lagi pada patroli berikutnya.';
+      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Toggle aktif. Menunggu jadwal operasional Shopee diatur.';
       if (stateContext.botPhase === 'AUTOMATION_OFF' || (stateContext.desiredState === 'MANUAL_OFF' && stateContext.liveState !== 'OPEN')) {
         return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
       }
@@ -1102,8 +1133,14 @@
       if (stateContext.isSuspended) {
         return `Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${outlet.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`;
       }
-      if (stateContext.toggleReason === 'SCHEDULE_UNAVAILABLE') {
-        return 'Jadwal operasional Shopee belum tersedia.';
+      if (stateContext.toggleReason === 'NOT_FETCHED_YET') {
+        return 'Toggle dikunci sambil menunggu bot fetch jadwal operasional Shopee.';
+      }
+      if (stateContext.toggleReason === 'FETCH_RETRYING') {
+        return 'Toggle dikunci karena bot belum berhasil fetch jadwal operasional Shopee.';
+      }
+      if (stateContext.toggleReason === 'FETCHED_EMPTY') {
+        return 'Toggle dikunci karena jadwal operasional Shopee belum diatur di Shopee.';
       }
       if (stateContext.toggleReason === 'OUTSIDE_SCHEDULE') {
         return 'Di luar jadwal operasional';

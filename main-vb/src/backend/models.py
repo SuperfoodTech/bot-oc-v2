@@ -29,11 +29,29 @@ class StoreStatusResponse(BaseModel):
     vercel_password: Optional[str] = ""
     vercel_status: str
     shopee_status: str
+    shopee_regular_hours: Dict = Field(default_factory=dict)
     subscription_status: str
     is_suspended: bool
     alasan_penangguhan: Optional[str] = ""
     pause_until: Optional[str] = None
+    timezone: Optional[str] = "Asia/Jakarta"
     last_synced_at: Optional[str] = None
+    desired_state: Optional[str] = None
+    live_state: Optional[str] = None
+    bot_phase: Optional[str] = None
+    schedule_available: Optional[bool] = None
+    schedule_fetch_status: Optional[str] = None
+    schedule_fetch_attempted_at: Optional[str] = None
+    schedule_fetch_succeeded_at: Optional[str] = None
+    schedule_fetch_error: Optional[str] = None
+    within_operating_schedule: Optional[bool] = None
+    display_toggle_on: Optional[bool] = None
+    display_toggle_disabled: Optional[bool] = None
+    display_toggle_reason: Optional[str] = None
+    display_status_bucket: Optional[str] = None
+    display_status_label: Optional[str] = None
+    display_status_tone: Optional[str] = None
+    display_note: Optional[str] = None
 
 
 class SyncResponse(BaseModel):

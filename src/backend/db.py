@@ -39,6 +39,16 @@ SCHEDULE_DAY_NAMES = {
 }
 SCHEDULE_DAY_ORDER = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
 SCHEDULE_RANGE_RE = re.compile(r"^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$")
+SCHEDULE_FETCH_NOT_FETCHED_YET = "NOT_FETCHED_YET"
+SCHEDULE_FETCH_RETRYING = "FETCH_RETRYING"
+SCHEDULE_FETCH_EMPTY = "FETCHED_EMPTY"
+SCHEDULE_FETCH_READY = "READY"
+SCHEDULE_FETCH_STATUS_VALUES = {
+    SCHEDULE_FETCH_NOT_FETCHED_YET,
+    SCHEDULE_FETCH_RETRYING,
+    SCHEDULE_FETCH_EMPTY,
+    SCHEDULE_FETCH_READY,
+}
 
 
 def get_db_connection():
@@ -83,6 +93,9 @@ def init_db() -> None:
         migration12_path = base_dir / "012_outlet_timezone.sql"
         if migration12_path.exists():
             conn.execute(migration12_path.read_text(encoding="utf-8"))
+        migration13_path = base_dir / "013_schedule_fetch_status.sql"
+        if migration13_path.exists():
+            conn.execute(migration13_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -210,6 +223,41 @@ def has_usable_shopee_schedule(raw_schedule) -> bool:
     return any(schedule.values())
 
 
+def _normalized_schedule_has_intervals(schedule: Optional[Dict[str, List[str]]]) -> bool:
+    return any((schedule or {}).values())
+
+
+def _clean_schedule_fetch_error(value) -> Optional[str]:
+    raw_value = str(value or "").strip()
+    return raw_value or None
+
+
+def _derive_schedule_fetch_status(
+    store: Dict[str, Any],
+    *,
+    schedule_available: bool,
+) -> str:
+    if schedule_available:
+        return SCHEDULE_FETCH_READY
+
+    normalized = str(store.get("schedule_fetch_status") or "").strip().upper()
+    attempted_at = store.get("schedule_fetch_attempted_at")
+    succeeded_at = store.get("schedule_fetch_succeeded_at")
+    error_message = _clean_schedule_fetch_error(store.get("schedule_fetch_error"))
+
+    if normalized in {
+        SCHEDULE_FETCH_NOT_FETCHED_YET,
+        SCHEDULE_FETCH_RETRYING,
+        SCHEDULE_FETCH_EMPTY,
+    }:
+        return normalized
+    if succeeded_at and not error_message:
+        return SCHEDULE_FETCH_EMPTY
+    if attempted_at or error_message:
+        return SCHEDULE_FETCH_RETRYING
+    return SCHEDULE_FETCH_NOT_FETCHED_YET
+
+
 def _parse_schedule_range(range_text: str) -> Optional[Tuple[int, int]]:
     match = SCHEDULE_RANGE_RE.match(str(range_text or "").strip())
     if not match:
@@ -317,8 +365,10 @@ def derive_outlet_runtime_state(
     desired_state = _normalize_desired_state(store.get("vercel_status"), pause_until_dt)
     live_state = _normalize_live_state(store.get("shopee_status"))
     schedule = normalized_schedule if normalized_schedule is not None else normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
-    schedule_available = any((schedule or {}).values())
+    schedule_available = _normalized_schedule_has_intervals(schedule)
     within_schedule = schedule_available and _is_within_normalized_schedule(schedule, now_wib)
+    schedule_fetch_status = _derive_schedule_fetch_status(store, schedule_available=schedule_available)
+    schedule_fetch_error = _clean_schedule_fetch_error(store.get("schedule_fetch_error"))
     is_suspended = bool(store.get("is_suspended")) or str(store.get("suspension_status") or "").upper() == "SUSPENDED"
     subscription_active = _is_subscription_active(store.get("subscription_status"))
 
@@ -331,16 +381,27 @@ def derive_outlet_runtime_state(
             if live_state == "OPEN"
             else "Otomatisasi dinonaktifkan oleh admin."
         )
+    elif desired_state == "OPEN" and not schedule_available:
+        if schedule_fetch_status == SCHEDULE_FETCH_EMPTY:
+            bot_phase = SCHEDULE_FETCH_EMPTY
+            status_label = "Jadwal Shopee belum diatur"
+            status_tone = "closed"
+            display_note = "Toggle aktif, tetapi jadwal operasional Shopee belum diatur di Shopee sehingga bot belum bisa memproses outlet."
+        elif schedule_fetch_status == SCHEDULE_FETCH_RETRYING:
+            bot_phase = SCHEDULE_FETCH_RETRYING
+            status_label = "Gagal fetch jadwal, bot akan coba lagi"
+            status_tone = "pending"
+            display_note = "Toggle aktif. Bot belum berhasil fetch jadwal operasional Shopee dan akan mencoba lagi saat patroli berikutnya."
+        else:
+            bot_phase = SCHEDULE_FETCH_NOT_FETCHED_YET
+            status_label = "Menunggu fetch jadwal"
+            status_tone = "pending"
+            display_note = "Toggle aktif. Bot menunggu fetch jadwal operasional Shopee sebelum memproses outlet."
     elif live_state == "UNKNOWN":
         bot_phase = "STATUS_UNKNOWN"
         status_label = "Status sedang dicek bot"
         status_tone = "pending"
         display_note = "Status live outlet masih diperiksa bot."
-    elif desired_state == "OPEN" and live_state in {"PAUSE", "CLOSED"} and not schedule_available:
-        bot_phase = "SCHEDULE_UNAVAILABLE"
-        status_label = "Status sedang dicek bot"
-        status_tone = "pending"
-        display_note = "Jadwal operasional Shopee belum tersedia. Bot masih mencocokkan status outlet."
     elif desired_state in {"PAUSE", "MANUAL_OFF"} and live_state == "OPEN":
         bot_phase = "PENDING_PAUSE"
         status_label = "Sedang Buka • Menunggu bot menutup"
@@ -384,11 +445,6 @@ def derive_outlet_runtime_state(
             if pause_until_label
             else "Outlet sedang ditutup sementara."
         )
-    elif desired_state == "OPEN" and live_state in {"PAUSE", "CLOSED"} and not within_schedule:
-        bot_phase = "WAITING_SCHEDULE"
-        status_label = "Sedang Tutup • Di luar jadwal"
-        status_tone = "closed"
-        display_note = "Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai."
     elif desired_state == "OPEN" and live_state == "OPEN":
         bot_phase = "IN_SYNC"
         status_label = "Sedang Buka"
@@ -403,17 +459,23 @@ def derive_outlet_runtime_state(
     if is_suspended:
         display_toggle_reason = "SUSPENDED"
     elif not schedule_available:
-        display_toggle_reason = "SCHEDULE_UNAVAILABLE"
+        display_toggle_reason = schedule_fetch_status
     elif not within_schedule:
         display_toggle_reason = "OUTSIDE_SCHEDULE"
     else:
         display_toggle_reason = "READY"
 
-    display_toggle_on = bool(desired_state == "OPEN" and schedule_available and within_schedule and not is_suspended)
+    display_toggle_on = bool(
+        desired_state == "OPEN"
+        and not is_suspended
+        and (not schedule_available or within_schedule)
+    )
     display_toggle_disabled = bool(is_suspended or not schedule_available or not within_schedule)
     display_status_bucket = (
         "closed"
         if desired_state == "OPEN" and schedule_available and not within_schedule
+        else "closed"
+        if desired_state == "OPEN" and not schedule_available and schedule_fetch_status == SCHEDULE_FETCH_EMPTY
         else _derive_display_status_bucket(live_state, display_toggle_on, desired_state)
     )
 
@@ -422,6 +484,10 @@ def derive_outlet_runtime_state(
         "live_state": live_state,
         "bot_phase": bot_phase,
         "schedule_available": schedule_available,
+        "schedule_fetch_status": schedule_fetch_status,
+        "schedule_fetch_attempted_at": store.get("schedule_fetch_attempted_at"),
+        "schedule_fetch_succeeded_at": store.get("schedule_fetch_succeeded_at"),
+        "schedule_fetch_error": schedule_fetch_error,
         "within_operating_schedule": within_schedule,
         "display_toggle_on": display_toggle_on,
         "display_toggle_disabled": display_toggle_disabled,
@@ -574,7 +640,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.schedule_fetch_status,to_char(os.schedule_fetch_attempted_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_attempted_at,to_char(os.schedule_fetch_succeeded_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_succeeded_at,COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     # Virtual Brand outlets are controlled exclusively through vb_brands and
     # must not appear in the regular outlet dashboard or bot-oc worker scope.
@@ -921,8 +987,57 @@ def update_shopee_actual_status(store_id, status):
     with get_db_connection() as conn: conn.execute("UPDATE outlet_states os SET shopee_actual_status=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (_normalize_persisted_shopee_status(status), store_id))
 
 def update_shopee_regular_hours(store_id: str, regular_hours: Dict[str, List[str]]) -> None:
+    normalized_hours = normalize_shopee_regular_hours(regular_hours)
+    if not _normalized_schedule_has_intervals(normalized_hours):
+        mark_schedule_fetch_empty(store_id)
+        return
     with get_db_connection() as conn:
-        conn.execute("UPDATE outlet_states os SET shopee_regular_hours=%s, last_checked_at=now(), updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s", (json.dumps(regular_hours), store_id))
+        conn.execute(
+            """UPDATE outlet_states os
+                  SET shopee_regular_hours=%s,
+                      schedule_fetch_status=%s,
+                      schedule_fetch_attempted_at=now(),
+                      schedule_fetch_succeeded_at=now(),
+                      schedule_fetch_error=NULL,
+                      last_checked_at=now(),
+                      updated_at=now()
+                 FROM outlets o
+                WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (json.dumps(normalized_hours), SCHEDULE_FETCH_READY, store_id),
+        )
+
+
+def mark_schedule_fetch_empty(store_id: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os
+                  SET shopee_regular_hours=%s,
+                      schedule_fetch_status=%s,
+                      schedule_fetch_attempted_at=now(),
+                      schedule_fetch_succeeded_at=now(),
+                      schedule_fetch_error=NULL,
+                      last_checked_at=now(),
+                      updated_at=now()
+                 FROM outlets o
+                WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (json.dumps({}), SCHEDULE_FETCH_EMPTY, store_id),
+        )
+
+
+def mark_schedule_fetch_retry(store_id: str, error_message: Optional[str]) -> None:
+    error_text = _clean_schedule_fetch_error(error_message) or "Bot belum berhasil fetch jadwal Shopee."
+    with get_db_connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os
+                  SET schedule_fetch_status=%s,
+                      schedule_fetch_attempted_at=now(),
+                      schedule_fetch_error=%s,
+                      last_checked_at=now(),
+                      updated_at=now()
+                 FROM outlets o
+                WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (SCHEDULE_FETCH_RETRYING, error_text, store_id),
+        )
 
 
 def update_outlet_timezone(store_id: str, timezone: str) -> None:
@@ -1063,6 +1178,10 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
             pause_until=s.get("pause_until") or "",
             shopee_regular_hours=s.get("shopee_regular_hours") or {},
+            schedule_fetch_status=s.get("schedule_fetch_status") or SCHEDULE_FETCH_NOT_FETCHED_YET,
+            schedule_fetch_attempted_at=s.get("schedule_fetch_attempted_at") or "",
+            schedule_fetch_succeeded_at=s.get("schedule_fetch_succeeded_at") or "",
+            schedule_fetch_error=s.get("schedule_fetch_error") or "",
         ))
     return outlets
 

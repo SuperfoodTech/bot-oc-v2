@@ -27,6 +27,10 @@ def make_store(**overrides):
         "vercel_status": "ON",
         "shopee_status": "ON",
         "shopee_regular_hours": ALL_DAY_SCHEDULE,
+        "schedule_fetch_status": "",
+        "schedule_fetch_attempted_at": None,
+        "schedule_fetch_succeeded_at": None,
+        "schedule_fetch_error": "",
         "subscription_status": "Aktif",
         "is_suspended": False,
         "suspension_status": "ACTIVE",
@@ -140,7 +144,7 @@ def test_manual_off_uses_automation_off_label_even_when_live_pause():
     assert derived["display_status_label"] == "Sedang Tutup • Otomatisasi nonaktif"
 
 
-def test_closed_without_schedule_stays_in_checking_state():
+def test_closed_without_schedule_defaults_to_not_fetched_yet_with_toggle_retained_on():
     derived = derive_outlet_runtime_state(
         make_store(
             vercel_status="ON",
@@ -150,11 +154,69 @@ def test_closed_without_schedule_stays_in_checking_state():
         now_dt=datetime(2026, 8, 30, 10, 0, tzinfo=WIB),
     )
 
-    assert derived["bot_phase"] == "SCHEDULE_UNAVAILABLE"
+    assert derived["bot_phase"] == "NOT_FETCHED_YET"
     assert derived["display_status_bucket"] == "closed"
-    assert derived["display_status_label"] == "Status sedang dicek bot"
+    assert derived["display_status_label"] == "Menunggu fetch jadwal"
+    assert derived["display_toggle_on"] is True
     assert derived["display_toggle_disabled"] is True
-    assert derived["display_toggle_reason"] == "SCHEDULE_UNAVAILABLE"
+    assert derived["display_toggle_reason"] == "NOT_FETCHED_YET"
+
+
+def test_closed_without_schedule_and_failed_fetch_shows_retry_state():
+    derived = derive_outlet_runtime_state(
+        make_store(
+            vercel_status="ON",
+            shopee_status="CLOSED",
+            shopee_regular_hours={},
+            schedule_fetch_attempted_at="2026-08-30 09:55:00",
+            schedule_fetch_error="timeout",
+        ),
+        now_dt=datetime(2026, 8, 30, 10, 0, tzinfo=WIB),
+    )
+
+    assert derived["bot_phase"] == "FETCH_RETRYING"
+    assert derived["display_status_label"] == "Gagal fetch jadwal, bot akan coba lagi"
+    assert derived["display_toggle_on"] is True
+    assert derived["display_toggle_disabled"] is True
+    assert derived["display_toggle_reason"] == "FETCH_RETRYING"
+    assert derived["schedule_fetch_error"] == "timeout"
+
+
+def test_closed_without_schedule_and_successful_empty_fetch_shows_empty_state():
+    derived = derive_outlet_runtime_state(
+        make_store(
+            vercel_status="ON",
+            shopee_status="CLOSED",
+            shopee_regular_hours={},
+            schedule_fetch_succeeded_at="2026-08-30 09:55:00",
+        ),
+        now_dt=datetime(2026, 8, 30, 10, 0, tzinfo=WIB),
+    )
+
+    assert derived["bot_phase"] == "FETCHED_EMPTY"
+    assert derived["display_status_bucket"] == "closed"
+    assert derived["display_status_label"] == "Jadwal Shopee belum diatur"
+    assert derived["display_status_tone"] == "closed"
+    assert derived["display_toggle_on"] is True
+    assert derived["display_toggle_disabled"] is True
+    assert derived["display_toggle_reason"] == "FETCHED_EMPTY"
+
+
+def test_unknown_live_without_schedule_prefers_schedule_fetch_state():
+    derived = derive_outlet_runtime_state(
+        make_store(
+            vercel_status="ON",
+            shopee_status="UNKNOWN",
+            shopee_regular_hours={},
+        ),
+        now_dt=datetime(2026, 8, 30, 10, 0, tzinfo=WIB),
+    )
+
+    assert derived["live_state"] == "UNKNOWN"
+    assert derived["bot_phase"] == "NOT_FETCHED_YET"
+    assert derived["display_status_label"] == "Menunggu fetch jadwal"
+    assert derived["display_toggle_on"] is True
+    assert derived["display_toggle_disabled"] is True
 
 
 def test_unknown_live_with_active_toggle_counts_as_open_bucket():
