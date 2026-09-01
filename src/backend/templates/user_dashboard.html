@@ -223,7 +223,7 @@
             <input type="radio" name="pauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta">Sesi pertama besok</span>
+          <span class="radio-meta" id="pauseRestOfDayMeta">Ikuti jadwal outlet</span>
         </label>
 
         <label class="radio-card">
@@ -1545,12 +1545,45 @@
         : timezone === 'Asia/Jayapura' ? 'WIT' : 'WIB';
     }
 
-    function getPauseDurationLabel() {
-      const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
-      if (durationType === '30_min') return '30 menit';
-      if (durationType === '60_min') return '60 menit';
-      if (durationType === 'rest_of_day') return 'sesi pertama besok';
-      return 'sesuai waktu yang dipilih';
+    function buildPauseSuccessMessage(storeId, durationType, responseData = null) {
+      const outlet = currentUserOutlets.find(item => String(item.store_id) === String(storeId));
+      const timezone = responseData?.timezone || outlet?.timezone || 'Asia/Jakarta';
+      const pauseEndTime = Number(responseData?.pause_end_time);
+      const endDate = Number.isFinite(pauseEndTime) && pauseEndTime > 0 ? new Date(pauseEndTime) : null;
+
+      if (durationType === 'rest_of_day') {
+        return endDate
+          ? `Permintaan tutup sementara Sepanjang Hari tersimpan. Buka kembali pada ${formatPauseTargetDate(endDate, timezone)}.`
+          : 'Permintaan tutup sementara Sepanjang Hari tersimpan. Buka kembali pada sesi operasional outlet berikutnya.';
+      }
+      if (endDate) {
+        return `Permintaan tutup sementara tersimpan. Berakhir pada ${formatPauseTargetDate(endDate, timezone)}.`;
+      }
+      if (durationType === '30_min') return 'Permintaan tutup sementara tersimpan untuk 30 menit.';
+      if (durationType === '60_min') return 'Permintaan tutup sementara tersimpan untuk 60 menit.';
+      return 'Permintaan tutup sementara tersimpan.';
+    }
+
+    function formatRestOfDayMeta(date, timezone = 'Asia/Jakarta') {
+      const parts = new Intl.DateTimeFormat('id-ID', {
+        timeZone: timezone,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZoneName: 'short'
+      }).formatToParts(date).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      return `${parts.weekday} ${parts.hour}:${parts.minute} ${parts.timeZoneName || timezoneShortLabel(timezone)}`;
+    }
+
+    function updatePauseRestOfDayMeta() {
+      const meta = document.getElementById('pauseRestOfDayMeta');
+      if (!meta) return;
+      const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
+      const nextSession = outlet && getNextOperationalSessionDate(outlet);
+      meta.textContent = nextSession
+        ? formatRestOfDayMeta(nextSession, outlet.timezone || 'Asia/Jakarta')
+        : 'Ikuti jadwal outlet';
     }
 
     function getNextOperationalSessionDate(outlet, now = new Date()) {
@@ -1577,6 +1610,7 @@
     function updatePauseEndPreview() {
       const preview = document.getElementById('pauseEndPreview');
       if (!preview) return;
+      updatePauseRestOfDayMeta();
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
       if (durationType === 'rest_of_day') {
         const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
@@ -1635,9 +1669,9 @@
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          const durationLabel = getPauseDurationLabel();
+          const successMessage = buildPauseSuccessMessage(storeId, durationType, data);
           closeModal(false);
-          showUserToast(`Permintaan tutup sementara tersimpan untuk ${durationLabel}.`);
+          showUserToast(successMessage);
           // Refresh the outlet data without losing the current mitra session.
           await doLogin(activePasscode || sessionStorage.getItem(userSessionKey), true);
         } else {

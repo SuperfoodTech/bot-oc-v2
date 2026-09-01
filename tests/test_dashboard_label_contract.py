@@ -72,3 +72,12 @@ def test_admin_rest_of_day_information_is_dynamic_for_agency_and_vb():
     assert "function updateVbRestOfDayMeta()" in ADMIN_TEMPLATE
     assert "Preview outlet pertama: buka kembali" in ADMIN_TEMPLATE
     assert "new Date(Date.now() + 24 * 60 * 60 * 1000)" not in ADMIN_TEMPLATE
+
+
+def test_mitra_rest_of_day_copy_is_dynamic_and_not_tomorrow_first_session():
+    assert "sesi pertama besok" not in MITRA_TEMPLATE.casefold()
+    assert 'id="pauseRestOfDayMeta"' in MITRA_TEMPLATE
+    assert "function buildPauseSuccessMessage" in MITRA_TEMPLATE
+    assert "function updatePauseRestOfDayMeta()" in MITRA_TEMPLATE
+    assert "Permintaan tutup sementara Sepanjang Hari tersimpan." in MITRA_TEMPLATE
+    assert "Buka kembali pada sesi operasional outlet berikutnya." in MITRA_TEMPLATE
