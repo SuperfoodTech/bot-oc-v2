@@ -33,8 +33,8 @@ from shopee import store_status
 
 log = get_logger("backend_worker")
 
-# VB uses one shared Shopee account for all portal groups.
-ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "allvbadmin")
+# Filter account usernames allowed for bot execution (Default: auto7313 only)
+ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
 ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
 # One long-lived browser per Shopee bot account. Merchant switching happens in
 # this browser; the bot does not close/reopen Chrome for every outlet action.
@@ -155,7 +155,7 @@ def warmup_all_account_sessions():
         if not username or username in processed_accounts:
             continue
 
-        # Exclude usernames not in the configured VB whitelist.
+        # Exclude usernames not in whitelist (username != auto7313)
         if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
             log.info(f"  ⏭️ [STARTUP WARMUP] Excluding account '{username}' (username != auto7313).")
             continue
@@ -189,7 +189,7 @@ def warmup_all_account_sessions():
 def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
-    Excludes execution if outlet.username is not in the configured VB whitelist.
+    Excludes execution if outlet.username != auto7313.
     """
     # Exclude accounts not in ALLOWED_USERNAMES whitelist
     if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
@@ -691,7 +691,7 @@ def sync_all_stores(
             store_name="BOT_DAEMON",
             action="SYNC_CYCLE",
             target_state="SYNCED",
-            reason=f"Evaluasi bot selesai untuk {len(actions_taken)} aksi dijalankan (Filtered: username in {sorted(ALLOWED_USERNAMES)})"
+            reason=f"Evaluasi bot selesai untuk {len(actions_taken)} aksi dijalankan (Filtered: username == auto7313)"
         )
 
         cycle_finished_at = datetime.now(local_tz)
