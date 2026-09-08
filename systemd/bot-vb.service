@@ -1,0 +1,33 @@
+[Unit]
+Description=FoodMaster Bot-VB Daemon (Virtual Brand Automation)
+After=network.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%PROJECT_DIR%
+EnvironmentFile=%PROJECT_DIR%/.env
+Environment="PYTHONPATH=%PROJECT_DIR%/main-vb/src:%PROJECT_DIR%/src"
+Environment="HEADLESS=true"
+Environment="TZ=Asia/Jakarta"
+Environment="BOT_API_PORT=8082"
+Environment="ALLOWED_USERNAMES=allvbadmin"
+Environment="VB_SHOPEE_USERNAME=allvbadmin"
+Environment="VB_SESSION_FILE=%PROJECT_DIR%/src/data/session_allvbadmin.json"
+Environment="VB_CREDENTIALS_FILE=%PROJECT_DIR%/src/data/credentials allvbadmin.json"
+Environment="VB_CHROME_PROFILE_DIR=%PROJECT_DIR%/src/data/chrome_profile_allvbadmin"
+Environment="VB_CHROME_PROFILE_NAME=shopee_profile"
+Environment="VB_PATROL_INTERVAL_SECONDS=30"
+Environment="VB_MAX_RETRIES=2"
+ExecStart=%UV_BIN% run python main-vb/src/daemon.py
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

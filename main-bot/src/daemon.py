@@ -50,7 +50,9 @@ _lock_file_handle = None
 import socket
 
 
-def is_port_in_use(port: int = 8081) -> bool:
+def is_port_in_use(port: int | None = None) -> bool:
+    if port is None:
+        port = int(os.getenv("BOT_API_PORT", "8081"))
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(0.5)
@@ -88,9 +90,10 @@ def acquire_single_instance_lock() -> bool:
     if _lock_file_handle is not None:
         return False
     
-    # 1. Check if port 8081 is already bound by an active daemon
-    if is_port_in_use(8081):
-        log.warning("⚠️ Socket lock check: Port 8081 is already in use by an active daemon.")
+    # 1. Check if bot api port is already bound by an active daemon
+    api_port = int(os.getenv("BOT_API_PORT", "8081"))
+    if is_port_in_use(api_port):
+        log.warning(f"⚠️ Socket lock check: Port {api_port} is already in use by an active daemon.")
         return False
 
     cleanup_stale_lock()

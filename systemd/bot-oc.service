@@ -1,0 +1,25 @@
+[Unit]
+Description=FoodMaster Bot-OC Daemon (ShopeeFood Automation)
+After=network.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%PROJECT_DIR%
+EnvironmentFile=%PROJECT_DIR%/.env
+Environment="PYTHONPATH=%PROJECT_DIR%/src"
+Environment="HEADLESS=true"
+Environment="TZ=Asia/Jakarta"
+Environment="BOT_API_PORT=8081"
+ExecStart=%UV_BIN% run python main-bot/src/daemon.py
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
