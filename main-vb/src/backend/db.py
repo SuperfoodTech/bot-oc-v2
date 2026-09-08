@@ -440,11 +440,7 @@ def derive_outlet_runtime_state(
         bot_phase = "IN_SYNC"
         status_label = "Tutup Sementara"
         status_tone = "paused"
-        display_note = (
-            f"Buka kembali otomatis pada {pause_until_label}."
-            if pause_until_label
-            else "Outlet sedang ditutup sementara."
-        )
+        display_note = ""
     elif desired_state == "OPEN" and live_state == "OPEN":
         bot_phase = "IN_SYNC"
         status_label = "Sedang Buka"

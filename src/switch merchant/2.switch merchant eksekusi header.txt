@@ -1,0 +1,94 @@
+Request URL
+https://api.partner.shopee.co.id/nb/mss/mer-detect-api/PartnerMerchantDetectServer/SwitchMerchant
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+103.70.17.192:443
+Referrer Policy
+strict-origin-when-cross-origin
+a-rsp-cache
+false
+a-rsp-code
+0
+a-rsp-err-msg
+success
+a-rsp-msg
+ok
+a-rsp-timestamp
+1788423520
+a-rsp-traceid
+466bd0e2974fd9092b092052e5c18113-gateway
+access-control-allow-credentials
+true
+access-control-allow-headers
+content-type,shopee-baggage,x-merchant-requestid,x-merchant-timezone,x-merchant-language,x-merchant-token,x-merchant-toc-nonce,x-merchant-tob-nonce,x-merchant-from,x-merchant-login-from,x-merchant-tob-clientid,x-merchant-toc-userid,x-merchant-tob-userid,x-merchant-merchantid,x-merchant-storeid,x-merchant-googletoken,x-merchant-timestamp,x-merchant-sign,a-sma,x-merchant-duplication-check,a-appversion,x-merchant-pii
+access-control-allow-methods
+POST, GET, PUT, DELETE, OPTIONS
+access-control-allow-origin
+https://partner.shopee.co.id
+content-length
+409
+content-type
+application/json
+date
+Thu, 03 Sep 2026 08:18:40 GMT
+server
+SGW
+:authority
+api.partner.shopee.co.id
+:method
+POST
+:path
+/nb/mss/mer-detect-api/PartnerMerchantDetectServer/SwitchMerchant
+:scheme
+https
+accept
+application/json, text/plain, */*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7
+content-length
+32
+content-type
+application/json
+origin
+https://partner.shopee.co.id
+priority
+u=1, i
+referer
+https://partner.shopee.co.id/
+sec-ch-ua
+"Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Linux"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+same-site
+sec-gpc
+1
+shopee-baggage
+PFB=undefined
+user-agent
+Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+x-merchant-from
+12
+x-merchant-language
+id
+x-merchant-login-from
+12
+x-merchant-requestid
+8a10c40a-04e8-49c1-8775-c894117a229e
+x-merchant-timezone
+Asia/Jakarta
+x-merchant-tob-clientid
+TTlRTzhFQWRUbnFpedbtczzuuzwujpbi
+x-merchant-token
+B:EOeBvshEu77cVjR3WN2Q4fs/fBU5++7th0D+du9s8mEAHFA8BhZfAotAzbgew8N/PoyNUmQp48vNzlU+a/w9KyA+Xcm72y2vwXxgJbAIWHeihHogr53MUcQ+WC6dGkcwK9OZsWCQeXDLJ5pL002M37p4iaNWLyg+GqmMgq6/Dcar0JN5g81qycLqZdzirOTPyR34uLeA3SzZyROEDIPAN8MsRo8a2goiAAl9Ibg=

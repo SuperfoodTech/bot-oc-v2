@@ -1076,8 +1076,6 @@
     }
 
     function getOutletAutomationDetail(outlet, stateContext = getOutletStateContext(outlet)) {
-      const explicitNote = String(outlet?.display_note || '').trim();
-      if (explicitNote) return explicitNote;
       if (stateContext.botPhase === 'SUSPENDED') return 'Otomatisasi dinonaktifkan oleh admin.';
       if (stateContext.botPhase === 'STATUS_UNKNOWN') return 'Status live outlet masih diperiksa bot.';
       if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle aktif. Bot menunggu fetch jadwal operasional Shopee sebelum memproses outlet.';
@@ -1097,7 +1095,9 @@
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.';
       if (stateContext.botPhase === 'AUTOMATION_OFF') return 'Nonaktif sampai diaktifkan kembali.';
-      if (stateContext.desiredState === 'PAUSE') return 'Outlet sedang ditutup sementara.';
+      if (stateContext.desiredState === 'PAUSE') return '';
+      const explicitNote = String(outlet?.display_note || '').trim();
+      if (explicitNote) return explicitNote;
       return 'Outlet mengikuti jam operasional Shopee.';
     }
 
@@ -1213,6 +1213,8 @@
         const pauseRow = pauseLine
           ? `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(pauseLine)}</span></div>`
           : '';
+        const automationDetail = getOutletAutomationDetail(out, stateContext);
+        const automationDetailMarkup = automationDetail ? `<span>${escapeHtml(automationDetail)}</span>` : '';
         
         const card = document.createElement('div');
         card.className = 'card-box mitra-outlet-card';
@@ -1231,7 +1233,7 @@
           <div class="mitra-outlet-toggle-row">
             <div class="mitra-outlet-toggle-copy">
               <strong>Buka otomatis</strong>
-              <span>${escapeHtml(getOutletAutomationDetail(out, stateContext))}</span>
+              ${automationDetailMarkup}
             </div>
             <label class="switch-toggle ${isToggleDisabled ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
               <input type="checkbox" aria-label="Buka otomatis untuk ${storeName}" ${isToggleOn ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">

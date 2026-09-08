@@ -24,7 +24,7 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.10.6`.
+Latest documented release: `1.10.9`.
 
 Tab logs dan tab settings admin wajib menggunakan container internal masing-masing
 (`.logs-page-shell`, `.settings-page-shell`) dengan `height: 100%` dan `overflow-y: auto`
@@ -84,6 +84,15 @@ patrol tanpa menganggap kolom tersebut sebagai Store ID.
 Konfigurasi `HEADLESS` dipusatkan di `.env` dan dibaca bersama oleh service
 `bot-oc` serta `bot-vb` melalui Docker Compose. Nilai default tetap `true`
 agar stabil pada server/container tanpa X display.
+
+Eksperimen `test_switch_xhr.py` wajib reach dashboard lebih dulu melalui
+`src/core/browser.py`, lalu memverifikasi state UI dan struktur request partner
+secara read-only dengan Vibium. Sebelum memanggil XHR `MerchantDetect`
+manual, test wajib mencoba flow UI `browser.return_to_selector(driver)` untuk
+meniru klik profile lalu `Pilih Merchant Lain` dan mengobservasi trigger
+resource `PartnerMerchantDetectServer/MerchantDetect`. Artefak Vibium harus
+disimpan di direktori temporary, bukan di dalam repo, dan tidak boleh
+menyimpan token mentah di laporan teks yang dibagikan.
 
 Setiap update kode, konfigurasi, atau perilaku aplikasi wajib:
 

@@ -431,7 +431,7 @@
   <div class="toast-container-custom" id="toastContainer">
     <template x-for="t in toasts" :key="t.id">
       <div class="toast-custom" :class="['toast-' + t.type, t.exiting ? 'is-hiding' : '']">
-        <span class="toast-icon" :class="t.type === 'success' ? 'toast-icon-success' : 'toast-icon-alert'" x-text="t.type === 'success' ? '✓' : '!'" aria-hidden="true"></span>
+        <span class="toast-icon" :class="t.type === 'success' ? 'toast-icon-success' : (t.type === 'dark' ? 'toast-icon-dark' : 'toast-icon-alert')" x-text="t.type === 'success' || t.type === 'dark' ? '✓' : '!'" aria-hidden="true"></span>
         <span x-text="t.message"></span>
       </div>
     </template>
@@ -571,6 +571,33 @@
         setTimeout(() => button.classList.remove('is-copied'), 1600);
       } catch (error) {
         showToast('Link dashboard gagal disalin.', 'error');
+      }
+    }
+
+    async function copyStoreId(event, storeId) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const textToCopy = String(storeId || '').trim();
+      if (!textToCopy) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(textToCopy);
+        } else {
+          const input = document.createElement('input');
+          input.value = textToCopy;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          input.remove();
+        }
+        showToast(`Store ID ${textToCopy} berhasil disalin!`, 'dark');
+      } catch (error) {
+        showToast(`Gagal menyalin Store ID: ${textToCopy}`, 'error');
       }
     }
 
@@ -825,8 +852,8 @@
     function focusOutletDetailInitialControl(panel) {
       if (!panel) return;
       const selector = isMobileAdminViewport()
-        ? '.outlet-detail-back, .outlet-detail-accordion, .outlet-detail-actions a, .outlet-detail-actions button, .outlet-detail-close'
-        : '.outlet-detail-close, .outlet-detail-accordion, .outlet-detail-actions a, .outlet-detail-actions button';
+        ? '.outlet-detail-back, .outlet-detail-mitra-full-btn, .outlet-detail-accordion, .outlet-detail-close'
+        : '.outlet-detail-close, .outlet-detail-mitra-full-btn, .outlet-detail-accordion';
       const focusTarget = panel.querySelector(selector) || panel;
       if (focusTarget instanceof HTMLElement) {
         focusTarget.focus({ preventScroll: true });
@@ -3204,7 +3231,14 @@
             <small class="compact-meta compact-meta-merchant">${s.merchant_name}</small>
           </td>
           <td>${s.merchant_name}</td>
-          <td><code>${s.store_id}</code></td>
+          <td>
+            <div class="store-id-cell">
+              <code>${s.store_id}</code>
+              <button type="button" class="btn-copy-icon" onclick="copyStoreId(event, '${s.store_id}')" title="Salin Store ID ${s.store_id}" aria-label="Salin Store ID ${s.store_id}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
+          </td>
           <td>
             ${s.store_name}
           </td>
@@ -3239,7 +3273,12 @@
               <h3>${storeName}</h3>
               <div class="admin-mobile-outlet-meta">
                 <span class="admin-mobile-outlet-merchant">${merchantName}</span>
-                <span class="admin-mobile-store-chip">Store ID ${storeId}</span>
+                <span class="admin-mobile-store-chip">
+                  Store ID ${storeId}
+                  <button type="button" class="btn-copy-icon is-chip" onclick="copyStoreId(event, '${s.store_id}')" title="Salin Store ID ${s.store_id}" aria-label="Salin Store ID ${s.store_id}">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
+                </span>
               </div>
             </div>
             <div class="admin-mobile-outlet-side">
@@ -3947,20 +3986,27 @@
       const storeIdText = escapeHtml(detailValue(store.store_id));
       document.getElementById('outletDetailTitle').textContent = 'Detail Outlet';
       content.innerHTML = `
-        <div class="outlet-detail-status">
-          <span class="${statusPresentation.className}" title="${statusTooltip}">${escapeHtml(statusPresentation.label)}</span>
-          ${statusPresentation.note ? `<p class="outlet-detail-status-note">${escapeHtml(statusPresentation.note)}</p>` : ''}
-        </div>
         <div class="outlet-detail-identity">
           <div class="outlet-detail-identity-copy">
             <div class="outlet-detail-eyebrow">${ownerName}</div>
             <h3>${storeName}</h3>
-            <p class="outlet-detail-store-id">Store ID&nbsp; ${storeIdText}</p>
+            <p class="outlet-detail-store-id">
+              <span>Store ID&nbsp; ${storeIdText}</span>
+              <button type="button" class="btn-copy-icon" onclick="copyStoreId(event, '${escapeHtml(String(store.store_id || ''))}')" title="Salin Store ID ${storeIdText}" aria-label="Salin Store ID ${storeIdText}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </p>
             <div class="outlet-detail-context">
               <span>${merchantName}</span>
             </div>
           </div>
           <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
+        </div>
+        <div class="outlet-detail-mitra-action">
+          <a class="btn-primary outlet-detail-mitra-full-btn" href="${mitraUrl}" target="_blank" rel="noopener noreferrer" title="Buka Dashboard Mitra">
+            <span>Buka Dashboard Mitra</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </a>
         </div>
         <dl class="outlet-detail-list">
           <div><dt>Status live Shopee</dt><dd><span class="${shopeeStatus.className}" title="Nilai status terakhir: ${escapeHtml(shopeeStatus.value)}">${shopeeStatus.label}</span></dd><small>Nilai terakhir yang diterima dari XHR Shopee.</small></div>
@@ -3983,19 +4029,7 @@
             <div class="admin-schedule-heading"><strong>Tampilan 7 hari</strong><span>Klik panah untuk tutup</span></div>
             ${detailScheduleRows}
           </div>
-        </section>
-        <div class="outlet-detail-actions">
-          <a class="btn-primary" style="background:#be1a1a;border-color:#be1a1a;text-decoration:none" href="${mitraUrl}" target="_blank" rel="noopener noreferrer">Dashboard Mitra</a>
-          <button type="button" class="btn-outline outlet-detail-delete-button" id="outletDetailDeleteButton">Hapus outlet</button>
-        </div>`;
-      const deleteButton = content.querySelector('#outletDetailDeleteButton');
-      if (deleteButton) {
-        deleteButton.addEventListener('click', () => openDeleteModal(
-          String(store.store_id || ''),
-          String(store.store_name || '-'),
-          String(store.nama_pemilik || '-')
-        ));
-      }
+        </section>`;
       if (shouldResetScroll) panel.scrollTop = 0;
       showOutletDetailPanel(panel, backdrop);
       document.body.classList.add('outlet-detail-open');
