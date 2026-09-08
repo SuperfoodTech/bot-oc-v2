@@ -29,6 +29,15 @@ def test_mitra_recent_activity_uses_a_two_row_grid_without_a_fake_chevron():
     assert "grid-template-columns: 58px 82px minmax(0, 1fr) 18px;" not in STYLES
 
 
+def test_mitra_recent_activity_has_scrollable_card_container():
+    assert ".mobile-wrapper.is-dashboard-view .history-list {" in STYLES
+    assert "max-height: 380px;" in STYLES
+    assert "overflow-y: auto;" in STYLES
+    assert "overscroll-behavior: contain;" in STYLES
+    assert "logs.slice(0, 5)" not in MITRA_TEMPLATE
+    assert "logs.forEach(" in MITRA_TEMPLATE
+
+
 def test_mitra_dashboard_keeps_account_summary_above_outlet_list():
     assert 'class="section-heading mitra-section-heading"' in MITRA_TEMPLATE
     assert 'id="outletsList"' in MITRA_TEMPLATE

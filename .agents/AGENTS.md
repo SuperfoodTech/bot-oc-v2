@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.10.9`.
+Latest documented release: `1.10.10`.
+
+Card riwayat aktivitas mitra pada Dashboard Mitra (`.mitra-activity-card .history-list`)
+wajib menggunakan internal scrollable container (`max-height: 380px`, `overflow-y: auto`)
+tanpa pembatasan `.slice(0, 5)` pada client rendering agar tidak memicu scroll global
+pada window/body.
 
 Tab logs dan tab settings admin wajib menggunakan container internal masing-masing
 (`.logs-page-shell`, `.settings-page-shell`) dengan `height: 100%` dan `overflow-y: auto`

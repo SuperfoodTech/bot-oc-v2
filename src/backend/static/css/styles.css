@@ -8050,7 +8050,7 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 }
 
 .mobile-wrapper.is-dashboard-view .mitra-activity-card {
-  padding: 18px 18px 4px;
+  padding: 18px 18px 12px;
   border-radius: 20px;
 }
 
@@ -8061,8 +8061,34 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 }
 
 .mobile-wrapper.is-dashboard-view .history-list {
+  display: flex;
+  flex-direction: column;
   gap: 0;
   margin-top: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.mobile-wrapper.is-dashboard-view .history-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.mobile-wrapper.is-dashboard-view .history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobile-wrapper.is-dashboard-view .history-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+
+.mobile-wrapper.is-dashboard-view .history-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
 }
 
 .mobile-wrapper.is-dashboard-view .history-item {

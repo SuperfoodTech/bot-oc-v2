@@ -1745,7 +1745,7 @@
         }
 
         if (logs.length) {
-          logs.slice(0, 5).forEach(l => {
+          logs.forEach(l => {
             const timeText = formatIndonesianTime(l.timestamp, false);
             const actor = getHistoryActorPresentation(l.action);
             const summary = getHistorySummary(l, ACTION_LABELS);
