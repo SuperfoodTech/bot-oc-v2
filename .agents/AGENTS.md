@@ -24,7 +24,7 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.10.10`.
+Latest documented release: `1.10.11`.
 
 Card riwayat aktivitas mitra pada Dashboard Mitra (`.mitra-activity-card .history-list`)
 wajib menggunakan internal scrollable container (`max-height: 380px`, `overflow-y: auto`)

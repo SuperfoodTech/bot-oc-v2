@@ -2716,8 +2716,19 @@
     }
 
     function setupCustomFilterDropdowns() {
+      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter', 'vbGroupFilter', 'vbPortalFilter']);
+      const PLACEHOLDERS = {
+        ownerFilter: 'Cari nama pemilik...',
+        outletFilter: 'Cari nama outlet...',
+        storeIdFilter: 'Cari Store ID...',
+        vbGroupFilter: 'Cari nama grup...',
+        vbPortalFilter: 'Cari portal...'
+      };
+
       document.querySelectorAll('.outlet-filter-card .filter-select, .vb-filter-card .filter-select').forEach(select => {
         let wrapper = select.previousElementSibling;
+        const isSearchable = SEARCHABLE_IDS.has(select.id);
+
         if (!wrapper || !wrapper.classList.contains('custom-filter')) {
           wrapper = document.createElement('div');
           wrapper.className = 'custom-filter';
@@ -2731,32 +2742,111 @@
           trigger.setAttribute('aria-haspopup', 'listbox');
           trigger.addEventListener('click', event => {
             event.preventDefault();
-            document.querySelectorAll('.custom-filter.is-open').forEach(item => { if (item !== wrapper) item.classList.remove('is-open'); });
-            wrapper.classList.toggle('is-open');
-            trigger.setAttribute('aria-expanded', String(wrapper.classList.contains('is-open')));
+            const willOpen = !wrapper.classList.contains('is-open');
+            document.querySelectorAll('.custom-filter.is-open').forEach(item => {
+              if (item !== wrapper) {
+                item.classList.remove('is-open');
+                const t = item.querySelector('.custom-filter-trigger');
+                if (t) t.setAttribute('aria-expanded', 'false');
+              }
+            });
+            wrapper.classList.toggle('is-open', willOpen);
+            trigger.setAttribute('aria-expanded', String(willOpen));
+            if (willOpen) {
+              const searchInput = wrapper.querySelector('.custom-filter-search');
+              if (searchInput) {
+                searchInput.value = '';
+                const scrollBox = wrapper.querySelector('.custom-filter-options-scroll');
+                const emptyEl = wrapper.querySelector('.custom-filter-empty');
+                if (scrollBox) scrollBox.querySelectorAll('.custom-filter-option').forEach(opt => { opt.style.display = ''; });
+                if (emptyEl) emptyEl.style.display = 'none';
+                setTimeout(() => searchInput.focus(), 50);
+              }
+            }
           });
           wrapper.appendChild(trigger);
           const list = document.createElement('div');
           list.className = 'custom-filter-list';
           list.setAttribute('role', 'listbox');
+
+          if (isSearchable) {
+            const searchBox = document.createElement('div');
+            searchBox.className = 'custom-filter-search-box';
+            searchBox.innerHTML = `
+              <svg viewBox="0 0 24 24" class="custom-filter-search-icon" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <input type="search" class="custom-filter-search" placeholder="${PLACEHOLDERS[select.id] || 'Cari...'}" aria-label="Cari pilihan">
+            `;
+            const searchInput = searchBox.querySelector('.custom-filter-search');
+            searchInput.addEventListener('click', e => e.stopPropagation());
+            searchInput.addEventListener('input', e => {
+              const q = e.target.value.toLowerCase().trim();
+              const scrollBox = wrapper.querySelector('.custom-filter-options-scroll');
+              const emptyEl = wrapper.querySelector('.custom-filter-empty');
+              let visible = 0;
+              if (scrollBox) {
+                scrollBox.querySelectorAll('.custom-filter-option').forEach(opt => {
+                  const match = !q || opt.textContent.toLowerCase().includes(q);
+                  opt.style.display = match ? '' : 'none';
+                  if (match) visible++;
+                });
+              }
+              if (emptyEl) emptyEl.style.display = visible === 0 ? 'block' : 'none';
+            });
+            searchInput.addEventListener('keydown', e => {
+              if (e.key === 'Escape') {
+                wrapper.classList.remove('is-open');
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.focus();
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const scrollBox = wrapper.querySelector('.custom-filter-options-scroll');
+                const firstVisible = scrollBox?.querySelector('.custom-filter-option:not([style*="display: none"])');
+                if (firstVisible) {
+                  firstVisible.click();
+                }
+              }
+            });
+            list.appendChild(searchBox);
+          }
+
+          const scrollBox = document.createElement('div');
+          scrollBox.className = 'custom-filter-options-scroll';
+          list.appendChild(scrollBox);
+
+          if (isSearchable) {
+            const emptyEl = document.createElement('div');
+            emptyEl.className = 'custom-filter-empty';
+            emptyEl.textContent = 'Tidak ada hasil ditemukan';
+            emptyEl.style.display = 'none';
+            list.appendChild(emptyEl);
+          }
+
           wrapper.appendChild(list);
         }
         const trigger = wrapper.querySelector('.custom-filter-trigger');
         const list = wrapper.querySelector('.custom-filter-list');
+        const optionsContainer = wrapper.querySelector('.custom-filter-options-scroll');
         trigger.textContent = select.options[select.selectedIndex]?.text || '';
         trigger.setAttribute('aria-expanded', String(wrapper.classList.contains('is-open')));
-        list.innerHTML = [...select.options].map((option, index) => `<button type="button" role="option" class="custom-filter-option${option.value === select.value ? ' is-selected' : ''}" data-index="${index}">${option.textContent}</button>`).join('');
-        list.querySelectorAll('.custom-filter-option').forEach(optionButton => optionButton.addEventListener('click', () => {
+        optionsContainer.innerHTML = [...select.options].map((option, index) => `<button type="button" role="option" class="custom-filter-option${option.value === select.value ? ' is-selected' : ''}" data-index="${index}">${escapeHtml(option.textContent)}</button>`).join('');
+        optionsContainer.querySelectorAll('.custom-filter-option').forEach(optionButton => optionButton.addEventListener('click', () => {
           select.selectedIndex = Number(optionButton.dataset.index);
           select.dispatchEvent(new Event('change', { bubbles: true }));
           wrapper.classList.remove('is-open');
+          trigger.setAttribute('aria-expanded', 'false');
           setupCustomFilterDropdowns();
         }));
       });
       if (!document.body.dataset.customFilterCloseBound) {
         document.body.dataset.customFilterCloseBound = 'true';
         document.addEventListener('click', event => {
-          if (!event.target.closest('.custom-filter')) document.querySelectorAll('.custom-filter.is-open').forEach(item => item.classList.remove('is-open'));
+          if (!event.target.closest('.custom-filter')) {
+            document.querySelectorAll('.custom-filter.is-open').forEach(item => {
+              item.classList.remove('is-open');
+              const t = item.querySelector('.custom-filter-trigger');
+              if (t) t.setAttribute('aria-expanded', 'false');
+            });
+          }
         });
       }
     }

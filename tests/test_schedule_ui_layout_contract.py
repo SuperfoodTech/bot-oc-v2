@@ -130,3 +130,17 @@ def test_admin_outlet_table_uses_global_desktop_scroll_region():
     assert "breadcrumbVisible: false" in dashboard_template
     assert ".admin-shell .admin-main #adminTable tbody td:nth-child(1) .admin-table-owner-cell {" in STYLES
     assert "justify-content: center;" in STYLES
+
+
+def test_admin_filter_dropdown_search_contract():
+    dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+
+    assert "const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter'" in dashboard_template
+    assert "custom-filter-search-box" in dashboard_template
+    assert "custom-filter-search" in dashboard_template
+    assert "custom-filter-options-scroll" in dashboard_template
+    assert ".custom-filter-search-box {" in STYLES
+    assert ".custom-filter-search {" in STYLES
+    assert ".custom-filter-options-scroll {" in STYLES
+    assert ".custom-filter-empty {" in STYLES
+
