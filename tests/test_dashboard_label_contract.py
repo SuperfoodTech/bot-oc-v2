@@ -91,3 +91,12 @@ def test_mitra_login_caption_is_single_line_and_nowrap_contract():
     assert "max-width: 340px;" not in css_content
     assert "max-width: 304px;" not in css_content
 
+
+def test_mitra_account_summary_name_and_outlet_capitalization_contract():
+    mitra_html = (PROJECT_ROOT / "src/backend/templates/user_dashboard.html").read_text()
+    assert "document.getElementById('mitraName').textContent = `Mitra ${data.nama_pemilik}`;" not in mitra_html
+    assert "document.getElementById('mitraName').textContent = data.nama_pemilik || '';" in mitra_html
+    assert "return `${safeTotal} Outlet`;" in mitra_html
+    assert "0 Outlet" in mitra_html
+
+

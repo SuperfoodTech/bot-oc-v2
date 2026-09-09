@@ -24,7 +24,11 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.1`.
+Latest documented release: `1.13.2`.
+
+Nama pemilik akun pada kartu Ringkasan Akun Dashboard Mitra (`.mitra-account-summary #mitraName`)
+ditampilkan secara langsung tanpa prefix `"Mitra "`, dan teks jumlah outlet pada dashboard mitra
+wajib menggunakan kapitalisasi huruf besar `"Outlet"` (misal: `"4 Outlet"`).
 
 Teks subtitle/caption pada halaman login mitra (`#loginSection .mitra-login-copy .card-subtitle`)
 wajib tampil utuh dalam satu baris (`white-space: nowrap`) menggunakan ukuran font adaptif

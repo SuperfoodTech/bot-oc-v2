@@ -80,7 +80,7 @@
                   <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
                 </div>
                 <div class="auth-highlight-copy">
-                  <strong>Akses aman untuk mitra terdaftar</strong>
+                  <strong>Akses aman untuk merchant terdaftar</strong>
                   <p>Data outlet Anda terlindungi dengan sistem keamanan FoodMaster.</p>
                 </div>
               </article>
@@ -134,7 +134,7 @@
                 </svg>
               </span>
               <span class="mitra-account-copy">
-                <span class="card-title" id="mitraName">Mitra Fando</span>
+                <span class="card-title" id="mitraName">Fando</span>
                 <span class="card-subtitle" id="subDetails">Aktif hingga 01 Nov 2026</span>
               </span>
             </div>
@@ -551,7 +551,7 @@
           setLoginError('');
           syncUserPanels(true);
           const accountSummary = getAccountSubscriptionSummary(data.outlets);
-          document.getElementById('mitraName').textContent = `Mitra ${data.nama_pemilik}`;
+          document.getElementById('mitraName').textContent = data.nama_pemilik || '';
           document.getElementById('subDetails').textContent = accountSummary.details;
           const subBadge = document.getElementById('subBadge');
           if (subBadge) {
@@ -705,7 +705,7 @@
 
     function formatOutletCount(total) {
       const safeTotal = Number.isFinite(Number(total)) ? Number(total) : 0;
-      return `${safeTotal} outlet`;
+      return `${safeTotal} Outlet`;
     }
 
     function getAccountSubscriptionSummary(outlets) {
