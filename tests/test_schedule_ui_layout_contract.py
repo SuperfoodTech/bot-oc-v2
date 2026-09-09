@@ -48,19 +48,33 @@ def test_mitra_dashboard_keeps_account_summary_above_outlet_list():
     assert 'aria-label="Buka otomatis untuk ${storeName}"' in MITRA_TEMPLATE
     assert 'id="accountPasscode"' in MITRA_TEMPLATE
     assert 'Password:' in MITRA_TEMPLATE
+    assert 'id="accountOutletCount"' in MITRA_TEMPLATE
+    assert '${automationDetailMarkup}' not in MITRA_TEMPLATE
+
+
+def test_mitra_dashboard_3_state_toggle_contract():
+    assert "function getMitraToggleState(outlet, stateContext" in MITRA_TEMPLATE
+    assert "state-${toggleState}" in MITRA_TEMPLATE
+    assert ".mobile-wrapper.is-dashboard-view .switch-toggle.state-open" in STYLES
+    assert ".mobile-wrapper.is-dashboard-view .switch-toggle.state-paused" in STYLES
+    assert ".mobile-wrapper.is-dashboard-view .switch-toggle.state-closed" in STYLES
+    assert "<strong>Buka otomatis</strong>" not in MITRA_TEMPLATE
+    assert "mitra-outlet-toggle-row" not in MITRA_TEMPLATE
 
 
 def test_user_schedule_preview_uses_shopee_weekday_contract():
     assert "1: 'Minggu'" in MITRA_TEMPLATE
     assert "7: 'Sabtu'" in MITRA_TEMPLATE
     assert "shopeeDayNames[Number(day.weekday)]" in MITRA_TEMPLATE
+    assert "replace(/:/g, '.')" not in MITRA_TEMPLATE
+    assert "replace(/\\./g, ':')" in MITRA_TEMPLATE
 
 
 def test_admin_today_operating_hours_stacks_multi_slots_without_orphaned_timezone():
     template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
 
     assert "function renderTodayOperatingHoursMarkup" in template
-    assert "<span class=\"operating-meta\"><span class=\"operating-day\">${safeDayLabel}</span><span class=\"operating-timezone\">${escapeHtml(timezoneLabel)}</span></span>" in template
+    assert "<span class=\"operating-meta\"><span class=\"operating-timezone\">${escapeHtml(timezoneLabel)}</span></span>" in template
     assert "${ranges.join(' · ')} ${timezoneLabel}" not in template
 
 
@@ -143,4 +157,58 @@ def test_admin_filter_dropdown_search_contract():
     assert ".custom-filter-search {" in STYLES
     assert ".custom-filter-options-scroll {" in STYLES
     assert ".custom-filter-empty {" in STYLES
+
+
+def test_admin_outlet_table_8_columns_and_link_mitra_contract():
+    tab_template = (PROJECT_ROOT / "src/backend/templates/admin_tab_operasional.html").read_text()
+    dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+
+    # Verify table headers in admin_tab_operasional.html
+    assert "<th>Owner</th>" in tab_template
+    assert "<th>Merchant</th>" in tab_template
+    assert "<th>Store ID</th>" in tab_template
+    assert "<th>Outlet</th>" in tab_template
+    assert "<th>Jam Operasional</th>" in tab_template
+    assert "<th>Link</th>" in tab_template
+    assert "<th>Link Mitra</th>" in tab_template
+    assert "<th>Toggle</th>" in tab_template
+    assert "<th>Status</th>" not in tab_template
+    assert "<th>Action</th>" not in tab_template
+    assert "<th>Periode Layanan</th>" not in tab_template
+    assert '<td colspan="8"' in tab_template
+
+    # Verify admin_dashboard.html logic
+    assert "function getShopeeFoodStoreUrl(storeId)" in dashboard_template
+    assert "function getAdminToggleState(store, stateContext" in dashboard_template
+    assert "admin-table-shopeefood-link" in dashboard_template
+    assert "admin-table-mitra-link" in dashboard_template
+    assert "Lihat di ShopeeFood" in dashboard_template
+    assert "Link Mitra" in dashboard_template
+    assert "state-${toggleState}" in dashboard_template
+    assert '<td colspan="8"' in dashboard_template
+
+    # Verify drawer no longer contains the moved CTA
+    assert 'class="btn-primary outlet-detail-mitra-full-btn"' not in dashboard_template
+
+    # Verify toggle column 8 is never hidden with display: none
+    assert ".data-table th:nth-child(8),\n  .data-table td:nth-child(8) {\n    display: none;\n  }" not in STYLES
+
+    # Verify 3-state toggle, ShopeeFood link, and Link Mitra styles
+    assert ".switch-toggle.admin-table-toggle.state-open" in STYLES
+    assert ".switch-toggle.admin-table-toggle.state-paused" in STYLES
+    assert ".switch-toggle.admin-table-toggle.state-closed" in STYLES
+    assert ".admin-table-shopeefood-link {" in STYLES
+    assert ".admin-table-mitra-link {" in STYLES
+
+
+def test_admin_filter_toolbar_adaptive_layout_contract():
+    assert "grid-template-columns: repeat(6, minmax(0, 1fr)) auto;" in STYLES
+    assert ".custom-filter-trigger {" in STYLES
+    assert "text-overflow: ellipsis;" in STYLES
+    assert ".custom-filter {" in STYLES
+    assert "gap: 8px;" in STYLES
+    assert ".admin-main .outlet-filter-toolbar .reset-filter-button {" in STYLES
+
+
+
 

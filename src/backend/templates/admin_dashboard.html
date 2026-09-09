@@ -309,9 +309,9 @@
       <p class="card-subtitle">Brand akan dijeda dan aktif kembali otomatis sesuai durasi yang dipilih.</p>
       <div id="vbPauseEndPreview" class="pause-end-preview" aria-live="polite">Berakhir pada -</div>
       <div class="radio-group">
-        <label class="radio-card active"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30 Menit</span></div><span class="radio-meta">30 mnt</span></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span></div><span class="radio-meta">1 jam</span></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta" id="vbRestOfDayMeta">Ikuti jadwal outlet</span></label>
+        <label class="radio-card active"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30 Menit</span></div></label>
+        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span></div></label>
+        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta" id="vbRestOfDayMeta" hidden></span></label>
         <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="custom"><span>Durasi lain</span></div></label>
         <div id="vbCustomDurationBox" style="display:none; margin-top:6px">
           <div class="custom-datetime-fields">
@@ -353,7 +353,6 @@
             <input type="radio" name="adminPauseDuration" value="30_min" checked>
             <span>30 Menit</span>
           </div>
-          <span class="radio-meta">30 mnt</span>
         </label>
 
         <label class="radio-card">
@@ -361,7 +360,6 @@
             <input type="radio" name="adminPauseDuration" value="60_min">
             <span>60 Menit</span>
           </div>
-          <span class="radio-meta">1 jam</span>
         </label>
 
         <label class="radio-card">
@@ -369,7 +367,7 @@
             <input type="radio" name="adminPauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta" id="adminRestOfDayMeta">Ikuti jadwal outlet</span>
+          <span class="radio-meta" id="adminRestOfDayMeta" hidden></span>
         </label>
 
         <label class="radio-card">
@@ -852,8 +850,8 @@
     function focusOutletDetailInitialControl(panel) {
       if (!panel) return;
       const selector = isMobileAdminViewport()
-        ? '.outlet-detail-back, .outlet-detail-mitra-full-btn, .outlet-detail-accordion, .outlet-detail-close'
-        : '.outlet-detail-close, .outlet-detail-mitra-full-btn, .outlet-detail-accordion';
+        ? '.outlet-detail-back, .outlet-detail-accordion, .outlet-detail-close'
+        : '.outlet-detail-close, .outlet-detail-accordion';
       const focusTarget = panel.querySelector(selector) || panel;
       if (focusTarget instanceof HTMLElement) {
         focusTarget.focus({ preventScroll: true });
@@ -1333,7 +1331,7 @@
         if (requestGeneration !== storeFetchGeneration) return;
         console.error("Error loading stores:", err);
         if (!isSilent) {
-          document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
+          document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="table-loading-state">Data outlet gagal dimuat. Coba muat ulang halaman.</td></tr>';
           document.getElementById('mobileOutletList').innerHTML = '<div class="mobile-empty-state">Data outlet gagal dimuat. Coba muat ulang halaman.</div>';
         }
       }
@@ -2641,7 +2639,7 @@
     }
 
     function showTableSkeleton() {
-      const row = '<tr class="skeleton-table-row">' + Array.from({ length: 9 }, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
+      const row = '<tr class="skeleton-table-row">' + Array.from({ length: 8 }, () => '<td><span class="skeleton skeleton-cell"></span></td>').join('') + '</tr>';
       document.getElementById('tableBody').innerHTML = row.repeat(5);
       document.getElementById('mobileOutletList').innerHTML = Array.from({ length: 3 }, () => `
         <article class="mobile-outlet-card admin-mobile-outlet-card skeleton-mobile-card">
@@ -3266,6 +3264,50 @@
       return `${window.location.origin}/mitra/${slug}`;
     }
 
+    function getShopeeFoodStoreUrl(storeId) {
+      return `https://shopee.co.id/universal-link/now-food/shop/${encodeURIComponent(String(storeId || '').trim())}`;
+    }
+
+    function getAdminToggleState(store, stateContext = getAdminStateContext(store)) {
+      const isPending = pendingAdminToggleStoreIds.has(String(store?.store_id));
+      const isScheduleDisabled = isAdminToggleDisabled(store, stateContext);
+      const isDesiredOpen = getAdminDesiredToggleOn(store, stateContext);
+
+      if (isScheduleDisabled) {
+        return 'closed';
+      }
+      if (isDesiredOpen) {
+        return 'open';
+      }
+      return 'paused';
+    }
+
+    function getAdminToggleTooltip(store, stateContext = getAdminStateContext(store), toggleState = getAdminToggleState(store, stateContext)) {
+      const isPending = pendingAdminToggleStoreIds.has(String(store?.store_id));
+      if (isPending) {
+        return 'Status: Menyimpan perubahan status outlet ke server...';
+      }
+
+      const shopeeStatus = getAdminShopeeStatusPresentation(store?.shopee_status);
+      const statusPresentation = getAdminStatusPresentation(store, stateContext);
+      const statusSubtext = getAdminStatusSubtext(store, stateContext);
+      const disabledReason = getAdminToggleDisabledReason(store, stateContext);
+
+      if (toggleState === 'open') {
+        return `Status Outlet: Sedang Buka\nLive Shopee: ${shopeeStatus.label}\nKeterangan: Outlet aktif menerima pesanan mengikuti jam operasional.\nOpsi: Klik untuk tutup sementara (pause).`;
+      }
+
+      if (toggleState === 'paused') {
+        const pauseTarget = store?.pause_until ? `Buka otomatis ${getPauseDetail(store.pause_until)}` : 'Menunggu dibuka manual';
+        return `Status Outlet: Tutup Sementara (Pause)\nKeterangan: ${pauseTarget}\nLive Shopee: ${shopeeStatus.label}\nOpsi: Klik untuk buka outlet sekarang.`;
+      }
+
+      // toggleState === 'closed' (kiri disable)
+      const label = statusPresentation?.label || 'Sedang Tutup';
+      const detail = statusSubtext || disabledReason || 'Outlet sedang tutup di luar jadwal operasional.';
+      return `Status Outlet: ${label}\nKondisi: ${detail}\nLive Shopee: ${shopeeStatus.label}\nKunci Toggle: ${disabledReason || 'Toggle dikunci di luar jadwal operasional.'}`;
+    }
+
     function renderAdminTable(stores) {
       const tbody = document.getElementById('tableBody');
       const mobileList = document.getElementById('mobileOutletList');
@@ -3278,16 +3320,17 @@
       mobileList.innerHTML = '';
 
       if (!sortedStores.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="table-loading-state">Tidak ada outlet yang sesuai.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-state">Tidak ada outlet yang sesuai.</td></tr>';
         mobileList.innerHTML = '<div class="mobile-empty-state">Tidak ada outlet yang sesuai dengan pencarian.</div>';
         return;
       }
 
       sortedStores.forEach(s => {
         const stateContext = getAdminStateContext(s);
-        const isDesiredOpen = getAdminDesiredToggleOn(s, stateContext);
+        const toggleState = getAdminToggleState(s, stateContext);
         const isTogglePending = pendingAdminToggleStoreIds.has(String(s.store_id));
-        const isToggleDisabled = isTogglePending || isAdminToggleDisabled(s, stateContext);
+        const isToggleDisabled = isTogglePending || toggleState === 'closed';
+        const isToggleChecked = toggleState === 'open';
         const toggleDisabledReason = getAdminToggleDisabledReason(s, stateContext);
         const ownerName = s.nama_pemilik || 'Fando';
         const storeName = escapeHtml(detailValue(s.store_name, 'Outlet'));
@@ -3309,8 +3352,26 @@
           : (toggleSummary.note && toggleSummary.note !== '-'
               ? `${toggleSummary.title} · ${toggleSummary.note}`
               : toggleSummary.title);
+        const toggleTooltip = getAdminToggleTooltip(s, stateContext, toggleState);
+        const storeIdVal = String(s.store_id || '').trim();
+        const shopeeFoodUrl = storeIdVal ? getShopeeFoodStoreUrl(storeIdVal) : '';
+        const mitraUrl = getMitraDynamicUrl(s.vercel_link, s.nama_pemilik || '-');
         const tr = document.createElement('tr');
         const todaySchedule = getTodayOperatingHours(s);
+
+        const linkCellMarkup = shopeeFoodUrl ? `
+          <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link" onclick="event.stopPropagation()" aria-label="Buka outlet ShopeeFood untuk store ${storeId}">
+            <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+            <span>Lihat di ShopeeFood</span>
+          </a>
+        ` : '<span class="compact-meta">-</span>';
+
+        const botLinkCellMarkup = mitraUrl ? `
+          <a href="${mitraUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-mitra-link" onclick="event.stopPropagation()" aria-label="Buka Link Mitra untuk store ${storeId}" title="Link Mitra">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            <span>Link Mitra</span>
+          </a>
+        ` : '<span class="compact-meta">-</span>';
 
         tr.innerHTML = `
           <td>
@@ -3333,15 +3394,9 @@
             ${s.store_name}
           </td>
           <td>${todaySchedule}</td>
-          <td>
-            <div class="admin-status-summary">
-              <span class="${statusPresentation.className}" title="${statusTooltip}">${escapeHtml(statusPresentation.label)}</span>
-              ${statusSubtext ? `<small class="table-cell-note">${escapeHtml(statusSubtext)}</small>` : ''}
-            </div>
-          </td>
-          <td>${getAdminActionMarkup(s)}</td>
-          <td><span class="service-period"><strong>${formatServicePeriod(s.tanggal_mulai_layanan, s.tanggal_berakhir_layanan)}</strong><small>${getServiceRemainingTime(s.tanggal_berakhir_layanan)}</small></span></td>
-          <td><label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="${isToggleDisabled ? escapeHtml(toggleDisabledReason) : 'Toggle outlet'}"><input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
+          <td>${linkCellMarkup}</td>
+          <td>${botLinkCellMarkup}</td>
+          <td><label class="switch-toggle admin-table-toggle state-${toggleState} ${isTogglePending ? 'is-toggle-pending' : ''}" title="${escapeHtml(toggleTooltip)}"><input type="checkbox" ${isToggleChecked ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" aria-label="Toggle outlet ${storeName} (status: ${toggleState})" onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)"><span class="slider"></span></label></td>
         `;
         tr.classList.add('outlet-data-row');
         tr.tabIndex = 0;
@@ -3401,13 +3456,28 @@
             </div>
           </dl>
 
+          <div class="admin-mobile-shopeefood-action">
+            ${shopeeFoodUrl ? `
+            <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link" onclick="event.stopPropagation()" aria-label="Buka outlet ShopeeFood untuk store ${storeId}">
+              <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+              <span>Lihat di ShopeeFood</span>
+            </a>
+            ` : ''}
+            ${mitraUrl ? `
+            <a href="${mitraUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-mitra-link" onclick="event.stopPropagation()" aria-label="Buka Link Mitra untuk store ${storeId}" title="Link Mitra">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              <span>Link Mitra</span>
+            </a>
+            ` : ''}
+          </div>
+
           <div class="admin-mobile-toggle-row">
             <div class="admin-mobile-toggle-copy">
               <strong>Toggle outlet</strong>
               <span>${escapeHtml(toggleMetaText)}</span>
             </div>
-            <label class="switch-toggle admin-table-toggle ${isTogglePending ? 'is-toggle-pending' : ''}" title="${isToggleDisabled ? escapeHtml(toggleDisabledReason) : 'Toggle outlet'}">
-              <input type="checkbox" ${isDesiredOpen ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
+            <label class="switch-toggle admin-table-toggle state-${toggleState} ${isTogglePending ? 'is-toggle-pending' : ''}" title="${escapeHtml(toggleTooltip)}">
+              <input type="checkbox" ${isToggleChecked ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" aria-label="Toggle outlet ${storeName} (status: ${toggleState})" onchange="toggleAdminOutlet('${s.store_id}', this.checked, this)">
               <span class="slider"></span>
             </label>
           </div>
@@ -3436,14 +3506,13 @@
       const values = Array.isArray(ranges)
         ? ranges.map(value => String(value || '').trim()).filter(Boolean)
         : (typeof ranges === 'string' && ranges.trim() ? [ranges.trim()] : []);
-      const safeDayLabel = escapeHtml(dayLabel);
 
       if (!values.length) {
-        return `<span class="today-operating-hours"><span class="operating-time">Tutup</span><span class="operating-meta"><span class="operating-day">${safeDayLabel}</span></span></span>`;
+        return `<span class="today-operating-hours"><span class="operating-time">Tutup</span></span>`;
       }
 
-      const timeLines = values.map(range => `<span class="operating-time">${escapeHtml(range)}</span>`).join('');
-      return `<span class="today-operating-hours">${timeLines}<span class="operating-meta"><span class="operating-day">${safeDayLabel}</span><span class="operating-timezone">${escapeHtml(timezoneLabel)}</span></span></span>`;
+      const timeLines = values.map(range => `<span class="operating-time">${escapeHtml(String(range || '').replace(/\./g, ':'))}</span>`).join('');
+      return `<span class="today-operating-hours">${timeLines}<span class="operating-meta"><span class="operating-timezone">${escapeHtml(timezoneLabel)}</span></span></span>`;
     }
 
     function getTodayOperatingHours(store) {
@@ -3975,7 +4044,8 @@
       const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
       return days.map(day => {
         const values = Array.isArray(schedule[day]) ? schedule[day] : (schedule[day] ? [schedule[day]] : []);
-        return `<div class="admin-schedule-row"><strong>${day}</strong><span>${values.length ? values.join(' · ') + ' WIB' : 'Tutup'}</span></div>`;
+        const formattedValues = values.map(v => String(v || '').replace(/\./g, ':'));
+        return `<div class="admin-schedule-row"><strong>${day}</strong><span>${formattedValues.length ? formattedValues.join(' · ') + ' WIB' : 'Tutup'}</span></div>`;
       }).join('');
     }
 
@@ -4060,7 +4130,6 @@
       }
       outletDetailActiveStoreId = nextStoreId;
       const stateContext = getAdminStateContext(store);
-      const mitraUrl = getMitraDynamicUrl(store.vercel_link, store.nama_pemilik || '-');
       const statusPresentation = getAdminStatusPresentation(store, stateContext);
       const statusTooltip = escapeHtml(getAdminStatusTooltip(store, stateContext));
       const shopeeStatus = getAdminShopeeStatusPresentation(store.shopee_status);
@@ -4091,12 +4160,6 @@
             </div>
           </div>
           <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
-        </div>
-        <div class="outlet-detail-mitra-action">
-          <a class="btn-primary outlet-detail-mitra-full-btn" href="${mitraUrl}" target="_blank" rel="noopener noreferrer" title="Buka Dashboard Mitra">
-            <span>Buka Dashboard Mitra</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          </a>
         </div>
         <dl class="outlet-detail-list">
           <div><dt>Status live Shopee</dt><dd><span class="${shopeeStatus.className}" title="Nilai status terakhir: ${escapeHtml(shopeeStatus.value)}">${shopeeStatus.label}</span></dd><small>Nilai terakhir yang diterima dari XHR Shopee.</small></div>

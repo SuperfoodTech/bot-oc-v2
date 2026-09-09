@@ -24,7 +24,13 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.10.11`.
+Latest documented release: `1.12.0`.
+
+Kolom `Link Mitra` pada tabel operasional admin (`#adminTable`) menampilkan
+tautan langsung ke Dashboard Mitra (`.admin-table-mitra-link`) di sebelah kanan
+kolom `Link` ShopeeFood tanpa logo Shopee, dan CTA buka dashboard mitra pada
+panel drawer samping ditiadakan. Kolom Toggle (kolom 8) wajib tetap tampil utuh
+pada semua breakpoint desktop dan laptop tanpa disembunyikan.
 
 Card riwayat aktivitas mitra pada Dashboard Mitra (`.mitra-activity-card .history-list`)
 wajib menggunakan internal scrollable container (`max-height: 380px`, `overflow-y: auto`)

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link rel="stylesheet" href="/static/css/styles.css?v=20260831-mitra-dashboard-v61">
 </head>
+
 <body x-data="userApp()">
 
   <div class="mobile-wrapper is-auth-view">
@@ -20,9 +22,16 @@
         <img class="brand-logo brand-logo-mitra" src="/static/icons/Logo_FoodMaster.png" alt="FoodMaster">
       </div>
       <div class="header-actions">
-        <a href="https://wa.me/6285183151531" class="help-link customer-service-link" target="_blank" rel="noopener noreferrer" aria-label="Hubungi customer service via WhatsApp" title="Customer Service via WhatsApp">
+        <a href="https://wa.me/6285183151531" class="help-link customer-service-link" target="_blank"
+          rel="noopener noreferrer" aria-label="Hubungi customer service via WhatsApp"
+          title="Customer Service via WhatsApp">
           <span>Butuh bantuan?</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 0 2 2h1v-5H6a2 2 0 0 0-2 2Zm16 0a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2Z"></path><path d="M17 15v1a3 3 0 0 1-3 3h-1"></path><circle cx="12" cy="5" r="2"></circle></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 13v-1a8 8 0 0 1 16 0v1"></path>
+            <path d="M4 13a2 2 0 0 0 2 2h1v-5H6a2 2 0 0 0-2 2Zm16 0a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2Z"></path>
+            <path d="M17 15v1a3 3 0 0 1-3 3h-1"></path>
+            <circle cx="12" cy="5" r="2"></circle>
+          </svg>
         </a>
       </div>
     </header>
@@ -34,7 +43,8 @@
             <div class="mitra-login-copy">
               <div class="step-indicator">Dashboard Mitra</div>
               <h1 class="card-title">Masukkan kata sandi</h1>
-              <p class="card-subtitle">Gunakan kata sandi dari admin FoodMaster untuk mengakses dashboard outlet Anda.</p>
+              <p class="card-subtitle">Gunakan kata sandi dari admin FoodMaster untuk mengakses dashboard outlet Anda.
+              </p>
             </div>
           </div>
 
@@ -50,9 +60,12 @@
                       <circle cx="12" cy="14.5" r="1"></circle>
                     </svg>
                   </span>
-                  <input type="password" id="passcodeInput" class="form-input" placeholder="Masukkan kata sandi" autocomplete="current-password" aria-invalid="false">
-                  <button type="button" id="passcodeToggleBtn" class="password-toggle-btn" onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <input type="password" id="passcodeInput" class="form-input" placeholder="Masukkan kata sandi"
+                    autocomplete="current-password" aria-invalid="false">
+                  <button type="button" id="passcodeToggleBtn" class="password-toggle-btn"
+                    onclick="togglePasswordVisibility('passcodeInput', this)" aria-label="Tampilkan kata sandi">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                       <circle cx="12" cy="12" r="3"></circle>
                     </svg>
@@ -85,12 +98,20 @@
             <div class="google-auth-option" style="display: none;">
               <div class="login-divider">ATAU</div>
               <button type="button" class="btn-google" id="googleLoginBtn">
-              <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-              </svg>
+                <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    fill="#4285F4" />
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    fill="#34A853" />
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    fill="#FBBC05" />
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    fill="#EA4335" />
+                </svg>
                 Masuk dengan Google
               </button>
             </div>
@@ -100,17 +121,6 @@
       </div>
 
       <div id="dashboardSection" class="dashboard-stack" aria-hidden="true" hidden style="display: none;">
-        <section class="page-intro mitra-dashboard-hero">
-          <div class="mitra-hero-copy">
-            <div class="mitra-hero-label">Dashboard Mitra</div>
-            <h1 class="page-title">Kelola outlet Anda</h1>
-            <p class="page-description">Pantau status live dan buka otomatis dari satu layar.</p>
-          </div>
-          <div class="mitra-hero-art" aria-hidden="true">
-            <img class="mitra-hero-shop" src="/static/icons/shop-outlet-red.svg" alt="">
-          </div>
-        </section>
-
         <div class="dashboard-content-stack">
           <section class="card-box mitra-account-summary" aria-label="Ringkasan akun">
             <div class="mitra-account-summary-head">
@@ -133,7 +143,9 @@
               <span class="mitra-account-meta-item">
                 <svg viewBox="0 0 16 16">
                   <path d="M3 1L0 4v1s2 1 4 1 4-1 4-1 2 1 4 1 4-1 4-1V4l-3-3H3Z"></path>
-                  <path d="M1 15V7.52C1.82 7.76 2.88 8 4 8c1.3 0 2.53-.32 3.38-.6.23-.08.43-.15.62-.22.18.07.39.14.62.22.85.28 2.08.6 3.38.6 1.12 0 2.18-.24 3-.48V15H7v-5H4v5H1Zm11-5h-2v3h2v-3Z"></path>
+                  <path
+                    d="M1 15V7.52C1.82 7.76 2.88 8 4 8c1.3 0 2.53-.32 3.38-.6.23-.08.43-.15.62-.22.18.07.39.14.62.22.85.28 2.08.6 3.38.6 1.12 0 2.18-.24 3-.48V15H7v-5H4v5H1Zm11-5h-2v3h2v-3Z">
+                  </path>
                 </svg>
                 <span id="accountOutletCount">0 outlet</span>
               </span>
@@ -144,13 +156,7 @@
             </div>
           </section>
 
-          <div class="section-heading mitra-section-heading">
-            <div class="mitra-section-heading-copy">
-              <h2>Outlet Anda</h2>
-              <p class="mitra-section-caption">Lihat status live dan kelola buka otomatis per outlet.</p>
-            </div>
-            <span class="section-count" id="outletCount">Memuat...</span>
-          </div>
+          <div class="section-heading mitra-section-heading" hidden></div>
 
           <div id="outletsList" class="outlet-list"></div>
 
@@ -198,7 +204,8 @@
     <div class="modal-card pause-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalStoreName">
       <div class="step-indicator">Tutup sementara</div>
       <h3 class="card-title" id="modalStoreName">Pilih durasi</h3>
-      <p class="card-subtitle">Bot akan memproses tutup sementara, lalu membuka kembali otomatis sesuai durasi yang dipilih.</p>
+      <p class="card-subtitle">Bot akan memproses tutup sementara, lalu membuka kembali otomatis sesuai durasi yang
+        dipilih.</p>
       <div id="pauseEndPreview" class="pause-end-preview" aria-live="polite">Berakhir pada -</div>
 
       <div class="radio-group">
@@ -207,7 +214,6 @@
             <input type="radio" name="pauseDuration" value="30_min" checked>
             <span>30 Menit</span>
           </div>
-          <span class="radio-meta">30 mnt</span>
         </label>
 
         <label class="radio-card">
@@ -215,7 +221,6 @@
             <input type="radio" name="pauseDuration" value="60_min">
             <span>60 Menit</span>
           </div>
-          <span class="radio-meta">1 jam</span>
         </label>
 
         <label class="radio-card">
@@ -223,7 +228,7 @@
             <input type="radio" name="pauseDuration" value="rest_of_day">
             <span>Sepanjang Hari</span>
           </div>
-          <span class="radio-meta" id="pauseRestOfDayMeta">Ikuti jadwal outlet</span>
+          <span class="radio-meta" id="pauseRestOfDayMeta" hidden></span>
         </label>
 
         <label class="radio-card">
@@ -232,26 +237,35 @@
             <span>Durasi lain</span>
           </div>
         </label>
-        
+
         <div id="customDurationBox" style="display: none; margin-top: 6px;">
           <div class="custom-datetime-fields">
-            <label>Mulai<input type="text" id="customStartInput" class="form-input" readonly disabled aria-disabled="true"></label>
+            <label>Mulai<input type="text" id="customStartInput" class="form-input" readonly disabled
+                aria-disabled="true"></label>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
             <label>Target berakhir
               <div class="custom-picker-anchor">
-                <button type="button" id="customUntilTrigger" class="custom-picker-trigger" onclick="openCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                <button type="button" id="customUntilTrigger" class="custom-picker-trigger"
+                  onclick="openCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
                   <span id="customUntilDisplay">Pilih tanggal &amp; waktu</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 9h18"></path></svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                    <path d="M8 2v4M16 2v4M3 9h18"></path>
+                  </svg>
                 </button>
                 <input type="hidden" id="customUntilInput" aria-hidden="true">
-                <div id="customDateTimePicker" class="custom-picker-popover" role="dialog" aria-label="Pilih tanggal dan waktu" hidden>
+                <div id="customDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu" hidden>
                   <div class="custom-picker-header">
-                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button>
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(-1)"
+                      aria-label="Bulan sebelumnya">‹</button>
                     <strong id="customPickerMonthLabel"></strong>
-                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(1)" aria-label="Bulan berikutnya">›</button>
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(1)"
+                      aria-label="Bulan berikutnya">›</button>
                   </div>
                   <div class="custom-picker-weekdays" aria-hidden="true">
-                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span> Sb</span>
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>
+                      Sb</span>
                   </div>
                   <div id="customPickerCalendar" class="custom-picker-calendar"></div>
                   <div class="custom-picker-time">
@@ -432,7 +446,7 @@
         radio.addEventListener('change', (e) => {
           document.querySelectorAll('.radio-card').forEach(c => c.classList.remove('active'));
           e.target.closest('.radio-card').classList.add('active');
-          
+
           if (e.target.value === 'custom') {
             document.getElementById('customDurationBox').style.display = 'block';
           } else {
@@ -534,7 +548,7 @@
       try {
         const res = await fetch('/api/v1/user/login', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ passcode: passcode, slug: currentSlug || null })
         });
         const data = await res.json();
@@ -558,7 +572,8 @@
           }
           document.getElementById('accountOutletCount').textContent = formatOutletCount(data.total_outlets);
           setAccountPasscode(data.passcode || passcode);
-          document.getElementById('outletCount').textContent = formatOutletCount(data.total_outlets);
+          const outletCountEl = document.getElementById('outletCount');
+          if (outletCountEl) outletCountEl.textContent = formatOutletCount(data.total_outlets);
           renderOutlets(data.outlets);
           fetchHistory();
           startUserEventStream();
@@ -906,6 +921,27 @@
       };
     }
 
+    function getMitraToggleState(outlet, stateContext = getOutletStateContext(outlet)) {
+      if (stateContext.toggleDisabled) {
+        return 'closed';
+      }
+      if (stateContext.toggleChecked) {
+        return 'open';
+      }
+      return 'paused';
+    }
+
+    function getMitraToggleTooltip(outlet, stateContext = getOutletStateContext(outlet), toggleState = getMitraToggleState(outlet, stateContext)) {
+      if (toggleState === 'open') {
+        return 'Buka otomatis aktif (Sedang Buka). Klik untuk tutup sementara.';
+      }
+      if (toggleState === 'paused') {
+        const pauseTarget = outlet?.pause_until ? `Buka otomatis ${formatPauseResumeInline(outlet.pause_until)}` : 'Menunggu dibuka manual';
+        return `Tutup sementara (Pause). ${pauseTarget}. Klik untuk buka outlet sekarang.`;
+      }
+      return getToggleBlockedMessage(outlet, stateContext) || 'Toggle dikunci di luar jam operasional.';
+    }
+
     function getOutletStatusTooltip(outlet, stateContext) {
       const liveValue = String(outlet?.shopee_status || stateContext.liveState || 'UNKNOWN').trim().toUpperCase() || 'UNKNOWN';
       return `Live Shopee: ${liveValue} | Desired bot: ${stateContext.desiredState} | Fase: ${stateContext.botPhase}`;
@@ -1009,7 +1045,8 @@
     }
 
     function parseScheduleRange(range) {
-      const match = String(range || '').match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
+      const normalized = String(range || '').replace(/\./g, ':');
+      const match = normalized.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
       if (!match) return null;
       return {
         start: Number(match[1]) * 60 + Number(match[2]),
@@ -1018,7 +1055,7 @@
     }
 
     function formatScheduleRange(range) {
-      return String(range || '').replace(/:/g, '.');
+      return String(range || '').replace(/\./g, ':');
     }
 
     function getWibParts(date = new Date(), timezone = 'Asia/Jakarta') {
@@ -1076,29 +1113,7 @@
     }
 
     function getOutletAutomationDetail(outlet, stateContext = getOutletStateContext(outlet)) {
-      if (stateContext.botPhase === 'SUSPENDED') return 'Otomatisasi dinonaktifkan oleh admin.';
-      if (stateContext.botPhase === 'STATUS_UNKNOWN') return 'Status live outlet masih diperiksa bot.';
-      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle aktif. Bot menunggu fetch jadwal operasional Shopee sebelum memproses outlet.';
-      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Toggle aktif. Bot belum berhasil fetch jadwal operasional Shopee dan akan mencoba lagi saat patroli berikutnya.';
-      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Toggle aktif, tetapi jadwal operasional Shopee belum diatur di Shopee sehingga bot belum bisa memproses outlet.';
-      if (stateContext.botPhase === 'PENDING_PAUSE') {
-        return stateContext.desiredState === 'PAUSE'
-          ? 'Permintaan tutup sementara sudah tersimpan. Menunggu bot menutup outlet.'
-          : 'Permintaan menonaktifkan otomatisasi sudah tersimpan. Menunggu bot menutup outlet.';
-      }
-      if (stateContext.botPhase === 'PENDING_OPEN') {
-        return stateContext.isWithinSchedule
-          ? (stateContext.liveState === 'CLOSED'
-              ? 'Outlet tertutup di Shopee padahal toggle aktif. Menunggu bot membuka kembali outlet.'
-              : 'Permintaan buka sudah tersimpan. Menunggu bot membuka outlet.')
-          : 'Permintaan buka sudah tersimpan. Bot akan membuka outlet saat jadwal operasional dimulai.';
-      }
-      if (stateContext.botPhase === 'WAITING_SCHEDULE') return 'Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai.';
-      if (stateContext.botPhase === 'AUTOMATION_OFF') return 'Nonaktif sampai diaktifkan kembali.';
-      if (stateContext.desiredState === 'PAUSE') return '';
-      const explicitNote = String(outlet?.display_note || '').trim();
-      if (explicitNote) return explicitNote;
-      return 'Outlet mengikuti jam operasional Shopee.';
+      return '';
     }
 
     function getOutletPauseLine(outlet, stateContext = getOutletStateContext(outlet)) {
@@ -1197,10 +1212,12 @@
         const storeKey = String(out.store_id);
         const isTogglePending = pendingToggleStoreIds.has(storeKey);
         const stateContext = getOutletStateContext(out);
+        const toggleState = getMitraToggleState(out, stateContext);
         const isSuspended = stateContext.isSuspended;
         const isScheduleBlocked = stateContext.toggleDisabled && !isSuspended;
-        const isToggleOn = stateContext.toggleChecked;
-        const isToggleDisabled = stateContext.toggleDisabled || isTogglePending;
+        const isToggleChecked = toggleState === 'open';
+        const isToggleDisabled = toggleState === 'closed' || isTogglePending;
+        const toggleTooltip = getMitraToggleTooltip(out, stateContext, toggleState);
         const shopeeStatus = getMitraStatusPresentation(out, stateContext);
         const isScheduleExpanded = expandedScheduleStores.has(out.store_id);
         const topStatusTitle = getOutletStatusTooltip(out, stateContext);
@@ -1213,9 +1230,7 @@
         const pauseRow = pauseLine
           ? `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(pauseLine)}</span></div>`
           : '';
-        const automationDetail = getOutletAutomationDetail(out, stateContext);
-        const automationDetailMarkup = automationDetail ? `<span>${escapeHtml(automationDetail)}</span>` : '';
-        
+
         const card = document.createElement('div');
         card.className = 'card-box mitra-outlet-card';
         card.innerHTML = `
@@ -1226,19 +1241,11 @@
             </div>
             <div class="mitra-outlet-side">
               <p class="mitra-outlet-store-id">ID ${storeId}</p>
-              <span class="${shopeeStatus.className}" title="${escapeHtml(topStatusTitle)}">${escapeHtml(shopeeStatus.label)}</span>
+              <label class="switch-toggle state-${toggleState} ${isToggleDisabled ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" title="${escapeHtml(toggleTooltip)}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
+                <input type="checkbox" aria-label="Buka otomatis untuk ${storeName}" ${isToggleChecked ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
+                <span class="slider"></span>
+              </label>
             </div>
-          </div>
-
-          <div class="mitra-outlet-toggle-row">
-            <div class="mitra-outlet-toggle-copy">
-              <strong>Buka otomatis</strong>
-              ${automationDetailMarkup}
-            </div>
-            <label class="switch-toggle ${isToggleDisabled ? 'is-schedule-disabled' : ''} ${isTogglePending ? 'is-toggle-pending' : ''}" aria-busy="${isTogglePending ? 'true' : 'false'}" onclick="handleScheduleToggleAttempt(event, '${storeId}')">
-              <input type="checkbox" aria-label="Buka otomatis untuk ${storeName}" ${isToggleOn ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} onchange="toggleVercel('${storeId}', this.checked)">
-              <span class="slider"></span>
-            </label>
           </div>
 
           <div class="mitra-outlet-meta">
@@ -1661,7 +1668,7 @@
       try {
         const res = await fetch('/api/v1/user/pause', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             store_id: storeId,
             duration_type: durationType,
@@ -1691,7 +1698,7 @@
     async function resumeStore(storeId) {
       if (!beginUserToggle(storeId)) return;
       try {
-        const res = await fetch(`/api/v1/user/resume?store_id=${storeId}`, {method: 'POST'});
+        const res = await fetch(`/api/v1/user/resume?store_id=${storeId}`, { method: 'POST' });
         const data = await res.json();
         if (res.ok && data.success) {
           showUserToast('Permintaan buka outlet tersimpan.');
@@ -1834,4 +1841,5 @@
     }
   </script>
 </body>
+
 </html>
