@@ -119,4 +119,12 @@ def test_history_logs_ux_writing_contract():
         assert phrase in admin_html, f"Phrase '{phrase}' missing in admin_dashboard.html"
 
 
+def test_mitra_pending_pause_and_open_subtext_contract():
+    mitra_html = (PROJECT_ROOT / "src/backend/templates/user_dashboard.html").read_text()
+    assert "return 'Bot sedang dalam proses penutupan outlet';" in mitra_html
+    assert "return 'Bot sedang dalam proses pembukaan outlet'" in mitra_html or "? 'Bot sedang dalam proses pembukaan outlet'" in mitra_html
+
+
+
+
 

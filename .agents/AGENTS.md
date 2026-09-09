@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.3`.
+Latest documented release: `1.13.4`.
+
+Subteks status outlet pada fungsi `getOutletPauseLine` di Dashboard Mitra (`user_dashboard.html`):
+- Fase antrean tutup (`PENDING_PAUSE`): `"Bot sedang dalam proses penutupan outlet"` (tanpa informasi waktu buka kembali).
+- Fase antrean buka (`PENDING_OPEN`): `"Bot sedang dalam proses pembukaan outlet"`.
+- Fase tutup aktif (`PAUSE`): Menampilkan estimasi waktu buka kembali (`formatPauseResumeInline`).
 
 Format judul dan isi riwayat aktivitas log audit pada Dashboard Mitra (`#historyLogs`)
 dan drawer detail outlet Dashboard Admin (`#outletDetailHistoryLogs`) wajib mengikuti standar UX writing:

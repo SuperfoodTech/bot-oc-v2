@@ -1102,16 +1102,15 @@
           ? `Dinonaktifkan admin: ${outlet.alasan_penangguhan}`
           : 'Dinonaktifkan admin.';
       }
+      if (stateContext.botPhase === 'PENDING_PAUSE') {
+        return 'Bot sedang dalam proses penutupan outlet';
+      }
       if (stateContext.desiredState === 'PAUSE' && outlet.pause_until) {
-        const reopenText = outlet.pause_until ? formatPauseResumeInline(outlet.pause_until) : '';
-        if (stateContext.botPhase !== 'PENDING_PAUSE') return reopenText;
-        return reopenText
-          ? `Permintaan tutup tersimpan. Menunggu giliran bot. ${reopenText}`
-          : 'Permintaan tutup tersimpan. Menunggu giliran bot.';
+        return formatPauseResumeInline(outlet.pause_until);
       }
       if (stateContext.botPhase === 'PENDING_OPEN') {
         return stateContext.isWithinSchedule
-          ? 'Toggle aktif. Menunggu sinkronisasi bot membuka outlet.'
+          ? 'Bot sedang dalam proses pembukaan outlet'
           : (getNextScheduleOpenText(outlet) || 'Di luar jam operasional');
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') return getNextScheduleOpenText(outlet) || 'Di luar jam operasional';
