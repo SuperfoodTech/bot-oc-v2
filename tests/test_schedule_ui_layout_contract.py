@@ -47,9 +47,11 @@ def test_mitra_dashboard_keeps_account_summary_above_outlet_list():
     assert 'onclick="scrollToAccountNotice()"' not in MITRA_TEMPLATE
     assert 'aria-label="Buka otomatis untuk ${storeName}"' in MITRA_TEMPLATE
     assert 'id="accountPasscode"' in MITRA_TEMPLATE
-    assert 'Password:' in MITRA_TEMPLATE
+    assert 'Kata Sandi:' in MITRA_TEMPLATE
     assert 'id="accountOutletCount"' in MITRA_TEMPLATE
     assert '${automationDetailMarkup}' not in MITRA_TEMPLATE
+    assert '.mobile-wrapper.is-dashboard-view .mitra-account-summary #subBadge' in STYLES
+    assert 'background: #16a34a;' in STYLES
 
 
 def test_mitra_dashboard_3_state_toggle_contract():

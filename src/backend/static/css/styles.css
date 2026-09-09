@@ -525,8 +525,8 @@ label {
 }
 
 .subscription-card #subBadge.badge-open {
-  background: #be1a1a;
-  border-color: #be1a1a;
+  background: #16a34a;
+  border-color: #16a34a;
   color: #ffffff;
 }
 
@@ -7888,12 +7888,13 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   line-height: 1.1;
 }
 
-.mobile-wrapper.is-dashboard-view .mitra-account-summary #subBadge {
+.mobile-wrapper.is-dashboard-view .mitra-account-summary #subBadge,
+.mobile-wrapper.is-dashboard-view .mitra-account-summary #subBadge.badge-open {
   min-height: 30px;
   padding: 6px 12px;
   border: 0;
   border-radius: 999px;
-  background: #ed1c24;
+  background: #16a34a;
   color: #ffffff;
   font-size: 12px;
   font-weight: 800;

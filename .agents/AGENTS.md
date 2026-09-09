@@ -24,7 +24,11 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.12.0`.
+Latest documented release: `1.12.1`.
+
+Badge status `Aktif` pada kartu Ringkasan Akun Mitra (`.mitra-account-summary #subBadge`)
+wajib menggunakan warna latar belakang hijau (`#16a34a`) dengan teks putih untuk
+merefleksikan status aktif secara positif.
 
 Kolom `Link Mitra` pada tabel operasional admin (`#adminTable`) menampilkan
 tautan langsung ke Dashboard Mitra (`.admin-table-mitra-link`) di sebelah kanan

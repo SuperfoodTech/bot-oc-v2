@@ -41,9 +41,9 @@
         <div class="mitra-login-stack">
           <div class="mitra-login-hero">
             <div class="mitra-login-copy">
-              <div class="step-indicator">Dashboard Mitra</div>
-              <h1 class="card-title">Masukkan kata sandi</h1>
-              <p class="card-subtitle">Gunakan kata sandi dari admin FoodMaster untuk mengakses dashboard outlet Anda.
+              <div class="step-indicator">Bot ShopeeFood</div>
+              <h1 class="card-title">Masukkan Kata Sandi</h1>
+              <p class="card-subtitle">Gunakan kata sandi dari Admin untuk mengakses Bot Anda.
               </p>
             </div>
           </div>
@@ -51,7 +51,7 @@
           <div class="mitra-login-form">
             <form class="mitra-login-form-shell" onsubmit="event.preventDefault(); doLogin()" novalidate>
               <div class="mitra-login-field">
-                <label for="passcodeInput" class="mitra-login-field-label">Kata sandi mitra</label>
+                <label for="passcodeInput" class="mitra-login-field-label">Kata Sandi</label>
                 <div id="passcodeField" class="password-input-wrapper">
                   <span class="password-field-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
@@ -147,10 +147,10 @@
                     d="M1 15V7.52C1.82 7.76 2.88 8 4 8c1.3 0 2.53-.32 3.38-.6.23-.08.43-.15.62-.22.18.07.39.14.62.22.85.28 2.08.6 3.38.6 1.12 0 2.18-.24 3-.48V15H7v-5H4v5H1Zm11-5h-2v3h2v-3Z">
                   </path>
                 </svg>
-                <span id="accountOutletCount">0 outlet</span>
+                <span id="accountOutletCount">0 Outlet</span>
               </span>
               <span class="mitra-account-meta-note">
-                <span class="mitra-account-password-label">Password:</span>
+                <span class="mitra-account-password-label">Kata Sandi:</span>
                 <strong class="mitra-account-password-value" id="accountPasscode">-</strong>
               </span>
             </div>
@@ -1105,7 +1105,7 @@
           const hours = String(Math.floor(interval.start / 60)).padStart(2, '0');
           const minutes = String(interval.start % 60).padStart(2, '0');
           return offset === 0
-            ? `Akan buka kembali pada ${hours}:${minutes} WIB`
+            ? `Akan buka pada ${hours}:${minutes} WIB`
             : `Akan buka kembali ${candidateParts.weekday}, ${hours}:${minutes} WIB`;
         }
       }
@@ -1132,12 +1132,12 @@
       if (stateContext.botPhase === 'PENDING_OPEN') {
         return stateContext.isWithinSchedule
           ? 'Toggle aktif. Menunggu sinkronisasi bot membuka outlet.'
-          : (getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.');
+          : (getNextScheduleOpenText(outlet) || 'Di luar jam operasional');
       }
-      if (stateContext.botPhase === 'WAITING_SCHEDULE') return getNextScheduleOpenText(outlet) || 'Menunggu jadwal buka berikutnya.';
-      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Toggle aktif. Menunggu bot fetch jadwal operasional Shopee.';
-      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Toggle aktif. Bot akan mencoba fetch jadwal lagi pada patroli berikutnya.';
-      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Toggle aktif. Menunggu jadwal operasional Shopee diatur.';
+      if (stateContext.botPhase === 'WAITING_SCHEDULE') return getNextScheduleOpenText(outlet) || 'Di luar jam operasional';
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Ada kesalahan data, harap hubungi Admin';
+      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Ada kesalahan data, harap hubungi Admin';
+      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Ada kesalahan data, harap hubungi Admin';
       if (stateContext.botPhase === 'AUTOMATION_OFF' || (stateContext.desiredState === 'MANUAL_OFF' && stateContext.liveState !== 'OPEN')) {
         return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
       }
@@ -1166,7 +1166,7 @@
     function renderOutletSchedule(outlet) {
       const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
       const names = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal reguler Shopee <span>WIB</span></div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].map(formatScheduleRange).join(' · ') : 'Tutup'}</span></div>`).join('')}</div>`;
+      return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal Operasional <span>WIB</span></div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].map(formatScheduleRange).join(' · ') : 'Tutup'}</span></div>`).join('')}</div>`;
     }
 
     function isOutletWithinSchedule(outlet, now = new Date()) {
@@ -1252,7 +1252,7 @@
             ${pauseRow}
             <div class="mitra-outlet-meta-row">
               ${clockIcon}
-              <span><strong>Jam operasional:</strong> ${escapeHtml(scheduleSummary)}</span>
+              <span><strong>Jadwal hari ini:</strong> ${escapeHtml(scheduleSummary)}</span>
             </div>
           </div>
 
