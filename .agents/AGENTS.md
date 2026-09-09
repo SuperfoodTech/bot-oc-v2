@@ -24,7 +24,21 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.12.1`.
+Latest documented release: `1.13.1`.
+
+Teks subtitle/caption pada halaman login mitra (`#loginSection .mitra-login-copy .card-subtitle`)
+wajib tampil utuh dalam satu baris (`white-space: nowrap`) menggunakan ukuran font adaptif
+(`clamp(12px, 3.4vw, 14px)`) dengan `max-width: 100%` tanpa batasan lebar buatan (340px / 304px),
+agar tidak memotong frasa `"Bot Anda."` ke baris kedua baik pada mode desktop maupun mobile.
+
+Drawer detail outlet (`.outlet-detail-panel`) pada dashboard admin menampilkan
+informasi ringkas: identitas outlet, Jadwal reguler Shopee (tampilan langsung 7 hari
+tanpa dropdown/akordion ataupun tombol minimize), dan kartu Aktivitas terbaru
+(maksimal 10 log audit outlet) dengan scrollbar internal hanya pada container
+daftar log (`.outlet-detail-history-list`). Seluruh panel drawer (`.outlet-detail-panel`)
+dan pembungkus kontennya (`#outletDetailContent`) wajib menggunakan `overflow: hidden`
+pada mode desktop, tablet, maupun mobile agar tidak memicu scroll global ataupun scroll
+ganda pada drawer. Baris `Status live Shopee` ditiadakan dari drawer ini.
 
 Badge status `Aktif` pada kartu Ringkasan Akun Mitra (`.mitra-account-summary #subBadge`)
 wajib menggunakan warna latar belakang hijau (`#16a34a`) dengan teks putih untuk

@@ -45,6 +45,8 @@ def test_mitra_dashboard_keeps_account_summary_above_outlet_list():
     assert MITRA_TEMPLATE.index('class="card-box mitra-account-summary"') < MITRA_TEMPLATE.index('class="section-heading mitra-section-heading"')
     assert MITRA_TEMPLATE.index('class="card-box mitra-account-summary"') < MITRA_TEMPLATE.index('id="outletsList"')
     assert 'onclick="scrollToAccountNotice()"' not in MITRA_TEMPLATE
+    assert 'id="accountNotice"' not in MITRA_TEMPLATE
+    assert 'Kata sandi akun Anda dikelola oleh admin FoodMaster' not in MITRA_TEMPLATE
     assert 'aria-label="Buka otomatis untuk ${storeName}"' in MITRA_TEMPLATE
     assert 'id="accountPasscode"' in MITRA_TEMPLATE
     assert 'Kata Sandi:' in MITRA_TEMPLATE
@@ -210,6 +212,56 @@ def test_admin_filter_toolbar_adaptive_layout_contract():
     assert ".custom-filter {" in STYLES
     assert "gap: 8px;" in STYLES
     assert ".admin-main .outlet-filter-toolbar .reset-filter-button {" in STYLES
+
+
+def test_admin_outlet_detail_drawer_streamlined_layout_and_internal_log_scroll_contract():
+    dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+
+    # 1. Scoped check: drawer markup inside openOutletDetail should not have removed fields
+    open_detail_start = dashboard_template.index("function openOutletDetail(")
+    open_detail_end = dashboard_template.index("function closeOutletDetail(", open_detail_start)
+    drawer_code = dashboard_template[open_detail_start:open_detail_end]
+
+    removed_drawer_fields = [
+        "Nilai terakhir yang diterima dari XHR Shopee.",
+        "Status live Shopee",
+        "<dt>Kontrak bot</dt>",
+        "<dt>Pause sampai</dt>",
+        "<dt>Sinkron terakhir</dt>",
+        "<dt>Toggle terakhir</dt>",
+        "<dt>Waktu toggle</dt>",
+        "<dt>Catatan toggle</dt>",
+        "<dt>Status subscription</dt>",
+        "<dt>Password dashboard</dt>",
+        "<dt>Catatan jam khusus</dt>",
+        "outlet-detail-list",
+        "outlet-detail-accordion",
+    ]
+    for field in removed_drawer_fields:
+        assert field not in drawer_code, f"Unexpected field found in drawer code: {field}"
+
+    # 2. Schedule section is directly open (no accordion dropdown/minimize), followed by log activity container
+    schedule_section_pos = drawer_code.index('class="outlet-detail-section"')
+    history_section_pos = drawer_code.index('class="outlet-detail-history-section"', schedule_section_pos)
+    assert schedule_section_pos < history_section_pos
+    assert 'class="outlet-detail-section-heading"' in drawer_code
+    assert 'Jadwal reguler Shopee' in drawer_code
+
+    # 3. History fetching and max 10 logs limit in JS
+    assert 'id="outletDetailHistoryLogs"' in drawer_code
+    assert "function fetchOutletDetailHistory(storeId)" in dashboard_template
+    assert "fetchOutletDetailHistory(nextStoreId);" in drawer_code
+    assert "logs.slice(0, 10)" in dashboard_template
+    assert "getHistoryActorPresentation(" in dashboard_template
+    assert "getHistorySummary(" in dashboard_template
+
+    # 4. Scrollbar contract: only log container scrolls, drawer panel is overflow: hidden
+    assert ".outlet-detail-history-list {" in STYLES
+    assert "overflow-y: auto;" in STYLES
+    assert ".outlet-detail-history-list::-webkit-scrollbar" in STYLES
+    assert "display: flex; flex-direction: column; overflow: hidden;" in STYLES
+    assert ".outlet-detail-section-heading {" in STYLES
+
 
 
 

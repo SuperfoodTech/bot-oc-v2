@@ -81,3 +81,13 @@ def test_mitra_rest_of_day_copy_is_dynamic_and_not_tomorrow_first_session():
     assert "function updatePauseRestOfDayMeta()" in MITRA_TEMPLATE
     assert "Permintaan tutup sementara Sepanjang Hari tersimpan." in MITRA_TEMPLATE
     assert "Buka kembali pada sesi operasional outlet berikutnya." in MITRA_TEMPLATE
+
+
+def test_mitra_login_caption_is_single_line_and_nowrap_contract():
+    css_content = (PROJECT_ROOT / "src/backend/static/css/styles.css").read_text()
+    assert '<p class="card-subtitle">Gunakan kata sandi dari Admin untuk mengakses Bot Anda.</p>' in MITRA_TEMPLATE
+    assert "#loginSection .mitra-login-copy .card-subtitle" in css_content
+    assert "white-space: nowrap;" in css_content
+    assert "max-width: 340px;" not in css_content
+    assert "max-width: 304px;" not in css_content
+

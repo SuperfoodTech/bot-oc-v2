@@ -850,8 +850,8 @@
     function focusOutletDetailInitialControl(panel) {
       if (!panel) return;
       const selector = isMobileAdminViewport()
-        ? '.outlet-detail-back, .outlet-detail-accordion, .outlet-detail-close'
-        : '.outlet-detail-close, .outlet-detail-accordion';
+        ? '.outlet-detail-back, .outlet-detail-close'
+        : '.outlet-detail-close';
       const focusTarget = panel.querySelector(selector) || panel;
       if (focusTarget instanceof HTMLElement) {
         focusTarget.focus({ preventScroll: true });
@@ -4129,15 +4129,6 @@
         setOutletDetailUrl(nextStoreId, getRequestedOutletDetailStoreId() ? 'replace' : 'push');
       }
       outletDetailActiveStoreId = nextStoreId;
-      const stateContext = getAdminStateContext(store);
-      const statusPresentation = getAdminStatusPresentation(store, stateContext);
-      const statusTooltip = escapeHtml(getAdminStatusTooltip(store, stateContext));
-      const shopeeStatus = getAdminShopeeStatusPresentation(store.shopee_status);
-      const pauseSummary = getAdminPauseSummary(store, stateContext);
-      const subscriptionSummary = getAdminSubscriptionSummary(store);
-      const toggleSummary = getAdminActionSummary(store);
-      const lastToggleAt = store.last_toggle_at ? formatActionDateTime(store.last_toggle_at, true) : 'Belum ada log toggle';
-      const lastSyncedAt = store.last_synced_at ? formatActionDateTime(store.last_synced_at, true) : 'Belum pernah sinkron';
       const detailScheduleRows = getAdminScheduleRowsMarkup(store);
       const ownerName = escapeHtml(detailValue(store.nama_pemilik, '-'));
       const merchantName = escapeHtml(detailValue(store.merchant_name || store.nama_portal, '-'));
@@ -4161,28 +4152,24 @@
           </div>
           <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
         </div>
-        <dl class="outlet-detail-list">
-          <div><dt>Status live Shopee</dt><dd><span class="${shopeeStatus.className}" title="Nilai status terakhir: ${escapeHtml(shopeeStatus.value)}">${shopeeStatus.label}</span></dd><small>Nilai terakhir yang diterima dari XHR Shopee.</small></div>
-          <div><dt>Kontrak bot</dt><dd>${escapeHtml(getAdminDesiredStateLabel(stateContext.desiredState))}</dd><small>Live: ${escapeHtml(getAdminLiveStateLabel(stateContext.liveState))} · Fase: ${escapeHtml(getAdminBotPhaseLabel(stateContext.botPhase))}</small></div>
-          <div><dt>Pause sampai</dt><dd>${escapeHtml(pauseSummary.value)}</dd><small>${escapeHtml(pauseSummary.note)}</small></div>
-          <div><dt>Sinkron terakhir</dt><dd>${escapeHtml(lastSyncedAt)}</dd><small>Waktu pembacaan status outlet terakhir oleh backend.</small></div>
-          <div><dt>Toggle terakhir</dt><dd>${escapeHtml(toggleSummary.title)}</dd><small>${escapeHtml(toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.')}</small></div>
-          <div><dt>Waktu toggle</dt><dd>${escapeHtml(lastToggleAt)}</dd><small>Timestamp dari audit log toggle terbaru.</small></div>
-          <div><dt>Catatan toggle</dt><dd>${escapeHtmlWithBreaks(store.last_toggle_reason, 'Belum ada catatan toggle.')}</dd></div>
-          <div><dt>Status subscription</dt><dd>${escapeHtml(subscriptionSummary.value)}</dd><small>${escapeHtml(subscriptionSummary.note)}</small></div>
-          <div><dt>Password dashboard</dt><dd>${escapeHtml(detailValue(store.vercel_password))}</dd><small>Password login dashboard mitra.</small></div>
-          <div><dt>Catatan jam khusus</dt><dd>${escapeHtmlWithBreaks(store.special_hours, 'Belum ada catatan jam khusus.')}</dd></div>
-        </dl>
         <section class="outlet-detail-section">
-          <button type="button" class="outlet-detail-accordion" aria-expanded="false" onclick="toggleOutletDetailSchedule(this)">
-            <span>Jadwal reguler Shopee</span>
-            <svg class="outlet-detail-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          <div class="outlet-detail-schedule-panel" hidden>
-            <div class="admin-schedule-heading"><strong>Tampilan 7 hari</strong><span>Klik panah untuk tutup</span></div>
+          <div class="outlet-detail-section-heading">
+            <h4>Jadwal reguler Shopee</h4>
+            <span class="outlet-detail-schedule-meta">Tampilan 7 hari</span>
+          </div>
+          <div class="outlet-detail-schedule-panel">
             ${detailScheduleRows}
           </div>
+        </section>
+        <section class="outlet-detail-history-section">
+          <div class="outlet-detail-history-heading">
+            <h4>Aktivitas terbaru</h4>
+          </div>
+          <div class="outlet-detail-history-list" id="outletDetailHistoryLogs">
+            <div class="history-item is-empty"><span>Memuat aktivitas...</span></div>
+          </div>
         </section>`;
+      fetchOutletDetailHistory(nextStoreId);
       if (shouldResetScroll) panel.scrollTop = 0;
       showOutletDetailPanel(panel, backdrop);
       document.body.classList.add('outlet-detail-open');
@@ -4221,6 +4208,110 @@
         });
       } else {
         outletDetailRestoreFocusEl = null;
+      }
+    }
+
+    async function fetchOutletDetailHistory(storeId) {
+      const container = document.getElementById('outletDetailHistoryLogs');
+      if (!container) return;
+      container.innerHTML = '<div class="history-item is-empty"><span>Memuat aktivitas...</span></div>';
+
+      const ACTION_LABELS = {
+        'USER_PAUSE_STORE': 'Ditutup sementara',
+        'USER_RESUME_STORE': 'Dibuka kembali manual',
+        'ADMIN_PAUSE_STORE': 'Ditutup oleh admin',
+        'ADMIN_RESUME_STORE': 'Dinyalakan kembali oleh admin',
+        'ADMIN_SUSPEND_UPDATE': 'Status penangguhan diperbarui',
+        'ADMIN_RENEW_SUBSCRIPTION': 'Layanan diperpanjang',
+        'ACTION_OPEN': 'Dibuka otomatis',
+        'ACTION_CLOSE': 'Ditutup otomatis'
+      };
+
+      try {
+        const res = await fetch(`/api/v1/user/history?store_ids=${encodeURIComponent(storeId)}`);
+        if (!res.ok) throw new Error('Gagal memuat log');
+        const data = await res.json();
+        if (outletDetailActiveStoreId !== String(storeId)) return;
+        container.innerHTML = '';
+
+        let logs = Array.isArray(data.logs) ? data.logs : [];
+        if (logs.length > 10) {
+          logs = logs.slice(0, 10);
+        }
+
+        if (logs.length) {
+          logs.forEach(l => {
+            const timeText = formatActionDateTime(l.timestamp, false);
+            const actor = getHistoryActorPresentation(l.action);
+            const summary = getHistorySummary(l, ACTION_LABELS);
+
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `
+              <span class="history-role-pill ${actor.className}">${actor.label}</span>
+              <span class="history-time">${escapeHtml(timeText)}</span>
+              <span class="mitra-history-body">
+                <strong>${escapeHtml(summary.title)}</strong>
+                <span>${escapeHtml(summary.subtitle || l.store_name || '-')}</span>
+              </span>
+            `;
+            container.appendChild(item);
+          });
+        } else {
+          container.innerHTML = '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
+        }
+      } catch (err) {
+        if (outletDetailActiveStoreId !== String(storeId)) return;
+        container.innerHTML = '<div class="history-item is-empty"><span>Aktivitas belum bisa dimuat. Coba lagi beberapa saat.</span></div>';
+      }
+    }
+
+    function getHistoryActorPresentation(action) {
+      const normalized = String(action || '').toUpperCase();
+      if (['ACTION_OPEN', 'ACTION_CLOSE'].includes(normalized)) {
+        return { label: 'Bot', className: 'is-bot' };
+      }
+      if (normalized.startsWith('ADMIN_')) {
+        return { label: 'Admin', className: 'is-admin' };
+      }
+      if (normalized.startsWith('USER_')) {
+        return { label: 'Merchant', className: 'is-merchant' };
+      }
+      return { label: 'Info', className: 'is-neutral' };
+    }
+
+    function extractDurationLabel(reason) {
+      const match = String(reason || '').match(/duration:\s*([^(]+)/i);
+      return match ? match[1].trim() : '';
+    }
+
+    function getHistorySummary(log, actionLabels) {
+      const action = String(log?.action || '').toUpperCase();
+      const reason = String(log?.reason || '');
+      switch (action) {
+        case 'ACTION_OPEN':
+          return { title: 'Dibuka otomatis', subtitle: log.store_name };
+        case 'ACTION_CLOSE':
+          return { title: 'Ditutup otomatis', subtitle: log.store_name };
+        case 'USER_PAUSE_STORE': {
+          const durationLabel = extractDurationLabel(reason);
+          return {
+            title: durationLabel ? `Ditutup sementara ${durationLabel.toLowerCase()}` : 'Ditutup sementara',
+            subtitle: log.store_name
+          };
+        }
+        case 'USER_RESUME_STORE':
+          return { title: 'Dibuka kembali manual', subtitle: log.store_name };
+        case 'ADMIN_PAUSE_STORE':
+          return { title: /until/i.test(reason) ? 'Ditutup sementara oleh admin' : 'Ditutup oleh admin', subtitle: log.store_name };
+        case 'ADMIN_RESUME_STORE':
+          return { title: 'Dinyalakan kembali oleh admin', subtitle: log.store_name };
+        case 'ADMIN_RENEW_SUBSCRIPTION':
+          return { title: 'Layanan diperpanjang', subtitle: log.store_name };
+        case 'ADMIN_SUSPEND_UPDATE':
+          return { title: /Tidak/i.test(reason) ? 'Penangguhan dicabut admin' : 'Outlet ditangguhkan admin', subtitle: log.store_name };
+        default:
+          return { title: actionLabels[action] || action || 'Aktivitas outlet', subtitle: log.store_name };
       }
     }
 
