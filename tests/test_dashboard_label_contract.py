@@ -100,3 +100,23 @@ def test_mitra_account_summary_name_and_outlet_capitalization_contract():
     assert "0 Outlet" in mitra_html
 
 
+def test_history_logs_ux_writing_contract():
+    mitra_html = (PROJECT_ROOT / "src/backend/templates/user_dashboard.html").read_text()
+    admin_html = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+
+    expected_phrases = [
+        "Outlet dibuka oleh Admin",
+        "Outlet dibuka oleh Merchant",
+        "Bot berhasil membuka outlet",
+        "Outlet ditutup oleh Admin",
+        "Outlet ditutup oleh Merchant",
+        "Bot berhasil menutup outlet",
+        "Store ID ${escapeHtml(l.store_id)}",
+    ]
+
+    for phrase in expected_phrases:
+        assert phrase in mitra_html, f"Phrase '{phrase}' missing in user_dashboard.html"
+        assert phrase in admin_html, f"Phrase '{phrase}' missing in admin_dashboard.html"
+
+
+

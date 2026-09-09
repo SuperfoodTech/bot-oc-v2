@@ -4217,14 +4217,14 @@
       container.innerHTML = '<div class="history-item is-empty"><span>Memuat aktivitas...</span></div>';
 
       const ACTION_LABELS = {
-        'USER_PAUSE_STORE': 'Ditutup sementara',
-        'USER_RESUME_STORE': 'Dibuka kembali manual',
-        'ADMIN_PAUSE_STORE': 'Ditutup oleh admin',
-        'ADMIN_RESUME_STORE': 'Dinyalakan kembali oleh admin',
+        'USER_PAUSE_STORE': 'Outlet ditutup oleh Merchant',
+        'USER_RESUME_STORE': 'Outlet dibuka oleh Merchant',
+        'ADMIN_PAUSE_STORE': 'Outlet ditutup oleh Admin',
+        'ADMIN_RESUME_STORE': 'Outlet dibuka oleh Admin',
         'ADMIN_SUSPEND_UPDATE': 'Status penangguhan diperbarui',
-        'ADMIN_RENEW_SUBSCRIPTION': 'Layanan diperpanjang',
-        'ACTION_OPEN': 'Dibuka otomatis',
-        'ACTION_CLOSE': 'Ditutup otomatis'
+        'ADMIN_RENEW_SUBSCRIPTION': 'Layanan diperpanjang oleh Admin',
+        'ACTION_OPEN': 'Bot berhasil membuka outlet',
+        'ACTION_CLOSE': 'Bot berhasil menutup outlet'
       };
 
       try {
@@ -4241,7 +4241,7 @@
 
         if (logs.length) {
           logs.forEach(l => {
-            const timeText = formatActionDateTime(l.timestamp, false);
+            const timeText = formatHistoryLogTimestamp(l.timestamp);
             const actor = getHistoryActorPresentation(l.action);
             const summary = getHistorySummary(l, ACTION_LABELS);
 
@@ -4253,6 +4253,7 @@
               <span class="mitra-history-body">
                 <strong>${escapeHtml(summary.title)}</strong>
                 <span>${escapeHtml(summary.subtitle || l.store_name || '-')}</span>
+                ${l.store_id ? `<span class="history-store-id">Store ID ${escapeHtml(l.store_id)}</span>` : ''}
               </span>
             `;
             container.appendChild(item);
@@ -4264,6 +4265,22 @@
         if (outletDetailActiveStoreId !== String(storeId)) return;
         container.innerHTML = '<div class="history-item is-empty"><span>Aktivitas belum bisa dimuat. Coba lagi beberapa saat.</span></div>';
       }
+    }
+
+    function formatHistoryLogTimestamp(value) {
+      const raw = String(value || '');
+      let normalized = raw.replace(/([+-]\d{2})$/, '$1:00');
+      if (!normalized.includes('T') && normalized.includes(' ')) normalized = normalized.replace(' ', 'T');
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) normalized += '+07:00';
+      const parsed = new Date(normalized);
+      if (Number.isNaN(parsed.getTime())) return raw || '-';
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).formatToParts(parsed).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+      const monthStr = months[Number(parts.month) - 1];
+      return `${parts.day} ${monthStr} ${parts.year}, ${parts.hour}:${parts.minute} WIB`;
     }
 
     function getHistoryActorPresentation(action) {
@@ -4290,26 +4307,21 @@
       const reason = String(log?.reason || '');
       switch (action) {
         case 'ACTION_OPEN':
-          return { title: 'Dibuka otomatis', subtitle: log.store_name };
+          return { title: 'Bot berhasil membuka outlet', subtitle: log.store_name };
         case 'ACTION_CLOSE':
-          return { title: 'Ditutup otomatis', subtitle: log.store_name };
-        case 'USER_PAUSE_STORE': {
-          const durationLabel = extractDurationLabel(reason);
-          return {
-            title: durationLabel ? `Ditutup sementara ${durationLabel.toLowerCase()}` : 'Ditutup sementara',
-            subtitle: log.store_name
-          };
-        }
+          return { title: 'Bot berhasil menutup outlet', subtitle: log.store_name };
+        case 'USER_PAUSE_STORE':
+          return { title: 'Outlet ditutup oleh Merchant', subtitle: log.store_name };
         case 'USER_RESUME_STORE':
-          return { title: 'Dibuka kembali manual', subtitle: log.store_name };
+          return { title: 'Outlet dibuka oleh Merchant', subtitle: log.store_name };
         case 'ADMIN_PAUSE_STORE':
-          return { title: /until/i.test(reason) ? 'Ditutup sementara oleh admin' : 'Ditutup oleh admin', subtitle: log.store_name };
+          return { title: 'Outlet ditutup oleh Admin', subtitle: log.store_name };
         case 'ADMIN_RESUME_STORE':
-          return { title: 'Dinyalakan kembali oleh admin', subtitle: log.store_name };
+          return { title: 'Outlet dibuka oleh Admin', subtitle: log.store_name };
         case 'ADMIN_RENEW_SUBSCRIPTION':
-          return { title: 'Layanan diperpanjang', subtitle: log.store_name };
+          return { title: 'Layanan diperpanjang oleh Admin', subtitle: log.store_name };
         case 'ADMIN_SUSPEND_UPDATE':
-          return { title: /Tidak/i.test(reason) ? 'Penangguhan dicabut admin' : 'Outlet ditangguhkan admin', subtitle: log.store_name };
+          return { title: /Tidak/i.test(reason) ? 'Penangguhan outlet dicabut oleh Admin' : 'Outlet ditangguhkan oleh Admin', subtitle: log.store_name };
         default:
           return { title: actionLabels[action] || action || 'Aktivitas outlet', subtitle: log.store_name };
       }

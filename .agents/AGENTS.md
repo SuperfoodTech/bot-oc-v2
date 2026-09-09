@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.2`.
+Latest documented release: `1.13.3`.
+
+Format judul dan isi riwayat aktivitas log audit pada Dashboard Mitra (`#historyLogs`)
+dan drawer detail outlet Dashboard Admin (`#outletDetailHistoryLogs`) wajib mengikuti standar UX writing:
+- Pelaku & aksi eksplisit: `"Outlet dibuka oleh Admin"`, `"Outlet dibuka oleh Merchant"`, `"Bot berhasil membuka outlet"`, `"Outlet ditutup oleh Admin"`, `"Outlet ditutup oleh Merchant"`, `"Bot berhasil menutup outlet"`.
+- Setiap kartu log audit menampilkan: Judul aksi (baris 1), Nama outlet (baris 2), `Store ID <store_id>` (baris 3), dan Waktu format `DD MMM YYYY, HH:mm WIB` (baris 4, misal: `09 Sep 2026, 10:42 WIB`).
 
 Nama pemilik akun pada kartu Ringkasan Akun Dashboard Mitra (`.mitra-account-summary #mitraName`)
 ditampilkan secara langsung tanpa prefix `"Mitra "`, dan teks jumlah outlet pada dashboard mitra
