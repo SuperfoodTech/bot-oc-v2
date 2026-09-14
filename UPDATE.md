@@ -1,6 +1,16 @@
 # Update
 
-## Latest update: v1.13.8 (Virtual Brand Shopee Store Name Real-Time Synchronization)
+## Latest update: v1.13.9 (Dynamic Google Sheet Header Detection for Agency Sync)
+
+### Handover Catatan Teknis Perubahan v1.13.9
+- Memperbaiki parsing Google Sheet CSV pada endpoint sinkronisasi Agency (`/api/v1/admin/sync-source`) dengan pencocokan nama header secara dinamis (`find_col`) pada `src/core/sheets.py` dan `main-vb/src/core/sheets.py`.
+- Mencegah error duplikasi Store ID (*502 Bad Gateway*) saat terdapat penambahan kolom baru pada spreadsheet kontrol (seperti penambahan kolom `WA Pemilik` di Kolom B).
+- Memastikan paritas *byte-for-byte identical* antara `src/core/sheets.py` dan `main-vb/src/core/sheets.py` tetap terjaga.
+- Detail rilis terdokumentasi di [update/1.13.9.md](update/1.13.9.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
+
+---
+
+## Update v1.13.8 (Virtual Brand Shopee Store Name Real-Time Synchronization)
 
 ### Handover Catatan Teknis Perubahan v1.13.8
 - Mengambil nama asli toko (`data.store.name`) dari API Shopee Foody `/api/seller/store` saat bot mengakses halaman *Business Hours*.

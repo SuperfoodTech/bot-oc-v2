@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.8`.
+Latest documented release: `1.13.9`.
+
+Parsing Google Sheet CSV pada endpoint sinkronisasi Agency (`/api/v1/admin/sync-source`)
+menggunakan deteksi nama header secara dinamis (`find_col`) pada `src/core/sheets.py`
+dan `main-vb/src/core/sheets.py` agar impor data tetap berjalan lancar saat ada penambahan
+atau pergeseran kolom spreadsheet (seperti penambahan kolom `WA Pemilik`).
 
 Sinkronisasi nama outlet asli (`data.store.name`) dari API Shopee Foody pada
 menu Business Hours disimpan ke kolom `outlets.long_name` khusus untuk Virtual Brand (VB)
