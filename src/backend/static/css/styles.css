@@ -3615,11 +3615,11 @@ body {
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1.1fr) minmax(220px, 2fr) minmax(95px, 0.8fr) minmax(170px, 1.35fr) minmax(125px, 1fr);
+  grid-template-columns: 160px minmax(180px, 1fr) 105px 210px 125px;
   gap: 16px;
   align-items: center;
-  padding: 14px 18px;
-  min-width: 780px;
+  padding: 12px 18px;
+  min-width: 720px;
 }
 
 .vb-store-table-head {
