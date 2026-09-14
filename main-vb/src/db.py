@@ -254,6 +254,18 @@ def update_shopee_regular_hours(store_id: str, regular_hours: dict) -> None:
         )
 
 
+def update_shopee_special_hours(store_id: str, special_hours: Any) -> None:
+    payload = special_hours if isinstance(special_hours, list) else (special_hours.get("special_hours", []) if isinstance(special_hours, dict) else [])
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os SET shopee_special_hours=%s,
+               last_checked_at=now(), updated_at=now()
+               FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (Jsonb(payload), store_id),
+        )
+
+
+
 def mark_schedule_fetch_empty(store_id: str) -> None:
     with connection() as conn:
         conn.execute(

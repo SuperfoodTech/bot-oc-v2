@@ -1,6 +1,7 @@
 from .store_status import (
     get_actual_store_status,
     get_regular_hours,
+    get_special_hours,
     pause_store_action,
     open_store_action,
 )
@@ -8,6 +9,8 @@ from .store_status import (
 __all__ = [
     "get_actual_store_status",
     "get_regular_hours",
+    "get_special_hours",
     "pause_store_action",
     "open_store_action",
 ]
+

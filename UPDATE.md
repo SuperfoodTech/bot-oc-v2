@@ -1,26 +1,26 @@
 # Update
 
-## Latest update: v1.13.9 (Dynamic Google Sheet Header Detection for Agency Sync)
+## Latest update: v1.14.0 (Shopee Special Hours Real-Time Synchronization & Visualization)
 
-### Handover Catatan Teknis Perubahan v1.13.9
-- Memperbaiki parsing Google Sheet CSV pada endpoint sinkronisasi Agency (`/api/v1/admin/sync-source`) dengan pencocokan nama header secara dinamis (`find_col`) pada `src/core/sheets.py` dan `main-vb/src/core/sheets.py`.
-- Mencegah error duplikasi Store ID (*502 Bad Gateway*) saat terdapat penambahan kolom baru pada spreadsheet kontrol (seperti penambahan kolom `WA Pemilik` di Kolom B).
-- Memastikan paritas *byte-for-byte identical* antara `src/core/sheets.py` dan `main-vb/src/core/sheets.py` tetap terjaga.
-- Detail rilis terdokumentasi di [update/1.13.9.md](update/1.13.9.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
+### Handover Catatan Teknis Perubahan v1.14.0
+- Penarikan (*fetch*) dan penyimpanan data Jadwal Khusus (*Special Hours*) Shopee Foody (`/api/seller/store/special-hours`) saat bot berada di tab Business Hours untuk Bot O/C reguler (`main-bot`) dan Virtual Brand (`main-vb`).
+- Menambahkan kolom `shopee_special_hours jsonb` pada tabel `outlet_states` PostgreSQL.
+- Menjaga paritas `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap 100% identik *byte-for-byte*.
+- Visualisasi Jadwal Khusus di Dashboard Admin (`admin_dashboard.html`):
+  - **Tab Agency**: Ditampilkan di dalam Drawer Detail Outlet pada seksi "Jadwal khusus Shopee".
+  - **Tab Virtual Brand (VB)**: Ditampilkan sebagai kolom ke-6 "Jadwal Khusus" di sebelah kanan kolom "Jam Hari Ini" pada tabel `.vb-store-table` dan di dalam Drawer Jadwal VB.
+- Detail rilis terdokumentasi di [update/1.14.0.md](update/1.14.0.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
+
+---
+
+## Update v1.13.9 (Virtual Brand Status UX Writing & Dynamic Google Sheet Parser)
+- Standarisasi UX writing untuk subteks status outlet pada tabel Virtual Brand (`PENDING_OPEN`, `PENDING_PAUSE`, `NOT_FETCHED_YET`).
+- Memperbaiki parsing Google Sheet CSV pada endpoint sinkronisasi Agency (`/api/v1/admin/sync-source`) dengan pencocokan nama header secara dinamis (`find_col`) pada `src/core/sheets.py` dan `main-vb/src/core/sheets.py` (tahan terhadap penambahan kolom seperti `WA Pemilik`).
+- Detail rilis terdokumentasi di [update/1.13.9.md](update/1.13.9.md).
 
 ---
 
 ## Update v1.13.8 (Virtual Brand Shopee Store Name Real-Time Synchronization)
-
-### Handover Catatan Teknis Perubahan v1.13.8
-- Mengambil nama asli toko (`data.store.name`) dari API Shopee Foody `/api/seller/store` saat bot mengakses halaman *Business Hours*.
-- Menyimpan nama outlet asli ke tabel `outlets.long_name` khusus untuk Virtual Brand melalui adapter `main-vb/src/db.py`.
-- `src/backend/db.py` menyediakan stub no-op sehingga `main-bot` tidak mengubah data outlet Bot O/C reguler.
-- Menjaga paritas `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap 100% identik *byte-for-byte*.
-- Memperbarui tabel Virtual Brand di Dashboard Admin (`admin_dashboard.html`) dengan menambahkan kolom mandiri `Nama Listing` di samping kolom `Portal`.
-- Detail rilis terdokumentasi di [update/1.13.8.md](update/1.13.8.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
-
----
 
 ## Update v1.13.7 (Virtual Brand Outlet Detail Drawer Audit Alignment)
 - Penyelarasan drawer detail outlet Virtual Brand (VB) persis dengan drawer Agency.

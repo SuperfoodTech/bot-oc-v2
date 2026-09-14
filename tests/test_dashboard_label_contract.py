@@ -126,5 +126,15 @@ def test_mitra_pending_pause_and_open_subtext_contract():
     assert "return 'Bot sedang dalam proses pembukaan outlet'" in mitra_html or "? 'Bot sedang dalam proses pembukaan outlet'" in mitra_html
 
 
+def test_vb_status_ux_writing_contract():
+    admin_html = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+    assert "function getVbStatusSubtext(" in admin_html
+    assert "function getVbStatusPresentation(" in admin_html
+    assert "Bot sedang dalam proses pembukaan outlet" in admin_html
+    assert "Bot sedang dalam proses penutupan outlet" in admin_html
+    assert "Bot sedang dalam proses pengambilan data outlet" in admin_html
+
+
+
 
 

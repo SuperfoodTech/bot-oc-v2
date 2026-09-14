@@ -1,62 +1,73 @@
-# Definition of Done (DoD) - Sinkronisasi Nama Outlet Asli (Store Name) Shopee untuk Virtual Brand (VB)
+# Definition of Done (DoD) - Integrasi Fetch Special Hours Shopee & Penempatan UI (Agency Drawer & VB Kolom Baru)
 
-Dokumen ini memuat kriteria keberhasilan (*Definition of Done*) untuk implementasi pengambilan nama outlet asli dari API Shopee Foody pada halaman *Business Hours* dan penyimpanannya ke database khusus untuk Virtual Brand (VB), serta visualisasinya di UI Admin Dashboard.
+Dokumen ini memuat kriteria keberhasilan (*Definition of Done*) untuk implementasi penarikan (*fetch*) jadwal khusus (*Special Hours*) dari API Shopee Foody (`/api/seller/store/special-hours`), migrasi penyimpanan database PostgreSQL `shopee_special_hours`, adapter database, integrasi worker engine bot-oc & bot-vb, serta penempatan informasi pada UI Dashboard Admin.
 
 ---
 
 ## 1. Scope & Batasan Pekerjaan
-- [x] **Khusus Virtual Brand**: Fitur penyimpanan nama outlet asli dari Shopee hanya aktif untuk Virtual Brand (VB).
-- [x] **Main-Bot Tidak Terpengaruh**: Bot O/C reguler (`main-bot`) tidak mengubah nama outlet yang sudah ada di database (`outlets.long_name`).
-- [x] **Kepatuhan Paritas Worker**: File `main-vb/src/worker.py` dan `main-bot/src/worker.py` tetap identik secara persis (*byte-for-byte identical*).
+- [ ] **Dual Service Support**: Penarikan jadwal khusus Shopee aktif pada kedua engine: Bot O/C reguler (`main-bot`) dan Virtual Brand (`main-vb`).
+- [ ] **Kepatuhan Paritas Worker**: File `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap identik secara persis (*byte-for-byte identical*, 0 diff).
+- [ ] **Kepatuhan Paritas Browser**: File `src/core/browser.py` dan `main-vb/src/core/browser.py` tetap identik 100% (*byte-for-byte identical*).
+- [ ] **Penempatan UI Terpisah Sesuai Arahan**:
+  - **Tab Agency**: Informasi Jadwal Khusus diletakkan di dalam **Drawer Detail Outlet** (`.outlet-detail-panel`). Tabel utama Agency tetap bersih dengan 8 kolom standar.
+  - **Tab Virtual Brand (VB)**: Informasi Jadwal Khusus ditampilkan pada tabel utama sebagai **kolom ke-6 di sebelah kanan kolom `Jam Hari Ini`** (`Jadwal Khusus`) pada `.vb-store-table`, serta di dalam drawer jadwal VB.
 
 ---
 
 ## 2. Implementasi Teknis & Kode
 
-### A. Shopee Client Layer (`store_status.py`)
-- [x] Fungsi `get_actual_store_status` pada `src/shopee/store_status.py` dan `main-vb/src/shopee/store_status.py` mengekstrak `store_data.get("name")` dari respons `/api/seller/store`.
-- [x] Return dictionary `get_actual_store_status` menyertakan key `"store_name"` dengan nilai string yang sudah di-`strip()` (atau string kosong jika tidak tersedia).
+### A. Database Migration & Schema (`database/migrations/014_shopee_special_hours.sql`)
+- [ ] Dibuat file migrasi `014_shopee_special_hours.sql` untuk menambahkan kolom `shopee_special_hours jsonb` pada tabel `outlet_states`.
+- [ ] Versi migrasi dicatat ke tabel `schema_migrations`.
+- [ ] Eksekusi migrasi berhasil dijalankan pada database PostgreSQL `fm-postgres`.
 
-### B. Database Adapter Layer (`db.py`)
-- [x] `main-vb/src/db.py`: Mengimplementasikan `update_outlet_name(store_id: str, store_name: str)` yang mengeksekusi:
-  ```sql
-  UPDATE outlets SET long_name = %s, updated_at = now()
-  WHERE store_id = %s AND (long_name IS NULL OR long_name <> %s);
-  ```
-- [x] `src/backend/db.py`: Menyediakan fungsi stub `update_outlet_name(store_id: str, store_name: str)` berupa *no-op* (`pass`) agar kompatibel saat dipanggil worker tanpa mengubah data milik `main-bot`.
+### B. Shopee Client Layer (`store_status.py`)
+- [ ] Fungsi `get_special_hours(driver, store_id: str) -> Optional[Dict[str, Any]]` ditambahkan pada `src/shopee/store_status.py` dan `main-vb/src/shopee/store_status.py`.
+- [ ] Endpoint: `GET https://foody.shopee.co.id/api/seller/store/special-hours` via XHR async script dengan timeout dan credential session Shopee.
+- [ ] **Keamanan Identitas Toko (Store Identity Verification)**: Memvalidasi `data.store_id == requested_store_id`. Jika tidak cocok, melempar `StoreIdentityMismatch` dan tidak menyimpan data salah.
+- [ ] Di-export pada `src/shopee/__init__.py` dan `main-vb/src/shopee/__init__.py`.
 
-### C. Worker Engine Layer (`worker.py`)
-- [x] Pada blok pengecekan `live_info` setelah `get_actual_store_status`, jika `live_info.get("store_name")` tersedia, worker memanggil `db.update_outlet_name(outlet.store_id, store_name)` dan memperbarui `outlet.nama_panjang_outlet`.
-- [x] Dipastikan perintah `diff -u main-bot/src/worker.py main-vb/src/worker.py` menghasilkan *zero diff*.
+### C. Database Adapter Layer (`db.py`)
+- [ ] `src/backend/db.py`: Mengimplementasikan `update_shopee_special_hours(store_id: str, special_hours: list) -> None` untuk menyimpan payload JSONB ke `outlet_states.shopee_special_hours`.
+- [ ] `main-vb/src/db.py`: Mengimplementasikan fungsi `update_shopee_special_hours(store_id: str, special_hours: list) -> None` yang kompatibel.
+- [ ] Query `list_outlets` dan endpoint `/api/v1/admin/vb/brands` menyertakan data `shopee_special_hours`.
 
-### D. Frontend & UI Admin Dashboard (`admin_dashboard.html`)
-- [x] Di tabel Virtual Brand (`.vb-store-table`), ditambahkan kolom mandiri `Nama Listing` untuk menampilkan nama asli outlet (`outlet.storeName`), berdampingan dengan kolom `Portal` (`outlet.portalName`).
-- [x] Label kolom jam operasional tetap mematuhi aturan standar: `"Jam Hari Ini"`.
-- [x] Tampilan responsif pada breakpoint desktop, tablet, dan mobile tetap rapi tanpa overflow tak terduga.
+### D. Worker Engine Layer (`worker.py`)
+- [ ] Setelah memastikan halaman Business Hours tervalidasi, worker memanggil `store_status.get_special_hours(driver, store_id=outlet.store_id)`.
+- [ ] Hasil list `special_hours` disimpan ke database via `db.update_shopee_special_hours`.
+- [ ] Terverifikasi `cmp main-bot/src/worker.py main-vb/src/worker.py` menghasilkan *zero diff*.
+
+### E. Frontend & UI Admin Dashboard (`admin_dashboard.html` & `styles.css`)
+- [ ] **Agency Drawer (`openOutletDetail`)**: Menampilkan card/seksi "Jadwal Khusus Shopee" yang memuat rentang tanggal dan jam/status khusus jika ada (atau badge `"Tidak ada jadwal khusus"`).
+- [ ] **Virtual Brand Table (`.vb-store-table`)**: Menambahkan kolom ke-6 `Jadwal Khusus` di sebelah kanan `Jam Hari Ini` dengan visualisasi ringkas rentang tanggal/jam khusus.
+- [ ] **Virtual Brand Drawer (`vbScheduleDrawer`)**: Menampilkan rincian jadwal khusus di drawer samping VB.
+- [ ] **Grid Styling**: Proporsi kolom tabel VB disesuaikan menjadi 6 kolom yang seimbang, rapat (*snug*), dan responsif.
 
 ---
 
 ## 3. Pengujian & Verifikasi (Testing)
 
 ### A. Automated Testing
-- [x] Unit test parser identitas toko Shopee (`tests/test_regular_hours_store_identity.py`) memverifikasi bahwa field `store_name` terekstraksi dengan tepat dan aman saat data kosong.
-- [x] Unit test/verifikasi paritas memastikan `main-bot/src/worker.py` dan `main-vb/src/worker.py` 100% identik.
-- [x] Test suite yang ada tetap lolos tanpa regresi.
+- [ ] Dibuat unit test `tests/test_special_hours_store_identity.py` untuk menguji:
+  - Sukses parsing respons `special_hours` dari Shopee.
+  - Penolakan dan pelemparan exception `StoreIdentityMismatch` jika Store ID tidak cocok.
+  - Penanganan respons kosong, null, atau timeout.
+- [ ] Unit test UI layout contract memverifikasi keberadaan kolom `Jadwal Khusus` pada VB dan seksi jadwal khusus pada drawer Agency.
+- [ ] Seluruh unit test suite (`uv run pytest tests/`) lulus 100% tanpa regresi.
 
-### B. Manual / Live Verification
-- [x] Saat patroli VB berjalan dan mengakses halaman Business Hours, log mencatat deteksi `store_name`.
-- [x] Tabel `outlets` pada baris store VB terisi dengan nama asli dari Shopee (misal: `"Warung Lontong Sayur, WonderFood"` menggantikan fallback `"Lakubudi - 21897114"`).
-- [x] Membuka halaman `/admin/dashboard?tab=vb` menampilkan nama asli toko pada baris outlet di dalam kartu brand yang di-*expand*.
+### B. Paritas File
+- [ ] `cmp main-bot/src/worker.py main-vb/src/worker.py` -> 0 diff.
+- [ ] `cmp src/core/browser.py main-vb/src/core/browser.py` -> 0 diff.
 
 ---
 
-## 4. Dokumentasi, Deployment, & Standar Operasional
+## 4. Dokumentasi, Deployment & Standar Operasional
 
-- [x] **Dokumentasi Rilis**: Dibuat file rilis `update/1.13.8.md` yang memuat seksi `Whats New`, `Spesifikasi`, dan `Handling`.
-- [x] **Pembaruan Aturan**: File `.agents/AGENTS.md` diperbarui mencatat versi `1.13.8` dan aturan terkait perilaku sinkronisasi nama outlet VB.
-- [x] **Zero-Downtime Deployment**: Update backend/frontend diterapkan menggunakan perintah standar:
+- [ ] **Dokumentasi Rilis**: Dibuat file rilis `update/1.14.0.md` yang memuat `Whats New`, `Spesifikasi`, dan `Handling`.
+- [ ] **Pembaruan Aturan**: File `.agents/AGENTS.md` diperbarui dengan versi `1.14.0` dan aturan teknis fetch special-hours & penempatan UI.
+- [ ] **Zero-Downtime Deployment**: Update backend web di-deploy dengan perintah standar:
   ```bash
   docker compose build web
   docker compose up -d --no-deps web
   ```
-  tanpa mematikan container `fm-bot`, `fm-vb`, atau `fm-postgres`.
+  tanpa menginterupsi bot atau database.

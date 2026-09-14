@@ -24,7 +24,14 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.9`.
+Latest documented release: `1.14.0`.
+
+Sinkronisasi Jadwal Khusus (*Special Hours*) dari endpoint `/api/seller/store/special-hours`
+disimpan ke kolom `outlet_states.shopee_special_hours` (`jsonb`) saat bot mengakses tab Business Hours.
+Validasi identitas toko (`StoreIdentityMismatch`) wajib diterapkan secara ketat sebelum menyimpan jadwal.
+Tampilan Jadwal Khusus di Dashboard Admin:
+- Tab Agency: Tampil di dalam Drawer Detail Outlet pada kartu "Jadwal khusus Shopee".
+- Tab Virtual Brand: Tampil sebagai kolom ke-6 "Jadwal Khusus" di sebelah kanan kolom "Jam Hari Ini" pada tabel `.vb-store-table` dan di dalam Drawer Jadwal VB.
 
 Parsing Google Sheet CSV pada endpoint sinkronisasi Agency (`/api/v1/admin/sync-source`)
 menggunakan deteksi nama header secara dinamis (`find_col`) pada `src/core/sheets.py`
@@ -36,6 +43,11 @@ menu Business Hours disimpan ke kolom `outlets.long_name` khusus untuk Virtual B
 melalui adapter `main-vb/src/db.py`, sedangkan `src/backend/db.py` menyediakan stub no-op
 agar engine `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap identik byte-for-byte
 tanpa mengubah data outlet Bot O/C reguler.
+
+Subteks status outlet pada kolom status tabel Virtual Brand (`admin_dashboard.html` / `getVbStatusSubtext`):
+- Fase antrean buka (`PENDING_OPEN`): `"Bot sedang dalam proses pembukaan outlet"`.
+- Fase antrean tutup (`PENDING_PAUSE`): `"Bot sedang dalam proses penutupan outlet"`.
+- Fase pengambilan data/jadwal (`NOT_FETCHED_YET`, `FETCH_RETRYING`, `STATUS_UNKNOWN`): `"Bot sedang dalam proses pengambilan data outlet"`.
 
 Header kolom jam operasional pada tabel Agency (`#adminTable`) dan tabel Virtual Brand (`.vb-store-table`)
 wajib menggunakan teks `Jam Hari Ini`, serta label data kartu mobile Agency (`.admin-mobile-outlet-grid dt`)

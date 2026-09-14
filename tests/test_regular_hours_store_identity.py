@@ -72,9 +72,12 @@ def test_live_status_rejects_another_store_response():
         },
     }
 
-    result = module.get_actual_store_status(FakeDriver(response), "22403454")
-
-    assert result is None
+    try:
+        module.get_actual_store_status(FakeDriver(response), "22403454")
+    except module.StoreIdentityMismatch as exc:
+        assert "live-store" in str(exc)
+    else:
+        raise AssertionError("mismatched store response must be rejected")
 
 
 def test_live_status_extracts_store_name_when_matching():

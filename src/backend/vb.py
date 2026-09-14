@@ -74,7 +74,7 @@ def list_brands() -> list[dict[str, Any]]:
         for row in rows:
             stores = list(conn.execute(
                 """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                          os.shopee_actual_status, os.shopee_regular_hours, os.timezone,
+                          os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
                           os.schedule_fetch_status,
                           os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
                           os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
@@ -93,6 +93,7 @@ def list_brands() -> list[dict[str, Any]]:
                 control = store_controls.get(str(store["store_id"]), {})
                 effective_status = control.get("status", "ON")
                 store["shopee_regular_hours"] = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
+                store["shopee_special_hours"] = store.get("shopee_special_hours") or []
                 store["timezone"] = normalize_timezone(store.get("timezone"))
                 store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
                 store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
@@ -117,7 +118,7 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
             return None
         stores = list(conn.execute(
             """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                      os.shopee_actual_status, os.shopee_regular_hours, os.timezone,
+                      os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
                       os.schedule_fetch_status,
                       os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
                       os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
@@ -135,6 +136,7 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
             control = store_controls.get(str(store["store_id"]), {})
             effective_status = control.get("status", "ON")
             store["shopee_regular_hours"] = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
+            store["shopee_special_hours"] = store.get("shopee_special_hours") or []
             store["timezone"] = normalize_timezone(store.get("timezone"))
             store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
             store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
