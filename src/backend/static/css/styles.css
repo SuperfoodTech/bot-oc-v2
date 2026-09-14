@@ -6367,7 +6367,7 @@ body.vb-schedule-open {
 .outlet-content-layout { display: grid; grid-template-columns: minmax(0, 1fr) 242px; gap: 12px; align-items: stretch; }
 .outlet-detail-panel {
   min-width: 0;
-  padding: 16px 14px;
+  padding: 0;
   border: 1px solid #eceef0;
   border-radius: 11px;
   background: #fff;
@@ -6392,7 +6392,7 @@ body.vb-schedule-open {
   flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 4px;
+  padding: 16px 14px 20px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
@@ -6418,7 +6418,7 @@ body.vb-schedule-open {
 #vbScheduleDrawerContent::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.6);
 }
-.outlet-detail-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #f0f1f2; }
+.outlet-detail-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 14px 14px; border-bottom: 1px solid #f0f1f2; flex: 0 0 auto; }
 .outlet-detail-panel-head h2 { margin: 0; font-size: 13px; font-weight: 700; flex: 1 1 auto; }
 .outlet-detail-back {
   display: none;
@@ -6731,27 +6731,6 @@ body.vb-schedule-open {
   display: flex;
   flex-direction: column;
   gap: 0;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
-}
-.outlet-detail-history-list::-webkit-scrollbar {
-  width: 5px;
-}
-.outlet-detail-history-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.outlet-detail-history-list::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
-  border-radius: 999px;
-}
-.outlet-detail-history-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6);
 }
 .outlet-detail-history-list .history-item {
   display: grid;
@@ -6893,7 +6872,7 @@ body.vb-schedule-open {
   .admin-main .filter-field .form-input, .admin-main .reset-filter-button { height: 34px; }
   .outlet-content-layout { display: block; height: calc(100vh - 355px); min-height: 260px; }
   .outlet-content-layout .outlet-section { min-height: 0; height: 100%; }
-  .outlet-detail-panel { position: fixed; z-index: 120; top: 0; right: 0; width: min(360px, 92vw); height: 100vh; max-height: none; display: flex; flex-direction: column; overflow: hidden; padding: 22px 20px; border: 0; border-left: 1px solid #eceef0; border-radius: 0; box-shadow: -12px 0 30px rgba(20, 23, 28, .12); transform: translateX(calc(100% + 20px)); transition: transform 240ms cubic-bezier(.22, 1, .36, 1), opacity 240ms ease; }
+  .outlet-detail-panel { position: fixed; z-index: 120; top: 0; right: 0; width: min(360px, 92vw); height: 100vh; max-height: none; display: flex; flex-direction: column; overflow: hidden; padding: 0; border: 0; border-left: 1px solid #eceef0; border-radius: 0; box-shadow: -12px 0 30px rgba(20, 23, 28, .12); transform: translateX(calc(100% + 20px)); transition: transform 240ms cubic-bezier(.22, 1, .36, 1), opacity 240ms ease; }
   .outlet-detail-panel.is-open { transform: translateX(0); }
   .outlet-detail-backdrop { position: fixed; z-index: 110; inset: 0; background: rgba(20, 23, 28, .22); }
   .outlet-detail-backdrop[hidden] { display: none; }
@@ -6902,7 +6881,10 @@ body.vb-schedule-open {
   .outlet-detail-actions { margin-top: 10px; }
   .admin-main .data-table th { padding: 10px 7px !important; font-size: 9px !important; }
   .admin-main .data-table td { padding: 10px 7px !important; font-size: 9px !important; }
-  .outlet-detail-panel-head { padding-bottom: 18px; }
+  .outlet-detail-panel-head { padding: 22px 20px 18px; }
+  .outlet-detail-content,
+  #outletDetailContent,
+  #vbScheduleDrawerContent { padding: 16px 20px 24px; }
   .outlet-detail-panel-head h2 { font-size: 15px; }
   .outlet-detail-panel-actions { gap: 10px; }
   .outlet-detail-identity { margin-top: 15px; gap: 14px; }

@@ -272,10 +272,10 @@ def test_admin_outlet_detail_drawer_streamlined_layout_and_internal_log_scroll_c
     assert "getHistoryActorPresentation(" in dashboard_template
     assert "getHistorySummary(" in dashboard_template
 
-    # 4. Scrollbar contract: only log container scrolls, drawer panel is overflow: hidden
-    assert ".outlet-detail-history-list {" in STYLES
+    # 4. Scrollbar contract: drawer content container scrolls, drawer panel is overflow: hidden
+    assert ".outlet-detail-content" in STYLES
     assert "overflow-y: auto;" in STYLES
-    assert ".outlet-detail-history-list::-webkit-scrollbar" in STYLES
+    assert ".outlet-detail-content::-webkit-scrollbar" in STYLES
     assert "display: flex; flex-direction: column; overflow: hidden;" in STYLES
     assert ".outlet-detail-section-heading {" in STYLES
 
