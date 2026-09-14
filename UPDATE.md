@@ -1,6 +1,41 @@
 # Update
 
-## Latest update: v1.10.1
+## Latest update: v1.13.5 (Virtual Brand Dispatching & Browser Auth Recovery Fix)
+
+### Handover Catatan Teknis Perubahan v1.13.5
+
+#### 1. Masalah Whitelist Akun Bot VB (`ALLOWED_USERNAMES`)
+- **Gejala**: Scheduler bot VB melakukan dispatch portal merchant (`Gurame Bakar, Do Eat`, `Lokarasa`, `SuperFood`, `WonderFood`), namun di akhir siklus selalu menghasilkan `Stores processed: 0` dan tidak ada store yang diproses.
+- **Penyebab**: Unit systemd `bot-vb.service` membaca `EnvironmentFile=%PROJECT_DIR%/.env`. Berdasarkan aturan prioritas systemd, seluruh variabel di dalam `EnvironmentFile=` selalu menimpa (`override`) direktif `Environment="ALLOWED_USERNAMES=allvbadmin"`. Akibatnya, nilai `ALLOWED_USERNAMES=auto7313` dari `.env` pusat aktif di runtime VB dan memicu exclusion filter pada worker VB untuk semua outlet berakun `allvbadmin`.
+- **Solusi**:
+  - Dibuat file override lokal `.env.vb` berisi `ALLOWED_USERNAMES=allvbadmin`.
+  - Ditambahkan direktif `EnvironmentFile=-%PROJECT_DIR%/.env.vb` pada file unit systemd `systemd/bot-vb.service` dan `/etc/systemd/system/bot-vb.service` di bawah baris `.env` utama.
+  - File pola `.env.*` diabaikan oleh `.gitignore`.
+
+#### 2. Perbaikan Login Flow: Tombol "Lanjutkan" Hang
+- **Gejala**: Saat flow autentikasi Shopee Partner memunculkan dialog konfirmasi tombol "Lanjutkan", proses hang selama 60 detik hingga memicu renderer timeout:
+  `Message: timeout: Timed out receiving message from renderer: 60.000`.
+- **Penyebab**: Pemanggilan native Selenium `btn_el.click()` memblokir ChromeDriver karena menunggu event navigasi dokumen HTML penuh (`document.readyState`), sementara tombol tersebut merupakan aksi internal AJAX/SPA.
+- **Solusi**:
+  - Diganti dengan eksekusi klik langsung melalui JavaScript DOM (`driver.execute_script(...)`) pada [src/core/browser.py](src/core/browser.py) dan [main-vb/src/core/browser.py](main-vb/src/core/browser.py).
+  - Klik dieksekusi seketika tanpa menunggu page reload klasik, menghilangkan timeout renderer 60 detik.
+
+#### 3. Perbaikan Fallback Nama Merchant & Proteksi Logout Warmup
+- **Gejala**: Sesi browser yang sudah berhasil login di-logout secara paksa oleh bot saat startup warmup dengan pesan: `Invalid active merchant detected (Name: Unknown Merchant, ID: 21747251). Redirecting/Switching...`.
+- **Penyebab**: API `GetUserInfo` mengembalikan `merchantId` yang valid (`21747251`), tetapi tidak menyertakan `merchantName` di tingkat root. Pengecekan fallback UI name sebelumnya hanya aktif jika `not active_id`, sehingga saat `active_id` ada namun `active_name` `"Unknown Merchant"`, fallback terlewat dan bot memicu `_deliberate_logout_and_relogin`.
+- **Solusi**:
+  - Pengecekan fallback UI name diperluas untuk mencakup kondisi `active_name == "Unknown Merchant"`.
+  - Pada mode warmup (`target_name is None`), bot tidak memicu logout paksa selama `active_id` sudah terdeteksi dan valid.
+
+#### 4. Kepatuhan Paritas & Arsitektur
+- [main-vb/src/core/browser.py](main-vb/src/core/browser.py) dipelihara tetap identik 100% *byte-for-byte* dengan [src/core/browser.py](src/core/browser.py).
+- Ditambahkan fungsi stub `init_state()` pada [main-vb/src/db.py](main-vb/src/db.py) agar pemanggilan inisialisasi daemon engine berjalan lancar.
+- Main bot (`bot-oc.service` / `main-bot/`) dibiarkan utuh tanpa interupsi.
+- Detail rilis terdokumentasi di [update/1.13.5.md](update/1.13.5.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
+
+---
+
+## Update v1.10.1
 
 ### Server safety fix v1.10.1
 

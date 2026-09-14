@@ -21,6 +21,12 @@ def connection():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
+def init_state() -> None:
+    """Initialize state for VB daemon (no-op since database schema is initialized by central backend)."""
+    pass
+
+
+
 def _clean_schedule_fetch_error(value) -> str | None:
     raw_value = str(value or "").strip()
     return raw_value or None

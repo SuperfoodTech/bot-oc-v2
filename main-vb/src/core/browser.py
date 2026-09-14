@@ -914,13 +914,23 @@ def _perform_login(driver, wait, username: str = None, password: str = None, pho
 
         # Cek dan klik tombol Lanjutkan/Continue jika ada di halaman konfirmasi setelah login
         try:
-            btn_el = driver.find_element(By.XPATH, "//button[contains(., 'Lanjutkan') or contains(., 'Continue')] | //*[text()='Lanjutkan' or text()='Continue']")
-            if btn_el.is_displayed():
-                log.info("👉 [AUTH] Menemukan tombol 'Lanjutkan', mencoba mengklik...")
-                try:
-                    btn_el.click()
-                except Exception:
-                    driver.execute_script("arguments[0].click();", btn_el)
+            clicked_lanjutkan = driver.execute_script("""
+                var targets = ['lanjutkan', 'continue'];
+                var candidates = Array.from(document.querySelectorAll('button, .ant-btn, [role="button"], a, span, div'));
+                for (var el of candidates) {
+                    var rect = el.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) continue;
+                    var text = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    if (targets.some(function(t) { return text === t; })) {
+                        var clickable = el.closest('button, .ant-btn, [role="button"]') || el;
+                        clickable.click();
+                        return true;
+                    }
+                }
+                return false;
+            """)
+            if clicked_lanjutkan:
+                log.info("👉 [AUTH] Menemukan dan mengklik tombol 'Lanjutkan' via JS...")
                 time.sleep(2)
         except Exception:
             pass
@@ -1663,7 +1673,7 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
             except: pass
 
             # ── Step 4.5: Fallback to UI Name Matching ──
-            if not active_id or active_id == "None":
+            if not active_id or active_id == "None" or not active_name or active_name.lower().strip() == "unknown merchant":
                 try:
                     log.debug("  ⏳ Menunggu sinkronisasi UI merchant (Maks 10 detik)...")
                     def get_ui_name(d):
@@ -1676,14 +1686,18 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                     ui_name = WebDriverWait(driver, 10).until(get_ui_name)
                     if ui_name:
                         active_name = ui_name
-                        api_response_path = Path(__file__).resolve().parent.parent / "API" / "response.json"
-                        with open(api_response_path, "r") as f:
-                            m_data = json.load(f)
-                            for m in m_data.get("data", {}).get("selectMerchant", {}).get("merchantList", []):
-                                if m["merchantName"].lower() == ui_name.lower():
-                                    active_id = str(m["merchantId"])
-                                    log.info(f"📍 [MERCHANT] Detected UI: {active_name} (ID: {active_id})")
-                                    break
+                        try:
+                            api_response_path = Path(__file__).resolve().parent.parent / "API" / "response.json"
+                            if api_response_path.exists():
+                                with open(api_response_path, "r") as f:
+                                    m_data = json.load(f)
+                                    for m in m_data.get("data", {}).get("selectMerchant", {}).get("merchantList", []):
+                                        if m["merchantName"].lower() == ui_name.lower():
+                                            active_id = str(m["merchantId"])
+                                            log.info(f"📍 [MERCHANT] Detected UI: {active_name} (ID: {active_id})")
+                                            break
+                        except Exception:
+                            pass
                 except Exception as e:
                     pass
 
@@ -1703,9 +1717,10 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                     log.info(f"✅ [MERCHANT] Already as target: {active_name}")
             else:
                 is_invalid_name = (
-                    not active_name or
+                    (not active_name or
                     active_name.lower().strip() == "unknown merchant" or
-                    active_name.lower().strip() == "admin"
+                    active_name.lower().strip() == "admin") and
+                    (not active_id or active_id == "None")
                 )
                 if not is_invalid_name:
                     # Active merchant name is valid — accept it regardless of active_id.

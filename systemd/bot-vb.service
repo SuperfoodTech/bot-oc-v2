@@ -8,6 +8,7 @@ Type=simple
 User=%USER%
 WorkingDirectory=%PROJECT_DIR%
 EnvironmentFile=%PROJECT_DIR%/.env
+EnvironmentFile=-%PROJECT_DIR%/.env.vb
 Environment="PYTHONPATH=%PROJECT_DIR%/main-vb/src:%PROJECT_DIR%/src"
 Environment="HEADLESS=true"
 Environment="TZ=Asia/Jakarta"
@@ -20,7 +21,7 @@ Environment="VB_CHROME_PROFILE_DIR=%PROJECT_DIR%/src/data/chrome_profile_allvbad
 Environment="VB_CHROME_PROFILE_NAME=shopee_profile"
 Environment="VB_PATROL_INTERVAL_SECONDS=30"
 Environment="VB_MAX_RETRIES=2"
-ExecStart=%UV_BIN% run python main-vb/src/daemon.py
+ExecStart=%UV_BIN% run --no-env-file python main-vb/src/daemon.py
 Restart=always
 RestartSec=10
 KillMode=mixed

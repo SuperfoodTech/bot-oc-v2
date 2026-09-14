@@ -12,7 +12,7 @@ Environment="PYTHONPATH=%PROJECT_DIR%/src"
 Environment="HEADLESS=true"
 Environment="TZ=Asia/Jakarta"
 Environment="BOT_API_PORT=8081"
-ExecStart=%UV_BIN% run python main-bot/src/daemon.py
+ExecStart=%UV_BIN% run --no-env-file python main-bot/src/daemon.py
 Restart=always
 RestartSec=10
 KillMode=mixed

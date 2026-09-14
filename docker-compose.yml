@@ -1,3 +1,5 @@
+name: fm
+
 services:
   db:
     image: postgres:16-alpine
@@ -25,9 +27,9 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - ENVIRONMENT=development
-      - PORT=3001
-      - APP_BASE_URL=http://localhost:3001
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PORT=${PORT:-3001}
+      - APP_BASE_URL=${APP_BASE_URL:-http://38.103.170.205:3001}
       - ALLOWED_USERNAMES=auto7313
       - DATABASE_URL=postgresql://${POSTGRES_USER:-foodmaster}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-foodmaster}
       - SHOPEE_BOT_USERNAME=auto7313

@@ -24,7 +24,7 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.4`.
+Latest documented release: `1.13.5`.
 
 Subteks status outlet pada fungsi `getOutletPauseLine` di Dashboard Mitra (`user_dashboard.html`):
 - Fase antrean tutup (`PENDING_PAUSE`): `"Bot sedang dalam proses penutupan outlet"` (tanpa informasi waktu buka kembali).
@@ -127,6 +127,10 @@ patrol tanpa menganggap kolom tersebut sebagai Store ID.
 Konfigurasi `HEADLESS` dipusatkan di `.env` dan dibaca bersama oleh service
 `bot-oc` serta `bot-vb` melalui Docker Compose. Nilai default tetap `true`
 agar stabil pada server/container tanpa X display.
+
+Service `bot-vb` mendukung file override `.env.vb` melalui direktif
+`EnvironmentFile=-%PROJECT_DIR%/.env.vb` di bawah `.env` utama pada unit systemd,
+agar variabel seperti `ALLOWED_USERNAMES=allvbadmin` tidak tertimpa oleh `.env` pusat.
 
 Eksperimen `test_switch_xhr.py` wajib reach dashboard lebih dulu melalui
 `src/core/browser.py`, lalu memverifikasi state UI dan struktur request partner
