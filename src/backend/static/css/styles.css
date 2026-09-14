@@ -6388,7 +6388,25 @@ body.vb-schedule-open {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+.outlet-detail-content::-webkit-scrollbar {
+  width: 5px;
+}
+.outlet-detail-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.outlet-detail-content::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+.outlet-detail-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
 }
 .outlet-detail-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #f0f1f2; }
 .outlet-detail-panel-head h2 { margin: 0; font-size: 13px; font-weight: 700; flex: 1 1 auto; }
@@ -6680,8 +6698,7 @@ body.vb-schedule-open {
 .outlet-detail-history-section {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid #f0f1f2;
