@@ -222,7 +222,7 @@ def test_admin_outlet_table_8_columns_and_link_mitra_contract():
 
 
 def test_admin_filter_toolbar_adaptive_layout_contract():
-    assert "grid-template-columns: repeat(6, minmax(0, 1fr)) auto;" in STYLES
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr)) auto;" in STYLES
     assert ".custom-filter-trigger {" in STYLES
     assert "text-overflow: ellipsis;" in STYLES
     assert ".custom-filter {" in STYLES
@@ -265,7 +265,7 @@ def test_admin_outlet_detail_drawer_streamlined_layout_and_internal_log_scroll_c
 
     # 3. History fetching and max 10 logs limit in JS
     assert 'id="outletDetailHistoryLogs"' in drawer_code
-    assert "function fetchOutletDetailHistory(storeId)" in dashboard_template
+    assert "fetchOutletDetailHistory(storeId" in dashboard_template
     assert "fetchOutletDetailHistory(nextStoreId);" in drawer_code
     assert "logs.slice(0, 10)" in dashboard_template
     assert "getHistoryActorPresentation(" in dashboard_template

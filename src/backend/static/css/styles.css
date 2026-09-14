@@ -3605,19 +3605,21 @@ body {
 .vb-store-table {
   display: grid;
   gap: 0;
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid #f0f1f3;
   border-radius: 16px;
   background: #fff;
+  -webkit-overflow-scrolling: touch;
 }
 
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(90px, 0.75fr) minmax(140px, 1.15fr) minmax(130px, 1fr);
+  grid-template-columns: minmax(130px, 1.1fr) minmax(220px, 2fr) minmax(95px, 0.8fr) minmax(170px, 1.35fr) minmax(125px, 1fr);
   gap: 16px;
   align-items: center;
-  padding: 14px 16px;
+  padding: 14px 18px;
+  min-width: 780px;
 }
 
 .vb-store-table-head {
@@ -3625,9 +3627,11 @@ body {
   color: #717780;
   font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.vb-store-table-head > span:first-child { padding-left: 28px; }
+.vb-store-table-head > span:first-child { padding-left: 22px; }
 
 .vb-store-row {
   border-top: 1px solid #f2f3f5;
