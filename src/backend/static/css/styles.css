@@ -6383,29 +6383,39 @@ body.vb-schedule-open {
   opacity: 1;
   pointer-events: auto;
 }
-.outlet-detail-content {
+.outlet-detail-content,
+#outletDetailContent,
+#vbScheduleDrawerContent {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 2px;
+  padding-right: 4px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
-.outlet-detail-content::-webkit-scrollbar {
+.outlet-detail-content::-webkit-scrollbar,
+#outletDetailContent::-webkit-scrollbar,
+#vbScheduleDrawerContent::-webkit-scrollbar {
   width: 5px;
 }
-.outlet-detail-content::-webkit-scrollbar-track {
+.outlet-detail-content::-webkit-scrollbar-track,
+#outletDetailContent::-webkit-scrollbar-track,
+#vbScheduleDrawerContent::-webkit-scrollbar-track {
   background: transparent;
 }
-.outlet-detail-content::-webkit-scrollbar-thumb {
+.outlet-detail-content::-webkit-scrollbar-thumb,
+#outletDetailContent::-webkit-scrollbar-thumb,
+#vbScheduleDrawerContent::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.4);
   border-radius: 999px;
 }
-.outlet-detail-content::-webkit-scrollbar-thumb:hover {
+.outlet-detail-content::-webkit-scrollbar-thumb:hover,
+#outletDetailContent::-webkit-scrollbar-thumb:hover,
+#vbScheduleDrawerContent::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.6);
 }
 .outlet-detail-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #f0f1f2; }
@@ -8831,12 +8841,15 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   }
 
   #outletDetailContent,
-  #vbScheduleDrawerContent {
+  #vbScheduleDrawerContent,
+  .outlet-detail-content {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 18px 18px calc(24px + env(safe-area-inset-bottom));
   }
 
