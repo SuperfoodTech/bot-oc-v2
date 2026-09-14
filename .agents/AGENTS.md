@@ -24,7 +24,14 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.9`.
+Latest documented release: `1.14.0`.
+
+Sinkronisasi Jadwal Khusus (*Special Hours*) dari endpoint `/api/seller/store/special-hours`
+disimpan ke kolom `outlet_states.shopee_special_hours` (`jsonb`) saat bot mengakses tab Business Hours.
+Validasi identitas toko (`StoreIdentityMismatch`) wajib diterapkan secara ketat sebelum menyimpan jadwal.
+Tampilan Jadwal Khusus di Dashboard Admin:
+- Tab Agency: Tampil di dalam Drawer Detail Outlet pada kartu "Jadwal khusus Shopee".
+- Tab Virtual Brand: Tampil sebagai kolom ke-6 "Jadwal Khusus" di sebelah kanan kolom "Jam Hari Ini" pada tabel `.vb-store-table` dan di dalam Drawer Jadwal VB.
 
 Sinkronisasi nama outlet asli (`data.store.name`) dari API Shopee Foody pada
 menu Business Hours disimpan ke kolom `outlets.long_name` khusus untuk Virtual Brand (VB)

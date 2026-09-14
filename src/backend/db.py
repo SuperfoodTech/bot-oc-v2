@@ -636,7 +636,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.schedule_fetch_status,to_char(os.schedule_fetch_attempted_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_attempted_at,to_char(os.schedule_fetch_succeeded_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_succeeded_at,COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.shopee_special_hours,os.schedule_fetch_status,to_char(os.schedule_fetch_attempted_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_attempted_at,to_char(os.schedule_fetch_succeeded_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_succeeded_at,COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     # Virtual Brand outlets are controlled exclusively through vb_brands and
     # must not appear in the regular outlet dashboard or bot-oc worker scope.
@@ -682,6 +682,7 @@ def _store_query(where: str = "", params=()) -> List[Dict]:
             r["special_hours"] = r.get("special_hours") or ""
             r["shopee_status"] = _normalize_persisted_shopee_status(r.get("shopee_status"))
             r["shopee_regular_hours"] = normalize_shopee_regular_hours(r.get("shopee_regular_hours"))
+            r["shopee_special_hours"] = r.get("shopee_special_hours") or []
             r["last_action"] = format_last_action(r.get("last_action_raw"))
             r.update(derive_outlet_runtime_state(r, now_dt=now_dt, normalized_schedule=r["shopee_regular_hours"]))
         return rows
@@ -1001,6 +1002,21 @@ def update_shopee_regular_hours(store_id: str, regular_hours: Dict[str, List[str
                 WHERE o.id=os.outlet_id AND o.store_id=%s""",
             (json.dumps(normalized_hours), SCHEDULE_FETCH_READY, store_id),
         )
+
+
+def update_shopee_special_hours(store_id: str, special_hours: Any) -> None:
+    payload = special_hours if isinstance(special_hours, list) else (special_hours.get("special_hours", []) if isinstance(special_hours, dict) else [])
+    with get_db_connection() as conn:
+        conn.execute(
+            """UPDATE outlet_states os
+                  SET shopee_special_hours=%s,
+                      last_checked_at=now(),
+                      updated_at=now()
+                 FROM outlets o
+                WHERE o.id=os.outlet_id AND o.store_id=%s""",
+            (json.dumps(payload), store_id),
+        )
+
 
 
 def mark_schedule_fetch_empty(store_id: str) -> None:

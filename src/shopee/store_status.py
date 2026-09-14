@@ -202,6 +202,8 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
             log.info("  ✅ [LIVE DOM STATUS] Badge/DOM status detected -> Store is CLOSED.")
             return {"opening_status": 3, "order_enabled": 0, "status_str": "CLOSED", "raw": {"source": "partner_dom_badge"}}
 
+    except StoreIdentityMismatch:
+        raise
     except Exception as e:
         log.warning(f"⚠️ Pengecekan status toko gagal untuk store {store_id}: {e}")
 
@@ -274,6 +276,76 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
         raise
     except Exception as e:
         log.warning(f"⚠️ Gagal menarik data jadwal reguler untuk store {store_id}: {e}")
+
+    return None
+
+
+def get_special_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Pulls special business hours for a specific storeId after navigating browser to Business Hours page.
+    Endpoint: GET https://foody.shopee.co.id/api/seller/store/special-hours
+    """
+    if not driver or not store_id:
+        return None
+
+    try:
+        if not ensure_business_hours_page(driver, store_id):
+            log.warning(f"  ⚠️ [SPECIAL HOURS API] Business Hours page untuk Store {store_id} belum tervalidasi. Skip fetch special schedule.")
+            return None
+
+        log.info(f"🕒 [PULL SPECIAL HOURS] Menarik data jadwal khusus Store {store_id}...")
+        res = None
+        for attempt in range(1, 3):
+            try:
+                res = driver.execute_async_script("""
+                    var done = arguments[arguments.length - 1];
+                    var controller = new AbortController();
+                    var timer = setTimeout(function() {
+                        controller.abort();
+                        done({code: -1, msg: 'Client timeout (5s)'});
+                    }, 5000);
+                    fetch('https://foody.shopee.co.id/api/seller/store/special-hours', {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        signal: controller.signal
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { clearTimeout(timer); done(d); })
+                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                """)
+                if isinstance(res, dict) and res.get("code") == 0:
+                    break
+            except Exception as async_err:
+                log.warning(f"  ⚠️ [SPECIAL HOURS API] Percobaan {attempt}/2 error: {async_err}")
+            time.sleep(1.0)
+
+        log.info(f"  🔍 [SPECIAL HOURS API RESPONSE] Store {store_id} | Response: {res.get('code') if isinstance(res, dict) else None}")
+        if isinstance(res, dict) and res.get("code") == 0:
+            data = res.get("data")
+            response_store_id = str(data.get("store_id") or "").strip() if isinstance(data, dict) else ""
+            requested_store_id = str(store_id).strip()
+            log.info(
+                f"  🔍 [SPECIAL HOURS IDENTITY] requested_store_id={requested_store_id} "
+                f"response_store_id={response_store_id or 'missing'}"
+            )
+            if response_store_id != requested_store_id:
+                log.error(
+                    f"  ❌ [SPECIAL HOURS REJECTED] Store ID mismatch: "
+                    f"requested={requested_store_id}, response={response_store_id or 'missing'}. "
+                    "Jadwal khusus tidak disimpan."
+                )
+                raise StoreIdentityMismatch(
+                    f"special-hours requested={requested_store_id}, response={response_store_id or 'missing'}"
+                )
+
+            spec_hours = data.get("special_hours", []) if isinstance(data, dict) else []
+            log.info(f"  ✅ [PULL SPECIAL HOURS SUCCESS] Berhasil menarik data jadwal khusus ({len(spec_hours)} jadwal khusus terkonfigurasi).")
+            return data
+    except StoreIdentityMismatch:
+        raise
+    except Exception as e:
+        log.warning(f"⚠️ Gagal menarik data jadwal khusus untuk store {store_id}: {e}")
 
     return None
 

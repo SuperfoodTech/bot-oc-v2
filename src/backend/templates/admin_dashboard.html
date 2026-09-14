@@ -11,12 +11,13 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <script src="/static/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260915-vb-balanced-v4">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260915-special-hours-v5">
 </head>
 
 <body x-data="adminApp()">
@@ -28,16 +29,37 @@
         <span>Online Food Management</span>
       </div>
       <nav class="admin-sidebar-nav">
-        <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets" onclick="switchTab('outlets')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9 20v-6h6v6"/></svg><span>Agency</span></button>
-        <button class="tab-btn" :class="{ 'active': currentTab === 'vb' }" id="tabBtnVB" onclick="switchTab('vb')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 9 3 3-3 3m5 0h3"/></svg><span>Virtual Brand</span></button>
-        <button class="mobile-fetch-nav d-md-none" id="mobileFetchButton" type="button" onclick="triggerMobileNavFetch()" aria-label="Fetch data Agency" title="Fetch data Agency">
+        <button class="tab-btn" :class="{ 'active': currentTab === 'outlets' }" id="tabBtnOutlets"
+          onclick="switchTab('outlets')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
+            <path d="M9 20v-6h6v6" />
+          </svg><span>Agency</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'vb' }" id="tabBtnVB" onclick="switchTab('vb')"><svg
+            class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="m8 9 3 3-3 3m5 0h3" />
+          </svg><span>Virtual Brand</span></button>
+        <button class="mobile-fetch-nav d-md-none" id="mobileFetchButton" type="button"
+          onclick="triggerMobileNavFetch()" aria-label="Fetch data Agency" title="Fetch data Agency">
           <span class="mobile-fetch-nav-core" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
           </span>
           <span class="mobile-fetch-nav-label">Fetch</span>
         </button>
-        <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs" onclick="switchTab('logs')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Logs</span></button>
-        <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings" onclick="switchTab('settings')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l1.5-1.2-1.6-2.7-1.8.7a7 7 0 0 0-2-1.2L14.8 4h-3.2l-.3 2.4a7 7 0 0 0-2 1.2l-1.8-.7-1.6 2.7 1.5 1.2A7 7 0 0 0 7.3 12c0 .4 0 .8.1 1.2l-1.5 1.2 1.6 2.7 1.8-.7a7 7 0 0 0 2 1.2l.3 2.4h3.2l.3-2.4a7 7 0 0 0 2-1.2l1.8.7 1.6-2.7-1.5-1.2c.1-.4.1-.8.1-1.2Z"/></svg><span>Settings</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'logs' }" id="tabBtnLogs"
+          onclick="switchTab('logs')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 4h14v16H5z" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+          </svg><span>Logs</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'settings' }" id="tabBtnSettings"
+          onclick="switchTab('settings')"><svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19 12a7 7 0 0 0-.1-1.2l1.5-1.2-1.6-2.7-1.8.7a7 7 0 0 0-2-1.2L14.8 4h-3.2l-.3 2.4a7 7 0 0 0-2 1.2l-1.8-.7-1.6 2.7 1.5 1.2A7 7 0 0 0 7.3 12c0 .4 0 .8.1 1.2l-1.5 1.2 1.6 2.7 1.8-.7a7 7 0 0 0 2 1.2l.3 2.4h3.2l.3-2.4a7 7 0 0 0 2-1.2l1.8.7 1.6-2.7-1.5-1.2c.1-.4.1-.8.1-1.2Z" />
+          </svg><span>Settings</span></button>
       </nav>
       <div class="admin-sidebar-note">
         <span class="admin-sidebar-note-icon" aria-hidden="true">▣</span>
@@ -47,35 +69,49 @@
     </aside>
     <main class="admin-main">
       <header class="admin-page-header">
-        <div class="admin-heading-copy"><h1 class="page-title" id="adminPageTitle">Agency Outlet Management</h1><p class="admin-breadcrumb" hidden><span>Agency</span><span aria-hidden="true">›</span><span>Daftar Outlet</span></p></div>
+        <div class="admin-heading-copy">
+          <h1 class="page-title" id="adminPageTitle">Agency Outlet Management</h1>
+          <p class="admin-breadcrumb" hidden><span>Agency</span><span aria-hidden="true">›</span><span>Daftar
+              Outlet</span></p>
+        </div>
         <div class="admin-actions">
           <label class="admin-header-search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-            <input type="search" id="searchInput" placeholder="Cari outlet / pemilik / Store ID" aria-label="Cari outlet, pemilik, atau Store ID" oninput="handleHeaderSearchInput()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4 4" />
+            </svg>
+            <input type="search" id="searchInput" placeholder="Cari outlet / pemilik / Store ID"
+              aria-label="Cari outlet, pemilik, atau Store ID" oninput="handleHeaderSearchInput()">
           </label>
-          <button class="btn-primary fetch-sheet-button" type="button" id="fetchSheetHeader" onclick="handleHeaderFetchAction()">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M8 17h8"/><path d="m16 12 2 2 2-2"/></svg>
+          <button class="btn-primary fetch-sheet-button" type="button" id="fetchSheetHeader"
+            onclick="handleHeaderFetchAction()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v14H4z" />
+              <path d="M8 9h8M8 13h5M8 17h8" />
+              <path d="m16 12 2 2 2-2" />
+            </svg>
             <span class="fetch-label">Fetch dari Sheet</span>
           </button>
-          <button class="admin-user-avatar" type="button" onclick="switchTab('settings')" aria-label="Buka settings admin">AD</button>
+          <button class="admin-user-avatar" type="button" onclick="switchTab('settings')"
+            aria-label="Buka settings admin">AD</button>
         </div>
       </header>
-  <div class="desktop-wrapper">
-    {% include "admin_tab_operasional.html" %}
+      <div class="desktop-wrapper">
+        {% include "admin_tab_operasional.html" %}
 
-    {% include "admin_tab_vb.html" %}
+        {% include "admin_tab_vb.html" %}
 
-    {% include "admin_tab_bot.html" %}
+        {% include "admin_tab_bot.html" %}
 
-    {% include "admin_tab_settings.html" %}
-
-
+        {% include "admin_tab_settings.html" %}
 
 
 
 
 
-  </div>
+
+
+      </div>
     </main>
   </div>
 
@@ -138,8 +174,10 @@
             <input type="text" id="genPasscode" class="form-input" placeholder="Master@00@">
           </div>
           <div style="flex: 1;">
-            <div style="display: none;"><label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
-            <input type="email" id="genGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com"></div>
+            <div style="display: none;"><label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk
+                Google Auth)</label>
+              <input type="email" id="genGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com">
+            </div>
           </div>
         </div>
 
@@ -273,8 +311,10 @@
 
         <div style="display: flex; gap: 10px; margin-top: 10px;">
           <div style="flex: 1;">
-            <div style="display: none;"><label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk Google Auth)</label>
-            <input type="email" id="editGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com"></div>
+            <div style="display: none;"><label style="font-size: 12px; font-weight: 700;">Email Google Mitra (Untuk
+                Google Auth)</label>
+              <input type="email" id="editGoogleEmail" class="form-input" placeholder="cth: mitra@gmail.com">
+            </div>
           </div>
         </div>
 
@@ -309,34 +349,66 @@
       <p class="card-subtitle">Brand akan dijeda dan aktif kembali otomatis sesuai durasi yang dipilih.</p>
       <div id="vbPauseEndPreview" class="pause-end-preview" aria-live="polite">Berakhir pada -</div>
       <div class="radio-group">
-        <label class="radio-card active"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30 Menit</span></div></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span></div></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang Hari</span></div><span class="radio-meta" id="vbRestOfDayMeta" hidden></span></label>
-        <label class="radio-card"><div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="custom"><span>Durasi lain</span></div></label>
+        <label class="radio-card active">
+          <div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="30_min" checked><span>30
+              Menit</span></div>
+        </label>
+        <label class="radio-card">
+          <div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="60_min"><span>60 Menit</span>
+          </div>
+        </label>
+        <label class="radio-card">
+          <div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="rest_of_day"><span>Sepanjang
+              Hari</span></div><span class="radio-meta" id="vbRestOfDayMeta" hidden></span>
+        </label>
+        <label class="radio-card">
+          <div class="radio-card-label"><input type="radio" name="vbPauseDuration" value="custom"><span>Durasi
+              lain</span></div>
+        </label>
         <div id="vbCustomDurationBox" style="display:none; margin-top:6px">
           <div class="custom-datetime-fields">
-            <label>Mulai<input type="text" id="vbCustomStartInput" class="form-input" readonly disabled aria-disabled="true"></label>
+            <label>Mulai<input type="text" id="vbCustomStartInput" class="form-input" readonly disabled
+                aria-disabled="true"></label>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
             <label>Target berakhir
               <div class="custom-picker-anchor">
-                <button type="button" id="vbCustomUntilTrigger" class="custom-picker-trigger" onclick="openVbCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                <button type="button" id="vbCustomUntilTrigger" class="custom-picker-trigger"
+                  onclick="openVbCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
                   <span id="vbCustomUntilDisplay">Pilih tanggal &amp; waktu</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 9h18"></path></svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                    <path d="M8 2v4M16 2v4M3 9h18"></path>
+                  </svg>
                 </button>
                 <input type="hidden" id="vbCustomUntilInput" aria-hidden="true">
-                <div id="vbCustomDateTimePicker" class="custom-picker-popover" role="dialog" aria-label="Pilih tanggal dan waktu" hidden>
-                  <div class="custom-picker-header"><button type="button" class="custom-picker-nav" onclick="shiftVbPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button><strong id="vbCustomPickerMonthLabel"></strong><button type="button" class="custom-picker-nav" onclick="shiftVbPickerMonth(1)" aria-label="Bulan berikutnya">›</button></div>
-                  <div class="custom-picker-weekdays" aria-hidden="true"><span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span> Sb</span></div>
+                <div id="vbCustomDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu" hidden>
+                  <div class="custom-picker-header"><button type="button" class="custom-picker-nav"
+                      onclick="shiftVbPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button><strong
+                      id="vbCustomPickerMonthLabel"></strong><button type="button" class="custom-picker-nav"
+                      onclick="shiftVbPickerMonth(1)" aria-label="Bulan berikutnya">›</button></div>
+                  <div class="custom-picker-weekdays" aria-hidden="true">
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>
+                      Sb</span>
+                  </div>
                   <div id="vbCustomPickerCalendar" class="custom-picker-calendar"></div>
-                  <div class="custom-picker-time"><span>Waktu</span><div class="custom-picker-time-fields"><select id="vbCustomPickerHour" aria-label="Jam VB"></select><span>:</span><select id="vbCustomPickerMinute" aria-label="Menit VB"></select><b>WIB</b></div></div>
-                  <div class="custom-picker-actions"><button type="button" class="btn-outline" onclick="closeVbCustomDateTimePicker()">Batal</button><button type="button" class="btn-primary" onclick="applyVbCustomDateTimePicker()">Pilih</button></div>
+                  <div class="custom-picker-time"><span>Waktu</span>
+                    <div class="custom-picker-time-fields"><select id="vbCustomPickerHour"
+                        aria-label="Jam VB"></select><span>:</span><select id="vbCustomPickerMinute"
+                        aria-label="Menit VB"></select><b>WIB</b></div>
+                  </div>
+                  <div class="custom-picker-actions"><button type="button" class="btn-outline"
+                      onclick="closeVbCustomDateTimePicker()">Batal</button><button type="button" class="btn-primary"
+                      onclick="applyVbCustomDateTimePicker()">Pilih</button></div>
                 </div>
               </div>
             </label>
           </div>
         </div>
       </div>
-      <div class="form-actions"><button type="button" class="btn-outline" onclick="closeVbPauseModal()">Batal</button><button type="button" class="btn-primary" onclick="confirmVbPause()">Simpan</button></div>
+      <div class="form-actions"><button type="button" class="btn-outline"
+          onclick="closeVbPauseModal()">Batal</button><button type="button" class="btn-primary"
+          onclick="confirmVbPause()">Simpan</button></div>
     </div>
   </div>
 
@@ -379,23 +451,32 @@
 
         <div id="adminCustomDurationBox" style="display: none; margin-top: 6px;">
           <div class="custom-datetime-fields">
-            <label>Mulai<input type="text" id="adminCustomStartInput" class="form-input" readonly disabled aria-disabled="true"></label>
+            <label>Mulai<input type="text" id="adminCustomStartInput" class="form-input" readonly disabled
+                aria-disabled="true"></label>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
             <label>Target berakhir
               <div class="custom-picker-anchor">
-                <button type="button" id="adminCustomUntilTrigger" class="custom-picker-trigger" onclick="openAdminCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                <button type="button" id="adminCustomUntilTrigger" class="custom-picker-trigger"
+                  onclick="openAdminCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
                   <span id="adminCustomUntilDisplay">Pilih tanggal &amp; waktu</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M8 2v4M16 2v4M3 9h18"></path></svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                    <path d="M8 2v4M16 2v4M3 9h18"></path>
+                  </svg>
                 </button>
                 <input type="hidden" id="adminCustomUntilInput" aria-hidden="true">
-                <div id="adminCustomDateTimePicker" class="custom-picker-popover" role="dialog" aria-label="Pilih tanggal dan waktu" hidden>
+                <div id="adminCustomDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu" hidden>
                   <div class="custom-picker-header">
-                    <button type="button" class="custom-picker-nav" onclick="shiftAdminPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button>
+                    <button type="button" class="custom-picker-nav" onclick="shiftAdminPickerMonth(-1)"
+                      aria-label="Bulan sebelumnya">‹</button>
                     <strong id="adminCustomPickerMonthLabel"></strong>
-                    <button type="button" class="custom-picker-nav" onclick="shiftAdminPickerMonth(1)" aria-label="Bulan berikutnya">›</button>
+                    <button type="button" class="custom-picker-nav" onclick="shiftAdminPickerMonth(1)"
+                      aria-label="Bulan berikutnya">›</button>
                   </div>
                   <div class="custom-picker-weekdays" aria-hidden="true">
-                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span> Sb</span>
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>
+                      Sb</span>
                   </div>
                   <div id="adminCustomPickerCalendar" class="custom-picker-calendar"></div>
                   <div class="custom-picker-time">
@@ -409,7 +490,8 @@
                   </div>
                   <div class="custom-picker-actions">
                     <button type="button" class="btn-outline" onclick="closeAdminCustomDateTimePicker()">Batal</button>
-                    <button type="button" class="btn-primary" onclick="applyAdminCustomDateTimePicker()">Terapkan</button>
+                    <button type="button" class="btn-primary"
+                      onclick="applyAdminCustomDateTimePicker()">Terapkan</button>
                   </div>
                 </div>
               </div>
@@ -429,7 +511,9 @@
   <div class="toast-container-custom" id="toastContainer">
     <template x-for="t in toasts" :key="t.id">
       <div class="toast-custom" :class="['toast-' + t.type, t.exiting ? 'is-hiding' : '']">
-        <span class="toast-icon" :class="t.type === 'success' ? 'toast-icon-success' : (t.type === 'dark' ? 'toast-icon-dark' : 'toast-icon-alert')" x-text="t.type === 'success' || t.type === 'dark' ? '✓' : '!'" aria-hidden="true"></span>
+        <span class="toast-icon"
+          :class="t.type === 'success' ? 'toast-icon-success' : (t.type === 'dark' ? 'toast-icon-dark' : 'toast-icon-alert')"
+          x-text="t.type === 'success' || t.type === 'dark' ? '✓' : '!'" aria-hidden="true"></span>
         <span x-text="t.message"></span>
       </div>
     </template>
@@ -1258,7 +1342,7 @@
           url.searchParams.set('tab', tabName);
           url.searchParams.delete('store');
           window.history.pushState({ tab: tabName }, '', url);
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (tabName === 'outlets') {
@@ -1418,6 +1502,98 @@
       return getTodayOperatingHours(store);
     }
 
+    function formatSpecialHoursDate(startStr, endStr) {
+      if (!startStr) return '-';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      function parsePart(str) {
+        if (!str) return null;
+        const parts = String(str).trim().split('-');
+        if (parts.length === 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const d = parseInt(parts[2], 10);
+          return { y, m, d, monthName: months[m] || '' };
+        }
+        return null;
+      }
+      const pStart = parsePart(startStr);
+      const pEnd = parsePart(endStr || startStr);
+      if (!pStart) return String(startStr);
+      if (!pEnd || (pStart.y === pEnd.y && pStart.m === pEnd.m && pStart.d === pEnd.d)) {
+        return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y}`;
+      }
+      if (pStart.y === pEnd.y && pStart.m === pEnd.m) {
+        return `${String(pStart.d).padStart(2, '0')} - ${String(pEnd.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y}`;
+      }
+      if (pStart.y === pEnd.y) {
+        return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} - ${String(pEnd.d).padStart(2, '0')} ${pEnd.monthName} ${pStart.y}`;
+      }
+      return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y} - ${String(pEnd.d).padStart(2, '0')} ${pEnd.monthName} ${pEnd.y}`;
+    }
+
+    function formatSpecialHoursIntervals(intervals) {
+      if (!Array.isArray(intervals) || !intervals.length) {
+        return 'Tutup';
+      }
+      const formatted = intervals.map(item => {
+        const from = String(item.time_from || '').replace(/\./g, ':');
+        const to = String(item.time_to || '').replace(/\./g, ':');
+        return from && to ? `${from} - ${to}` : (from || to || '');
+      }).filter(Boolean);
+      return formatted.length ? formatted.join(', ') + ' WIB' : 'Tutup';
+    }
+
+    function getAdminSpecialHoursMarkup(store) {
+      const specialHours = Array.isArray(store?.shopee_special_hours) ? store.shopee_special_hours : [];
+      if (!specialHours.length) {
+        return '<div class="admin-schedule-empty">Tidak ada jadwal khusus Shopee terkonfigurasi.</div>';
+      }
+      return specialHours.map(item => {
+        const dateText = formatSpecialHoursDate(item.date_start, item.date_end);
+        const descText = item.date_desc ? escapeHtml(String(item.date_desc)) : '';
+        const intervalsText = formatSpecialHoursIntervals(item.intervals);
+        return `
+          <div class="admin-special-schedule-row">
+            <div class="admin-special-date-col">
+              <strong>${escapeHtml(dateText)}</strong>
+              ${descText ? `<small class="admin-special-desc">${descText}</small>` : ''}
+            </div>
+            <span class="admin-special-time">${escapeHtml(intervalsText)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getVbSpecialHoursCellMarkup(store) {
+      const specialHours = Array.isArray(store?.shopee_special_hours) ? store.shopee_special_hours : [];
+      if (!specialHours.length) {
+        return '<span class="vb-special-none">-</span>';
+      }
+      const first = specialHours[0];
+      const dateText = formatSpecialHoursDate(first.date_start, first.date_end);
+      const timeText = formatSpecialHoursIntervals(first.intervals);
+      if (specialHours.length === 1) {
+        const titleText = first.date_desc ? `${first.date_desc} (${dateText}: ${timeText})` : `${dateText}: ${timeText}`;
+        return `
+          <div class="vb-special-item" title="${escapeVBHtml(titleText)}">
+            <span class="vb-special-date">${escapeVBHtml(dateText)}</span>
+            <span class="vb-special-time">${escapeVBHtml(timeText)}</span>
+          </div>
+        `;
+      }
+      const fullTooltip = specialHours.map(it => {
+        const d = formatSpecialHoursDate(it.date_start, it.date_end);
+        const t = formatSpecialHoursIntervals(it.intervals);
+        return it.date_desc ? `${it.date_desc} (${d}: ${t})` : `${d}: ${t}`;
+      }).join('\n');
+      return `
+        <div class="vb-special-item" title="${escapeVBHtml(fullTooltip)}">
+          <span class="vb-special-date">${escapeVBHtml(dateText)}</span>
+          <span class="vb-special-time">${escapeVBHtml(timeText)} <strong class="vb-special-more">+${specialHours.length - 1}</strong></span>
+        </div>
+      `;
+    }
+
     function getVbGroupCode(brand) {
       const brandIndex = allVBBrands.findIndex(item => String(item.id) === String(brand.id));
       const sequence = brandIndex >= 0 ? brandIndex + 1 : 1;
@@ -1570,6 +1746,7 @@
         statusSubtext: getVbStatusSubtext(statusStore),
         statusTooltip: getAdminStatusTooltip(statusStore),
         todayScheduleMarkup: getVbTodayOperatingHours(store),
+        specialScheduleMarkup: getVbSpecialHoursCellMarkup(store),
         actionSummary: store ? getAdminActionSummary(store) : { title: 'Belum ada aksi', note: '-' }
       };
     }
@@ -1658,7 +1835,7 @@
         const queryMatchedOutlets = !filters.query
           ? outletScoped
           : outletScoped.filter(outlet => [outlet.portalName, outlet.storeName, outlet.storeId]
-              .some(value => String(value || '').toLowerCase().includes(filters.query)));
+            .some(value => String(value || '').toLowerCase().includes(filters.query)));
         const visibleOutlets = brandMatchesQuery ? outletScoped : queryMatchedOutlets;
         const hasOutletFilters = Boolean(filters.portal || filters.storeId);
         if (hasOutletFilters && !visibleOutlets.length) return acc;
@@ -1779,16 +1956,16 @@
         const activity = brand.activity || { title: 'Belum ada aktivitas', note: 'Menunggu sinkronisasi brand' };
         const outletRows = brand.visibleOutlets.length
           ? brand.visibleOutlets.map(outlet => {
-              const statusToneClass = outlet.liveState === 'OPEN'
-                ? 'is-open'
-                : (outlet.liveState === 'PAUSE'
-                    ? 'is-paused'
-                    : (outlet.liveState === 'CLOSED' ? 'is-closed' : 'is-unknown'));
-              const outletLabel = outlet.portalName;
-              const portalColorClass = `vb-portal-${Math.min(getVbPortalOrder(outlet.portalName), 3)}`;
-              const statusPresentation = outlet.statusPresentation || { label: 'Status sedang dicek bot', className: 'table-status is-warning' };
-              const statusTooltip = outlet.statusTooltip || 'Status live dan fase bot belum tersedia.';
-              return `
+            const statusToneClass = outlet.liveState === 'OPEN'
+              ? 'is-open'
+              : (outlet.liveState === 'PAUSE'
+                ? 'is-paused'
+                : (outlet.liveState === 'CLOSED' ? 'is-closed' : 'is-unknown'));
+            const outletLabel = outlet.portalName;
+            const portalColorClass = `vb-portal-${Math.min(getVbPortalOrder(outlet.portalName), 3)}`;
+            const statusPresentation = outlet.statusPresentation || { label: 'Status sedang dicek bot', className: 'table-status is-warning' };
+            const statusTooltip = outlet.statusTooltip || 'Status live dan fase bot belum tersedia.';
+            return `
                 <div class="vb-store-row ${portalColorClass}" role="button" tabindex="0" aria-label="Lihat jadwal ${escapeVBHtml(outlet.storeName || outletLabel)} (Store ID ${escapeVBHtml(outlet.storeId)})" onclick="openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this); }">
                   <div class="vb-store-main">
                     <span class="vb-store-field-label">Portal</span>
@@ -1806,9 +1983,10 @@
                   <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
                   <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
                   <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
+                  <div class="vb-store-special-hours"><span class="vb-store-field-label">Jadwal Khusus</span>${outlet.specialScheduleMarkup}</div>
                 </div>
               `;
-            }).join('')
+          }).join('')
           : '<div class="vb-store-empty">Tidak ada Store ID yang sesuai di grup ini.</div>';
 
         return `
@@ -1870,6 +2048,7 @@
                   <span>Store ID</span>
                   <span>Status</span>
                   <span>Jam Hari Ini</span>
+                  <span>Jadwal Khusus</span>
                 </div>
                 ${outletRows}
               </div>
@@ -1886,8 +2065,8 @@
       const hasFilters = Boolean(filters.query || filters.group || filters.masterStatus || filters.groupStatus || filters.portal || filters.storeId);
       summary.textContent = brands.length
         ? (hasFilters
-            ? `Menampilkan ${brands.length} dari ${totalBrands} grup · ${totalStores} Store ID`
-            : `Menampilkan ${brands.length} grup · ${totalStores} Store ID`)
+          ? `Menampilkan ${brands.length} dari ${totalBrands} grup · ${totalStores} Store ID`
+          : `Menampilkan ${brands.length} grup · ${totalStores} Store ID`)
         : '0 grup · Ubah filter untuk melihat hasil lainnya';
     }
 
@@ -2027,10 +2206,17 @@
         <section class="outlet-detail-section">
           <div class="outlet-detail-section-heading">
             <h4>Jadwal reguler Shopee</h4>
-            <span class="outlet-detail-schedule-meta">Tampilan 7 hari</span>
           </div>
           <div class="outlet-detail-schedule-panel">
             ${scheduleMarkup}
+          </div>
+        </section>
+        <section class="outlet-detail-section">
+          <div class="outlet-detail-section-heading">
+            <h4>Jadwal khusus Shopee</h4>
+          </div>
+          <div class="outlet-detail-schedule-panel">
+            ${getAdminSpecialHoursMarkup(store)}
           </div>
         </section>
         <section class="outlet-detail-history-section">
@@ -3124,12 +3310,12 @@
           note: stateContext.botPhase === 'WAITING_SCHEDULE'
             ? 'Tidak ada pause manual. Outlet menunggu jadwal buka berikutnya.'
             : (stateContext.botPhase === 'NOT_FETCHED_YET'
-                ? 'Tidak ada pause manual. Bot sedang mengambil jadwal Shopee pertama untuk outlet ini.'
-                : (stateContext.botPhase === 'FETCH_RETRYING'
-                    ? 'Tidak ada pause manual. Bot belum berhasil fetch jadwal Shopee dan akan mencoba lagi.'
-                    : (stateContext.botPhase === 'FETCHED_EMPTY'
-                        ? 'Tidak ada pause manual. Jadwal operasional Shopee outlet ini belum diatur.'
-                        : 'Tidak ada pause manual tersimpan.')))
+              ? 'Tidak ada pause manual. Bot sedang mengambil jadwal Shopee pertama untuk outlet ini.'
+              : (stateContext.botPhase === 'FETCH_RETRYING'
+                ? 'Tidak ada pause manual. Bot belum berhasil fetch jadwal Shopee dan akan mencoba lagi.'
+                : (stateContext.botPhase === 'FETCHED_EMPTY'
+                  ? 'Tidak ada pause manual. Jadwal operasional Shopee outlet ini belum diatur.'
+                  : 'Tidak ada pause manual tersimpan.')))
         };
       }
       if (store.pause_until) {
@@ -3248,8 +3434,8 @@
         const toggleMetaText = isTogglePending
           ? 'Menyimpan perubahan...'
           : (toggleSummary.note && toggleSummary.note !== '-'
-              ? `${toggleSummary.title} · ${toggleSummary.note}`
-              : toggleSummary.title);
+            ? `${toggleSummary.title} · ${toggleSummary.note}`
+            : toggleSummary.title);
         const toggleTooltip = getAdminToggleTooltip(s, stateContext, toggleState);
         const storeIdVal = String(s.store_id || '').trim();
         const shopeeFoodUrl = storeIdVal ? getShopeeFoodStoreUrl(storeIdVal) : '';
@@ -3762,7 +3948,7 @@
       try {
         const res = await fetch('/api/v1/user/pause', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             store_id: storeId,
             duration_type: durationType,
@@ -4040,10 +4226,17 @@
         <section class="outlet-detail-section">
           <div class="outlet-detail-section-heading">
             <h4>Jadwal reguler Shopee</h4>
-            <span class="outlet-detail-schedule-meta">Tampilan 7 hari</span>
           </div>
           <div class="outlet-detail-schedule-panel">
             ${detailScheduleRows}
+          </div>
+        </section>
+        <section class="outlet-detail-section">
+          <div class="outlet-detail-section-heading">
+            <h4>Jadwal khusus Shopee</h4>
+          </div>
+          <div class="outlet-detail-schedule-panel">
+            ${getAdminSpecialHoursMarkup(store)}
           </div>
         </section>
         <section class="outlet-detail-history-section">

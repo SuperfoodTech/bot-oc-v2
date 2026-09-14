@@ -575,6 +575,34 @@ def sync_all_stores(
                                 f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
                                 "Bot akan retry setelah fetch gagal."
                             )
+
+                    if schedule_identity_valid:
+                        try:
+                            special_res = store_status.get_special_hours(driver, store_id=outlet.store_id)
+                            if isinstance(special_res, dict):
+                                special_list = special_res.get("special_hours", [])
+                                outlet.shopee_special_hours = special_list
+                                try:
+                                    db.update_shopee_special_hours(outlet.store_id, special_list)
+                                except Exception as sp_persist_err:
+                                    log.warning(
+                                        f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Jadwal khusus Shopee Store {outlet.store_id} berhasil diambil "
+                                        f"tetapi gagal disimpan ke DB: {sp_persist_err}"
+                                    )
+                                else:
+                                    log.info(
+                                        f"  ✅ [SPECIAL HOURS STATUS SYNC] Store {outlet.store_id} jadwal khusus Shopee tersimpan "
+                                        f"({len(special_list)} entri)."
+                                    )
+                        except store_status.StoreIdentityMismatch as sp_identity_err:
+                            schedule_identity_valid = False
+                            log.error(
+                                f"  ❌ [SPECIAL HOURS QUARANTINE] Store {outlet.store_id} identity mismatch pada jadwal khusus: {sp_identity_err}"
+                            )
+                        except Exception as sp_err:
+                            log.warning(
+                                f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Gagal menarik jadwal khusus Shopee Store {outlet.store_id}: {sp_err}"
+                            )
                 else:
                     if current_schedule_fetch_status == "FETCHED_EMPTY":
                         log.info(

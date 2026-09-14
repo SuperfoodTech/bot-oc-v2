@@ -110,9 +110,10 @@ def test_vb_dashboard_uses_schedule_drawer_without_detail_panel_markup():
     assert "openVbScheduleDrawer(" in dashboard_template
     assert "resetVbFilters()" in tab_template
     assert "<span>Jam Hari Ini</span>" in dashboard_template
-    assert '<span class="vb-store-field-label">Jam Hari Ini</span>' in dashboard_template
     assert "shopee_regular_hours: outlet?.shopee_regular_hours || {}" in dashboard_template
-    assert "os.shopee_regular_hours, os.timezone" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
+    assert "os.shopee_regular_hours" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
+    assert "os.shopee_special_hours" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
+    assert "<span>Jadwal Khusus</span>" in dashboard_template
 
 
 def test_vb_dashboard_styles_define_scrollable_page_and_right_drawer():
