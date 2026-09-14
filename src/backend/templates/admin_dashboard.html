@@ -1499,6 +1499,42 @@
       }, { opened: 0, failure: 0, close: 0 });
     }
 
+    function getVbStatusSubtext(store, stateContext = getAdminStateContext(store)) {
+      if (stateContext.botPhase === 'PENDING_OPEN') {
+        return 'Bot sedang dalam proses pembukaan outlet';
+      }
+      if (stateContext.botPhase === 'PENDING_PAUSE') {
+        return 'Bot sedang dalam proses penutupan outlet';
+      }
+      if (stateContext.botPhase === 'NOT_FETCHED_YET' || stateContext.botPhase === 'FETCH_RETRYING' || stateContext.botPhase === 'STATUS_UNKNOWN') {
+        return 'Bot sedang dalam proses pengambilan data outlet';
+      }
+      return getAdminStatusSubtext(store, stateContext);
+    }
+
+    function getVbStatusPresentation(store, stateContext = getAdminStateContext(store)) {
+      const base = getAdminStatusPresentation(store, stateContext);
+      if (stateContext.botPhase === 'PENDING_OPEN') {
+        return {
+          ...base,
+          note: 'Bot sedang dalam proses pembukaan outlet'
+        };
+      }
+      if (stateContext.botPhase === 'PENDING_PAUSE') {
+        return {
+          ...base,
+          note: 'Bot sedang dalam proses penutupan outlet'
+        };
+      }
+      if (stateContext.botPhase === 'NOT_FETCHED_YET' || stateContext.botPhase === 'FETCH_RETRYING' || stateContext.botPhase === 'STATUS_UNKNOWN') {
+        return {
+          ...base,
+          note: 'Bot sedang dalam proses pengambilan data outlet'
+        };
+      }
+      return base;
+    }
+
     function getVbStoreView(outlet, storeMap) {
       const storeId = String(outlet?.store_id || '').trim();
       // VB outlets are excluded from the Agency feed. Use the VB API's
@@ -1530,8 +1566,8 @@
         storeName,
         liveState,
         livePresentation: getAdminShopeeStatusPresentation(liveSource),
-        statusPresentation: getAdminStatusPresentation(statusStore),
-        statusSubtext: getAdminStatusSubtext(statusStore),
+        statusPresentation: getVbStatusPresentation(statusStore),
+        statusSubtext: getVbStatusSubtext(statusStore),
         statusTooltip: getAdminStatusTooltip(statusStore),
         todayScheduleMarkup: getVbTodayOperatingHours(store),
         actionSummary: store ? getAdminActionSummary(store) : { title: 'Belum ada aksi', note: '-' }
