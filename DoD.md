@@ -30,7 +30,7 @@ Dokumen ini memuat kriteria keberhasilan (*Definition of Done*) untuk implementa
 - [x] Dipastikan perintah `diff -u main-bot/src/worker.py main-vb/src/worker.py` menghasilkan *zero diff*.
 
 ### D. Frontend & UI Admin Dashboard (`admin_dashboard.html`)
-- [x] Di tabel Virtual Brand (`.vb-store-table`), kolom pertama menampilkan nama outlet asli (`outlet.storeName`) sebagai label utama dan nama portal (`outlet.portalName`) sebagai subteks/label pendukung.
+- [x] Di tabel Virtual Brand (`.vb-store-table`), ditambahkan kolom mandiri `Nama Listing` untuk menampilkan nama asli outlet (`outlet.storeName`), berdampingan dengan kolom `Portal` (`outlet.portalName`).
 - [x] Label kolom jam operasional tetap mematuhi aturan standar: `"Jam Hari Ini"`.
 - [x] Tampilan responsif pada breakpoint desktop, tablet, dan mobile tetap rapi tanpa overflow tak terduga.
 

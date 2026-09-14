@@ -3614,7 +3614,7 @@ body {
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(100px, 0.75fr) minmax(0, 1.25fr) minmax(150px, 1.1fr);
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(90px, 0.75fr) minmax(140px, 1.15fr) minmax(130px, 1fr);
   gap: 16px;
   align-items: center;
   padding: 14px 16px;
@@ -3640,6 +3640,7 @@ body {
 }
 
 .vb-store-main,
+.vb-store-name,
 .vb-store-id,
 .vb-store-status,
 .vb-store-hours,
@@ -3647,9 +3648,18 @@ body {
   min-width: 0;
 }
 
-.vb-store-main {
+.vb-store-main,
+.vb-store-name {
   display: grid;
   gap: 6px;
+}
+
+.vb-store-name-text {
+  color: #23272f;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .vb-store-id,
@@ -3725,14 +3735,6 @@ body {
   line-height: 1.45;
 }
 
-.vb-store-copy small,
-.vb-portal-subtext {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.3;
-}
 
 .vb-store-row.vb-portal-0 .vb-store-dot { background: #087f5b; }
 .vb-store-row.vb-portal-1 .vb-store-dot { background: #7c3aed; }

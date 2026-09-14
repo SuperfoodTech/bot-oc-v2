@@ -1759,10 +1759,13 @@
                     <div class="vb-store-main-value">
                       <span class="vb-store-dot ${statusToneClass}" title="${escapeVBHtml(outlet.livePresentation.label)}"></span>
                       <div class="vb-store-copy">
-                        <strong>${escapeVBHtml(outlet.storeName || outletLabel)}</strong>
-                        ${outlet.portalName ? `<small class="vb-portal-subtext">${escapeVBHtml(outlet.portalName)}</small>` : ''}
+                        <strong>${escapeVBHtml(outletLabel)}</strong>
                       </div>
                     </div>
+                  </div>
+                  <div class="vb-store-name">
+                    <span class="vb-store-field-label">Nama Listing</span>
+                    <span class="vb-store-name-text">${escapeVBHtml(outlet.storeName || '-')}</span>
                   </div>
                   <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
                   <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
@@ -1827,6 +1830,7 @@
               <div class="vb-store-table">
                 <div class="vb-store-table-head">
                   <span>Portal</span>
+                  <span>Nama Listing</span>
                   <span>Store ID</span>
                   <span>Status</span>
                   <span>Jam Hari Ini</span>

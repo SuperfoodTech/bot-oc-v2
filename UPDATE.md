@@ -7,7 +7,7 @@
 - Menyimpan nama outlet asli ke tabel `outlets.long_name` khusus untuk Virtual Brand melalui adapter `main-vb/src/db.py`.
 - `src/backend/db.py` menyediakan stub no-op sehingga `main-bot` tidak mengubah data outlet Bot O/C reguler.
 - Menjaga paritas `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap 100% identik *byte-for-byte*.
-- Memperbarui tabel Virtual Brand di Dashboard Admin (`admin_dashboard.html`) untuk menampilkan nama outlet asli tebal dan nama portal sebagai subteks.
+- Memperbarui tabel Virtual Brand di Dashboard Admin (`admin_dashboard.html`) dengan menambahkan kolom mandiri `Nama Listing` di samping kolom `Portal`.
 - Detail rilis terdokumentasi di [update/1.13.8.md](update/1.13.8.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
 
 ---
