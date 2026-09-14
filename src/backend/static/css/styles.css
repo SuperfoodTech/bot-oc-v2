@@ -3615,7 +3615,7 @@ body {
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: 160px minmax(180px, 1fr) 105px 210px 125px;
+  grid-template-columns: minmax(130px, 1.1fr) minmax(180px, 1.35fr) minmax(90px, 0.7fr) minmax(160px, 1.15fr) minmax(110px, 0.7fr);
   gap: 16px;
   align-items: center;
   padding: 12px 18px;
