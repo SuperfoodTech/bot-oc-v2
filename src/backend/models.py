@@ -35,6 +35,7 @@ class StoreStatusResponse(BaseModel):
     vercel_status: str
     shopee_status: str
     shopee_regular_hours: Dict = Field(default_factory=dict)
+    shopee_special_hours: List[Dict] = Field(default_factory=list)
     subscription_status: str
     is_suspended: bool
     alasan_penangguhan: Optional[str] = ""

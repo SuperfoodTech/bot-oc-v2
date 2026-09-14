@@ -1503,11 +1503,17 @@
     }
 
     function formatSpecialHoursDate(startStr, endStr) {
-      if (!startStr) return '-';
+      if (!startStr && startStr !== 0) return '-';
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
       function parsePart(str) {
-        if (!str) return null;
-        const parts = String(str).trim().split('-');
+        if (!str && str !== 0) return null;
+        if (typeof str === 'number' || (/^\d{10,13}$/.test(String(str).trim()))) {
+          const ms = typeof str === 'number' ? str : parseInt(str, 10);
+          const dObj = new Date(ms > 1e11 ? ms : ms * 1000);
+          if (isNaN(dObj.getTime())) return null;
+          return { y: dObj.getFullYear(), m: dObj.getMonth(), d: dObj.getDate(), monthName: months[dObj.getMonth()] || '' };
+        }
+        const parts = String(str).trim().split('T')[0].split('-');
         if (parts.length === 3) {
           const y = parseInt(parts[0], 10);
           const m = parseInt(parts[1], 10) - 1;
@@ -1535,9 +1541,23 @@
       if (!Array.isArray(intervals) || !intervals.length) {
         return 'Tutup';
       }
+      function formatSec(sec) {
+        const s = parseInt(sec, 10);
+        if (isNaN(s)) return '';
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
       const formatted = intervals.map(item => {
-        const from = String(item.time_from || '').replace(/\./g, ':');
-        const to = String(item.time_to || '').replace(/\./g, ':');
+        let from = String(item.time_from || '').replace(/\./g, ':');
+        let to = String(item.time_to || '').replace(/\./g, ':');
+        if (!from && !to && (item.start_relative_sec !== undefined || item.end_relative_sec !== undefined)) {
+          const startSec = Number(item.start_relative_sec || 0);
+          const endSec = Number(item.end_relative_sec || 0);
+          if (startSec === 0 && endSec === 0) return '';
+          from = formatSec(startSec);
+          to = formatSec(endSec);
+        }
         return from && to ? `${from} - ${to}` : (from || to || '');
       }).filter(Boolean);
       return formatted.length ? formatted.join(', ') + ' WIB' : 'Tutup';

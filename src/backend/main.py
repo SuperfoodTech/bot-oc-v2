@@ -102,6 +102,7 @@ def _build_store_status_response(store: Dict[str, Any]) -> StoreStatusResponse:
         vercel_status=store["vercel_status"],
         shopee_status=store["shopee_status"],
         shopee_regular_hours=store.get("shopee_regular_hours") or {},
+        shopee_special_hours=store.get("shopee_special_hours") or [],
         subscription_status=store["subscription_status"],
         is_suspended=bool(store["is_suspended"]),
         alasan_penangguhan=store.get("alasan_penangguhan", ""),
