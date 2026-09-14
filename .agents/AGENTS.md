@@ -24,13 +24,18 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.13.8`.
+Latest documented release: `1.13.9`.
 
 Sinkronisasi nama outlet asli (`data.store.name`) dari API Shopee Foody pada
 menu Business Hours disimpan ke kolom `outlets.long_name` khusus untuk Virtual Brand (VB)
 melalui adapter `main-vb/src/db.py`, sedangkan `src/backend/db.py` menyediakan stub no-op
 agar engine `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap identik byte-for-byte
 tanpa mengubah data outlet Bot O/C reguler.
+
+Subteks status outlet pada kolom status tabel Virtual Brand (`admin_dashboard.html` / `getVbStatusSubtext`):
+- Fase antrean buka (`PENDING_OPEN`): `"Bot sedang dalam proses pembukaan outlet"`.
+- Fase antrean tutup (`PENDING_PAUSE`): `"Bot sedang dalam proses penutupan outlet"`.
+- Fase pengambilan data/jadwal (`NOT_FETCHED_YET`, `FETCH_RETRYING`, `STATUS_UNKNOWN`): `"Bot sedang dalam proses pengambilan data outlet"`.
 
 Header kolom jam operasional pada tabel Agency (`#adminTable`) dan tabel Virtual Brand (`.vb-store-table`)
 wajib menggunakan teks `Jam Hari Ini`, serta label data kartu mobile Agency (`.admin-mobile-outlet-grid dt`)
