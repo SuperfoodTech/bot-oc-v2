@@ -312,6 +312,19 @@ def update_outlet_timezone(store_id: str, timezone: str) -> None:
         )
 
 
+def update_outlet_name(store_id: str, store_name: str) -> None:
+    """Persist Shopee's actual store name into outlets.long_name."""
+    name = (store_name or "").strip()[:255]
+    if not name:
+        return
+    with connection() as conn:
+        conn.execute(
+            """UPDATE outlets SET long_name=%s, updated_at=now()
+               WHERE store_id=%s AND (long_name IS NULL OR long_name <> %s)""",
+            (name, str(store_id), name),
+        )
+
+
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="VB"):
     """Write copied-worker actions as VB logs without mixing regular bot logs."""
     with connection() as conn:

@@ -60,37 +60,11 @@
         </section>
       </details>
 
-      <section class="vb-quick-actions" id="vbQuickActions" hidden aria-labelledby="vbQuickActionsTitle">
-        <div class="vb-quick-actions-head">
-          <div>
-            <h3 id="vbQuickActionsTitle">Aksi cepat</h3>
-            <p>Ubah status beberapa brand sekaligus.</p>
-          </div>
-          <button type="button" class="btn-outline vb-bulk-mode-button" id="vbBulkModeButton" onclick="toggleVbBulkSelectionMode()">Pilih beberapa</button>
-        </div>
-        <div class="vb-bulk-toolbar" id="vbBulkToolbar" hidden>
-          <span id="vbBulkSelectionSummary" class="vb-bulk-selection-summary">0 dipilih</span>
-          <div class="vb-bulk-actions">
-            <button type="button" class="btn-outline" id="vbBulkOpenButton" onclick="runVbBulkOpen()" disabled>Buka terpilih</button>
-            <button type="button" class="btn-outline vb-bulk-pause-button" id="vbBulkPauseButton" onclick="openVbBulkPauseModal()" disabled>Tutup terpilih</button>
-          </div>
-        </div>
-        <p class="vb-bulk-selection-hint" id="vbBulkSelectionHint" hidden>Pilih grup pada kartu di bawah untuk menampilkan aksi massal.</p>
-      </section>
-
       <div id="vbResultsSummary" class="vb-results-summary" aria-live="polite"></div>
 
       <div id="vbTableBody" class="vb-brand-list">
         <div class="table-loading-state">Memuat data brand...</div>
       </div>
-    </div>
-  </div>
-
-  <div class="vb-mobile-bulk-bar d-md-none" id="vbMobileBulkBar" hidden aria-live="polite">
-    <span id="vbMobileBulkSelectionSummary" class="vb-bulk-selection-summary">0 dipilih</span>
-    <div class="vb-bulk-actions">
-      <button type="button" class="btn-outline" id="vbMobileBulkOpenButton" onclick="runVbBulkOpen()" disabled>Buka terpilih</button>
-      <button type="button" class="btn-outline vb-bulk-pause-button" id="vbMobileBulkPauseButton" onclick="openVbBulkPauseModal()" disabled>Tutup terpilih</button>
     </div>
   </div>
 
@@ -144,16 +118,18 @@
     </div>
   </div>
 
-  <div class="vb-schedule-backdrop" id="vbScheduleDrawerBackdrop" hidden onclick="handleVbScheduleDrawerBackdrop(event)"></div>
-  <aside class="vb-schedule-drawer" id="vbScheduleDrawer" hidden aria-hidden="true" aria-labelledby="vbScheduleDrawerTitle" tabindex="-1">
-    <div class="vb-schedule-drawer-head">
-      <div class="vb-schedule-drawer-copy">
-        <div class="step-indicator">Jadwal Store ID</div>
-        <h3 id="vbScheduleDrawerTitle">Jadwal outlet</h3>
-        <p id="vbScheduleDrawerSubtitle">Pilih Store ID untuk melihat jadwal.</p>
+  <aside class="outlet-detail-panel vb-schedule-drawer" id="vbScheduleDrawer" aria-labelledby="vbScheduleDrawerTitle" aria-modal="true" role="dialog" tabindex="-1" hidden>
+    <div class="outlet-detail-panel-head">
+      <button type="button" class="outlet-detail-back d-md-none" onclick="closeVbScheduleDrawer()" aria-label="Kembali ke daftar brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span>Kembali</span>
+      </button>
+      <h2 id="vbScheduleDrawerTitle">Detail Outlet</h2>
+      <div class="outlet-detail-panel-actions">
+        <button type="button" class="outlet-detail-close" onclick="closeVbScheduleDrawer()" aria-label="Tutup detail outlet">×</button>
       </div>
-      <button type="button" class="vb-schedule-close" aria-label="Tutup drawer jadwal" onclick="closeVbScheduleDrawer()">×</button>
     </div>
-    <div id="vbScheduleDrawerContent" class="vb-schedule-drawer-content"></div>
+    <div id="vbScheduleDrawerContent" class="outlet-detail-content"></div>
   </aside>
+  <div class="outlet-detail-backdrop vb-schedule-backdrop" id="vbScheduleDrawerBackdrop" onclick="closeVbScheduleDrawer()" hidden></div>
 </div>

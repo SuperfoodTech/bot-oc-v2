@@ -168,6 +168,26 @@ def request_status(brand_id: str, status: str, admin_id: str, pause_until=None) 
                  Jsonb({"requested_status": row["requested_status"]}),
                  "Perubahan menunggu giliran brand pada putaran patroli berikutnya"),
             )
+            outlets_for_brand = conn.execute(
+                """SELECT bo.outlet_id, os.vercel_status, os.shopee_actual_status
+                   FROM vb_brand_outlets bo
+                   LEFT JOIN outlet_states os ON os.outlet_id = bo.outlet_id
+                   WHERE bo.vb_brand_id = %s""",
+                (brand_id,),
+            ).fetchall()
+            admin_action = "ADMIN_PAUSE_STORE" if status in ("PAUSED", "OFF") else "ADMIN_RESUME_STORE"
+            target_state = "PAUSED" if status == "PAUSED" else ("CLOSED" if status == "OFF" else "OPEN")
+            reason_text = "Outlet ditutup oleh Admin via Dashboard VB" if status in ("PAUSED", "OFF") else "Outlet dibuka oleh Admin via Dashboard VB"
+            for out in outlets_for_brand:
+                conn.execute(
+                    """INSERT INTO automation_logs
+                       (outlet_id, mode, vb_brand_id, suspension_status, subscription_status,
+                        vercel_status_before, shopee_status_before, target_status, action,
+                        success, error_message, reason)
+                       VALUES (%s, 'VB', %s, 'ACTIVE', 'ACTIVE', %s, %s, %s, %s, true, NULL, %s)""",
+                    (out["outlet_id"], brand_id, out["vercel_status"] or "OFF",
+                     out["shopee_actual_status"] or "UNKNOWN", target_state, admin_action, reason_text),
+                )
             return row
 
 

@@ -75,3 +75,20 @@ def test_live_status_rejects_another_store_response():
     result = module.get_actual_store_status(FakeDriver(response), "22403454")
 
     assert result is None
+
+
+def test_live_status_extracts_store_name_when_matching():
+    module = load_store_status()
+    response = {
+        "code": 0,
+        "data": {
+            "store": {"id": "22403454", "name": " Warung Lontong Sayur, WonderFood "},
+            "opening_status": {"display_opening_status": 2, "order_enabled": 1},
+        },
+    }
+
+    result = module.get_actual_store_status(FakeDriver(response), "22403454")
+
+    assert result is not None
+    assert result["store_name"] == "Warung Lontong Sayur, WonderFood"
+

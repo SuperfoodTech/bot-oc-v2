@@ -445,16 +445,12 @@
     let storeFetchGeneration = 0;
     const ADMIN_OUTLET_SYNC_REFRESH_MS = 15000;
     const pendingAdminToggleStoreIds = new Set();
-    const selectedAdminStoreIds = new Set();
-    let adminBulkSelectionMode = false;
     const deferredAdminOutletEvents = new Map();
     const OUTLET_FILTER_FIELD_MAP = {
       ownerFilter: 'mobileOwnerFilter',
       outletFilter: 'mobileOutletFilter',
       storeIdFilter: 'mobileStoreIdFilter',
-      statusFilter: 'mobileStatusFilter',
-      subscriptionFilter: 'mobileSubscriptionFilter',
-      packageFilter: 'mobilePackageFilter'
+      statusFilter: 'mobileStatusFilter'
     };
     const VB_FILTER_FIELD_MAP = {
       vbGroupFilter: 'mobileVbGroupFilter',
@@ -463,7 +459,7 @@
       vbPortalFilter: 'mobileVbPortalFilter',
       vbStoreIdFilter: 'mobileVbStoreIdFilter'
     };
-    const OUTLET_SUMMARY_FILTER_KEYS = ['all', 'open', 'closed', 'subscription'];
+    const OUTLET_SUMMARY_FILTER_KEYS = ['all', 'open', 'closed'];
     let activeOutletSummaryFilter = 'all';
     let outletDetailActiveStoreId = '';
     let outletDetailRestoreFocusEl = null;
@@ -988,9 +984,7 @@
         owner: value('ownerFilter'),
         outlet: value('outletFilter'),
         storeId: value('storeIdFilter'),
-        status: value('statusFilter'),
-        subscription: value('subscriptionFilter'),
-        paket: value('packageFilter')
+        status: value('statusFilter')
       };
     }
 
@@ -1001,9 +995,7 @@
         (!filters.owner || store.nama_pemilik === filters.owner) &&
         (!filters.outlet || store.store_name === filters.outlet) &&
         (!filters.storeId || String(store.store_id) === filters.storeId) &&
-        (!filters.status || statusCategory === filters.status) &&
-        (!filters.subscription || (filters.subscription === 'active' ? isStoreSubscriptionActive(store) : !isStoreSubscriptionActive(store))) &&
-        (!filters.paket || store.paket === filters.paket)
+        (!filters.status || statusCategory === filters.status)
       );
     }
 
@@ -1021,14 +1013,12 @@
       const summaryCounts = {
         all: stores.length,
         open: statusCategories.filter(value => value === 'open').length,
-        closed: statusCategories.filter(value => value === 'closed').length,
-        subscription: stores.filter(isStoreSubscriptionActive).length
+        closed: statusCategories.filter(value => value === 'closed').length
       };
       const countTargets = {
         all: 'metricChipAllCount',
         open: 'metricChipOpenCount',
-        closed: 'metricChipClosedCount',
-        subscription: 'metricChipSubscriptionCount'
+        closed: 'metricChipClosedCount'
       };
 
       Object.entries(countTargets).forEach(([key, id]) => {
@@ -1043,7 +1033,7 @@
     }
 
     function updateMobileFilterBadge(filters = getActiveOutletFilters()) {
-      const count = [filters.owner, filters.outlet, filters.storeId, filters.status, filters.subscription, filters.paket].filter(Boolean).length;
+      const count = [filters.owner, filters.outlet, filters.storeId, filters.status].filter(Boolean).length;
       const badge = document.getElementById('mobileFilterBadge');
       const trigger = document.getElementById('mobileFilterTrigger');
       if (badge) {
@@ -1191,7 +1181,6 @@
       if (window.matchMedia('(min-width: 768px)').matches) {
         closeMobileFilterSheet();
         closeVbMobileFilterSheet();
-        document.body.classList.remove('vb-mobile-bulk-open');
         if (activeOutletSummaryFilter !== 'all') {
           activeOutletSummaryFilter = 'all';
           filterTable();
@@ -1258,7 +1247,6 @@
       if (tabName !== 'vb') {
         closeVbScheduleDrawer({ restoreFocus: false });
         closeVbMobileFilterSheet();
-        document.body.classList.remove('vb-mobile-bulk-open');
       }
       syncAdminHeaderForTab(tabName);
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1354,9 +1342,6 @@
     }
 
     let allVBBrands = [];
-    const selectedVbBrandIds = new Set();
-    let selectedVbPauseBrandIds = [];
-    let vbBulkSelectionMode = false;
     const VB_PORTAL_ORDER = ['superfood', 'wonderfood', 'lokarasa', 'gurame bakar, do eat'];
 
     function getVbPortalOrder(portalName) {
@@ -1739,95 +1724,6 @@
         </article>
       `).join('');
     }
-
-    function renderVbQuickActions(brands) {
-      const panel = document.getElementById('vbQuickActions');
-      const summary = document.getElementById('vbBulkSelectionSummary');
-      const openButton = document.getElementById('vbBulkOpenButton');
-      const pauseButton = document.getElementById('vbBulkPauseButton');
-      const toolbar = document.getElementById('vbBulkToolbar');
-      const modeButton = document.getElementById('vbBulkModeButton');
-      const hint = document.getElementById('vbBulkSelectionHint');
-      const mobileBar = document.getElementById('vbMobileBulkBar');
-      const mobileSummary = document.getElementById('vbMobileBulkSelectionSummary');
-      const mobileOpenButton = document.getElementById('vbMobileBulkOpenButton');
-      const mobilePauseButton = document.getElementById('vbMobileBulkPauseButton');
-      if (!panel) return;
-      const validIds = new Set((brands || []).map(brand => String(brand.id)));
-      [...selectedVbBrandIds].forEach(id => { if (!validIds.has(id)) selectedVbBrandIds.delete(id); });
-      panel.hidden = !(brands || []).length;
-      const selectedCount = selectedVbBrandIds.size;
-      const isMobile = isMobileAdminViewport();
-      const showDesktopToolbar = vbBulkSelectionMode && !isMobile && selectedCount > 0;
-      const showMobileToolbar = vbBulkSelectionMode && isMobile && selectedCount > 0;
-      if (summary) summary.textContent = `${selectedCount} dipilih`;
-      if (mobileSummary) mobileSummary.textContent = `${selectedCount} dipilih`;
-      if (openButton) openButton.disabled = !selectedCount;
-      if (pauseButton) pauseButton.disabled = !selectedCount;
-      if (mobileOpenButton) mobileOpenButton.disabled = !selectedCount;
-      if (mobilePauseButton) mobilePauseButton.disabled = !selectedCount;
-      if (toolbar) toolbar.hidden = !showDesktopToolbar;
-      if (hint) hint.hidden = !(vbBulkSelectionMode && selectedCount === 0);
-      if (mobileBar) mobileBar.hidden = !showMobileToolbar;
-      if (modeButton) modeButton.textContent = vbBulkSelectionMode ? 'Selesai memilih' : 'Pilih beberapa';
-      document.body.classList.toggle('vb-mobile-bulk-open', showMobileToolbar);
-    }
-
-    function toggleVbBulkSelectionMode() {
-      vbBulkSelectionMode = !vbBulkSelectionMode;
-      if (!vbBulkSelectionMode) selectedVbBrandIds.clear();
-      filterVBTable();
-    }
-
-    function toggleVbBulkBrand(brandId, checked) {
-      const id = String(brandId);
-      if (checked) selectedVbBrandIds.add(id);
-      else selectedVbBrandIds.delete(id);
-      filterVBTable();
-    }
-
-    async function runVbBulkOpen() {
-      const brandIds = [...selectedVbBrandIds];
-      if (!brandIds.length) return;
-      selectedVbBrandIds.clear();
-      vbBulkSelectionMode = false;
-      if (getAdminActiveTab() === 'vb') filterVBTable();
-      let successCount = 0;
-      const failedBrands = [];
-      for (const brandId of brandIds) {
-        const control = document.getElementById(`vb-card-${brandId}`)?.querySelector('input[type="checkbox"]');
-        const result = await requestVBStatus(brandId, 'ON', control, {}, { silentSuccess: true, silentError: true });
-        if (result.success) successCount += 1;
-        else failedBrands.push(allVBBrands.find(item => String(item.id) === String(brandId))?.name || `Brand ${brandId}`);
-      }
-      if (successCount) {
-        const message = successCount === brandIds.length
-          ? `${successCount} brand berhasil diminta untuk dibuka.`
-          : `${successCount} dari ${brandIds.length} brand berhasil diminta untuk dibuka.`;
-        showToast(message, 'success');
-      }
-      if (failedBrands.length) {
-        showErrorModal('Sebagian brand gagal dibuka', `Coba lagi untuk: ${failedBrands.join(', ')}`);
-      }
-    }
-
-    function openVbBulkPauseModal() {
-      const brandIds = [...selectedVbBrandIds];
-      if (!brandIds.length) return;
-      selectedVbPauseBrandIds = brandIds;
-      selectedVbBrandId = brandIds[0];
-      document.getElementById('vbPauseModalTitle').textContent = `Tutup ${brandIds.length} brand`;
-      setVbCustomDateTimeDefaults();
-      document.querySelectorAll('input[name="vbPauseDuration"]').forEach(radio => {
-        radio.checked = radio.value === '30_min';
-        radio.closest('.radio-card').classList.toggle('active', radio.checked);
-      });
-      document.getElementById('vbCustomDurationBox').style.display = 'none';
-      updateVbPausePreview();
-      document.getElementById('vbPauseModal').classList.add('active');
-      document.getElementById('vbPauseModal').setAttribute('aria-hidden', 'false');
-    }
-
     function renderVBTable(brands) {
       const body = document.getElementById('vbTableBody');
       if (!body) return;
@@ -1857,23 +1753,20 @@
               const statusPresentation = outlet.statusPresentation || { label: 'Status sedang dicek bot', className: 'table-status is-warning' };
               const statusTooltip = outlet.statusTooltip || 'Status live dan fase bot belum tersedia.';
               return `
-                <div class="vb-store-row ${portalColorClass}">
+                <div class="vb-store-row ${portalColorClass}" role="button" tabindex="0" aria-label="Lihat jadwal ${escapeVBHtml(outlet.storeName || outletLabel)} (Store ID ${escapeVBHtml(outlet.storeId)})" onclick="openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this); }">
                   <div class="vb-store-main">
                     <span class="vb-store-field-label">Portal</span>
                     <div class="vb-store-main-value">
                       <span class="vb-store-dot ${statusToneClass}" title="${escapeVBHtml(outlet.livePresentation.label)}"></span>
                       <div class="vb-store-copy">
-                        <strong>${escapeVBHtml(outletLabel)}</strong>
+                        <strong>${escapeVBHtml(outlet.storeName || outletLabel)}</strong>
+                        ${outlet.portalName ? `<small class="vb-portal-subtext">${escapeVBHtml(outlet.portalName)}</small>` : ''}
                       </div>
                     </div>
                   </div>
                   <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
                   <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
-                  <div class="vb-store-hours"><span class="vb-store-field-label">Jam Operasional</span>${outlet.todayScheduleMarkup}</div>
-                  <div class="vb-store-actions">
-                    <span class="vb-store-field-label">Aksi</span>
-                    <button type="button" class="btn-outline vb-schedule-button" onclick="openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this)">Lihat jadwal</button>
-                  </div>
+                  <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
                 </div>
               `;
             }).join('')
@@ -1883,7 +1776,6 @@
           <article class="vb-brand-card ${isExpanded ? 'is-expanded' : ''}" id="vb-card-${brand.id}">
             <div class="vb-brand-card-head">
               <div class="vb-group-identity">
-                ${vbBulkSelectionMode ? `<label class="vb-brand-select"><input type="checkbox" ${selectedVbBrandIds.has(String(brand.id)) ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Pilih brand ${escapeVBHtml(brand.name)}" onchange="toggleVbBulkBrand('${brand.id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
                 <div class="vb-group-eyebrow">Grup VB</div>
                 <h3>${escapeVBHtml(brand.name)}</h3>
                 <div class="vb-group-context">
@@ -1937,8 +1829,7 @@
                   <span>Portal</span>
                   <span>Store ID</span>
                   <span>Status</span>
-                  <span>Jam Operasional</span>
-                  <span>Aksi</span>
+                  <span>Jam Hari Ini</span>
                 </div>
                 ${outletRows}
               </div>
@@ -1968,7 +1859,6 @@
       updateVbMobileFilterBadge(filters);
       const filteredBrands = getFilteredVbBrandViews(allBrandViews, filters);
       renderVBStats(filteredBrands);
-      renderVbQuickActions(filteredBrands);
       updateVbResultsSummary(filteredBrands, allBrandViews.length, filters);
       renderVBTable(filteredBrands);
       syncVbScheduleDrawer(filteredBrands);
@@ -2069,42 +1959,48 @@
 
     function renderVbScheduleDrawerContent(brand, outlet) {
       const store = outlet.store;
-      const groupStatusClass = brand.effectiveStatus === 'ON' ? 'is-on' : 'is-off';
-      const shopeeStatus = outlet.livePresentation;
-      const actionSummary = outlet.actionSummary || { title: 'Belum ada aksi', note: '-' };
       const scheduleMarkup = hasUsableAdminSchedule(store)
         ? getAdminScheduleRowsMarkup(store)
         : '<div class="vb-schedule-empty">Jadwal reguler Shopee belum tersedia untuk Store ID ini.</div>';
+      const brandName = escapeHtml(brand.name || '-');
+      const storeName = escapeHtml(outlet.storeName || outlet.portalName || `Store ID ${outlet.storeId}`);
+      const storeIdText = escapeHtml(String(outlet.storeId || ''));
+      const portalName = escapeHtml(outlet.portalName || '-');
 
       return `
-        <div class="vb-schedule-meta">
-          <span class="vb-status-pill ${groupStatusClass}">Grup ${brand.effectiveStatus}</span>
-          <span class="vb-drawer-chip">${escapeVBHtml(brand.name)}</span>
-          <span class="vb-drawer-chip">${escapeVBHtml(outlet.portalName)}</span>
+        <div class="outlet-detail-identity">
+          <div class="outlet-detail-identity-copy">
+            <div class="outlet-detail-eyebrow">${brandName}</div>
+            <h3>${storeName}</h3>
+            <p class="outlet-detail-store-id">
+              <span>Store ID&nbsp; ${storeIdText}</span>
+              <button type="button" class="btn-copy-icon" onclick="copyStoreId(event, '${storeIdText}')" title="Salin Store ID ${storeIdText}" aria-label="Salin Store ID ${storeIdText}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </p>
+            <div class="outlet-detail-context">
+              <span>${portalName}</span>
+            </div>
+          </div>
+          <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
         </div>
-        <div class="vb-schedule-focus-grid">
-          <div class="vb-schedule-focus-card">
-            <span>Jam operasional hari ini</span>
-            <div>${outlet.todayScheduleMarkup}</div>
+        <section class="outlet-detail-section">
+          <div class="outlet-detail-section-heading">
+            <h4>Jadwal reguler Shopee</h4>
+            <span class="outlet-detail-schedule-meta">Tampilan 7 hari</span>
           </div>
-          <div class="vb-schedule-focus-card">
-            <span>Status live Shopee</span>
-            <strong>${escapeVBHtml(shopeeStatus.label)}</strong>
-            <small>Nilai terakhir yang diterima dashboard admin.</small>
+          <div class="outlet-detail-schedule-panel">
+            ${scheduleMarkup}
           </div>
-          <div class="vb-schedule-focus-card">
-            <span>Aktivitas terakhir</span>
-            <strong>${escapeVBHtml(actionSummary.title)}</strong>
-            <small>${escapeVBHtml(actionSummary.note)}</small>
+        </section>
+        <section class="outlet-detail-history-section">
+          <div class="outlet-detail-history-heading">
+            <h4>Aktivitas terbaru</h4>
           </div>
-        </div>
-        <div class="vb-schedule-panel">
-          <div class="vb-schedule-panel-head">
-            <strong>Jadwal reguler Shopee</strong>
-            <span>Tampilan 7 hari</span>
+          <div class="outlet-detail-history-list" id="vbDetailHistoryLogs">
+            <div class="history-item is-empty"><span>Memuat aktivitas...</span></div>
           </div>
-          <div class="vb-schedule-rows">${scheduleMarkup}</div>
-        </div>
+        </section>
       `;
     }
 
@@ -2116,11 +2012,10 @@
 
     function updateVbScheduleDrawer(brand, outlet) {
       const title = document.getElementById('vbScheduleDrawerTitle');
-      const subtitle = document.getElementById('vbScheduleDrawerSubtitle');
       const { content } = getVbScheduleDrawerElements();
-      if (title) title.textContent = outlet.storeName || `Store ID ${outlet.storeId}`;
-      if (subtitle) subtitle.textContent = `${brand.name} · Store ID ${outlet.storeId}`;
+      if (title) title.textContent = 'Detail Outlet';
       if (content) content.innerHTML = renderVbScheduleDrawerContent(brand, outlet);
+      fetchOutletDetailHistory(outlet.storeId, 'vbDetailHistoryLogs');
     }
 
     function openVbScheduleDrawer(brandId, storeId, trigger = null) {
@@ -2216,12 +2111,6 @@
     let vbPickerDate = null;
     let vbPickerMonth = null;
 
-    function getSelectedVbPauseBrandIds() {
-      return selectedVbPauseBrandIds.length
-        ? [...selectedVbPauseBrandIds]
-        : (selectedVbBrandId ? [String(selectedVbBrandId)] : []);
-    }
-
     function getVbPauseReferenceStore(brandId) {
       const brand = (allVBBrands || []).find(item => String(item.id) === String(brandId));
       if (!brand) return null;
@@ -2235,8 +2124,7 @@
     }
 
     function getSelectedVbPauseReferenceStore() {
-      const brandIds = getSelectedVbPauseBrandIds();
-      return brandIds.length ? getVbPauseReferenceStore(brandIds[0]) : null;
+      return selectedVbBrandId ? getVbPauseReferenceStore(selectedVbBrandId) : null;
     }
 
     function updateVbRestOfDayMeta() {
@@ -2249,12 +2137,11 @@
         : 'Ikuti jadwal outlet';
     }
 
-    function getVbPauseDurationLabel(brandCount = getSelectedVbPauseBrandIds().length) {
+    function getVbPauseDurationLabel() {
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       if (type === '30_min') return 'selama 30 menit';
       if (type === '60_min') return 'selama 60 menit';
       if (type === 'rest_of_day') {
-        if ((brandCount || 0) > 1) return 'mengikuti jadwal outlet referensi masing-masing brand';
         const store = getSelectedVbPauseReferenceStore();
         const nextSession = store && getNextAdminOperationalSessionDate(store);
         return nextSession
@@ -2270,7 +2157,6 @@
 
     function openVbPauseModal(brandId, brandName) {
       selectedVbBrandId = brandId;
-      selectedVbPauseBrandIds = [String(brandId)];
       document.getElementById('vbPauseModalTitle').textContent = `Tutup ${brandName}`;
       setVbCustomDateTimeDefaults();
       document.querySelectorAll('input[name="vbPauseDuration"]').forEach(radio => {
@@ -2286,7 +2172,6 @@
     function closeVbPauseModal() {
       closeVbCustomDateTimePicker();
       selectedVbBrandId = null;
-      selectedVbPauseBrandIds = [];
       const modal = document.getElementById('vbPauseModal');
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
@@ -2417,18 +2302,13 @@
       updateVbRestOfDayMeta();
       const durationType = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       if (durationType === 'rest_of_day') {
-        const brandCount = getSelectedVbPauseBrandIds().length;
         const store = getSelectedVbPauseReferenceStore();
         const nextSession = store && getNextAdminOperationalSessionDate(store);
         if (!nextSession) {
-          preview.textContent = brandCount > 1
-            ? 'Setiap brand mengikuti jadwal outlet referensi masing-masing saat jadwal tersedia.'
-            : 'Jadwal outlet referensi belum tersedia.';
+          preview.textContent = 'Jadwal outlet referensi belum tersedia.';
           return;
         }
-        preview.textContent = brandCount > 1
-          ? `Preview brand pertama: buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}. Brand lain mengikuti jadwal masing-masing.`
-          : `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`;
+        preview.textContent = `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`;
         return;
       }
       const end = getVbPauseEnd();
@@ -2445,49 +2325,29 @@
     document.addEventListener('input', event => { if (event.target.id === 'vbCustomUntilInput') updateVbPausePreview(); });
 
     async function confirmVbPause() {
-      const brandIds = getSelectedVbPauseBrandIds();
-      if (!brandIds.length) return;
-      const useAggregateFeedback = brandIds.length > 1 || vbBulkSelectionMode;
+      const brandId = selectedVbBrandId ? String(selectedVbBrandId) : '';
+      if (!brandId) return;
       const type = document.querySelector('input[name="vbPauseDuration"]:checked')?.value;
       const end = getVbPauseEnd();
       const invalidEnd = !end || Number.isNaN(end.getTime()) || end <= new Date();
       if (type !== 'rest_of_day' && invalidEnd) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
-      if (type === 'rest_of_day' && brandIds.length === 1 && invalidEnd) {
+      if (type === 'rest_of_day' && invalidEnd) {
         showToast('Jadwal outlet referensi belum tersedia untuk menghitung auto-buka.', 'error');
         return;
       }
       const customUntil = document.getElementById('vbCustomUntilInput').value;
-      const successLabel = getVbPauseDurationLabel(brandIds.length);
-      if (useAggregateFeedback) {
-        selectedVbBrandIds.clear();
-        vbBulkSelectionMode = false;
-      }
+      const successLabel = getVbPauseDurationLabel();
       closeVbPauseModal();
-      if (useAggregateFeedback && getAdminActiveTab() === 'vb') filterVBTable();
-      let successCount = 0;
-      const failedBrands = [];
-      for (const brandId of brandIds) {
-        const control = document.getElementById('vb-card-' + brandId)?.querySelector('input[type="checkbox"]');
-        const result = await requestVBStatus(
-          brandId,
-          'PAUSED',
-          control,
-          { duration_type: type, custom_until: type === 'custom' ? customUntil : null },
-          { silentSuccess: true, silentError: useAggregateFeedback }
-        );
-        if (result.success) successCount += 1;
-        else failedBrands.push(allVBBrands.find(item => String(item.id) === String(brandId))?.name || `Brand ${brandId}`);
-      }
-      if (successCount) {
-        const message = successCount === brandIds.length
-          ? `${successCount} brand berhasil diminta untuk ditutup ${successLabel}.`
-          : `${successCount} dari ${brandIds.length} brand berhasil diminta untuk ditutup ${successLabel}.`;
-        showToast(message, 'success');
-      }
-      if (useAggregateFeedback) {
-        if (failedBrands.length) {
-          showErrorModal('Sebagian brand gagal ditutup', `Coba lagi untuk: ${failedBrands.join(', ')}`);
-        }
+      const control = document.getElementById(`vb-card-${brandId}`)?.querySelector('input[type="checkbox"]');
+      const result = await requestVBStatus(
+        brandId,
+        'PAUSED',
+        control,
+        { duration_type: type, custom_until: type === 'custom' ? customUntil : null },
+        { silentSuccess: true }
+      );
+      if (result.success) {
+        showToast(`Brand berhasil diminta untuk ditutup ${successLabel}.`, 'success');
       }
     }
 
@@ -2695,8 +2555,7 @@
       const fields = {
         ownerFilter: ['nama_pemilik', 'Semua pemilik'],
         outletFilter: ['store_name', 'Semua outlet'],
-        storeIdFilter: ['store_id', 'Semua Store ID'],
-        packageFilter: ['paket', 'Semua paket']
+        storeIdFilter: ['store_id', 'Semua Store ID']
       };
       Object.entries(fields).forEach(([id, [key, label]]) => {
         const values = [...new Set(stores.map(s => String(s[key] || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
@@ -3346,7 +3205,6 @@
         const pauseSummary = getAdminPauseSummary(s, stateContext);
         const toggleSummary = getAdminActionSummary(s);
         const actionDetailNote = toggleSummary.note && toggleSummary.note !== '-' ? toggleSummary.note : 'Belum ada keterangan tambahan.';
-        const isBulkSelected = selectedAdminStoreIds.has(String(s.store_id));
         const toggleMetaText = isTogglePending
           ? 'Menyimpan perubahan...'
           : (toggleSummary.note && toggleSummary.note !== '-'
@@ -3376,12 +3234,14 @@
         tr.innerHTML = `
           <td>
             <div class="admin-table-owner-cell">
-              ${adminBulkSelectionMode ? `<label class="admin-store-select"><input type="checkbox" ${isBulkSelected ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} aria-label="Pilih outlet ${storeName}" onchange="toggleAdminBulkStore('${s.store_id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
               <strong>${ownerName}</strong>
             </div>
             <small class="compact-meta compact-meta-merchant">${s.merchant_name}</small>
           </td>
           <td>${s.merchant_name}</td>
+          <td>
+            ${s.store_name}
+          </td>
           <td>
             <div class="store-id-cell">
               <code>${s.store_id}</code>
@@ -3389,9 +3249,6 @@
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
               </button>
             </div>
-          </td>
-          <td>
-            ${s.store_name}
           </td>
           <td>${todaySchedule}</td>
           <td>${linkCellMarkup}</td>
@@ -3412,7 +3269,6 @@
         mobileCard.className = 'mobile-outlet-card admin-mobile-outlet-card';
         mobileCard.innerHTML = `
           <div class="admin-mobile-outlet-head">
-            ${adminBulkSelectionMode ? `<label class="admin-store-select"><input type="checkbox" ${isBulkSelected ? 'checked' : ''} ${isTogglePending ? 'disabled' : ''} aria-label="Pilih outlet ${storeName}" onchange="toggleAdminBulkStore('${s.store_id}', this.checked)"><span aria-hidden="true"></span></label>` : ''}
             <div class="admin-mobile-outlet-copy">
               <div class="admin-mobile-outlet-owner">${ownerNameText}</div>
               <h3>${storeName}</h3>
@@ -3439,7 +3295,7 @@
 
           <dl class="admin-mobile-outlet-grid">
             <div class="admin-mobile-data-block is-wide">
-              <dt>Jam operasional</dt>
+              <dt>Jam Hari Ini</dt>
               <dd>${todaySchedule}</dd>
             </div>
             <div class="admin-mobile-data-block">
@@ -3556,14 +3412,12 @@
     }
 
     let selectedAdminPauseStoreId = null;
-    let selectedAdminPauseStoreIds = [];
     let adminPickerDate = null;
     let adminPickerMonth = null;
 
     function openAdminPauseModal(storeId, storeName) {
       if (pendingAdminToggleStoreIds.has(String(storeId))) return;
       selectedAdminPauseStoreId = storeId;
-      selectedAdminPauseStoreIds = [String(storeId)];
       document.getElementById('adminModalStoreName').innerText = storeName;
       setAdminCustomDateTimeDefaults();
       updateAdminPauseEndPreview();
@@ -3763,7 +3617,6 @@
       const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
       const timezone = store?.timezone || 'Asia/Jakarta';
       if (durationType === 'rest_of_day') {
-        if ((selectedAdminPauseStoreIds || []).length > 1) return 'mengikuti jadwal masing-masing outlet';
         const nextSession = store && getNextAdminOperationalSessionDate(store);
         return nextSession
           ? `sampai ${formatAdminPauseTargetDate(nextSession, timezone)}`
@@ -3820,9 +3673,7 @@
         const store = allStores.find(item => String(item.store_id) === String(selectedAdminPauseStoreId));
         const nextSession = store && getNextAdminOperationalSessionDate(store);
         preview.textContent = nextSession
-          ? (selectedAdminPauseStoreIds.length > 1
-              ? `Preview outlet pertama: buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}. Outlet lain mengikuti jadwal masing-masing.`
-              : `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`)
+          ? `Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}`
           : 'Buka kembali mengikuti jadwal operasional outlet berikutnya';
         return;
       }
@@ -3847,13 +3698,12 @@
       document.getElementById('adminPauseModal').classList.remove('active');
       document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'true');
       selectedAdminPauseStoreId = null;
-      selectedAdminPauseStoreIds = [];
       if (shouldRender) filterTable();
     }
 
     async function confirmAdminPause() {
       if (!selectedAdminPauseStoreId) return;
-      const storeIds = selectedAdminPauseStoreIds.length ? [...selectedAdminPauseStoreIds] : [String(selectedAdminPauseStoreId)];
+      const storeId = String(selectedAdminPauseStoreId);
       const durationType = document.querySelector('input[name="adminPauseDuration"]:checked').value;
       const customMins = getAdminSelectedPauseMinutes() || 0;
       const customUntil = getAdminCustomUntilValue();
@@ -3862,39 +3712,34 @@
         return;
       }
       const successLabel = getAdminPauseDurationLabel();
-      const eligibleStoreIds = storeIds.filter(storeId => !pendingAdminToggleStoreIds.has(String(storeId)));
-      if (!eligibleStoreIds.length) return;
-      eligibleStoreIds.forEach(storeId => pendingAdminToggleStoreIds.add(String(storeId)));
+      if (pendingAdminToggleStoreIds.has(storeId)) return;
+      pendingAdminToggleStoreIds.add(storeId);
       closeAdminPauseModal(false);
       filterTable();
 
-      let successCount = 0;
+      let success = false;
       let lastError = '';
-      for (const storeId of eligibleStoreIds) {
-        try {
-          const res = await fetch('/api/v1/user/pause', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              store_id: storeId,
-              duration_type: durationType,
-              custom_minutes: customMins,
-              custom_until: durationType === 'custom' ? customUntil : null
-            })
-          });
-          const data = await res.json();
-          if (res.ok && data.success) successCount += 1;
-          else lastError = data.detail || 'Gagal menutup outlet.';
-        } catch (err) {
-          lastError = err.message || 'Gagal menutup outlet.';
-        } finally {
-          finishAdminToggle(storeId);
-        }
+      try {
+        const res = await fetch('/api/v1/user/pause', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            store_id: storeId,
+            duration_type: durationType,
+            custom_minutes: customMins,
+            custom_until: durationType === 'custom' ? customUntil : null
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) success = true;
+        else lastError = data.detail || 'Gagal menutup outlet.';
+      } catch (err) {
+        lastError = err.message || 'Gagal menutup outlet.';
+      } finally {
+        finishAdminToggle(storeId);
       }
-      if (successCount) showToast(`${successCount} outlet berhasil dijeda ${successLabel}.`, 'success');
-      if (lastError && !successCount) showToast(lastError, 'error');
-      selectedAdminStoreIds.clear();
-      updateAdminBulkToolbar();
+      if (success) showToast(`Outlet berhasil dijeda ${successLabel}.`, 'success');
+      if (lastError && !success) showToast(lastError, 'error');
       await loadStoresData(true);
     }
 
@@ -4211,8 +4056,8 @@
       }
     }
 
-    async function fetchOutletDetailHistory(storeId) {
-      const container = document.getElementById('outletDetailHistoryLogs');
+    async function fetchOutletDetailHistory(storeId, targetContainerId = 'outletDetailHistoryLogs') {
+      const container = document.getElementById(targetContainerId);
       if (!container) return;
       container.innerHTML = '<div class="history-item is-empty"><span>Memuat aktivitas...</span></div>';
 
@@ -4231,7 +4076,8 @@
         const res = await fetch(`/api/v1/user/history?store_ids=${encodeURIComponent(storeId)}`);
         if (!res.ok) throw new Error('Gagal memuat log');
         const data = await res.json();
-        if (outletDetailActiveStoreId !== String(storeId)) return;
+        if (targetContainerId === 'outletDetailHistoryLogs' && outletDetailActiveStoreId !== String(storeId)) return;
+        if (targetContainerId === 'vbDetailHistoryLogs' && !vbScheduleDrawerActiveKey.endsWith(`:${storeId}`)) return;
         container.innerHTML = '';
 
         let logs = Array.isArray(data.logs) ? data.logs : [];
@@ -4262,7 +4108,8 @@
           container.innerHTML = '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
         }
       } catch (err) {
-        if (outletDetailActiveStoreId !== String(storeId)) return;
+        if (targetContainerId === 'outletDetailHistoryLogs' && outletDetailActiveStoreId !== String(storeId)) return;
+        if (targetContainerId === 'vbDetailHistoryLogs' && !vbScheduleDrawerActiveKey.endsWith(`:${storeId}`)) return;
         container.innerHTML = '<div class="history-item is-empty"><span>Aktivitas belum bisa dimuat. Coba lagi beberapa saat.</span></div>';
       }
     }
@@ -4285,10 +4132,10 @@
 
     function getHistoryActorPresentation(action) {
       const normalized = String(action || '').toUpperCase();
-      if (['ACTION_OPEN', 'ACTION_CLOSE'].includes(normalized)) {
+      if (['ACTION_OPEN', 'ACTION_CLOSE', 'OPEN_STORE', 'CLOSE_STORE', 'OPEN', 'CLOSE'].includes(normalized)) {
         return { label: 'Bot', className: 'is-bot' };
       }
-      if (normalized.startsWith('ADMIN_')) {
+      if (normalized.startsWith('ADMIN_') || normalized.startsWith('VB_')) {
         return { label: 'Admin', className: 'is-admin' };
       }
       if (normalized.startsWith('USER_')) {
@@ -4307,16 +4154,22 @@
       const reason = String(log?.reason || '');
       switch (action) {
         case 'ACTION_OPEN':
+        case 'OPEN_STORE':
+        case 'OPEN':
           return { title: 'Bot berhasil membuka outlet', subtitle: log.store_name };
         case 'ACTION_CLOSE':
+        case 'CLOSE_STORE':
+        case 'CLOSE':
           return { title: 'Bot berhasil menutup outlet', subtitle: log.store_name };
         case 'USER_PAUSE_STORE':
           return { title: 'Outlet ditutup oleh Merchant', subtitle: log.store_name };
         case 'USER_RESUME_STORE':
           return { title: 'Outlet dibuka oleh Merchant', subtitle: log.store_name };
         case 'ADMIN_PAUSE_STORE':
+        case 'VB_PAUSE_STORE':
           return { title: 'Outlet ditutup oleh Admin', subtitle: log.store_name };
         case 'ADMIN_RESUME_STORE':
+        case 'VB_RESUME_STORE':
           return { title: 'Outlet dibuka oleh Admin', subtitle: log.store_name };
         case 'ADMIN_RENEW_SUBSCRIPTION':
           return { title: 'Layanan diperpanjang oleh Admin', subtitle: log.store_name };
@@ -4325,61 +4178,6 @@
         default:
           return { title: actionLabels[action] || action || 'Aktivitas outlet', subtitle: log.store_name };
       }
-    }
-
-    function updateAdminBulkToolbar() {
-      const toolbar = document.getElementById('adminBulkToolbar');
-      const summary = document.getElementById('adminBulkSelectionSummary');
-      const openButton = document.getElementById('adminBulkOpenButton');
-      const pauseButton = document.getElementById('adminBulkPauseButton');
-      const count = selectedAdminStoreIds.size;
-      if (toolbar) toolbar.hidden = !adminBulkSelectionMode;
-      if (summary) summary.textContent = `${count} dipilih`;
-      if (openButton) openButton.disabled = count === 0;
-      if (pauseButton) pauseButton.disabled = count === 0;
-      const modeButton = document.getElementById('adminBulkModeButton');
-      if (modeButton) modeButton.textContent = adminBulkSelectionMode ? 'Selesai memilih' : 'Pilih beberapa';
-    }
-
-    function toggleAdminBulkSelectionMode() {
-      adminBulkSelectionMode = !adminBulkSelectionMode;
-      if (!adminBulkSelectionMode) selectedAdminStoreIds.clear();
-      updateAdminBulkToolbar();
-      filterTable();
-    }
-
-    function toggleAdminBulkStore(storeId, checked) {
-      const key = String(storeId);
-      if (checked) selectedAdminStoreIds.add(key);
-      else selectedAdminStoreIds.delete(key);
-      updateAdminBulkToolbar();
-    }
-
-    function openAdminBulkPauseModal() {
-      const storeIds = [...selectedAdminStoreIds].filter(storeId => !pendingAdminToggleStoreIds.has(storeId));
-      if (!storeIds.length) return;
-      selectedAdminPauseStoreId = storeIds[0];
-      selectedAdminPauseStoreIds = storeIds;
-      document.getElementById('adminModalStoreName').textContent = `Tutup ${storeIds.length} outlet`;
-      setAdminCustomDateTimeDefaults();
-      document.querySelectorAll('input[name="adminPauseDuration"]').forEach(radio => {
-        radio.checked = radio.value === '30_min';
-        radio.closest('.radio-card').classList.toggle('active', radio.checked);
-      });
-      document.getElementById('adminCustomDurationBox').style.display = 'none';
-      updateAdminPauseEndPreview();
-      document.getElementById('adminPauseModal').classList.add('active');
-      document.getElementById('adminPauseModal').setAttribute('aria-hidden', 'false');
-    }
-
-    async function runAdminBulkOpen() {
-      const storeIds = [...selectedAdminStoreIds].filter(storeId => !pendingAdminToggleStoreIds.has(storeId));
-      if (!storeIds.length) return;
-      for (const storeId of storeIds) {
-        await toggleAdminOutlet(storeId, true, null);
-      }
-      selectedAdminStoreIds.clear();
-      updateAdminBulkToolbar();
     }
 
     function filterTable(sourceId = 'searchInput') {
@@ -4394,7 +4192,7 @@
 
     function resetOutletFilters() {
       activeOutletSummaryFilter = 'all';
-      ['searchInput', 'mobileSearchInput', 'ownerFilter', 'outletFilter', 'storeIdFilter', 'statusFilter', 'subscriptionFilter', 'packageFilter', ...Object.values(OUTLET_FILTER_FIELD_MAP)].forEach(id => {
+      ['searchInput', 'mobileSearchInput', 'ownerFilter', 'outletFilter', 'storeIdFilter', 'statusFilter', ...Object.values(OUTLET_FILTER_FIELD_MAP)].forEach(id => {
         setControlValue(id, '');
       });
       setupCustomFilterDropdowns();

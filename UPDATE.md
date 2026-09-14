@@ -1,6 +1,32 @@
 # Update
 
-## Latest update: v1.13.5 (Virtual Brand Dispatching & Browser Auth Recovery Fix)
+## Latest update: v1.13.8 (Virtual Brand Shopee Store Name Real-Time Synchronization)
+
+### Handover Catatan Teknis Perubahan v1.13.8
+- Mengambil nama asli toko (`data.store.name`) dari API Shopee Foody `/api/seller/store` saat bot mengakses halaman *Business Hours*.
+- Menyimpan nama outlet asli ke tabel `outlets.long_name` khusus untuk Virtual Brand melalui adapter `main-vb/src/db.py`.
+- `src/backend/db.py` menyediakan stub no-op sehingga `main-bot` tidak mengubah data outlet Bot O/C reguler.
+- Menjaga paritas `main-bot/src/worker.py` dan `main-vb/src/worker.py` tetap 100% identik *byte-for-byte*.
+- Memperbarui tabel Virtual Brand di Dashboard Admin (`admin_dashboard.html`) untuk menampilkan nama outlet asli tebal dan nama portal sebagai subteks.
+- Detail rilis terdokumentasi di [update/1.13.8.md](update/1.13.8.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
+
+---
+
+## Update v1.13.7 (Virtual Brand Outlet Detail Drawer Audit Alignment)
+- Penyelarasan drawer detail outlet Virtual Brand (VB) persis dengan drawer Agency.
+- Standarisasi pencatatan log audit VB eksklusif Admin dan Bot.
+- Detail rilis terdokumentasi di [update/1.13.7.md](update/1.13.7.md).
+
+---
+
+## Update v1.13.6 (Admin Dashboard Operational Table & Header Standardization)
+- Standardisasi label kolom operasional menjadi `Jam Hari Ini`.
+- Penyusunan ulang urutan kolom tabel Agency (`Nama Pemilik`, `Nama Portal`, `Nama Listing`, `Store ID`, `Jam Hari Ini`).
+- Detail rilis terdokumentasi di [update/1.13.6.md](update/1.13.6.md).
+
+---
+
+## Update v1.13.5 (Virtual Brand Dispatching & Browser Auth Recovery Fix)
 
 ### Handover Catatan Teknis Perubahan v1.13.5
 

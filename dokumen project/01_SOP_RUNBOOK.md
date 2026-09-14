@@ -224,8 +224,7 @@ curl -s http://localhost:3001/api/v1/health
 1. Buka tab `Virtual Brand`.
 2. Filter brand, portal, atau store ID.
 3. Toggle brand ke `ON` atau `OFF`.
-4. Untuk bulk action, klik `Pilih beberapa`.
-5. Status brand yang baru diubah akan masuk `requested_status` dulu dan baru diterapkan saat daemon VB memproses brand tersebut.
+4. Status brand yang baru diubah akan masuk `requested_status` dulu dan baru diterapkan saat daemon VB memproses brand tersebut.
 
 ### 8.6 Pantau aktivitas bot
 

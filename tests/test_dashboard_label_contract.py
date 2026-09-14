@@ -70,7 +70,8 @@ def test_admin_rest_of_day_information_is_dynamic_for_agency_and_vb():
     assert 'id="vbRestOfDayMeta"' in ADMIN_TEMPLATE
     assert "function updateAdminRestOfDayMeta()" in ADMIN_TEMPLATE
     assert "function updateVbRestOfDayMeta()" in ADMIN_TEMPLATE
-    assert "Preview outlet pertama: buka kembali" in ADMIN_TEMPLATE
+    assert "Buka kembali ${formatAdminPauseTargetDate(nextSession, store.timezone || 'Asia/Jakarta')}" in ADMIN_TEMPLATE
+    assert "Preview outlet pertama: buka kembali" not in ADMIN_TEMPLATE
     assert "new Date(Date.now() + 24 * 60 * 60 * 1000)" not in ADMIN_TEMPLATE
 
 
@@ -123,7 +124,6 @@ def test_mitra_pending_pause_and_open_subtext_contract():
     mitra_html = (PROJECT_ROOT / "src/backend/templates/user_dashboard.html").read_text()
     assert "return 'Bot sedang dalam proses penutupan outlet';" in mitra_html
     assert "return 'Bot sedang dalam proses pembukaan outlet'" in mitra_html or "? 'Bot sedang dalam proses pembukaan outlet'" in mitra_html
-
 
 
 

@@ -95,20 +95,22 @@ def test_vb_dashboard_uses_schedule_drawer_without_detail_panel_markup():
     assert 'id="vbScheduleDrawerBackdrop"' in tab_template
     assert 'id="vbResultsSummary"' in tab_template
     assert 'id="vbFilterDisclosure"' in tab_template
-    assert 'id="vbQuickActions"' in tab_template
-    assert 'id="vbBulkToolbar"' in tab_template
+    assert 'id="vbQuickActions"' not in tab_template
+    assert 'id="vbBulkToolbar"' not in tab_template
     assert 'id="vbInlineSearchInput"' in tab_template
     assert 'class="vb-empty-state"' in dashboard_template
     assert 'aria-label="${isExpanded ? \'Sembunyikan\' : \'Tampilkan\'} Store ID grup' in dashboard_template
-    assert "function runVbBulkOpen()" in dashboard_template
-    assert "function openVbBulkPauseModal()" in dashboard_template
-    assert "class=\"vb-brand-select\"" in dashboard_template
+    assert "function runVbBulkOpen()" not in dashboard_template
+    assert "function openVbBulkPauseModal()" not in dashboard_template
+    assert "class=\"vb-brand-select\"" not in dashboard_template
     assert '<span>Live Buka</span>' in dashboard_template
     assert '<span>Perlu cek</span>' in dashboard_template
     assert '<span>Live Tutup</span>' in dashboard_template
     assert 'class="vb-store-status"' in dashboard_template
     assert "openVbScheduleDrawer(" in dashboard_template
     assert "resetVbFilters()" in tab_template
+    assert "<span>Jam Hari Ini</span>" in dashboard_template
+    assert '<span class="vb-store-field-label">Jam Hari Ini</span>' in dashboard_template
     assert "shopee_regular_hours: outlet?.shopee_regular_hours || {}" in dashboard_template
     assert "os.shopee_regular_hours, os.timezone" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
 
@@ -120,16 +122,16 @@ def test_vb_dashboard_styles_define_scrollable_page_and_right_drawer():
     assert ".vb-store-table-head" in STYLES
 
 
-def test_admin_agency_has_bulk_actions_below_filter():
+def test_admin_agency_does_not_render_bulk_actions():
     tab_template = (PROJECT_ROOT / "src/backend/templates/admin_tab_operasional.html").read_text()
     dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
 
-    assert 'id="adminQuickActions"' in tab_template
-    assert 'id="adminBulkToolbar"' in tab_template
-    assert 'id="adminBulkOpenButton"' in tab_template
-    assert 'id="adminBulkPauseButton"' in tab_template
-    assert "function toggleAdminBulkSelectionMode()" in dashboard_template
-    assert "function openAdminBulkPauseModal()" in dashboard_template
+    assert 'id="adminQuickActions"' not in tab_template
+    assert 'id="adminBulkToolbar"' not in tab_template
+    assert 'id="adminBulkOpenButton"' not in tab_template
+    assert 'id="adminBulkPauseButton"' not in tab_template
+    assert "function toggleAdminBulkSelectionMode()" not in dashboard_template
+    assert "function runAdminBulkOpen()" not in dashboard_template
 
 
 def test_admin_outlet_table_uses_global_desktop_scroll_region():
@@ -168,18 +170,32 @@ def test_admin_outlet_table_8_columns_and_link_mitra_contract():
     dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
 
     # Verify table headers in admin_tab_operasional.html
-    assert "<th>Owner</th>" in tab_template
-    assert "<th>Merchant</th>" in tab_template
+    assert "<th>Nama Pemilik</th>" in tab_template
+    assert "<th>Nama Portal</th>" in tab_template
+    assert "<th>Nama Listing</th>" in tab_template
     assert "<th>Store ID</th>" in tab_template
-    assert "<th>Outlet</th>" in tab_template
-    assert "<th>Jam Operasional</th>" in tab_template
+    assert "<th>Jam Hari Ini</th>" in tab_template
+    assert "<th>Jam Operasional</th>" not in tab_template
     assert "<th>Link</th>" in tab_template
     assert "<th>Link Mitra</th>" in tab_template
     assert "<th>Toggle</th>" in tab_template
+    assert "<th>Owner</th>" not in tab_template
+    assert "<th>Merchant</th>" not in tab_template
+    assert "<th>Outlet</th>" not in tab_template
     assert "<th>Status</th>" not in tab_template
     assert "<th>Action</th>" not in tab_template
     assert "<th>Periode Layanan</th>" not in tab_template
     assert '<td colspan="8"' in tab_template
+    assert (
+        tab_template.index("<th>Nama Pemilik</th>")
+        < tab_template.index("<th>Nama Portal</th>")
+        < tab_template.index("<th>Nama Listing</th>")
+        < tab_template.index("<th>Store ID</th>")
+        < tab_template.index("<th>Jam Hari Ini</th>")
+        < tab_template.index("<th>Link</th>")
+        < tab_template.index("<th>Link Mitra</th>")
+        < tab_template.index("<th>Toggle</th>")
+    )
 
     # Verify admin_dashboard.html logic
     assert "function getShopeeFoodStoreUrl(storeId)" in dashboard_template
@@ -261,7 +277,6 @@ def test_admin_outlet_detail_drawer_streamlined_layout_and_internal_log_scroll_c
     assert ".outlet-detail-history-list::-webkit-scrollbar" in STYLES
     assert "display: flex; flex-direction: column; overflow: hidden;" in STYLES
     assert ".outlet-detail-section-heading {" in STYLES
-
 
 
 

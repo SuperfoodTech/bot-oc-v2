@@ -73,12 +73,6 @@ Catatan penting:
 - `ON` tidak selalu berarti live Shopee langsung buka saat itu juga. Bot masih harus menjalankan patroli dan aksi ke Shopee.
 - Admin tidak bisa memaksa outlet reguler buka di luar jadwal operasional atau saat jadwal Shopee belum siap.
 
-#### Bulk action
-
-1. Klik `Pilih beberapa`.
-2. Centang outlet yang ingin diproses.
-3. Gunakan `Buka terpilih` atau `Tutup terpilih`.
-
 ### 4.3 Virtual Brand
 
 Tab `Virtual Brand` dipakai untuk grup brand yang berisi banyak store lintas portal.
@@ -88,8 +82,7 @@ Admin dapat:
 - melihat statistik brand aktif,
 - memfilter berdasarkan nama grup, status master, status grup, portal, dan store ID,
 - meminta brand dibuka atau ditutup,
-- melihat jadwal store anggota melalui drawer jadwal,
-- menjalankan bulk action beberapa brand sekaligus.
+- melihat jadwal store anggota melalui drawer jadwal.
 
 Cara baca status brand:
 

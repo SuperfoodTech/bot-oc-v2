@@ -155,12 +155,15 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 f"pause_start_time: {pause_start}"
             )
 
+            store_name = (store_data.get("name") or "").strip() if isinstance(store_data, dict) else ""
+
             return {
                 "opening_status": display_status,
                 "order_enabled": order_enabled,
                 "status_str": status_str,
                 "pause_info": pause_time,
                 "timezone": store_data.get("timezone"),
+                "store_name": store_name,
                 "raw": op_data
             }
 

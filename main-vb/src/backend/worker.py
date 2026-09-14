@@ -556,6 +556,10 @@ def sync_all_stores(execute_actions: bool = True) -> Dict[str, Any]:
                     if live_info and live_info.get("timezone"):
                         outlet.timezone = live_info["timezone"]
                         db.update_outlet_timezone(outlet.store_id, outlet.timezone)
+                    if live_info and live_info.get("store_name"):
+                        store_name = live_info["store_name"]
+                        outlet.nama_panjang_outlet = store_name
+                        db.update_outlet_name(outlet.store_id, store_name)
                     if live_info and live_info.get("status_str") in ("OPEN", "CLOSED"):
                         actual_status = _normalize_live_status(live_info)
                         outlet.status_aktual = actual_status

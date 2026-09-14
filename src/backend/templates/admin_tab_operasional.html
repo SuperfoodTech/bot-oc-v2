@@ -4,7 +4,6 @@
         <article class="metric-card metric-card-total"><div class="metric-card-icon"><img src="/static/icons/shop-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Total Outlet</span><strong id="metricTotal">0</strong></div></article>
         <article class="metric-card metric-card-open"><div class="metric-card-icon"><img src="/static/icons/open-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Sedang Buka</span><strong id="metricOpen">0</strong></div></article>
         <article class="metric-card metric-card-closed"><div class="metric-card-icon"><img src="/static/icons/closed-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Sedang Tutup</span><strong id="metricClosed">0</strong></div></article>
-        <article class="metric-card metric-card-subscription"><div class="metric-card-icon"><img src="/static/icons/crown-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Subscription Aktif</span><strong id="metricSubscription">0</strong></div></article>
       </div>
       <div class="mobile-summary-strip d-md-none" id="mobileSummaryStrip" aria-label="Quick filter outlet">
         <button type="button" class="mobile-summary-segment is-active" data-summary-filter="all" aria-pressed="true" onclick="setOutletSummaryFilter('all')">
@@ -18,10 +17,6 @@
         <button type="button" class="mobile-summary-segment" data-summary-filter="closed" aria-pressed="false" onclick="setOutletSummaryFilter('closed')">
           <span class="mobile-summary-label">Tutup:</span>
           <strong id="metricChipClosedCount">0</strong>
-        </button>
-        <button type="button" class="mobile-summary-segment" data-summary-filter="subscription" aria-pressed="false" onclick="setOutletSummaryFilter('subscription')">
-          <span class="mobile-summary-label">Subs Aktif:</span>
-          <strong id="metricChipSubscriptionCount">0</strong>
         </button>
       </div>
       <div class="outlet-filter-card">
@@ -43,40 +38,22 @@
               <label class="filter-field"><span>Nama outlet</span><select id="outletFilter" class="form-input filter-select" aria-label="Filter nama outlet" onchange="filterTable()"><option value="">Semua outlet</option></select></label>
               <label class="filter-field"><span>Store ID</span><select id="storeIdFilter" class="form-input filter-select" aria-label="Filter Store ID" onchange="filterTable()"><option value="">Semua Store ID</option></select></label>
               <label class="filter-field"><span>Status</span><select id="statusFilter" class="form-input filter-select" aria-label="Filter status" onchange="filterTable()"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="closed">Sedang Tutup</option></select></label>
-              <label class="filter-field"><span>Subscription</span><select id="subscriptionFilter" class="form-input filter-select" aria-label="Filter subscription" onchange="filterTable()"><option value="">Semua subscription</option><option value="active">Aktif</option><option value="expired">Expired</option></select></label>
-              <label class="filter-field"><span>Paket</span><select id="packageFilter" class="form-input filter-select" aria-label="Filter paket" onchange="filterTable()"><option value="">Semua paket</option></select></label>
               <button class="btn-outline btn-compact reset-filter-button" type="button" onclick="resetOutletFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>Reset filter</button>
             </div>
           </div>
         </div>
       </div>
-      <section class="admin-quick-actions" id="adminQuickActions" aria-labelledby="adminQuickActionsTitle">
-        <div class="admin-quick-actions-head">
-          <div>
-            <h3 id="adminQuickActionsTitle">Aksi cepat</h3>
-            <p>Ubah status beberapa outlet sekaligus.</p>
-          </div>
-          <button type="button" class="btn-outline admin-bulk-mode-button" id="adminBulkModeButton" onclick="toggleAdminBulkSelectionMode()">Pilih beberapa</button>
-        </div>
-        <div class="admin-bulk-toolbar" id="adminBulkToolbar" hidden>
-          <span id="adminBulkSelectionSummary" class="admin-bulk-selection-summary">0 dipilih</span>
-          <div class="admin-bulk-actions">
-            <button type="button" class="btn-outline" id="adminBulkOpenButton" onclick="runAdminBulkOpen()" disabled>Buka terpilih</button>
-            <button type="button" class="btn-outline admin-bulk-pause-button" id="adminBulkPauseButton" onclick="openAdminBulkPauseModal()" disabled>Tutup terpilih</button>
-          </div>
-        </div>
-      </section>
       <div class="outlet-content-layout">
       <div class="table-card outlet-section">
         <div class="table-scroll d-none d-md-block">
           <table class="data-table" id="adminTable">
             <thead>
               <tr>
-                <th>Owner</th>
-                <th>Merchant</th>
+                <th>Nama Pemilik</th>
+                <th>Nama Portal</th>
+                <th>Nama Listing</th>
                 <th>Store ID</th>
-                <th>Outlet</th>
-                <th>Jam Operasional</th>
+                <th>Jam Hari Ini</th>
                 <th>Link</th>
                 <th>Link Mitra</th>
                 <th>Toggle</th>
@@ -122,8 +99,6 @@
             <label class="filter-field"><span>Nama outlet</span><select id="mobileOutletFilter" class="form-input mobile-sheet-select" aria-label="Filter nama outlet"><option value="">Semua outlet</option></select></label>
             <label class="filter-field"><span>Store ID</span><select id="mobileStoreIdFilter" class="form-input mobile-sheet-select" aria-label="Filter Store ID"><option value="">Semua Store ID</option></select></label>
             <label class="filter-field"><span>Status</span><select id="mobileStatusFilter" class="form-input mobile-sheet-select" aria-label="Filter status"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="closed">Sedang Tutup</option></select></label>
-            <label class="filter-field"><span>Subscription</span><select id="mobileSubscriptionFilter" class="form-input mobile-sheet-select" aria-label="Filter subscription"><option value="">Semua subscription</option><option value="active">Aktif</option><option value="expired">Expired</option></select></label>
-            <label class="filter-field"><span>Paket</span><select id="mobilePackageFilter" class="form-input mobile-sheet-select" aria-label="Filter paket"><option value="">Semua paket</option></select></label>
           </div>
           <div class="mobile-filter-sheet-footer">
             <button class="btn-outline" type="button" onclick="resetMobileFilterSheet()">Reset</button>

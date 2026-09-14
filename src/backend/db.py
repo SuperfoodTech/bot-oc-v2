@@ -1042,6 +1042,12 @@ def update_outlet_timezone(store_id: str, timezone: str) -> None:
             "UPDATE outlet_states os SET timezone=%s, updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s",
             (normalize_timezone(timezone), store_id),
         )
+
+
+def update_outlet_name(store_id: str, store_name: str) -> None:
+    """Stub adapter for main-bot / backend (VB only updates long_name)."""
+    pass
+
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="REGULAR"):
     with get_db_connection() as conn:
         outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
