@@ -42,6 +42,21 @@ ACTIVE_SESSIONS = {}
 SYNC_LOCK = threading.Lock()
 
 
+def _normalized_username(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _normalized_portal_name(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _merchant_group_key(outlet: MerchantOutlet) -> tuple[str, str]:
+    return (
+        _normalized_username(getattr(outlet, "username", "")),
+        _normalized_portal_name(getattr(outlet, "nama_portal", "")),
+    )
+
+
 def _normalize_live_status(live_info: dict) -> str:
     """Preserve Shopee's PAUSE state instead of collapsing it into CLOSED."""
     if not isinstance(live_info, dict):
@@ -151,7 +166,7 @@ def warmup_all_account_sessions():
 
     processed_accounts = set()
     for outlet in outlets:
-        username = (outlet.username or "").strip()
+        username = _normalized_username(outlet.username)
         if not username or username in processed_accounts:
             continue
 
@@ -191,32 +206,38 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
     Excludes execution if outlet.username != auto7313.
     """
+    username = _normalized_username(outlet.username)
+    portal_name = _normalized_portal_name(outlet.nama_portal)
+
     # Exclude accounts not in ALLOWED_USERNAMES whitelist
-    if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
-        log.info(f"  ⏭️ [SHOPEE EXECUTION] Excluding Store {outlet.store_id} - username '{outlet.username}' != auto7313.")
+    if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+        log.info(
+            f"  ⏭️ [SHOPEE EXECUTION] Excluding Store {outlet.store_id} - "
+            f"username '{username}' not in ALLOWED_USERNAMES."
+        )
         return False
 
     log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
 
     # Set session file according to outlet username
-    if outlet.username:
-        account_session_file = PROJECT_ROOT / "src" / "data" / f"session_{outlet.username}.json"
+    if username:
+        account_session_file = PROJECT_ROOT / "src" / "data" / f"session_{username}.json"
         if account_session_file.exists():
             browser.set_session_file(account_session_file)
 
-    cached = ACTIVE_SESSIONS.get(outlet.username)
+    cached = ACTIVE_SESSIONS.get(username)
     session = cached or browser.get_session(
-        username=outlet.username,
+        username=username,
         password=outlet.password,
         phone=outlet.hp,
-        target_name=outlet.nama_portal,
+        target_name=portal_name,
         close_browser=False,
         interactive=False,
     )
 
     if session:
         driver = session.get("driver")
-        ACTIVE_SESSIONS[outlet.username] = session
+        ACTIVE_SESSIONS[username] = session
 
         # Primary Action: In-Browser XHR via store_status module (Instant execution)
         if driver and outlet.store_id:
@@ -285,10 +306,14 @@ def sync_all_stores(
         # Format: { (username, nama_portal): [outlet1, outlet2, ...] }
         grouped_outlets: Dict[tuple, List[MerchantOutlet]] = {}
         for outlet in outlets:
-            if ALLOWED_USERNAMES and outlet.username not in ALLOWED_USERNAMES:
-                log.debug(f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - username '{outlet.username}' not in ALLOWED_USERNAMES")
+            username = _normalized_username(outlet.username)
+            if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+                log.debug(
+                    f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - "
+                    f"username '{username}' not in ALLOWED_USERNAMES"
+                )
                 continue
-            key = (outlet.username, outlet.nama_portal or "")
+            key = _merchant_group_key(outlet)
             if key not in grouped_outlets:
                 grouped_outlets[key] = []
             grouped_outlets[key].append(outlet)
@@ -420,8 +445,11 @@ def sync_all_stores(
             _ensure_group_session_ready(f"group bootstrap for merchant '{portal_name}'")
 
             for outlet in merchant_outlets:
-                if outlet.username:
-                    browser.set_session_file(PROJECT_ROOT / "src" / "data" / f"session_{outlet.username}.json")
+                outlet_username = _normalized_username(outlet.username)
+                if outlet_username:
+                    browser.set_session_file(
+                        PROJECT_ROOT / "src" / "data" / f"session_{outlet_username}.json"
+                    )
 
                 driver_ready = _ensure_group_session_ready(f"before patrol Store {outlet.store_id}")
                 if not driver_ready:
