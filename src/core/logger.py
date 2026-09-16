@@ -5,22 +5,14 @@ from datetime import datetime
 
 class DiscordWebhookHandler(logging.Handler):
     """
-    Handler kustom untuk meneruskan log berlevel ERROR atau CRITICAL ke Discord Webhook.
+    Handler logging internal - dinonaktifkan (No-Op) karena Discord eksklusif untuk Rekap VB Group.
     """
     def __init__(self, level=logging.ERROR):
         super().__init__(level)
 
     def emit(self, record):
-        try:
-            from core.notifier import send_discord_error
-            msg = record.getMessage()
-            send_discord_error(
-                message=msg,
-                title="❌ Eror Bot Patroli",
-                logger_name=record.name
-            )
-        except Exception:
-            pass
+        pass
+
 
 
 _LOGGERS = {}

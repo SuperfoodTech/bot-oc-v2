@@ -24,7 +24,19 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.18.0`.
+Latest documented release: `1.18.3`.
+
+Optimasi Memori & Pencegahan Out of Memory (OOM):
+- Instance Chromium/Chrome pada `src/core/browser.py` dan `main-vb/src/core/browser.py` wajib menggunakan flag hemat memori: `--blink-settings=imagesEnabled=false`, limit V8 heap `--js-flags=--max-old-space-size=512`, cache disk/media `--disk-cache-size=52428800` & `--media-cache-size=52428800`, serta `--disable-features=Translate,OptimizationHints,MediaRouter`.
+- Setiap iterasi evaluasi loop utama daemon (`main-bot/src/daemon.py` dan `main-vb/src/daemon.py`) wajib menyertakan `gc.collect()` di dalam blok `finally:` untuk membebaskan cyclic reference memory leak secara deterministik.
+- Penyesuaian konfigurasi browser dan pembersihan memori dilarang menginterupsi bot secara mendadak atau mematikan session 24/7 yang sedang aktif.
+
+Notifikasi Discord Virtual Brand (`send_discord_vb_group_summary`):
+- Notifikasi Virtual Brand dikirimkan secara eksklusif ke `DISCORD_WEBHOOK_VB_URL` dalam format rekap summary per-VB Brand (bukan per-portal atau per-outlet individual) untuk 6 skenario utama (Full Open, Full Close, Partial Open, Partial Close, All Failed Open, All Failed Close).
+- Seluruh pengiriman notifikasi individual/legacy ke Discord (`send_discord_error`, `send_discord_success`, `send_discord_skipped`, dan `DiscordWebhookHandler` di `logger.py`) dinonaktifkan secara total (No-Op untuk Discord).
+- `bot-oc` (Agency reguler) dilarang keras menembak Discord Webhook dan hanya mengirim event notifikasi ke WhatsApp Gateway (`bot-wa`).
+- Logika agregasi hasil aksi ditempatkan pada adapter `main-vb/src/db.py` (`record_log` / `_flush_pending_brand_notifications`) agar `main-vb/src/worker.py` tetap 100% identik byte-for-byte dengan `main-bot/src/worker.py`.
+- Helper `_get_webhook_url()` mendukung dynamic reload dari `.env` / `.env.vb` tanpa memerlukan restart service bot patroli.
 
 WhatsApp Gateway Microservice (`bot-wa`):
 - Service `bot-wa` beroperasi secara penuh di luar container bot patroli (`fm-bot` & `fm-bot-vb`) tanpa menginterupsi alur kerja patroli Selenium atau memicu restart container bot yang sedang berjalan.

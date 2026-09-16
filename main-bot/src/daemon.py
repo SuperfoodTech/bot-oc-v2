@@ -299,8 +299,15 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
 
         except Exception as e:
             log.error(f"❌ Error in daemon cycle #{cycle_count}: {e}")
+        finally:
+            try:
+                import gc
+                gc.collect()
+            except Exception:
+                pass
 
         if once or not RUNNING:
+
             log.info(f"🏁 Daemon single cycle execution completed.")
             break
 

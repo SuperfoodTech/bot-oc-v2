@@ -721,6 +721,11 @@ def _init_driver(headless: bool = None):
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-component-update")
+    options.add_argument("--blink-settings=imagesEnabled=false")
+    options.add_argument("--js-flags=--max-old-space-size=512")
+    options.add_argument("--disk-cache-size=52428800")
+    options.add_argument("--media-cache-size=52428800")
+    options.add_argument("--disable-features=Translate,OptimizationHints,MediaRouter")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
     if headless:
         options.add_argument("--headless=new")
@@ -731,6 +736,7 @@ def _init_driver(headless: bool = None):
         options.add_argument("--disable-renderer-backgrounding")
     else:
         options.add_argument("--start-maximized")
+
     
     session_file = get_session_file()
     account_name = session_file.stem.replace("session_", "") if "session_" in session_file.stem else "auto7313"

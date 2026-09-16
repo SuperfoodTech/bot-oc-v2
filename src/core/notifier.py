@@ -38,15 +38,57 @@ MODULE_NAME_MAP = {
 
 
 def _is_vb_environment(is_vb: bool = False) -> bool:
-    return is_vb or bool(os.getenv("VB_SHOPEE_USERNAME")) or bool(os.getenv("DISCORD_WEBHOOK_VB_URL"))
+    return is_vb or bool(os.getenv("VB_SHOPEE_USERNAME"))
 
 
 def _get_webhook_url(is_vb: bool = False) -> str:
-    if _is_vb_environment(is_vb):
-        vb_url = os.getenv("DISCORD_WEBHOOK_VB_URL", "").strip()
-        if vb_url:
-            return vb_url
-    return os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    """
+    Mengambil URL Webhook khusus Virtual Brand (DISCORD_WEBHOOK_VB_URL),
+    dengan fallback ke DISCORD_WEBHOOK_URL jika belum dikonfigurasi.
+    Mendukung dynamic reload dari .env dan .env.vb tanpa restart process.
+    """
+    vb_url = os.getenv("DISCORD_WEBHOOK_VB_URL", "").strip()
+    if not vb_url:
+        try:
+            from pathlib import Path
+            import dotenv
+            base_dir = Path(__file__).resolve().parent
+            for _ in range(5):
+                env_candidate = base_dir / ".env"
+                env_vb_candidate = base_dir / ".env.vb"
+                if env_candidate.exists() or env_vb_candidate.exists():
+                    if env_vb_candidate.exists():
+                        vals = dotenv.dotenv_values(str(env_vb_candidate))
+                        vb_url = vals.get("DISCORD_WEBHOOK_VB_URL", "").strip()
+                    if not vb_url and env_candidate.exists():
+                        vals = dotenv.dotenv_values(str(env_candidate))
+                        vb_url = vals.get("DISCORD_WEBHOOK_VB_URL", "").strip() or vals.get("DISCORD_WEBHOOK_URL", "").strip()
+                    if vb_url:
+                        break
+                base_dir = base_dir.parent
+        except Exception:
+            pass
+    if vb_url:
+        return vb_url
+
+    url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    if not url:
+        try:
+            from pathlib import Path
+            import dotenv
+            base_dir = Path(__file__).resolve().parent
+            for _ in range(5):
+                env_candidate = base_dir / ".env"
+                if env_candidate.exists():
+                    vals = dotenv.dotenv_values(str(env_candidate))
+                    url = vals.get("DISCORD_WEBHOOK_URL", "").strip()
+                    if url:
+                        break
+                base_dir = base_dir.parent
+        except Exception:
+            pass
+    return url
+
 
 
 def _get_footer_text(is_vb: bool = False) -> str:
@@ -107,83 +149,30 @@ def send_discord_error(
     outlet: str = None,
     error_type: str = None,
     is_vb: bool = False,
+    phone: str = None,
     **kwargs
 ):
     """
-    Mengirim notifikasi eror ke Discord Webhook secara asinkron dan to the point.
-    Mendukung pemanggilan positional (platform, merchant, error_type, message, extra)
-    maupun keyword arguments (message, title, logger_name, extra_fields, dll).
+    Event error handler:
+    - Discord: Ditiadakan (No-Op), karena Discord eksklusif hanya untuk Rekap VB Group (send_discord_vb_group_summary).
+    - WhatsApp Gateway: Diteruskan khusus Bot-OC via send_wa_webhook_async jika phone tersedia.
     """
-    webhook_url = _get_webhook_url(is_vb=is_vb)
-    if not webhook_url:
-        return
-
-    # Parse positional args if provided (legacy browser.py signature support)
-    if args:
-        if len(args) >= 4 and args[0] in ("Shopee", "GrabFood", "Gofood") or (len(args) >= 3 and not message):
-            if platform is None and len(args) > 0: platform = str(args[0])
-            if merchant is None and len(args) > 1: merchant = str(args[1])
-            if error_type is None and len(args) > 2: error_type = str(args[2])
-            if message is None and len(args) > 3: message = str(args[3])
-            if len(args) > 4:
-                extra_fields = extra_fields or {}
-                extra_fields["Detail"] = str(args[4])
-        else:
-            if message is None and len(args) > 0: message = str(args[0])
-            if title == "❌ Eror Bot Patroli" and len(args) > 1: title = str(args[1])
-            if logger_name is None and len(args) > 2: logger_name = str(args[2])
-            if extra_fields is None and len(args) > 3 and isinstance(args[3], dict): extra_fields = args[3]
-
-    if not message:
-        message = "Terjadi eror pada sistem patroli."
-
-    if error_type and title == "❌ Eror Bot Patroli":
-        title = f"❌ Eror Bot Patroli: {error_type}"
-
-    sig_raw = f"{title}:{error_type}:{platform}:{merchant}:{outlet}:{logger_name}:{message}"
-    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
-
-    if _is_duplicate(sig_hash):
-        return
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fields = []
-    if platform:
-        fields.append({"name": "Platform", "value": f"`{platform}`", "inline": True})
-    if merchant:
-        fields.append({"name": "Merchant Name", "value": f"`{merchant}`", "inline": True})
-    if outlet:
-        fields.append({"name": "Outlet Name", "value": f"`{outlet}`", "inline": True})
-    if error_type:
-        fields.append({"name": "Tipe Error", "value": f"`{error_type}`", "inline": True})
-    if logger_name:
-        explicit_mod = MODULE_NAME_MAP.get(logger_name, logger_name)
-        fields.append({"name": "Modul", "value": f"`{explicit_mod}`", "inline": True})
-    
-    fields.append({"name": "Waktu", "value": now_str, "inline": True})
-
-    if extra_fields:
-        for k, v in extra_fields.items():
-            fields.append({"name": str(k), "value": str(v), "inline": True})
-
-    trimmed_msg = message[:1900] + ("..." if len(message) > 1900 else "")
-
-    embed = {
-        "title": title,
-        "description": trimmed_msg,
-        "color": 15158332,  # Merah #E74C3C
-        "fields": fields,
-        "footer": {
-            "text": _get_footer_text(is_vb=is_vb)
-        }
-    }
-
-    payload = {
-        "embeds": [embed]
-    }
-
-    _send_payload_async(webhook_url, payload)
+    if not _is_vb_environment(is_vb):
+        target_phone = phone or (extra_fields.get("phone") if isinstance(extra_fields, dict) else None)
+        if not target_phone and args and len(args) > 4:
+            target_phone = str(args[4])
+        if target_phone:
+            send_wa_webhook_async(
+                event_type="BOT_ERROR",
+                phone=target_phone,
+                merchant=merchant or "Shopee Merchant",
+                outlet=outlet or "Outlet",
+                platform=platform or "Shopee",
+                error_type=error_type or "ACTION_FAILED",
+                detail=message or title,
+                is_vb=False
+            )
+    return
 
 
 def send_discord_success(
@@ -193,62 +182,29 @@ def send_discord_success(
     platform: str = "Shopee",
     store_id: str = None,
     message: str = None,
-    is_vb: bool = False
+    is_vb: bool = False,
+    phone: str = None,
+    **kwargs
 ):
     """
-    Mengirim notifikasi sukses saat outlet berhasil di-OPEN atau di-CLOSE / PAUSE.
+    Event success handler:
+    - Discord: Ditiadakan (No-Op), karena Discord eksklusif hanya untuk Rekap VB Group.
+    - WhatsApp Gateway: Diteruskan khusus Bot-OC via send_wa_webhook_async jika phone tersedia.
     """
-    webhook_url = _get_webhook_url(is_vb=is_vb)
-    if not webhook_url:
-        return
-
-    act = str(action).upper()
-    is_open = act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE")
-    
-    status_label = "BERHASIL DIBUKA (OPEN)" if is_open else "BERHASIL DITUTUP (CLOSE)"
-    emoji = "🟢" if is_open else "🟡"
-    color = 3066993 if is_open else 15844367  # Hijau #2ECC71 untuk OPEN, Kuning #F1C40F untuk CLOSE
-
-    title = f"{emoji} Outlet {status_label}"
-    
-    if not message:
-        message = f"Outlet **{outlet}** pada Merchant **{merchant}** berhasil di-{ 'OPEN' if is_open else 'CLOSE' }."
-
-    sig_raw = f"{title}:{platform}:{merchant}:{outlet}:{act}"
-    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
-
-    if _is_duplicate(sig_hash):
-        return
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fields = [
-        {"name": "Platform", "value": f"`{platform}`", "inline": True},
-        {"name": "Merchant Name", "value": f"`{merchant}`", "inline": True},
-        {"name": "Outlet Name", "value": f"`{outlet}`", "inline": True},
-    ]
-
-    if store_id:
-        fields.append({"name": "Store ID", "value": f"`{store_id}`", "inline": True})
-
-    fields.append({"name": "Status Aksi", "value": f"`{'OPEN' if is_open else 'CLOSE'}`", "inline": True})
-    fields.append({"name": "Waktu", "value": now_str, "inline": True})
-
-    embed = {
-        "title": title,
-        "description": message,
-        "color": color,
-        "fields": fields,
-        "footer": {
-            "text": _get_footer_text(is_vb=is_vb)
-        }
-    }
-
-    payload = {
-        "embeds": [embed]
-    }
-
-    _send_payload_async(webhook_url, payload)
+    if not _is_vb_environment(is_vb) and phone:
+        act = str(action).upper()
+        event = "ACTION_OPEN" if act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE") else "ACTION_CLOSE"
+        send_wa_webhook_async(
+            event_type=event,
+            phone=phone,
+            merchant=merchant,
+            outlet=outlet,
+            platform=platform,
+            store_id=store_id,
+            action=action,
+            is_vb=False
+        )
+    return
 
 
 def send_discord_skipped(
@@ -260,63 +216,30 @@ def send_discord_skipped(
     platform: str = "Shopee",
     store_id: str = None,
     message: str = None,
-    is_vb: bool = False
+    is_vb: bool = False,
+    phone: str = None,
+    **kwargs
 ):
     """
-    Mengirim notifikasi informasi (di-SKIP) ketika status live Shopee pasca-aksi
-    berbeda dari ekspektasi (misal karena ada Jadwal Khusus / Libur di Shopee).
+    Event skipped handler:
+    - Discord: Ditiadakan (No-Op), karena Discord eksklusif hanya untuk Rekap VB Group.
+    - WhatsApp Gateway: Diteruskan khusus Bot-OC via send_wa_webhook_async jika phone tersedia.
     """
-    webhook_url = _get_webhook_url(is_vb=is_vb)
-    if not webhook_url:
-        return
-
-    title = "⚠️ Status Outlet Berbeda (Di-SKIP)"
-    color_orange = 15105570  # Orange #E67E22
-
-    if not message:
-        message = (
-            f"Outlet **{outlet}** pada Merchant **{merchant}** di-SKIP dari paksa status.\n"
-            f"Status Live Shopee pasca-eksekusi adalah **{live_status}**, sedangkan ekspektasi dari aksi **{action}** adalah **{expected_status}**.\n"
-            f"*Kemungkinan toko memiliki Jadwal Khusus / Libur atau belum memiliki jadwal di Shopee.*"
+    if not _is_vb_environment(is_vb) and phone:
+        send_wa_webhook_async(
+            event_type="ACTION_SKIPPED",
+            phone=phone,
+            merchant=merchant,
+            outlet=outlet,
+            platform=platform,
+            store_id=store_id,
+            action=action,
+            live_status=live_status,
+            detail=f"Expected: {expected_status}, Live: {live_status}",
+            is_vb=False
         )
+    return
 
-    sig_raw = f"{title}:{platform}:{merchant}:{outlet}:{action}:{live_status}:{expected_status}"
-    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
-
-    if _is_duplicate(sig_hash):
-        return
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fields = [
-        {"name": "Platform", "value": f"`{platform}`", "inline": True},
-        {"name": "Merchant Name", "value": f"`{merchant}`", "inline": True},
-        {"name": "Outlet Name", "value": f"`{outlet}`", "inline": True},
-    ]
-
-    if store_id:
-        fields.append({"name": "Store ID", "value": f"`{store_id}`", "inline": True})
-
-    fields.append({"name": "Status Live Shopee", "value": f"`{live_status}`", "inline": True})
-    fields.append({"name": "Ekspektasi Aksi", "value": f"`{expected_status}`", "inline": True})
-    fields.append({"name": "Status Bot", "value": "`DI-SKIP (Jadwal Khusus)`", "inline": True})
-    fields.append({"name": "Waktu", "value": now_str, "inline": True})
-
-    embed = {
-        "title": title,
-        "description": message,
-        "color": color_orange,
-        "fields": fields,
-        "footer": {
-            "text": _get_footer_text(is_vb=is_vb)
-        }
-    }
-
-    payload = {
-        "embeds": [embed]
-    }
-
-    _send_payload_async(webhook_url, payload)
 
 
 def send_wa_webhook_async(

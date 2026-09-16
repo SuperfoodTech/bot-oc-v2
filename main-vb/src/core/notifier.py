@@ -42,11 +42,34 @@ def _get_webhook_url() -> str:
     """
     Mengambil URL Webhook khusus Virtual Brand (DISCORD_WEBHOOK_VB_URL),
     dengan fallback ke DISCORD_WEBHOOK_URL jika belum dikonfigurasi.
+    Mendukung dynamic reload dari .env dan .env.vb tanpa restart process.
     """
     vb_url = os.getenv("DISCORD_WEBHOOK_VB_URL", "").strip()
+    if not vb_url:
+        try:
+            from pathlib import Path
+            import dotenv
+            base_dir = Path(__file__).resolve().parent
+            for _ in range(5):
+                env_candidate = base_dir / ".env"
+                env_vb_candidate = base_dir / ".env.vb"
+                if env_candidate.exists() or env_vb_candidate.exists():
+                    if env_vb_candidate.exists():
+                        vals = dotenv.dotenv_values(str(env_vb_candidate))
+                        vb_url = vals.get("DISCORD_WEBHOOK_VB_URL", "").strip()
+                    if not vb_url and env_candidate.exists():
+                        vals = dotenv.dotenv_values(str(env_candidate))
+                        vb_url = vals.get("DISCORD_WEBHOOK_VB_URL", "").strip() or vals.get("DISCORD_WEBHOOK_URL", "").strip()
+                    if vb_url:
+                        break
+                base_dir = base_dir.parent
+        except Exception:
+            pass
+
     if vb_url:
         return vb_url
     return os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+
 
 
 def _get_footer_text() -> str:

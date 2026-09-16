@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
 
 import psycopg
@@ -337,8 +338,99 @@ def update_outlet_name(store_id: str, store_name: str) -> None:
         )
 
 
+_PENDING_BRAND_ACTIONS: dict[str, list[dict]] = {}
+_PENDING_LOCK = threading.Lock()
+
+
+def _record_pending_brand_action(brand_id: str, store_id: str, store_name: str, action: str, target_state: str, success: bool, error_message: str | None):
+    if not brand_id:
+        return
+    with _PENDING_LOCK:
+        if brand_id not in _PENDING_BRAND_ACTIONS:
+            _PENDING_BRAND_ACTIONS[brand_id] = []
+        _PENDING_BRAND_ACTIONS[brand_id].append({
+            "store_id": str(store_id),
+            "store_name": store_name,
+            "action": action,
+            "target_state": target_state,
+            "success": success,
+            "error_message": error_message,
+        })
+
+
+def _flush_pending_brand_notifications():
+    with _PENDING_LOCK:
+        if not _PENDING_BRAND_ACTIONS:
+            return
+        pending = dict(_PENDING_BRAND_ACTIONS)
+        _PENDING_BRAND_ACTIONS.clear()
+
+    try:
+        from core.notifier import send_discord_vb_group_summary
+        with connection() as conn:
+            for brand_id, actions in pending.items():
+                brand = conn.execute(
+                    "SELECT id, name, applied_status FROM vb_brands WHERE id=%s", (brand_id,)
+                ).fetchone()
+                if not brand:
+                    continue
+                brand_name = brand["name"] or "Virtual Brand Group"
+                applied_status = str(brand.get("applied_status") or "ON").upper()
+
+                actions_types = [a["action"] for a in actions if a.get("action")]
+                is_open = any(a in ("ACTION_OPEN", "USER_OPEN_STORE") for a in actions_types) or applied_status == "ON"
+                summary_action = "ACTION_OPEN" if is_open else "ACTION_CLOSE"
+
+                outlets = conn.execute("""
+                    SELECT o.store_id, COALESCE(o.long_name, o.short_name) AS name,
+                           os.shopee_actual_status, os.vercel_status
+                    FROM vb_brand_outlets bo
+                    JOIN outlets o ON o.id = bo.outlet_id AND o.is_active = true
+                    LEFT JOIN outlet_states os ON os.outlet_id = o.id
+                    WHERE bo.vb_brand_id = %s
+                    ORDER BY o.store_id
+                """, (brand_id,)).fetchall()
+
+                if not outlets:
+                    continue
+
+                success_items = []
+                failed_items = []
+
+                for out in outlets:
+                    st_id = str(out["store_id"])
+                    st_name = out["name"] or st_id
+                    live_st = str(out.get("shopee_actual_status") or "").upper()
+
+                    failed_record = next((a for a in actions if a["store_id"] == st_id and not a.get("success")), None)
+
+                    if is_open:
+                        if (live_st in ("ON", "OPEN") or (out.get("vercel_status") == "ON" and live_st != "PAUSE")) and not failed_record:
+                            success_items.append({"name": st_name, "store_id": st_id})
+                        else:
+                            failed_items.append({"name": st_name, "store_id": st_id})
+                    else:
+                        if (live_st in ("PAUSE", "CLOSED", "OFF")) and not failed_record:
+                            success_items.append({"name": st_name, "store_id": st_id})
+                        else:
+                            failed_items.append({"name": st_name, "store_id": st_id})
+
+                send_discord_vb_group_summary(
+                    group_name=brand_name,
+                    action=summary_action,
+                    success_items=success_items,
+                    failed_items=failed_items
+                )
+    except Exception as e:
+        print(f"[VB DB NOTIFICATION ERROR] Gagal mengirim summary group Discord: {e}")
+
+
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="VB"):
     """Write copied-worker actions as VB logs without mixing regular bot logs."""
+    if str(store_id).upper() == "SYSTEM":
+        _flush_pending_brand_notifications()
+        return
+
     with connection() as conn:
         outlet = conn.execute(
             "SELECT id FROM outlets WHERE store_id=%s", (store_id,)
@@ -368,3 +460,15 @@ def record_log(store_id, store_name, action, target_state, reason, success=True,
             "UPDATE outlet_states SET last_action_at=now(), last_checked_at=now(), updated_at=now() WHERE outlet_id=%s",
             (outlet["id"],),
         )
+
+        if brand and brand.get("vb_brand_id") and action in ("ACTION_OPEN", "ACTION_CLOSE", "USER_OPEN_STORE", "USER_PAUSE_STORE"):
+            _record_pending_brand_action(
+                brand_id=str(brand["vb_brand_id"]),
+                store_id=str(store_id),
+                store_name=store_name,
+                action=action,
+                target_state=target_state,
+                success=success,
+                error_message=error_message,
+            )
+
