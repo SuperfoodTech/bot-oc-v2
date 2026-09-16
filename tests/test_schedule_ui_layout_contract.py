@@ -303,6 +303,24 @@ def test_vb_filter_toolbar_and_reset_button_layout_contract():
     assert ".admin-main .vb-reset-button" in STYLES
 
 
+def test_vb_outlet_status_filter_contract():
+    vb_tab_template = (PROJECT_ROOT / "src/backend/templates/admin_tab_vb.html").read_text()
+    dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
+
+    # HTML assertions for desktop and mobile select filter
+    assert "<span>Status Outlet</span>" in vb_tab_template
+    assert '<option value="PERLU_CEK">Perlu cek</option>' in vb_tab_template
+    assert '<option value="OPEN">Live Buka</option>' in vb_tab_template
+    assert '<option value="CLOSED">Live Tutup</option>' in vb_tab_template
+    assert '<option value="PAUSE">Tutup Sementara</option>' in vb_tab_template
+
+    # JS assertions in dashboard
+    assert "isVbOutletPerluCek(" in dashboard_template
+    assert "matchesVbOutletStatus(" in dashboard_template
+    assert "outletStatus:" in dashboard_template
+
+
+
 
 
 

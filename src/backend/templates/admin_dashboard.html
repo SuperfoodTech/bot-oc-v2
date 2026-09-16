@@ -1191,7 +1191,7 @@
     }
 
     function getActiveVbAdvancedFilterCount(filters = getActiveVbFilters()) {
-      return [filters.group, filters.masterStatus, filters.groupStatus, filters.portal, filters.storeId].filter(Boolean).length;
+      return [filters.group, filters.outletStatus, filters.groupStatus, filters.portal, filters.storeId].filter(Boolean).length;
     }
 
     function updateVbMobileFilterBadge(filters = getActiveVbFilters()) {
@@ -1674,21 +1674,25 @@
       };
     }
 
+    function isVbOutletPerluCek(outlet) {
+      if (!outlet) return false;
+      const failureText = [
+        outlet.statusPresentation?.label,
+        outlet.statusPresentation?.note,
+        outlet.statusSubtext,
+        outlet.store?.last_toggle_reason,
+        outlet.store?.error_message,
+        outlet.store?.patrol_status
+      ].filter(Boolean).join(' ').toLowerCase();
+      return outlet.store?.patrol_success === false
+        || outlet.store?.last_patrol_success === false
+        || outlet.store?.success === false
+        || /patroli[^.]*gagal|patrol[^.]*fail|patrol[^.]*error|gagal patroli|patrol_failed/.test(failureText);
+    }
+
     function getVbStatusCounts(outlets = []) {
       return (outlets || []).reduce((counts, outlet) => {
-        const failureText = [
-          outlet.statusPresentation?.label,
-          outlet.statusPresentation?.note,
-          outlet.statusSubtext,
-          outlet.store?.last_toggle_reason,
-          outlet.store?.error_message,
-          outlet.store?.patrol_status
-        ].filter(Boolean).join(' ').toLowerCase();
-        const hasPatrolFailure = outlet.store?.patrol_success === false
-          || outlet.store?.last_patrol_success === false
-          || outlet.store?.success === false
-          || /patroli[^.]*gagal|patrol[^.]*fail|patrol[^.]*error|gagal patroli|patrol_failed/.test(failureText);
-        if (hasPatrolFailure) counts.failure += 1;
+        if (isVbOutletPerluCek(outlet)) counts.failure += 1;
         else if (outlet.liveState === 'OPEN') counts.opened += 1;
         else counts.close += 1;
         return counts;
@@ -1813,7 +1817,7 @@
       return {
         query: queryFromHeader.toLowerCase().trim(),
         group: document.getElementById('vbGroupFilter')?.value || '',
-        masterStatus: (document.getElementById('vbMasterFilter')?.value || '').toUpperCase(),
+        outletStatus: (document.getElementById('vbMasterFilter')?.value || '').toUpperCase(),
         groupStatus: (document.getElementById('vbStatusFilter')?.value || '').toUpperCase(),
         portal: document.getElementById('vbPortalFilter')?.value || '',
         storeId: (document.getElementById('vbStoreIdFilter')?.value || '').toLowerCase().trim()
@@ -1854,16 +1858,25 @@
       setupCustomFilterDropdowns();
     }
 
+    function matchesVbOutletStatus(outlet, statusFilter) {
+      if (!statusFilter) return true;
+      if (statusFilter === 'PERLU_CEK') return isVbOutletPerluCek(outlet);
+      if (statusFilter === 'OPEN') return outlet.liveState === 'OPEN';
+      if (statusFilter === 'CLOSED') return outlet.liveState === 'CLOSED';
+      if (statusFilter === 'PAUSE') return outlet.liveState === 'PAUSE';
+      return true;
+    }
+
     function getFilteredVbBrandViews(brandViews, filters) {
       return brandViews.reduce((acc, brand) => {
         const matchesGroup = !filters.group || String(brand.id) === String(filters.group);
-        const matchesMaster = !filters.masterStatus || brand.masterStatus === filters.masterStatus;
         const matchesStatus = !filters.groupStatus || brand.effectiveStatus === filters.groupStatus;
-        if (!matchesGroup || !matchesMaster || !matchesStatus) return acc;
+        if (!matchesGroup || !matchesStatus) return acc;
 
         const outletScoped = brand.outlets.filter(outlet => (
           (!filters.portal || outlet.portalName === filters.portal) &&
-          (!filters.storeId || outlet.storeId.toLowerCase().includes(filters.storeId))
+          (!filters.storeId || outlet.storeId.toLowerCase().includes(filters.storeId)) &&
+          matchesVbOutletStatus(outlet, filters.outletStatus)
         ));
         const brandMatchesQuery = !filters.query
           || (brand.name || '').toLowerCase().includes(filters.query)
@@ -1873,7 +1886,7 @@
           : outletScoped.filter(outlet => [outlet.portalName, outlet.storeName, outlet.storeId]
             .some(value => String(value || '').toLowerCase().includes(filters.query)));
         const visibleOutlets = brandMatchesQuery ? outletScoped : queryMatchedOutlets;
-        const hasOutletFilters = Boolean(filters.portal || filters.storeId);
+        const hasOutletFilters = Boolean(filters.portal || filters.storeId || filters.outletStatus);
         if (hasOutletFilters && !visibleOutlets.length) return acc;
         const shouldIncludeBrand = brandMatchesQuery || visibleOutlets.length > 0 || (!brand.outlets.length && !hasOutletFilters && !filters.query);
         if (!shouldIncludeBrand) return acc;
@@ -2097,7 +2110,7 @@
       const summary = document.getElementById('vbResultsSummary');
       if (!summary) return;
       const totalStores = brands.reduce((sum, brand) => sum + (brand.visibleStoreCount || 0), 0);
-      const hasFilters = Boolean(filters.query || filters.group || filters.masterStatus || filters.groupStatus || filters.portal || filters.storeId);
+      const hasFilters = Boolean(filters.query || filters.group || filters.outletStatus || filters.groupStatus || filters.portal || filters.storeId);
       summary.textContent = brands.length
         ? (hasFilters
           ? `Menampilkan ${brands.length} dari ${totalBrands} grup · ${totalStores} Store ID`

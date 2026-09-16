@@ -1,6 +1,16 @@
 # Update
 
-## Latest update: v1.14.0 (Shopee Special Hours Real-Time Synchronization & Visualization)
+## Latest update: v1.17.0 (Virtual Brand Outlet Status Operational Filter)
+
+### Handover Catatan Teknis Perubahan v1.17.0
+- Penggantian filter redundan "Status Master" pada Tab Virtual Brand (VB) dengan filter operasional "Status Outlet".
+- Opsi pilihan filter Status Outlet: `Semua status`, `Perlu cek` (`PERLU_CEK`), `Live Buka` (`OPEN`), `Live Tutup` (`CLOSED`), dan `Tutup Sementara` (`PAUSE`).
+- Filter `Perlu cek` menyaring outlet yang mengalami kegagalan patroli atau berstatus error.
+- Detail rilis terdokumentasi di [update/1.17.0.md](update/1.17.0.md) dan [.agents/AGENTS.md](.agents/AGENTS.md).
+
+---
+
+## Update v1.14.0 (Shopee Special Hours Real-Time Synchronization & Visualization)
 
 ### Handover Catatan Teknis Perubahan v1.14.0
 - Penarikan (*fetch*) dan penyimpanan data Jadwal Khusus (*Special Hours*) Shopee Foody (`/api/seller/store/special-hours`) saat bot berada di tab Business Hours untuk Bot O/C reguler (`main-bot`) dan Virtual Brand (`main-vb`).

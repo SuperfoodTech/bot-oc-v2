@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.16.1`.
+Latest documented release: `1.17.0`.
+
+Filter Status Outlet Virtual Brand (`#vbMasterFilter` & `#mobileVbMasterFilter`):
+- Filter `Status Master` digantikan secara penuh oleh filter operasional `Status Outlet`.
+- Opsi filter mencakup: `Semua status` (`""`), `Perlu cek` (`PERLU_CEK`), `Live Buka` (`OPEN`), `Live Tutup` (`CLOSED`), dan `Tutup Sementara` (`PAUSE`).
+- Opsi `Perlu cek` menyaring outlet yang membutuhkan penanganan (patroli gagal, error, atau status abnormal).
 
 Toolbar filter Virtual Brand (`.vb-filter-grid`):
 - Field input Store ID (`#vbStoreIdFilter`) dan tombol Reset Filter (`.vb-reset-button`) wajib memiliki tinggi seragam `36px` dengan padding, border, radius (`8px`), dan font `Nunito` yang konsisten dengan custom select filter lainnya.

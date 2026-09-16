@@ -31,13 +31,6 @@
             </select>
           </label>
           <label class="filter-field">
-            <span>Status Master</span>
-            <select id="vbMasterFilter" class="form-input filter-select" onchange="filterVBTable()">
-              <option value="">Semua status</option>
-              <option value="AKTIF">Aktif</option>
-            </select>
-          </label>
-          <label class="filter-field">
             <span>Status Grup</span>
             <select id="vbStatusFilter" class="form-input filter-select" onchange="filterVBTable()">
               <option value="">Semua status</option>
@@ -49,6 +42,16 @@
             <span>Portal</span>
             <select id="vbPortalFilter" class="form-input filter-select" onchange="filterVBTable()">
               <option value="">Semua portal</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Status Outlet</span>
+            <select id="vbMasterFilter" class="form-input filter-select" onchange="filterVBTable()">
+              <option value="">Semua status</option>
+              <option value="PERLU_CEK">Perlu cek</option>
+              <option value="OPEN">Live Buka</option>
+              <option value="CLOSED">Live Tutup</option>
+              <option value="PAUSE">Tutup Sementara</option>
             </select>
           </label>
           <label class="filter-field">
@@ -88,13 +91,6 @@
           </select>
         </label>
         <label class="filter-field">
-          <span>Status Master</span>
-          <select id="mobileVbMasterFilter" class="form-input mobile-sheet-select" aria-label="Filter status master VB">
-            <option value="">Semua status</option>
-            <option value="AKTIF">Aktif</option>
-          </select>
-        </label>
-        <label class="filter-field">
           <span>Status Grup</span>
           <select id="mobileVbStatusFilter" class="form-input mobile-sheet-select" aria-label="Filter status grup VB">
             <option value="">Semua status</option>
@@ -106,6 +102,16 @@
           <span>Portal</span>
           <select id="mobileVbPortalFilter" class="form-input mobile-sheet-select" aria-label="Filter portal VB">
             <option value="">Semua portal</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>Status Outlet</span>
+          <select id="mobileVbMasterFilter" class="form-input mobile-sheet-select" aria-label="Filter status outlet VB">
+            <option value="">Semua status</option>
+            <option value="PERLU_CEK">Perlu cek</option>
+            <option value="OPEN">Live Buka</option>
+            <option value="CLOSED">Live Tutup</option>
+            <option value="PAUSE">Tutup Sementara</option>
           </select>
         </label>
         <label class="filter-field">
