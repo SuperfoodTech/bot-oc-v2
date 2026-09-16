@@ -24,7 +24,11 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.17.0`.
+Latest documented release: `1.18.0`.
+
+WhatsApp Gateway Microservice (`bot-wa`):
+- Service `bot-wa` beroperasi secara penuh di luar container bot patroli (`fm-bot` & `fm-bot-vb`) tanpa menginterupsi alur kerja patroli Selenium atau memicu restart container bot yang sedang berjalan.
+- Data riwayat aksi bot dibaca dari catatan database PostgreSQL (`audit_logs`) atau dikirim via webhook asinkron (`send_wa_webhook_async`) sehingga tidak mengganggu ketersediaan bot 24/7.
 
 Filter Status Outlet Virtual Brand (`#vbMasterFilter` & `#mobileVbMasterFilter`):
 - Filter `Status Master` digantikan secara penuh oleh filter operasional `Status Outlet`.

@@ -1,8 +1,9 @@
 """
-src/core/notifier.py
-====================
-Modul Notifier Discord Webhook untuk mengirim notifikasi eror bot patroli.
-Format: Bahasa Indonesia, to the point, hanya menggunakan emoji ❌ untuk penanda eror.
+main-vb/src/core/notifier.py
+============================
+Modul Notifier Discord Webhook khusus Virtual Brand Engine (bot-vb).
+Seluruh notifikasi Virtual Brand dikirimkan khusus ke Discord Webhook (DISCORD_WEBHOOK_VB_URL).
+Pengiriman notifikasi WhatsApp (bot-wa) di-bypass secara penuh untuk Virtual Brand.
 """
 
 import os
@@ -38,13 +39,26 @@ MODULE_NAME_MAP = {
 
 
 def _get_webhook_url() -> str:
+    """
+    Mengambil URL Webhook khusus Virtual Brand (DISCORD_WEBHOOK_VB_URL),
+    dengan fallback ke DISCORD_WEBHOOK_URL jika belum dikonfigurasi.
+    """
+    vb_url = os.getenv("DISCORD_WEBHOOK_VB_URL", "").strip()
+    if vb_url:
+        return vb_url
     return os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+
+
+def _get_footer_text() -> str:
+    """
+    Footer identitas khusus untuk seluruh notifikasi Virtual Brand.
+    """
+    return "FoodMaster Virtual Brand"
 
 
 def _is_duplicate(signature: str) -> bool:
     now = time.time()
     with _CACHE_LOCK:
-        # Cleanup expired items
         expired = [k for k, v in _NOTIFICATION_CACHE.items() if now - v > _CACHE_TTL_SECONDS]
         for k in expired:
             del _NOTIFICATION_CACHE[k]
@@ -68,125 +82,56 @@ def _send_payload_async(webhook_url: str, payload: dict):
                 data=data_bytes,
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent": "FoodMasterBot/1.0"
+                    "User-Agent": "FoodMasterBot-VB/1.0"
                 },
                 method="POST"
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 pass
         except Exception as e:
-            # Tidak melempar exception ke luar agar tidak merusak alur kerja utama bot
-            print(f"[NOTIFIER ERROR] Gagal mengirim webhook Discord: {e}")
+            print(f"[VB NOTIFIER ERROR] Gagal mengirim webhook Discord: {e}")
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
 
 
-def send_discord_error(
-    *args,
-    message: str = None,
-    title: str = "❌ Eror Bot Patroli",
-    logger_name: str = None,
-    extra_fields: dict = None,
-    platform: str = None,
-    merchant: str = None,
-    outlet: str = None,
-    error_type: str = None,
+def send_discord_error(*args, **kwargs):
+    """
+    No-Op Stub: Notifikasi eror individual ditiadakan untuk Virtual Brand di Discord.
+    Notifikasi Discord Virtual Brand beroperasi secara eksklusif hanya untuk Rekap VB Group (Skenario 1.1 - 1.6).
+    """
+    return
+
+
+
+
+def send_discord_success(*args, **kwargs):
+    """
+    No-Op Stub: Notifikasi sukses per-outlet individual ditiadakan untuk Virtual Brand.
+    Notifikasi Virtual Brand dipusatkan secara eksklusif via Rekap Per-Group (send_discord_vb_group_summary).
+    """
+    return
+
+
+def send_discord_skipped(*args, **kwargs):
+    """
+    No-Op Stub: Notifikasi di-SKIP per-outlet individual ditiadakan untuk Virtual Brand.
+    Notifikasi Virtual Brand dipusatkan secara eksklusif via Rekap Per-Group (send_discord_vb_group_summary).
+    """
+    return
+
+
+
+def send_discord_vb_group_summary(
+    group_name: str,
+    action: str,
+    success_items: list,
+    failed_items: list = None,
     **kwargs
 ):
     """
-    Mengirim notifikasi eror ke Discord Webhook secara asinkron dan to the point.
-    Mendukung pemanggilan positional (platform, merchant, error_type, message, extra)
-    maupun keyword arguments (message, title, logger_name, extra_fields, dll).
-    """
-    webhook_url = _get_webhook_url()
-    if not webhook_url:
-        return
-
-    # Parse positional args if provided (legacy browser.py signature support)
-    # Style 1: (platform, merchant, error_type, message, extra_info)
-    # Style 2: (message, title, logger_name, extra_fields)
-    if args:
-        if len(args) >= 4 and args[0] in ("Shopee", "GrabFood", "Gofood") or (len(args) >= 3 and not message):
-            # Positional style from browser.py: (platform, merchant, error_type, message, ...)
-            if platform is None and len(args) > 0: platform = str(args[0])
-            if merchant is None and len(args) > 1: merchant = str(args[1])
-            if error_type is None and len(args) > 2: error_type = str(args[2])
-            if message is None and len(args) > 3: message = str(args[3])
-            if len(args) > 4:
-                extra_fields = extra_fields or {}
-                extra_fields["Detail"] = str(args[4])
-        else:
-            # Positional style: (message, title, logger_name, extra_fields)
-            if message is None and len(args) > 0: message = str(args[0])
-            if title == "❌ Eror Bot Patroli" and len(args) > 1: title = str(args[1])
-            if logger_name is None and len(args) > 2: logger_name = str(args[2])
-            if extra_fields is None and len(args) > 3 and isinstance(args[3], dict): extra_fields = args[3]
-
-    if not message:
-        message = "Terjadi eror pada sistem patroli."
-
-    if error_type and title == "❌ Eror Bot Patroli":
-        title = f"❌ Eror Bot Patroli: {error_type}"
-
-    # Buat signature spesifik per merchant & outlet agar notifikasi toko berbeda tidak ter-suppress
-    sig_raw = f"{title}:{error_type}:{platform}:{merchant}:{outlet}:{logger_name}:{message}"
-    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
-
-    if _is_duplicate(sig_hash):
-        return
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fields = []
-    if platform:
-        fields.append({"name": "Platform", "value": f"`{platform}`", "inline": True})
-    if merchant:
-        fields.append({"name": "Merchant Name", "value": f"`{merchant}`", "inline": True})
-    if outlet:
-        fields.append({"name": "Outlet Name", "value": f"`{outlet}`", "inline": True})
-    if error_type:
-        fields.append({"name": "Tipe Error", "value": f"`{error_type}`", "inline": True})
-    if logger_name:
-        explicit_mod = MODULE_NAME_MAP.get(logger_name, logger_name)
-        fields.append({"name": "Modul", "value": f"`{explicit_mod}`", "inline": True})
-    
-    fields.append({"name": "Waktu", "value": now_str, "inline": True})
-
-    if extra_fields:
-        for k, v in extra_fields.items():
-            fields.append({"name": str(k), "value": str(v), "inline": True})
-
-    # Limit message length for Discord Embed Description (max 2000 chars)
-    trimmed_msg = message[:1900] + ("..." if len(message) > 1900 else "")
-
-    embed = {
-        "title": title,
-        "description": trimmed_msg,
-        "color": 15158332,  # Merah #E74C3C
-        "fields": fields,
-        "footer": {
-            "text": "FoodMaster Bot Patrol Engine"
-        }
-    }
-
-    payload = {
-        "embeds": [embed]
-    }
-
-    _send_payload_async(webhook_url, payload)
-
-
-def send_discord_success(
-    merchant: str,
-    outlet: str,
-    action: str,
-    platform: str = "Shopee",
-    store_id: str = None,
-    message: str = None
-):
-    """
-    Mengirim notifikasi sukses saat outlet berhasil di-OPEN atau di-CLOSE / PAUSE.
+    Mengirim notifikasi rekap aksi per-VB Group ke Discord Webhook khusus Virtual Brand.
+    Mendukung status Full Success (🟢 BUKA / 🔴 TUTUP) & Partial Success (🟠 SEBAGIAN).
     """
     webhook_url = _get_webhook_url()
     if not webhook_url:
@@ -194,118 +139,103 @@ def send_discord_success(
 
     act = str(action).upper()
     is_open = act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE")
-    
-    status_label = "BERHASIL DIBUKA (OPEN)" if is_open else "BERHASIL DITUTUP (CLOSE)"
-    emoji = "🟢" if is_open else "🟡"
-    color = 3066993 if is_open else 15844367  # Hijau #2ECC71 untuk OPEN, Kuning #F1C40F untuk CLOSE
+    action_word = "DIBUKA" if is_open else "DITUTUP"
 
-    title = f"{emoji} Outlet {status_label}"
-    
-    if not message:
-        message = f"Outlet **{outlet}** pada Merchant **{merchant}** berhasil di-{ 'OPEN' if is_open else 'CLOSE' }."
+    success_list = success_items or []
+    failed_list = failed_items or []
 
-    sig_raw = f"{title}:{platform}:{merchant}:{outlet}:{act}"
+    success_count = len(success_list)
+    failed_count = len(failed_list)
+
+    if success_count == 0 and failed_count == 0:
+        return
+
+    if failed_count == 0:
+        # Sukses Total (All Succeeded)
+        emoji = "🟢" if is_open else "🔴"
+        title = f"{emoji} VB GROUP BERHASIL {action_word} BOT"
+        color = 3066993 if is_open else 15158332
+        hasil_str = f"{success_count} Berhasil"
+    elif success_count == 0:
+        # Gagal Total (All Failed)
+        emoji = "🔴"
+        title = f"🔴 VB GROUP GAGAL {action_word} BOT"
+        color = 15158332  # Merah Alert #E74C3C
+        hasil_str = f"{failed_count} Gagal"
+    else:
+        # Sebagian Berhasil (Partial Success)
+        emoji = "🟠"
+        title = f"🟠 VB GROUP SEBAGIAN BERHASIL {action_word} BOT"
+        color = 15105570  # Orange #E67E22
+        hasil_str = f"{success_count} Berhasil, {failed_count} Gagal"
+
+    lines = [
+        f"**VB Group:** {group_name}",
+        f"**Hasil:** {hasil_str}",
+        ""
+    ]
+
+    def _format_item(item):
+        if isinstance(item, dict):
+            name = item.get("name") or "Listing"
+            info = item.get("store_id") or item.get("link") or ""
+        elif isinstance(item, (tuple, list)):
+            name = str(item[0]) if len(item) > 0 else "Listing"
+            info = str(item[1]) if len(item) > 1 else ""
+        else:
+            name = str(item)
+            info = ""
+        formatted = f"{name} — {info}".strip(" —")
+        return formatted if formatted else "Listing"
+
+    if success_count > 0:
+        lines.append(f"**Berhasil {action_word} ({success_count}):**")
+        for item in success_list:
+            lines.append(f"✅ {_format_item(item)}")
+        lines.append("")
+
+    if failed_count > 0:
+        lines.append(f"**Gagal {action_word} ({failed_count}):**")
+        for item in failed_list:
+            lines.append(f"❌ {_format_item(item)}")
+        lines.append("")
+
+    description = "\n".join(lines).strip()
+    if len(description) > 3900:
+        description = description[:3900] + "\n..."
+
+    def _extract_id(item):
+        if isinstance(item, dict):
+            return str(item.get("store_id") or item.get("name") or "item")
+        elif isinstance(item, (tuple, list)):
+            return str(item[1] if len(item) > 1 else (item[0] if len(item) > 0 else "item"))
+        return str(item)
+
+    succ_ids = ",".join(sorted(_extract_id(item) for item in success_list))
+    fail_ids = ",".join(sorted(_extract_id(item) for item in failed_list))
+
+    sig_raw = f"{title}:{group_name}:{action_word}:{succ_ids}:{fail_ids}"
     sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
+
 
     if _is_duplicate(sig_hash):
         return
 
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fields = [
-        {"name": "Platform", "value": f"`{platform}`", "inline": True},
-        {"name": "Merchant Name", "value": f"`{merchant}`", "inline": True},
-        {"name": "Outlet Name", "value": f"`{outlet}`", "inline": True},
-    ]
-
-    if store_id:
-        fields.append({"name": "Store ID", "value": f"`{store_id}`", "inline": True})
-
-    fields.append({"name": "Status Aksi", "value": f"`{'OPEN' if is_open else 'CLOSE'}`", "inline": True})
-    fields.append({"name": "Waktu", "value": now_str, "inline": True})
-
     embed = {
         "title": title,
-        "description": message,
+        "description": description,
         "color": color,
-        "fields": fields,
         "footer": {
-            "text": "FoodMaster Bot Patrol Engine"
+            "text": _get_footer_text()
         }
     }
 
-    payload = {
-        "embeds": [embed]
-    }
-
-    _send_payload_async(webhook_url, payload)
+    _send_payload_async(webhook_url, {"embeds": [embed]})
 
 
-def send_discord_skipped(
-    merchant: str,
-    outlet: str,
-    action: str,
-    live_status: str,
-    expected_status: str,
-    platform: str = "Shopee",
-    store_id: str = None,
-    message: str = None
-):
+def send_wa_webhook_async(*args, **kwargs):
     """
-    Mengirim notifikasi informasi (di-SKIP) ketika status live Shopee pasca-aksi
-    berbeda dari ekspektasi (misal karena ada Jadwal Khusus / Libur di Shopee).
+    Stub No-Op khusus Virtual Brand: Notifikasi Virtual Brand (bot-vb) 100% dikirim ke Discord,
+    dan TIDAK AKAN PERNAH memicu pengiriman notifikasi WhatsApp.
     """
-    webhook_url = _get_webhook_url()
-    if not webhook_url:
-        return
-
-    title = "⚠️ Status Outlet Berbeda (Di-SKIP)"
-    color_orange = 15105570  # Orange #E67E22
-
-    if not message:
-        message = (
-            f"Outlet **{outlet}** pada Merchant **{merchant}** di-SKIP dari paksa status.\n"
-            f"Status Live Shopee pasca-eksekusi adalah **{live_status}**, sedangkan ekspektasi dari aksi **{action}** adalah **{expected_status}**.\n"
-            f"*Kemungkinan toko memiliki Jadwal Khusus / Libur atau belum memiliki jadwal di Shopee.*"
-        )
-
-    sig_raw = f"{title}:{platform}:{merchant}:{outlet}:{action}:{live_status}:{expected_status}"
-    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
-
-    if _is_duplicate(sig_hash):
-        return
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fields = [
-        {"name": "Platform", "value": f"`{platform}`", "inline": True},
-        {"name": "Merchant Name", "value": f"`{merchant}`", "inline": True},
-        {"name": "Outlet Name", "value": f"`{outlet}`", "inline": True},
-    ]
-
-    if store_id:
-        fields.append({"name": "Store ID", "value": f"`{store_id}`", "inline": True})
-
-    fields.append({"name": "Status Live Shopee", "value": f"`{live_status}`", "inline": True})
-    fields.append({"name": "Ekspektasi Aksi", "value": f"`{expected_status}`", "inline": True})
-    fields.append({"name": "Status Bot", "value": "`DI-SKIP (Jadwal Khusus)`", "inline": True})
-    fields.append({"name": "Waktu", "value": now_str, "inline": True})
-
-    embed = {
-        "title": title,
-        "description": message,
-        "color": color_orange,
-        "fields": fields,
-        "footer": {
-            "text": "FoodMaster Bot Patrol Engine"
-        }
-    }
-
-    payload = {
-        "embeds": [embed]
-    }
-
-    _send_payload_async(webhook_url, payload)
-
-
-
+    return

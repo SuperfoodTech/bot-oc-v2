@@ -94,6 +94,7 @@ services:
       - CHROMEDRIVER_PATH=/usr/bin/chromedriver
       - CHROME_BIN=/usr/bin/chromium
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - DISCORD_WEBHOOK_VB_URL=${DISCORD_WEBHOOK_VB_URL}
       - TZ=Asia/Jakarta
     command: ["uv", "run", "python", "main-vb/src/daemon.py"]
     volumes:
