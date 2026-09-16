@@ -17,7 +17,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260915-drawer-scroll-v2">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260915-vb-card-hover-v1">
 </head>
 
 <body x-data="adminApp()">
@@ -1767,6 +1767,16 @@
         statusTooltip: getAdminStatusTooltip(statusStore),
         todayScheduleMarkup: getVbTodayOperatingHours(store),
         specialScheduleMarkup: getVbSpecialHoursCellMarkup(store),
+        linkCellMarkup: (() => {
+          const sId = String(store?.store_id || outlet?.store_id || '').trim();
+          const ofdUrl = sId ? getShopeeFoodStoreUrl(sId) : '';
+          return ofdUrl ? `
+            <a href="${ofdUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link" onclick="event.stopPropagation()" aria-label="Buka outlet ShopeeFood untuk store ${escapeVBHtml(sId)}" title="Lihat di ShopeeFood">
+              <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+              <span>Lihat di ShopeeFood</span>
+            </a>
+          ` : '<span class="compact-meta">-</span>';
+        })(),
         actionSummary: store ? getAdminActionSummary(store) : { title: 'Belum ada aksi', note: '-' }
       };
     }
@@ -1835,7 +1845,13 @@
       const portalOptions = portals.map(name => ({ value: name, label: name }));
       setVbSelectOptions('vbPortalFilter', 'Semua portal', portalOptions);
       setVbSelectOptions('mobileVbPortalFilter', 'Semua portal', portalOptions);
+      const storeIds = [...new Set(brandViews.flatMap(brand => brand.outlets.map(outlet => outlet.storeId)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'id', { numeric: true, sensitivity: 'base' }));
+      const storeIdOptions = storeIds.map(id => ({ value: id, label: id }));
+      setVbSelectOptions('vbStoreIdFilter', 'Semua Store ID', storeIdOptions);
+      setVbSelectOptions('mobileVbStoreIdFilter', 'Semua Store ID', storeIdOptions);
       syncVbMobileFilterSelectsFromDesktop();
+      setupCustomFilterDropdowns();
     }
 
     function getFilteredVbBrandViews(brandViews, filters) {
@@ -2004,6 +2020,7 @@
                   <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
                   <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
                   <div class="vb-store-special-hours"><span class="vb-store-field-label">Jadwal Khusus</span>${outlet.specialScheduleMarkup}</div>
+                  <div class="vb-store-ofd"><span class="vb-store-field-label">Link OFD</span>${outlet.linkCellMarkup}</div>
                 </div>
               `;
           }).join('')
@@ -2011,7 +2028,7 @@
 
         return `
           <article class="vb-brand-card ${isExpanded ? 'is-expanded' : ''}" id="vb-card-${brand.id}">
-            <div class="vb-brand-card-head">
+            <div class="vb-brand-card-head" role="button" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-label="Grup ${escapeVBHtml(brand.name)}: klik untuk detail, double click untuk expand/collapse semua" onclick="handleVbBrandCardHeadClick('${brand.id}', event)" onkeydown="handleVbBrandCardHeadKeyDown('${brand.id}', event)">
               <div class="vb-group-identity">
                 <div class="vb-group-eyebrow">Grup VB</div>
                 <h3>${escapeVBHtml(brand.name)}</h3>
@@ -2047,17 +2064,14 @@
                   <small>${escapeVBHtml(activity.note)}</small>
                 </div>
               </div>
-              <div class="vb-brand-toggle">
+              <div class="vb-brand-toggle" onclick="event.stopPropagation()">
                 <div class="vb-control">
-                  <label class="switch-toggle ${isPending ? 'is-toggle-pending' : ''}" aria-busy="${isPending ? 'true' : 'false'}">
-                    <input type="checkbox" ${isOn ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)">
+                  <label class="switch-toggle ${isPending ? 'is-toggle-pending' : ''}" aria-busy="${isPending ? 'true' : 'false'}" onclick="event.stopPropagation()">
+                    <input type="checkbox" ${isOn ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)" onclick="event.stopPropagation()">
                     <span class="slider"></span>
                   </label>
                   ${isOn ? '' : '<span class="vb-control-label">OFF</span>'}
                 </div>
-                <button type="button" class="vb-expand-button" aria-label="${isExpanded ? 'Sembunyikan' : 'Tampilkan'} Store ID grup ${escapeVBHtml(brand.name)}" aria-expanded="${isExpanded ? 'true' : 'false'}" onclick="toggleVbBrandDetail('${brand.id}')">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
-                </button>
               </div>
             </div>
             <div class="vb-brand-detail" ${isExpanded ? '' : 'hidden'}>
@@ -2069,6 +2083,7 @@
                   <span>Status</span>
                   <span>Jam Hari Ini</span>
                   <span>Jadwal Khusus</span>
+                  <span>Link OFD</span>
                 </div>
                 ${outletRows}
               </div>
@@ -2125,17 +2140,67 @@
       requestVBStatus(brand.id, 'ON', control);
     }
 
+    let vbBrandClickTimer = null;
+    let vbBrandLastClickBrandId = null;
+
+    function handleVbBrandCardHeadClick(brandId, event) {
+      if (event.target.closest('a, button, input, label, select, .switch-toggle, .vb-brand-toggle')) {
+        return;
+      }
+      if (vbBrandClickTimer) {
+        clearTimeout(vbBrandClickTimer);
+        vbBrandClickTimer = null;
+        vbBrandLastClickBrandId = null;
+        toggleAllVbBrands();
+        return;
+      }
+      vbBrandLastClickBrandId = brandId;
+      vbBrandClickTimer = setTimeout(() => {
+        vbBrandClickTimer = null;
+        vbBrandLastClickBrandId = null;
+        toggleVbBrandDetail(brandId);
+      }, 250);
+    }
+
+    function handleVbBrandCardHeadKeyDown(brandId, event) {
+      if (event.target.closest('a, button, input, label, select, .switch-toggle, .vb-brand-toggle')) {
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleVbBrandDetail(brandId);
+      }
+    }
+
     function toggleVbBrandDetail(brandId) {
       const card = document.getElementById(`vb-card-${brandId}`);
+      const head = card?.querySelector('.vb-brand-card-head');
       const detail = card?.querySelector('.vb-brand-detail');
-      const button = card?.querySelector('.vb-expand-button');
-      if (!detail || !button) return;
-      const isExpanded = button.getAttribute('aria-expanded') === 'true';
-      button.setAttribute('aria-expanded', String(!isExpanded));
-      detail.hidden = isExpanded;
-      card.classList.toggle('is-expanded', !isExpanded);
-      if (isExpanded) vbExpandedBrandIds.delete(String(brandId));
-      else vbExpandedBrandIds.add(String(brandId));
+      if (!card || !detail) return;
+      const isExpanded = card.classList.contains('is-expanded');
+      const nextExpanded = !isExpanded;
+      detail.hidden = !nextExpanded;
+      card.classList.toggle('is-expanded', nextExpanded);
+      if (head) head.setAttribute('aria-expanded', String(nextExpanded));
+      if (nextExpanded) vbExpandedBrandIds.add(String(brandId));
+      else vbExpandedBrandIds.delete(String(brandId));
+    }
+
+    function toggleAllVbBrands() {
+      const allCards = document.querySelectorAll('.vb-brand-card');
+      if (!allCards.length) return;
+      const anyCollapsed = Array.from(allCards).some(card => !card.classList.contains('is-expanded'));
+      const targetExpand = anyCollapsed;
+      allCards.forEach(card => {
+        const brandIdStr = card.id.replace('vb-card-', '');
+        const head = card.querySelector('.vb-brand-card-head');
+        const detail = card.querySelector('.vb-brand-detail');
+        if (detail) detail.hidden = !targetExpand;
+        card.classList.toggle('is-expanded', targetExpand);
+        if (head) head.setAttribute('aria-expanded', String(targetExpand));
+        if (targetExpand) vbExpandedBrandIds.add(brandIdStr);
+        else vbExpandedBrandIds.delete(brandIdStr);
+      });
     }
 
     function getVbScheduleDrawerElements() {
@@ -2819,13 +2884,14 @@
     }
 
     function setupCustomFilterDropdowns() {
-      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter', 'vbGroupFilter', 'vbPortalFilter']);
+      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter', 'vbGroupFilter', 'vbPortalFilter', 'vbStoreIdFilter']);
       const PLACEHOLDERS = {
         ownerFilter: 'Cari nama pemilik...',
         outletFilter: 'Cari nama outlet...',
         storeIdFilter: 'Cari Store ID...',
         vbGroupFilter: 'Cari nama grup...',
-        vbPortalFilter: 'Cari portal...'
+        vbPortalFilter: 'Cari portal...',
+        vbStoreIdFilter: 'Cari Store ID...'
       };
 
       document.querySelectorAll('.outlet-filter-card .filter-select, .vb-filter-card .filter-select').forEach(select => {

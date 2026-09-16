@@ -3332,22 +3332,22 @@ body {
 }
 
 .vb-filter-card {
-  padding: 18px 16px;
+  padding: 14px 14px;
   border: 1px solid #eceef0;
-  border-radius: 18px;
+  border-radius: 11px;
   background: #fff;
 }
 
 .vb-filter-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
-  gap: 12px;
+  gap: 8px;
   align-items: end;
 }
 
 .vb-reset-button {
-  min-width: 134px;
-  min-height: 40px;
+  min-width: 0;
+  height: 36px;
 }
 
 .vb-results-summary {
@@ -3382,6 +3382,12 @@ body {
   border: 1px solid #eceef0;
   border-radius: 12px;
   box-shadow: 0 10px 24px rgba(17, 24, 39, 0.03);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.vb-brand-card:hover {
+  border-color: #d7dade;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.06);
 }
 
 .vb-brand-card-head {
@@ -3389,6 +3395,21 @@ body {
   grid-template-columns: minmax(150px, 0.8fr) minmax(0, 3.2fr) auto;
   gap: 12px;
   align-items: center;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin: -6px -8px;
+  transition: background-color 150ms ease;
+  user-select: none;
+}
+
+.vb-brand-card-head:hover {
+  background-color: #f8fafc;
+}
+
+.vb-brand-card-head:focus-visible {
+  outline: 2px solid #be1a1a;
+  outline-offset: 2px;
 }
 
 .vb-group-identity {
@@ -3562,40 +3583,6 @@ body {
   letter-spacing: 0.06em;
 }
 
-.vb-expand-button {
-  display: inline-grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 1px solid #eceef0;
-  border-radius: 50%;
-  background: #fff;
-  color: #34383e;
-  cursor: pointer;
-  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease, transform 180ms ease;
-}
-
-.vb-expand-button:hover {
-  border-color: #f2d1cd;
-  background: #fff7f6;
-  color: #be1a1a;
-}
-
-.vb-expand-button svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  transition: transform 180ms ease;
-}
-
-.vb-expand-button[aria-expanded="true"] svg {
-  transform: rotate(180deg);
-}
-
 .vb-brand-detail {
   margin-top: 12px;
   padding-top: 12px;
@@ -3612,22 +3599,33 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.vb-store-table,
+.vb-store-table button,
+.vb-store-table label,
+.vb-store-table span,
+.vb-store-table strong,
+.vb-store-table code,
+.vb-store-table small,
+.vb-store-table a {
+  font-family: 'Nunito', sans-serif !important;
+}
+
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.25fr) minmax(85px, 0.65fr) minmax(150px, 1.1fr) minmax(105px, 0.65fr) minmax(115px, 0.75fr);
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.25fr) minmax(85px, 0.65fr) minmax(150px, 1.1fr) minmax(105px, 0.65fr) minmax(115px, 0.75fr) minmax(145px, 0.9fr);
   gap: 16px;
   align-items: center;
   padding: 12px 18px;
-  min-width: 820px;
+  min-width: 960px;
 }
 
 .vb-store-table-head {
   background: #fbfbfc;
-  color: #717780;
-  font-size: 11px;
+  color: #565d68;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -3649,6 +3647,7 @@ body {
 .vb-store-status,
 .vb-store-hours,
 .vb-store-special-hours,
+.vb-store-ofd,
 .vb-store-actions {
   min-width: 0;
 }
@@ -3660,10 +3659,10 @@ body {
 }
 
 .vb-store-name-text {
-  color: #23272f;
-  font-size: 13px;
+  color: #737981;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.35;
   word-break: break-word;
 }
 
@@ -3671,6 +3670,7 @@ body {
 .vb-store-status,
 .vb-store-hours,
 .vb-store-special-hours,
+.vb-store-ofd,
 .vb-store-actions {
   display: grid;
   gap: 6px;
@@ -3735,10 +3735,10 @@ body {
 
 .vb-store-copy strong {
   display: block;
-  color: #23272f;
-  font-size: 13px;
+  color: #111317;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 
@@ -3750,8 +3750,8 @@ body {
 .vb-store-id code {
   padding: 0;
   background: transparent;
-  color: #23272f;
-  font-size: 12px;
+  color: #111317;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -3759,8 +3759,26 @@ body {
   justify-items: start;
 }
 
+.vb-store-hours .today-operating-hours .operating-time {
+  color: #111317 !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+
 .vb-store-hours .today-operating-hours .operating-meta {
   justify-content: flex-start;
+  color: #777d86 !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+.vb-store-hours .today-operating-hours .operating-timezone {
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
 }
 
 .vb-store-special-hours {
@@ -4153,10 +4171,6 @@ body.vb-schedule-open {
   .vb-control {
     justify-content: space-between;
     width: 100%;
-  }
-
-  .vb-expand-button {
-    justify-self: end;
   }
 
   .vb-store-table {
@@ -6190,9 +6204,9 @@ body.vb-schedule-open {
 .admin-shell .admin-main .stat-card .stat-detail { grid-column: 2; grid-row: 3; }
 .admin-shell .admin-main .outlet-filter-toolbar { grid-template-columns: minmax(230px, 1.5fr) repeat(3, minmax(145px, 1fr)); gap: 16px 12px; align-items: end; }
 .admin-shell .admin-main .filter-field { display: grid; min-width: 0; gap: 7px; margin: 0; color: #3f444c; font-size: 11px; font-weight: 700; }
-.admin-shell .admin-main .filter-field .form-input { min-width: 0; height: 42px; }
+.admin-shell .admin-main .filter-field .form-input { min-width: 0; height: 36px; }
 .admin-shell .admin-main .filter-search-field { grid-column: span 2; }
-.admin-shell .admin-main .reset-filter-button { height: 42px; white-space: nowrap; }
+.admin-shell .admin-main .reset-filter-button { height: 36px; white-space: nowrap; }
 .admin-shell .admin-main .table-scroll { overflow-x: auto; }
 .admin-shell .admin-main .data-table { min-width: 1120px; }
 @media (min-width: 1200px) { .admin-shell .admin-main .outlet-filter-toolbar { grid-template-columns: minmax(220px, 1.4fr) repeat(6, minmax(112px, 1fr)) auto; gap: 12px; } .admin-shell .admin-main .filter-search-field { grid-column: auto; } }
@@ -6202,7 +6216,7 @@ body.vb-schedule-open {
 .admin-shell .sidebar-icon,
 .admin-shell .stat-icon,
 .admin-shell .fetch-sheet-button svg,
-.admin-shell .reset-filter-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.admin-shell .reset-filter-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .admin-shell .stat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .admin-shell .stat-card-top .stat-label { order: 0; }
 .admin-shell .stat-card-top .stat-icon { order: 1; }
@@ -6983,10 +6997,12 @@ body.vb-schedule-open {
   .admin-main .stat-card .stat-label { font-size: 10px !important; font-weight: 600; text-transform: none; }
   .admin-main .stat-card .stat-val { margin: 6px 0 2px; font-size: 29px !important; }
   .admin-main .stat-card .stat-detail { font-size: 10px !important; }
-  .admin-main .outlet-filter-card { margin-bottom: 19px; padding: 14px 14px; border: 1px solid #eceef0; border-radius: 11px; }
+  .admin-main .outlet-filter-card,
+  .admin-main .vb-filter-card { margin-bottom: 19px; padding: 14px 14px; border: 1px solid #eceef0; border-radius: 11px; }
   .desktop-outlet-filter-heading { width: 100%; }
   .desktop-outlet-filter-heading .table-heading-actions { width: 100%; min-width: 0; flex: 1 1 auto; }
-  .admin-main .outlet-filter-toolbar {
+  .admin-main .outlet-filter-toolbar,
+  .admin-main .vb-filter-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
     gap: 8px;
@@ -6994,7 +7010,11 @@ body.vb-schedule-open {
     width: 100%;
     box-sizing: border-box;
   }
-  .admin-main .outlet-filter-toolbar .filter-field {
+  .admin-main .vb-filter-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  }
+  .admin-main .outlet-filter-toolbar .filter-field,
+  .admin-main .vb-filter-grid .filter-field {
     grid-column: auto;
   }
   .admin-main .outlet-filter-toolbar .reset-filter-button {
@@ -7007,6 +7027,33 @@ body.vb-schedule-open {
     white-space: nowrap;
     justify-content: center;
     box-sizing: border-box;
+    flex-shrink: 0;
+  }
+  .admin-main .vb-filter-grid .reset-filter-button,
+  .admin-main .vb-reset-button {
+    grid-column: auto;
+    width: auto;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0;
+  }
+  .admin-main .outlet-filter-toolbar .reset-filter-button svg,
+  .admin-main .vb-filter-grid .reset-filter-button svg,
+  .admin-main .vb-reset-button svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
     flex-shrink: 0;
   }
   .admin-main .filter-field {
@@ -7079,6 +7126,43 @@ body.vb-schedule-open {
 .admin-main .vb-filter-card .filter-select:focus { border-color: #c9a2a2 !important; box-shadow: 0 0 0 3px rgba(190,26,26,.08) !important; outline: none; }
 .admin-main .outlet-filter-card .filter-select option,
 .admin-main .vb-filter-card .filter-select option { background: #fff; color: #737981; font-weight: 500; }
+.admin-main .vb-filter-card input.form-input,
+.admin-main .vb-filter-card #vbStoreIdFilter {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  height: 36px !important;
+  line-height: 34px !important;
+  box-sizing: border-box !important;
+  padding: 0 9px !important;
+  border: 1px solid #dedfe2 !important;
+  border-radius: 8px !important;
+  background-color: #fff !important;
+  color: #292d33 !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.admin-main .vb-filter-card input.form-input:hover,
+.admin-main .vb-filter-card #vbStoreIdFilter:hover {
+  border-color: #c7c9cd !important;
+}
+.admin-main .vb-filter-card input.form-input:focus,
+.admin-main .vb-filter-card #vbStoreIdFilter:focus {
+  border-color: #c9a2a2 !important;
+  box-shadow: 0 0 0 3px rgba(190,26,26,.08) !important;
+  outline: none !important;
+}
+.admin-main .vb-filter-card input.form-input::placeholder,
+.admin-main .vb-filter-card #vbStoreIdFilter::placeholder {
+  color: #737981 !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
 .custom-filter { position: relative; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .native-filter-select { display: none !important; }
 .custom-filter-trigger {
@@ -9851,7 +9935,9 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     font-weight: 700;
   }
 
-  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-select {
+  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-select,
+  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-input,
+  .admin-shell .admin-main .mobile-filter-sheet-body .vb-mobile-sheet-input {
     min-height: 48px;
     margin-top: 0;
     padding: 11px 14px;
@@ -9861,11 +9947,23 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     color: #111317;
     font-size: 13px;
     font-weight: 600;
+    width: 100%;
+    box-sizing: border-box;
   }
 
-  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-select:focus {
+  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-select:focus,
+  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-input:focus,
+  .admin-shell .admin-main .mobile-filter-sheet-body .vb-mobile-sheet-input:focus {
     border-color: #be1a1a;
     box-shadow: 0 0 0 3px rgba(190, 26, 26, 0.08);
+    outline: none;
+  }
+
+  .admin-shell .admin-main .mobile-filter-sheet-body .mobile-sheet-input::placeholder,
+  .admin-shell .admin-main .mobile-filter-sheet-body .vb-mobile-sheet-input::placeholder {
+    color: #9da3ad;
+    font-size: 13px;
+    font-weight: 500;
   }
 
   .admin-shell .admin-main .mobile-filter-sheet-footer {

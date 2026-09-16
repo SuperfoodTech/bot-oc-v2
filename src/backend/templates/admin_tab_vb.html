@@ -53,9 +53,11 @@
           </label>
           <label class="filter-field">
             <span>Store ID</span>
-            <input type="search" id="vbStoreIdFilter" class="form-input" placeholder="Cari Store ID" oninput="filterVBTable()">
+            <select id="vbStoreIdFilter" class="form-input filter-select" aria-label="Filter Store ID" onchange="filterVBTable()">
+              <option value="">Semua Store ID</option>
+            </select>
           </label>
-            <button class="btn-outline reset-filter-button vb-reset-button" type="button" onclick="resetVbFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>Reset Filter</button>
+            <button class="btn-outline btn-compact reset-filter-button vb-reset-button" type="button" onclick="resetVbFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>Reset filter</button>
           </div>
         </section>
       </details>

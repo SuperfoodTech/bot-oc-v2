@@ -99,7 +99,10 @@ def test_vb_dashboard_uses_schedule_drawer_without_detail_panel_markup():
     assert 'id="vbBulkToolbar"' not in tab_template
     assert 'id="vbInlineSearchInput"' in tab_template
     assert 'class="vb-empty-state"' in dashboard_template
-    assert 'aria-label="${isExpanded ? \'Sembunyikan\' : \'Tampilkan\'} Store ID grup' in dashboard_template
+    assert "handleVbBrandCardHeadClick(" in dashboard_template
+    assert "toggleAllVbBrands(" in dashboard_template
+    assert "toggleVbBrandDetail(" in dashboard_template
+    assert "vb-expand-button" not in dashboard_template
     assert "function runVbBulkOpen()" not in dashboard_template
     assert "function openVbBulkPauseModal()" not in dashboard_template
     assert "class=\"vb-brand-select\"" not in dashboard_template
@@ -114,6 +117,8 @@ def test_vb_dashboard_uses_schedule_drawer_without_detail_panel_markup():
     assert "os.shopee_regular_hours" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
     assert "os.shopee_special_hours" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
     assert "<span>Jadwal Khusus</span>" in dashboard_template
+    assert "<span>Link OFD</span>" in dashboard_template
+    assert "vb-store-ofd" in dashboard_template
 
 
 def test_vb_dashboard_styles_define_scrollable_page_and_right_drawer():
@@ -121,6 +126,8 @@ def test_vb_dashboard_styles_define_scrollable_page_and_right_drawer():
     assert ".vb-stat-grid" in STYLES
     assert ".vb-schedule-drawer" in STYLES
     assert ".vb-store-table-head" in STYLES
+    assert ".vb-store-hours .today-operating-hours .operating-time" in STYLES
+    assert ".vb-store-ofd" in STYLES
 
 
 def test_admin_agency_does_not_render_bulk_actions():
@@ -179,11 +186,11 @@ def test_admin_outlet_table_8_columns_and_link_mitra_contract():
     assert "<th>Jam Operasional</th>" not in tab_template
     assert "<th>Link</th>" in tab_template
     assert "<th>Link Mitra</th>" in tab_template
-    assert "<th>Toggle</th>" in tab_template
+    assert "<th>Status</th>" in tab_template
+    assert "<th>Toggle</th>" not in tab_template
     assert "<th>Owner</th>" not in tab_template
     assert "<th>Merchant</th>" not in tab_template
     assert "<th>Outlet</th>" not in tab_template
-    assert "<th>Status</th>" not in tab_template
     assert "<th>Action</th>" not in tab_template
     assert "<th>Periode Layanan</th>" not in tab_template
     assert '<td colspan="8"' in tab_template
@@ -195,7 +202,7 @@ def test_admin_outlet_table_8_columns_and_link_mitra_contract():
         < tab_template.index("<th>Jam Hari Ini</th>")
         < tab_template.index("<th>Link</th>")
         < tab_template.index("<th>Link Mitra</th>")
-        < tab_template.index("<th>Toggle</th>")
+        < tab_template.index("<th>Status</th>")
     )
 
     # Verify admin_dashboard.html logic
@@ -278,6 +285,23 @@ def test_admin_outlet_detail_drawer_streamlined_layout_and_internal_log_scroll_c
     assert ".outlet-detail-content::-webkit-scrollbar" in STYLES
     assert "display: flex; flex-direction: column; overflow: hidden;" in STYLES
     assert ".outlet-detail-section-heading {" in STYLES
+
+
+def test_vb_filter_toolbar_and_reset_button_layout_contract():
+    vb_tab_template = (PROJECT_ROOT / "src/backend/templates/admin_tab_vb.html").read_text()
+
+    # Verify HTML structure
+    assert 'id="vbStoreIdFilter"' in vb_tab_template
+    assert 'aria-label="Filter Store ID"' in vb_tab_template
+    assert 'class="btn-outline btn-compact reset-filter-button vb-reset-button"' in vb_tab_template
+    assert 'Reset filter' in vb_tab_template
+
+    # Verify CSS rules
+    assert ".admin-main .vb-filter-grid {" in STYLES
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr)) auto;" in STYLES
+    assert ".admin-main .vb-filter-card #vbStoreIdFilter" in STYLES
+    assert ".admin-main .vb-reset-button" in STYLES
+
 
 
 

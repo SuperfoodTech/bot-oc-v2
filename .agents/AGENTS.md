@@ -24,7 +24,30 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.14.0`.
+Latest documented release: `1.16.1`.
+
+Toolbar filter Virtual Brand (`.vb-filter-grid`):
+- Field input Store ID (`#vbStoreIdFilter`) dan tombol Reset Filter (`.vb-reset-button`) wajib memiliki tinggi seragam `36px` dengan padding, border, radius (`8px`), dan font `Nunito` yang konsisten dengan custom select filter lainnya.
+- Tombol reset filter menggunakan label `"Reset filter"` dan class `btn-compact`.
+
+Interaksi kartu grup Virtual Brand (`.vb-brand-card-head`):
+- Tombol chevron expand terpisah (`.vb-expand-button`) ditiadakan.
+- **Single click** pada baris/header kartu grup melakukan expand/collapse detail Store ID hanya untuk grup yang diklik.
+- **Double click** pada baris/header kartu grup melakukan expand all jika ada grup yang tertutup, atau collapse all jika seluruh grup sedang terbuka.
+- Kontrol switch toggle ON/OFF grup (`.vb-brand-toggle`) wajib diberi `event.stopPropagation()` agar pengubahan status grup tidak memicu expand/collapse kartu.
+
+Kolom ke-8 pada tabel operasional admin (`#adminTable`) diberi label header `Status`
+(menggantikan label `Toggle`).
+
+Tabel Virtual Brand (`.vb-store-table`) memiliki kolom ke-7 `Link OFD` di sebelah kanan
+kolom `Jadwal Khusus` yang menampilkan tautan langsung ke ShopeeFood (`.admin-table-shopeefood-link`)
+menggunakan icon dan teks `Lihat di ShopeeFood` dengan `event.stopPropagation()` agar klik tidak
+memicu drawer jadwal VB.
+
+Font design dan tipografi baris tabel Virtual Brand (`.vb-store-table`), khususnya baris
+`Jam Hari Ini` (`.vb-store-hours .today-operating-hours`) dan seluruh teks tabel VB,
+disamakan secara penuh dengan tabel Agency (`#adminTable`) menggunakan font `Nunito`
+dengan warna teks, ukuran font, dan font-weight yang konsisten.
 
 Sinkronisasi Jadwal Khusus (*Special Hours*) dari endpoint `/api/seller/store/special-hours`
 disimpan ke kolom `outlet_states.shopee_special_hours` (`jsonb`) saat bot mengakses tab Business Hours.
