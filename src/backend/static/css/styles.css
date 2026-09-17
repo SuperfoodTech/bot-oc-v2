@@ -10243,8 +10243,7 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 
 .brand-hero-actions {
   margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
   gap: 10px;
 }
 

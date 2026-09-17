@@ -24,7 +24,11 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.3`.
+Latest documented release: `1.23.4`.
+
+Virtual Brand Dedicated Dashboard UI Simplification:
+- Hero Card Brand (`/brand/{slug}`) tampil bersih (*clean*) dan minimalis tanpa kartu metrik status live ("Live Buka", "Perlu Cek", "Live Tutup") dan tanpa accordion tombol/tabel detail outlet.
+- Tombol aksi Hero Card berfokus penuh pada tombol "Lihat Jadwal" yang membentang rapi secara full-width bersama 3-state switch toggle status brand.
 
 Dynamic Agency Summary Metric Cards:
 - Kartu metrik ringkasan pada Tab Agency (`#metricTotal`, `#metricOpen`, `#metricClosed`) diperbarui secara dinamis via `updateAgencyStatCards(baseFiltered)` setiap kali pengguna menerapkan filter pencarian, filter pemilik, filter outlet, filter Store ID, maupun filter status, menjaga konsistensi perilaku dengan Tab Virtual Brand (VB).

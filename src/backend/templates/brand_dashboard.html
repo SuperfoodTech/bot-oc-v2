@@ -10,7 +10,7 @@
   <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260917-brand-v1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260917-brand-v2">
 </head>
 
 <body class="brand-dashboard-body">
@@ -64,21 +64,6 @@
             </div>
           </div>
 
-          <div class="brand-metrics-row">
-            <div class="brand-metric-pill is-opened" title="Jumlah outlet dengan status Live Buka di ShopeeFood">
-              <span class="brand-metric-label">Live Buka</span>
-              <strong class="brand-metric-value" id="metricOpened">0</strong>
-            </div>
-            <div class="brand-metric-pill is-failure" title="Jumlah outlet yang membutuhkan pengecekan">
-              <span class="brand-metric-label">Perlu Cek</span>
-              <strong class="brand-metric-value" id="metricFailure">0</strong>
-            </div>
-            <div class="brand-metric-pill is-closed" title="Jumlah outlet dengan status Live Tutup di ShopeeFood">
-              <span class="brand-metric-label">Live Tutup</span>
-              <strong class="brand-metric-value" id="metricClose">0</strong>
-            </div>
-          </div>
-
           <div class="brand-hero-actions">
             <button type="button" class="btn-brand-action btn-brand-schedule" onclick="openScheduleBottomSheet()">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
@@ -90,31 +75,6 @@
               </svg>
               <span>Lihat Jadwal</span>
             </button>
-
-            <button type="button" class="btn-brand-action btn-brand-outlets" id="outletsAccordionBtn"
-              onclick="toggleOutletsAccordion()" aria-expanded="false" aria-controls="brandOutletsList">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-              </svg>
-              <span>Daftar Outlet (<span id="totalOutletsCount">0</span>)</span>
-              <svg class="brand-accordion-chevron" id="accordionChevron" viewBox="0 0 24 24" width="14" height="14"
-                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                aria-hidden="true">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-          </div>
-
-          <div class="brand-outlets-collapse" id="brandOutletsList" hidden>
-            <div class="brand-outlets-table-head">
-              <span>Nama Outlet</span>
-              <span>Status</span>
-            </div>
-            <div class="brand-outlets-body" id="outletsBody">
-              <!-- Rendered via JS -->
-            </div>
           </div>
         </section>
 
@@ -198,7 +158,6 @@
   <script>
     let currentBrandData = null;
     let isPendingToggle = false;
-    let isOutletsExpanded = false;
 
     function getBrandSlugFromPath() {
       const path = window.location.pathname;
@@ -257,13 +216,6 @@
       document.getElementById('brandTitle').textContent = brand.name || 'Virtual Brand';
       document.title = `${brand.name || 'Brand'} | FoodMaster`;
 
-      // Metrics
-      const counts = brand.status_counts || { opened: 0, failure: 0, close: 0, total: 0 };
-      document.getElementById('metricOpened').textContent = counts.opened;
-      document.getElementById('metricFailure').textContent = counts.failure;
-      document.getElementById('metricClose').textContent = counts.close;
-      document.getElementById('totalOutletsCount').textContent = brand.outlets ? brand.outlets.length : 0;
-
       // Toggle state
       const toggleLabel = document.getElementById('brandToggleLabel');
       const toggleInput = document.getElementById('brandToggleInput');
@@ -289,122 +241,8 @@
         toggleLabel.title = 'Brand Tutup Sementara. Klik untuk buka sekarang.';
       }
 
-      // Render Outlets
-      renderOutletsList(brand.outlets || []);
-
       // Render History Logs
       renderHistoryLogs(brand.history_logs || []);
-    }
-
-    function formatPauseDetail(timestampStr) {
-      if (!timestampStr) return '';
-      try {
-        const d = new Date(timestampStr.replace(' ', 'T') + '+07:00');
-        if (Number.isNaN(d.getTime())) return '';
-        const hr = String(d.getHours()).padStart(2, '0');
-        const min = String(d.getMinutes()).padStart(2, '0');
-        return `pukul ${hr}:${min} WIB`;
-      } catch {
-        return '';
-      }
-    }
-
-    function getVbStatusPresentation(outlet) {
-      const live = String(outlet.live_state || outlet.shopee_status || 'UNKNOWN').toUpperCase();
-      const botPhase = String(outlet.bot_phase || '').toUpperCase();
-      const isError = Boolean(outlet.schedule_fetch_error || botPhase === 'ACTION_FAILED' || outlet.success === false);
-
-      if (isError) {
-        return {
-          statusClass: 'is-warning',
-          statusText: 'Perlu cek',
-          subtext: outlet.error_message || 'Patroli gagal'
-        };
-      }
-      if (botPhase === 'PENDING_OPEN') {
-        return {
-          statusClass: 'is-pending',
-          statusText: 'Bot sedang dalam proses pembukaan outlet',
-          subtext: ''
-        };
-      }
-      if (botPhase === 'PENDING_PAUSE') {
-        return {
-          statusClass: 'is-pending',
-          statusText: 'Bot sedang dalam proses penutupan outlet',
-          subtext: ''
-        };
-      }
-      if (botPhase === 'NOT_FETCHED_YET' || botPhase === 'FETCH_RETRYING' || botPhase === 'STATUS_UNKNOWN') {
-        return {
-          statusClass: 'is-pending',
-          statusText: 'Bot sedang dalam proses pengambilan data outlet',
-          subtext: ''
-        };
-      }
-      if (botPhase === 'WAITING_SCHEDULE') {
-        return {
-          statusClass: 'is-closed',
-          statusText: 'Menunggu jadwal operasional',
-          subtext: 'Akan aktif lagi saat jam operasional dimulai.'
-        };
-      }
-      if (live === 'OPEN') {
-        return {
-          statusClass: 'is-open',
-          statusText: 'Live Buka',
-          subtext: ''
-        };
-      }
-      if (live === 'PAUSE') {
-        const pauseDetail = formatPauseDetail(outlet.pause_until);
-        return {
-          statusClass: 'is-paused',
-          statusText: 'Tutup Sementara',
-          subtext: pauseDetail ? `Buka otomatis ${pauseDetail}` : ''
-        };
-      }
-      if (live === 'CLOSED') {
-        return {
-          statusClass: 'is-closed',
-          statusText: 'Live Tutup',
-          subtext: ''
-        };
-      }
-      return {
-        statusClass: 'is-pending',
-        statusText: 'Bot sedang dalam proses pengambilan data outlet',
-        subtext: ''
-      };
-    }
-
-    function renderOutletsList(outlets) {
-      const body = document.getElementById('outletsBody');
-      if (!outlets || !outlets.length) {
-        body.innerHTML = '<div class="brand-outlet-empty">Tidak ada outlet terdaftar pada brand ini.</div>';
-        return;
-      }
-
-      body.innerHTML = outlets.map(outlet => {
-        const storeName = outlet.long_name || outlet.store_name || outlet.merchant_name || 'Outlet';
-        const portalName = outlet.merchant_name || 'Portal';
-        const storeId = outlet.store_id || '-';
-        const pres = getVbStatusPresentation(outlet);
-
-        return `
-          <div class="brand-outlet-row">
-            <div class="brand-outlet-col-main">
-              <span class="brand-outlet-portal">${escapeHtml(portalName)}</span>
-              <strong class="brand-outlet-name">${escapeHtml(storeName)}</strong>
-              <code class="brand-outlet-store-id">ID ${escapeHtml(storeId)}</code>
-            </div>
-            <div class="brand-outlet-col-status">
-              <span class="brand-status-pill ${pres.statusClass}">${escapeHtml(pres.statusText)}</span>
-              ${pres.subtext ? `<small class="brand-status-subtext">${escapeHtml(pres.subtext)}</small>` : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
     }
 
     function getHistoryActorPresentation(action) {
@@ -503,17 +341,6 @@
           </div>
         `;
       }).join('');
-    }
-
-    function toggleOutletsAccordion() {
-      isOutletsExpanded = !isOutletsExpanded;
-      const list = document.getElementById('brandOutletsList');
-      const btn = document.getElementById('outletsAccordionBtn');
-      const chevron = document.getElementById('accordionChevron');
-
-      list.hidden = !isOutletsExpanded;
-      btn.setAttribute('aria-expanded', isOutletsExpanded ? 'true' : 'false');
-      chevron.style.transform = isOutletsExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
     }
 
     function handleBrandToggleAttempt(event) {
