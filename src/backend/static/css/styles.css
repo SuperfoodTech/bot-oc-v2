@@ -10086,6 +10086,12 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   box-sizing: border-box;
 }
 
+.brand-dashboard-shell .app-header,
+.mobile-wrapper.is-dashboard-view .app-header {
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
 .brand-loading-panel,
 .brand-error-panel {
   display: flex;
@@ -10095,6 +10101,16 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   min-height: 320px;
   text-align: center;
   padding: 32px 16px;
+}
+
+.brand-loading-panel[hidden],
+.brand-error-panel[hidden],
+.brand-dashboard-content[hidden],
+.brand-outlets-collapse[hidden],
+.brand-bottom-sheet-backdrop[hidden],
+.brand-bottom-sheet[hidden],
+.modal-overlay[hidden] {
+  display: none !important;
 }
 
 .brand-spinner {
@@ -10227,27 +10243,38 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 
 .brand-hero-actions {
   margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
-.btn-brand-schedule {
+.btn-brand-action {
   width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 6px;
+  padding: 9px 10px;
   border-radius: 10px;
-  background: var(--subtle, #f1f5f9);
+  background: transparent !important;
   color: var(--ink, #0f172a);
   border: 1px solid var(--line, #e2e8f0);
   font-size: 12px;
   font-weight: 700;
+  font-family: inherit;
   cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-.btn-brand-schedule:hover {
-  background: #e2e8f0;
+.btn-brand-action:hover {
+  background: rgba(15, 23, 42, 0.04) !important;
+  border-color: #cbd5e1;
+}
+
+.btn-brand-action svg {
+  flex: 0 0 auto;
 }
 
 /* Accordion Outlets */
@@ -10308,11 +10335,11 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 
 .brand-outlet-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 12px 4px;
   border-bottom: 1px solid var(--line, #f1f5f9);
-  gap: 12px;
+  gap: 10px;
 }
 
 .brand-outlet-row:last-child {
@@ -10320,7 +10347,7 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 }
 
 .brand-outlet-col-main {
-  flex: 1;
+  flex: 1 1 50%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -10340,7 +10367,8 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   font-weight: 700;
   color: var(--ink, #0f172a);
   line-height: 1.35;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .brand-outlet-store-id {
@@ -10351,37 +10379,61 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 }
 
 .brand-outlet-col-status {
-  flex: 0 0 auto;
+  flex: 0 1 50%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .brand-status-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
+  display: inline-block;
+  padding: 0;
+  border-radius: 0;
   font-size: 11px;
   font-weight: 800;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: right;
+  line-height: 1.35;
+  max-width: 100%;
+  word-break: normal;
+  overflow-wrap: break-word;
+  background: transparent !important;
 }
 
 .brand-status-pill.is-open {
-  background: #eefaf0;
+  background: transparent !important;
   color: #15803d;
 }
 
 .brand-status-pill.is-paused {
-  background: #fee2e2;
+  background: transparent !important;
   color: #dc2626;
 }
 
 .brand-status-pill.is-closed {
-  background: #f1f5f9;
-  color: #475569;
+  background: transparent !important;
+  color: #64748b;
 }
 
 .brand-status-pill.is-warning {
-  background: #fff8eb;
+  background: transparent !important;
   color: #b45309;
+}
+
+.brand-status-pill.is-pending {
+  background: transparent !important;
+  color: #d97706;
+}
+
+.brand-status-subtext {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  margin-top: 3px;
+  text-align: right;
+  line-height: 1.25;
 }
 
 .brand-outlet-empty {

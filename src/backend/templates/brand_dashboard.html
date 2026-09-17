@@ -21,22 +21,6 @@
         <img class="brand-logo brand-logo-mitra" src="/static/icons/Logo_FoodMaster.png" alt="FoodMaster">
       </div>
       <div class="header-actions">
-        <button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle tema gelap/terang" title="Toggle tema">
-          <svg class="sun-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg class="moon-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
         <a href="https://wa.me/6285183151531" class="help-link customer-service-link" target="_blank" rel="noopener noreferrer" aria-label="Hubungi customer service via WhatsApp" title="Customer Service via WhatsApp">
           <span>Bantuan</span>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -66,11 +50,10 @@
         <section class="card-box brand-hero-card" id="brandHeroCard">
           <div class="brand-hero-top">
             <div class="brand-hero-info">
-              <span class="brand-hero-badge">Virtual Brand</span>
               <h1 class="brand-hero-title" id="brandTitle">-</h1>
             </div>
             <div class="brand-hero-toggle-wrap">
-              <label class="switch-toggle admin-table-toggle" id="brandToggleLabel" title="Ubah status brand">
+              <label class="switch-toggle" id="brandToggleLabel" title="Ubah status brand" onclick="handleBrandToggleAttempt(event)">
                 <input type="checkbox" id="brandToggleInput" onchange="handleBrandToggle(this.checked)">
                 <span class="slider"></span>
               </label>
@@ -93,32 +76,27 @@
           </div>
 
           <div class="brand-hero-actions">
-            <button type="button" class="btn-brand-schedule" onclick="openScheduleBottomSheet()">
+            <button type="button" class="btn-brand-action btn-brand-schedule" onclick="openScheduleBottomSheet()">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                 <line x1="16" y1="2" x2="16" y2="6"></line>
                 <line x1="8" y1="2" x2="8" y2="6"></line>
                 <line x1="3" y1="10" x2="21" y2="10"></line>
               </svg>
-              <span>Lihat Jadwal Operasional</span>
+              <span>Lihat Jadwal</span>
             </button>
-          </div>
-        </section>
 
-        <!-- Daftar Outlet (Accordion Collapsible) -->
-        <section class="card-box brand-outlets-card">
-          <button type="button" class="brand-accordion-head" id="outletsAccordionBtn" onclick="toggleOutletsAccordion()" aria-expanded="false" aria-controls="brandOutletsList">
-            <div class="brand-accordion-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <button type="button" class="btn-brand-action btn-brand-outlets" id="outletsAccordionBtn" onclick="toggleOutletsAccordion()" aria-expanded="false" aria-controls="brandOutletsList">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
               </svg>
               <span>Daftar Outlet (<span id="totalOutletsCount">0</span>)</span>
-            </div>
-            <svg class="brand-accordion-chevron" id="accordionChevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+              <svg class="brand-accordion-chevron" id="accordionChevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
 
           <div class="brand-outlets-collapse" id="brandOutletsList" hidden>
             <div class="brand-outlets-table-head">
@@ -287,7 +265,7 @@
         toggleState = 'open';
       }
 
-      toggleLabel.className = `switch-toggle admin-table-toggle state-${toggleState} ${isScheduleLocked ? 'is-schedule-disabled' : ''} ${isPendingToggle ? 'is-toggle-pending' : ''}`;
+      toggleLabel.className = `switch-toggle state-${toggleState} ${isScheduleLocked ? 'is-schedule-disabled' : ''} ${isPendingToggle ? 'is-toggle-pending' : ''}`;
       toggleInput.checked = toggleState === 'open';
       toggleInput.disabled = isScheduleLocked || isPendingToggle;
 
@@ -306,36 +284,100 @@
       renderHistoryLogs(brand.history_logs || []);
     }
 
+    function formatPauseDetail(timestampStr) {
+      if (!timestampStr) return '';
+      try {
+        const d = new Date(timestampStr.replace(' ', 'T') + '+07:00');
+        if (Number.isNaN(d.getTime())) return '';
+        const hr = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `pukul ${hr}:${min} WIB`;
+      } catch {
+        return '';
+      }
+    }
+
+    function getVbStatusPresentation(outlet) {
+      const live = String(outlet.live_state || outlet.shopee_status || 'UNKNOWN').toUpperCase();
+      const botPhase = String(outlet.bot_phase || '').toUpperCase();
+      const isError = Boolean(outlet.schedule_fetch_error || botPhase === 'ACTION_FAILED' || outlet.success === false);
+
+      if (isError) {
+        return {
+          statusClass: 'is-warning',
+          statusText: 'Perlu cek',
+          subtext: outlet.error_message || 'Patroli gagal'
+        };
+      }
+      if (botPhase === 'PENDING_OPEN') {
+        return {
+          statusClass: 'is-pending',
+          statusText: 'Bot sedang dalam proses pembukaan outlet',
+          subtext: ''
+        };
+      }
+      if (botPhase === 'PENDING_PAUSE') {
+        return {
+          statusClass: 'is-pending',
+          statusText: 'Bot sedang dalam proses penutupan outlet',
+          subtext: ''
+        };
+      }
+      if (botPhase === 'NOT_FETCHED_YET' || botPhase === 'FETCH_RETRYING' || botPhase === 'STATUS_UNKNOWN') {
+        return {
+          statusClass: 'is-pending',
+          statusText: 'Bot sedang dalam proses pengambilan data outlet',
+          subtext: ''
+        };
+      }
+      if (botPhase === 'WAITING_SCHEDULE') {
+        return {
+          statusClass: 'is-closed',
+          statusText: 'Menunggu jadwal operasional',
+          subtext: 'Akan aktif lagi saat jam operasional dimulai.'
+        };
+      }
+      if (live === 'OPEN') {
+        return {
+          statusClass: 'is-open',
+          statusText: 'Live Buka',
+          subtext: ''
+        };
+      }
+      if (live === 'PAUSE') {
+        const pauseDetail = formatPauseDetail(outlet.pause_until);
+        return {
+          statusClass: 'is-paused',
+          statusText: 'Tutup Sementara',
+          subtext: pauseDetail ? `Buka otomatis ${pauseDetail}` : ''
+        };
+      }
+      if (live === 'CLOSED') {
+        return {
+          statusClass: 'is-closed',
+          statusText: 'Live Tutup',
+          subtext: ''
+        };
+      }
+      return {
+        statusClass: 'is-pending',
+        statusText: 'Bot sedang dalam proses pengambilan data outlet',
+        subtext: ''
+      };
+    }
+
     function renderOutletsList(outlets) {
       const body = document.getElementById('outletsBody');
-      if (!outlets.length) {
+      if (!outlets || !outlets.length) {
         body.innerHTML = '<div class="brand-outlet-empty">Tidak ada outlet terdaftar pada brand ini.</div>';
         return;
       }
 
       body.innerHTML = outlets.map(outlet => {
-        const storeName = outlet.long_name || outlet.merchant_name || 'Outlet';
+        const storeName = outlet.long_name || outlet.store_name || outlet.merchant_name || 'Outlet';
         const portalName = outlet.merchant_name || 'Portal';
         const storeId = outlet.store_id || '-';
-        const live = outlet.shopee_status || 'UNKNOWN';
-        const isError = Boolean(outlet.schedule_fetch_error || outlet.bot_phase === 'ACTION_FAILED');
-
-        let statusClass = 'is-closed';
-        let statusText = 'Tutup';
-
-        if (isError) {
-          statusClass = 'is-warning';
-          statusText = 'Perlu cek';
-        } else if (live === 'OPEN') {
-          statusClass = 'is-open';
-          statusText = 'Live Buka';
-        } else if (live === 'PAUSE') {
-          statusClass = 'is-paused';
-          statusText = 'Tutup Sementara';
-        } else if (live === 'CLOSED') {
-          statusClass = 'is-closed';
-          statusText = 'Live Tutup';
-        }
+        const pres = getVbStatusPresentation(outlet);
 
         return `
           <div class="brand-outlet-row">
@@ -345,65 +387,109 @@
               <code class="brand-outlet-store-id">ID ${escapeHtml(storeId)}</code>
             </div>
             <div class="brand-outlet-col-status">
-              <span class="brand-status-pill ${statusClass}">${statusText}</span>
+              <span class="brand-status-pill ${pres.statusClass}">${escapeHtml(pres.statusText)}</span>
+              ${pres.subtext ? `<small class="brand-status-subtext">${escapeHtml(pres.subtext)}</small>` : ''}
             </div>
           </div>
         `;
       }).join('');
     }
 
+    function getHistoryActorPresentation(action) {
+      const normalized = String(action || '').toUpperCase();
+      if (['ACTION_OPEN', 'ACTION_CLOSE', 'OPEN_STORE', 'CLOSE_STORE', 'OPEN', 'CLOSE'].includes(normalized)) {
+        return { label: 'Bot', className: 'is-bot' };
+      }
+      if (normalized.startsWith('ADMIN_') || normalized.startsWith('VB_')) {
+        return { label: 'Admin', className: 'is-admin' };
+      }
+      if (normalized.startsWith('USER_')) {
+        return { label: 'Merchant', className: 'is-merchant' };
+      }
+      return { label: 'Info', className: 'is-neutral' };
+    }
+
+    function getHistorySummary(log) {
+      const action = String(log?.action || '').toUpperCase();
+      const reason = String(log?.reason || '');
+      const storeName = log.store_name || (log.store_id ? `Store ID ${log.store_id}` : '-');
+
+      switch (action) {
+        case 'ACTION_OPEN':
+        case 'OPEN_STORE':
+        case 'OPEN':
+          return { title: 'Bot berhasil membuka outlet', subtitle: storeName };
+        case 'ACTION_CLOSE':
+        case 'CLOSE_STORE':
+        case 'CLOSE':
+          return { title: 'Bot berhasil menutup outlet', subtitle: storeName };
+        case 'USER_PAUSE_STORE':
+        case 'USER_PAUSE':
+          return { title: 'Outlet ditutup oleh Merchant', subtitle: storeName };
+        case 'USER_RESUME_STORE':
+        case 'USER_RESUME':
+          return { title: 'Outlet dibuka oleh Merchant', subtitle: storeName };
+        case 'ADMIN_PAUSE_STORE':
+        case 'VB_PAUSE_STORE':
+        case 'ADMIN_PAUSE':
+        case 'VB_PAUSE':
+          return { title: 'Outlet ditutup oleh Admin', subtitle: storeName };
+        case 'ADMIN_RESUME_STORE':
+        case 'VB_RESUME_STORE':
+        case 'ADMIN_RESUME':
+        case 'VB_RESUME':
+          return { title: 'Outlet dibuka oleh Admin', subtitle: storeName };
+        case 'ADMIN_RENEW_SUBSCRIPTION':
+          return { title: 'Layanan diperpanjang oleh Admin', subtitle: storeName };
+        case 'ADMIN_SUSPEND_UPDATE':
+          return { title: /Tidak/i.test(reason) ? 'Penangguhan outlet dicabut oleh Admin' : 'Outlet ditangguhkan oleh Admin', subtitle: storeName };
+        default:
+          return { title: reason || 'Perubahan status operasional', subtitle: storeName };
+      }
+    }
+
+    function formatHistoryLogTimestamp(value) {
+      if (!value) return '-';
+      const raw = String(value || '');
+      let normalized = raw.replace(/([+-]\d{2})$/, '$1:00');
+      if (!normalized.includes('T') && normalized.includes(' ')) normalized = normalized.replace(' ', 'T');
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) normalized += '+07:00';
+      const parsed = new Date(normalized);
+      if (Number.isNaN(parsed.getTime())) return raw || '-';
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).formatToParts(parsed).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+      const monthStr = months[Number(parts.month) - 1];
+      return `${parts.day} ${monthStr} ${parts.year}, ${parts.hour}:${parts.minute} WIB`;
+    }
+
     function renderHistoryLogs(logs) {
       const container = document.getElementById('brandHistoryLogs');
-      if (!logs.length) {
-        container.innerHTML = '<div class="history-item is-empty"><span>Belum ada riwayat aktivitas.</span></div>';
+      if (!container) return;
+      if (!logs || !logs.length) {
+        container.innerHTML = '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
         return;
       }
 
       container.innerHTML = logs.map(log => {
-        const actionTitle = formatActionTitle(log.action, log.reason);
-        const outletLabel = log.store_name || `Store ID ${log.store_id}`;
-        const timeFormatted = formatLogTime(log.timestamp);
+        const timeText = formatHistoryLogTimestamp(log.timestamp);
+        const actor = getHistoryActorPresentation(log.action);
+        const summary = getHistorySummary(log);
 
         return `
           <div class="history-item">
-            <strong>${escapeHtml(actionTitle)}</strong>
-            <span>${escapeHtml(outletLabel)}</span>
-            ${log.store_id ? `<small class="history-store-id">Store ID ${escapeHtml(log.store_id)}</small>` : ''}
-            <small class="history-time">${escapeHtml(timeFormatted)}</small>
+            <span class="history-role-pill ${actor.className}">${actor.label}</span>
+            <span class="history-time">${escapeHtml(timeText)}</span>
+            <span class="mitra-history-body">
+              <strong>${escapeHtml(summary.title)}</strong>
+              <span>${escapeHtml(summary.subtitle || '-')}</span>
+              ${log.store_id ? `<span class="history-store-id">Store ID ${escapeHtml(log.store_id)}</span>` : ''}
+            </span>
           </div>
         `;
       }).join('');
-    }
-
-    function formatActionTitle(action, reason) {
-      const norm = String(action || '').toUpperCase();
-      if (norm.includes('USER_PAUSE') || norm.includes('ADMIN_PAUSE') || norm === 'PAUSE') {
-        return 'Outlet ditutup';
-      }
-      if (norm.includes('USER_RESUME') || norm.includes('ADMIN_RESUME') || norm === 'OPEN' || norm === 'ACTION_OPEN') {
-        return 'Outlet dibuka';
-      }
-      if (norm === 'ACTION_CLOSE' || norm === 'CLOSE') {
-        return 'Bot menutup outlet';
-      }
-      return reason || 'Perubahan status operasional';
-    }
-
-    function formatLogTime(timestampStr) {
-      if (!timestampStr) return '-';
-      try {
-        const d = new Date(timestampStr.replace(' ', 'T') + '+07:00');
-        if (isNaN(d.getTime())) return timestampStr;
-        const day = String(d.getDate()).padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-        const mon = months[d.getMonth()];
-        const yr = d.getFullYear();
-        const hr = String(d.getHours()).padStart(2, '0');
-        const min = String(d.getMinutes()).padStart(2, '0');
-        return `${day} ${mon} ${yr}, ${hr}:${min} WIB`;
-      } catch {
-        return timestampStr;
-      }
     }
 
     function toggleOutletsAccordion() {
@@ -415,6 +501,17 @@
       list.hidden = !isOutletsExpanded;
       btn.setAttribute('aria-expanded', isOutletsExpanded ? 'true' : 'false');
       chevron.style.transform = isOutletsExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    function handleBrandToggleAttempt(event) {
+      if (isPendingToggle) {
+        event.preventDefault();
+        return;
+      }
+      if (currentBrandData && currentBrandData.is_schedule_locked) {
+        event.preventDefault();
+        showToast('Seluruh outlet sedang di luar jadwal operasional Shopee.', 'warning');
+      }
     }
 
     function handleBrandToggle(checked) {

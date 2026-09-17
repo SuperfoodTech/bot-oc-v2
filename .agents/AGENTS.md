@@ -24,12 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.21.0`.
+Latest documented release: `1.22.0`.
 
 Virtual Brand Dedicated Dashboard & Link Brand Integration:
 - Setiap brand Virtual Brand memiliki dashboard publik mandiri via slug URL `/brand/{slug}` yang dapat diakses langsung oleh PIC brand tanpa memerlukan halaman login password.
-- Brand Hero Card menampilkan nama brand, switch toggle 3-state tanpa label teks, 3 metrik status live (Live Buka, Perlu Cek, Live Tutup), dan tombol "Lihat Jadwal Operasional" yang membuka drawer bottom sheet jadwal 7 hari dari store ID pertama.
-- Daftar outlet ditampilkan dalam format accordion collapsible (arrow down/up) dengan isi 2 kolom ringkas: Nama Outlet (listing/portal & Store ID) dan Status Live/Bot (tanpa link ShopeeFood di dashboard brand).
+- Brand Hero Card menampilkan nama brand, switch toggle 3-state tanpa label teks, 3 metrik status live (Live Buka, Perlu Cek, Live Tutup), serta 2 tombol aksi di dalam Hero Card ("Lihat Jadwal" dan "Daftar Outlet (N)").
+- Daftar outlet ditampilkan dalam format accordion collapsible yang terintegrasi di dalam Hero Card dengan isi 2 kolom ringkas: Nama Outlet (listing/portal & Store ID) dan Status Live/Bot (tanpa link ShopeeFood di dashboard brand).
 - Kolom ke-6 pada tabel outlet VB di Admin Dashboard (`admin_dashboard.html`) menampilkan "Link Brand" yang menghubungkan baris outlet ke dashboard brand masing-masing.
 
 Penyederhanaan Visual 3-State Toggle & Eliminasi Label Teks:
