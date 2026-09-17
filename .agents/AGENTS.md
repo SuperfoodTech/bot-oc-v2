@@ -24,7 +24,7 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.20.0`.
+Latest documented release: `1.21.0`.
 
 Virtual Brand Dedicated Dashboard & Link Brand Integration:
 - Setiap brand Virtual Brand memiliki dashboard publik mandiri via slug URL `/brand/{slug}` yang dapat diakses langsung oleh PIC brand tanpa memerlukan halaman login password.

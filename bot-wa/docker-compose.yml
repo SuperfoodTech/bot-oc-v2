@@ -1,0 +1,23 @@
+name: bot-wa-gateway
+
+services:
+  wa-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fm-wa-gateway
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - WA_API_KEY=${WA_API_KEY:-change-this-wa-secret-key-12345}
+      - WA_AUTH_DIR=/app/auth_info_baileys
+      - LOG_LEVEL=info
+      - TZ=Asia/Jakarta
+    volumes:
+      # Persistent volume for WhatsApp Multi-File Session Auth
+      - wa_session_data:/app/auth_info_baileys
+
+volumes:
+  wa_session_data:

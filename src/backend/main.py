@@ -1381,3 +1381,118 @@ def control_bot_endpoint(req: BotControlRequest, admin: dict = Depends(require_a
             return {"success": True, "message": f"Sync selesai! Status toko di-refresh.", "data": {"processed": processed_count}}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Gagal eksekusi sync: {e}")
+
+
+class WATestRequest(BaseModel):
+    phone: str
+    message: str
+
+
+@app.get("/api/v1/admin/wa/status", summary="Admin: Get WhatsApp Gateway Status & QR Code")
+def get_wa_gateway_status(admin: dict = Depends(require_admin)):
+    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    wa_key = os.getenv("WA_GATEWAY_KEY", "foodmaster-wa-secret-2026-key").strip()
+
+    if not wa_url:
+        return {
+            "success": True,
+            "wa_status": "OFFLINE",
+            "gateway_url": "-",
+            "qr_code_raw": None,
+            "queue_length": 0,
+            "error": "Environment variable WA_GATEWAY_URL belum dikonfigurasi."
+        }
+
+    try:
+        req = urllib.request.Request(
+            f"{wa_url.rstrip('/')}/api/v1/status",
+            headers={
+                "User-Agent": "FoodMaster-Backend",
+                "X-API-Key": wa_key
+            }
+        )
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode())
+                data["gateway_url"] = wa_url
+                return data
+    except Exception as e:
+        return {
+            "success": True,
+            "wa_status": "OFFLINE",
+            "gateway_url": wa_url,
+            "qr_code_raw": None,
+            "queue_length": 0,
+            "error": f"Tidak dapat terhubung ke Gateway WA: {e}"
+        }
+
+    return {
+        "success": True,
+        "wa_status": "OFFLINE",
+        "gateway_url": wa_url,
+        "qr_code_raw": None,
+        "queue_length": 0
+    }
+
+
+@app.post("/api/v1/admin/wa/logout", summary="Admin: Disconnect / Reset WA Session")
+def logout_wa_gateway_session(admin: dict = Depends(require_admin)):
+    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    wa_key = os.getenv("WA_GATEWAY_KEY", "foodmaster-wa-secret-2026-key").strip()
+
+    try:
+        req = urllib.request.Request(
+            f"{wa_url.rstrip('/')}/api/v1/logout",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "FoodMaster-Backend",
+                "X-API-Key": wa_key
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode())
+                state.record_log(
+                    store_id="SYSTEM",
+                    store_name="WhatsApp Gateway",
+                    action="ADMIN_RESET_WA_SESSION",
+                    target_state="DISCONNECTED",
+                    reason=f"Admin {admin.get('username')} memicu reset sesi WA via Dashboard"
+                )
+                return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal melakukan logout sesi WA: {e}")
+
+    return {"success": False, "error": "Respons tidak dikenal dari gateway."}
+
+
+@app.post("/api/v1/admin/wa/test", summary="Admin: Send Test WhatsApp Message")
+def send_test_wa_message_endpoint(req_body: WATestRequest, admin: dict = Depends(require_admin)):
+    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    wa_key = os.getenv("WA_GATEWAY_KEY", "foodmaster-wa-secret-2026-key").strip()
+
+    if not req_body.phone or not req_body.message:
+        raise HTTPException(status_code=400, detail="Nomor telepon dan isi pesan wajib diisi.")
+
+    try:
+        payload = json.dumps({"phone": req_body.phone, "message": req_body.message}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{wa_url.rstrip('/')}/api/v1/send-message",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "FoodMaster-Backend",
+                "X-API-Key": wa_key
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            if resp.status == 200:
+                return json.loads(resp.read().decode())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mengirim pesan tes WA: {e}")
+
+    return {"success": False, "error": "Respons tidak dikenal dari gateway."}
+

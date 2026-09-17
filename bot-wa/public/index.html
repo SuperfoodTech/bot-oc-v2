@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodMaster WhatsApp Gateway Console</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2316a34a' d='M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    :root {
+      --accent: #BE1A1A;
+      --ink: #111827;
+      --muted: #4b5563;
+      --surface: #ffffff;
+      --canvas: #f8fafc;
+      --line: #e2e8f0;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #be1a1a;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+    .container {
+      width: min(100%, 720px);
+      margin: 32px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      padding: 32px;
+    }
+    .header {
+      margin-bottom: 24px;
+    }
+    .step-indicator {
+      display: inline-block;
+      color: #15803d;
+      background: #dcfce7;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 4px 0 6px;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+    .api-key-box {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .api-key-box input {
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+    .stat-card {
+      padding: 14px 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+    }
+    .stat-label {
+      display: block;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .badge-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .badge-connected { background: #dcfce7; color: #15803d; }
+    .badge-connected .badge-dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.2); }
+    .badge-connecting { background: #e0f2fe; color: #0369a1; }
+    .badge-connecting .badge-dot { background: #0284c7; animation: pulse 1.5s infinite; }
+    .badge-qr { background: #fef3c7; color: #b45309; }
+    .badge-qr .badge-dot { background: #d97706; animation: pulse 1.5s infinite; }
+    .badge-offline { background: #fee2e2; color: #991515; }
+    .badge-offline .badge-dot { background: #be1a1a; }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .qr-card {
+      padding: 24px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      text-align: center;
+    }
+    .qr-frame {
+      display: inline-block;
+      padding: 16px;
+      background: #ffffff;
+      border: 2px solid #e2e8f0;
+      border-radius: 14px;
+      margin: 16px 0;
+    }
+    .instructions {
+      text-align: left;
+      background: #ffffff;
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      margin-top: 16px;
+    }
+    .instructions ol { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.6; }
+    
+    .connected-card {
+      padding: 32px 24px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 16px;
+      text-align: center;
+    }
+    .connecting-card {
+      padding: 36px 24px;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 16px;
+      text-align: center;
+    }
+    .connected-icon {
+      width: 52px; height: 52px; background: #16a34a; color: #fff;
+      border-radius: 50%; display: grid; place-items: center; margin: 0 auto 12px;
+    }
+    .connected-icon svg { width: 28px; height: 28px; }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    .btn-primary { background: #111827; color: #fff; }
+    .btn-primary:hover { background: #1f2937; }
+    .btn-outline { background: transparent; border: 1px solid #cbd5e1; color: #0f172a; }
+    .btn-danger { background: #fee2e2; color: #991515; border: 1px solid #fca5a5; }
+    .btn-danger:hover { background: #fecaca; }
+
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+    .form-group { margin-top: 16px; text-align: left; }
+    .form-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+    .msg-output { margin-top: 10px; font-size: 13px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header" style="margin-bottom: 20px;">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #111827;">FoodMaster WhatsApp Gateway</h1>
+    </div>
+
+    <input type="hidden" id="apiKeyInput" value="foodmaster-wa-secret-2026-key">
+
+    <div class="status-grid">
+      <div class="stat-card">
+        <span class="stat-label">Status Koneksi</span>
+        <div id="statusBadge" class="badge badge-offline">
+          <span class="badge-dot"></span>
+          <strong id="statusText">Memuat...</strong>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">Antrean Pesan</span>
+        <span id="queueLengthText" class="stat-value">0 pesan</span>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">Update Terakhir</span>
+        <span id="lastUpdateText" class="stat-value" style="font-size: 12px; color: #475569;">-</span>
+      </div>
+    </div>
+
+    <div id="qrReadyCard" class="qr-card" style="display: none;">
+      <h3 style="margin: 0 0 12px;">Scan QR Code WhatsApp</h3>
+      <div class="qr-frame" style="margin: 0 auto;">
+        <img id="qrImage" src="" style="width: 240px; height: 240px; display: block; margin: 0 auto; border-radius: 8px;" alt="QR Code WhatsApp">
+      </div>
+    </div>
+
+    <div id="connectingCard" class="connecting-card" style="display: none;">
+      <div class="wa-spinner" style="width: 32px; height: 32px; margin: 0 auto 12px; border-width: 3px; border-top-color: #0284c7;"></div>
+      <h3 style="margin: 0 0 6px; color: #0369a1;">Menghubungkan Sesi WhatsApp...</h3>
+      <p style="margin: 0; color: #075985; font-size: 13px;">Sedang memverifikasi enkripsi sesi WhatsApp setelah scan. Mohon tunggu sebentar...</p>
+    </div>
+
+    <div id="connectedCard" class="connected-card" style="display: none;">
+      <div class="connected-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <h3 style="margin: 0 0 6px; color: #14532d;">WhatsApp Berhasil Terhubung 24/7!</h3>
+      <p style="margin: 0 0 16px; color: #166534; font-size: 13px;">Sesi login aktif. Bot siap mengirim notifikasi otomatis patroli outlet FoodMaster.</p>
+      
+      <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; text-align: left; max-width: 380px; margin: 0 auto;">
+        <div id="userNameRow" style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase;">Nama Akun:</span>
+          <strong id="connectedUserName" style="font-size: 14px; color: #0f172a;">-</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase;">Nomor Telepon:</span>
+          <strong id="connectedUserPhone" style="font-size: 14px; color: #16a34a;">-</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="btnRefresh" onclick="manualRefreshStatus(this)" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+        <span class="btn-spinner" style="display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite;"></span>
+        <span class="btn-text">Refresh Status</span>
+      </button>
+      <button class="btn btn-danger" onclick="logoutSession()">Reset / Logout Sesi WA</button>
+    </div>
+
+    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line);">
+      <h3 style="font-size: 15px; margin: 0 0 4px;">Tes Kirim Pesan WhatsApp</h3>
+      <p class="subtitle" style="font-size: 12px;">Uji pengiriman notifikasi langsung ke nomor telepon.</p>
+
+      <div class="form-group">
+        <label>Nomor Telepon Tujuan (cth: 081234567890)</label>
+        <input id="testPhone" class="form-input" placeholder="081234567890">
+      </div>
+      <div class="form-group">
+        <label>Isi Pesan</label>
+        <textarea id="testMsg" class="form-input" rows="2" placeholder="Halo, ini pesan tes dari FoodMaster WA Gateway."></textarea>
+      </div>
+      <button class="btn btn-primary" style="margin-top: 12px;" onclick="sendTestMessage()">Kirim Pesan Tes</button>
+      <div id="testOutput" class="msg-output"></div>
+    </div>
+  </div>
+
+  <script>
+    let pollTimer = null;
+
+    async function manualRefreshStatus(btn) {
+      if (btn) {
+        btn.disabled = true;
+        const spinner = btn.querySelector('.btn-spinner');
+        const text = btn.querySelector('.btn-text');
+        if (spinner) spinner.style.display = 'inline-block';
+        if (text) text.textContent = 'Memeriksa...';
+      }
+
+      const minWait = new Promise(resolve => setTimeout(resolve, 400));
+      await Promise.all([fetchStatus(), minWait]);
+
+      const lastUpd = document.getElementById('lastUpdateText');
+      if (lastUpd) {
+        lastUpd.style.transition = 'color 0.2s ease, transform 0.2s ease';
+        lastUpd.style.color = '#16a34a';
+        setTimeout(() => { lastUpd.style.color = '#475569'; }, 800);
+      }
+
+      if (btn) {
+        const spinner = btn.querySelector('.btn-spinner');
+        const text = btn.querySelector('.btn-text');
+        if (spinner) spinner.style.display = 'none';
+        if (text) text.textContent = 'Refresh Status';
+        btn.disabled = false;
+      }
+    }
+
+    function getApiKey() {
+      const val = document.getElementById('apiKeyInput').value.trim();
+      return val || 'foodmaster-wa-secret-2026-key';
+    }
+
+    async function fetchStatus() {
+      const apiKey = getApiKey();
+      const badge = document.getElementById('statusBadge');
+      const text = document.getElementById('statusText');
+      const queue = document.getElementById('queueLengthText');
+      const lastUpd = document.getElementById('lastUpdateText');
+      const qrCard = document.getElementById('qrReadyCard');
+      const connCard = document.getElementById('connectedCard');
+      const connectingCard = document.getElementById('connectingCard');
+      const qrImg = document.getElementById('qrImage');
+
+      try {
+        const res = await fetch('/api/v1/status');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        const status = data.wa_status || 'OFFLINE';
+        queue.textContent = (data.queue_length || 0) + ' pesan';
+        lastUpd.textContent = new Date().toLocaleTimeString('id-ID');
+
+        badge.className = 'badge ';
+        if (status === 'CONNECTED') {
+          badge.classList.add('badge-connected');
+          text.textContent = 'Terhubung 24/7';
+          qrCard.style.display = 'none';
+          connectingCard.style.display = 'none';
+          connCard.style.display = 'block';
+          if (data.user) {
+            document.getElementById('connectedUserPhone').textContent = data.user.phone || '-';
+            const nameRow = document.getElementById('userNameRow');
+            if (data.user.name) {
+              nameRow.style.display = 'flex';
+              document.getElementById('connectedUserName').textContent = data.user.name;
+            } else {
+              nameRow.style.display = 'none';
+            }
+          }
+        } else if (status === 'CONNECTING' || status === 'INITIALIZING') {
+          badge.classList.add('badge-connecting');
+          text.textContent = 'Menghubungkan Sesi WA...';
+          qrCard.style.display = 'none';
+          connectingCard.style.display = 'block';
+          connCard.style.display = 'none';
+        } else if (status === 'QR_READY') {
+          badge.classList.add('badge-qr');
+          text.textContent = 'Siap Scan QR';
+          qrCard.style.display = 'block';
+          connectingCard.style.display = 'none';
+          connCard.style.display = 'none';
+          if (data.qr_code_image) {
+            qrImg.src = data.qr_code_image;
+          }
+        } else {
+          badge.classList.add('badge-offline');
+          text.textContent = status;
+          qrCard.style.display = 'none';
+          connectingCard.style.display = 'none';
+          connCard.style.display = 'none';
+        }
+
+        if (pollTimer) clearTimeout(pollTimer);
+        pollTimer = setTimeout(fetchStatus, 3000);
+      } catch (err) {
+        badge.className = 'badge badge-offline';
+        text.textContent = 'Offline / Gagal Koneksi';
+        qrCard.style.display = 'none';
+        connCard.style.display = 'none';
+        if (pollTimer) clearTimeout(pollTimer);
+        pollTimer = setTimeout(fetchStatus, 5000);
+      }
+    }
+
+    async function logoutSession() {
+      if (!confirm('Apakah Anda yakin ingin reset / logout sesi WA?')) return;
+      const apiKey = getApiKey();
+      try {
+        const res = await fetch('/api/v1/logout', {
+          method: 'POST',
+          headers: { 'X-API-Key': apiKey }
+        });
+        const data = await res.json();
+        alert(data.message || 'Sesi di-reset.');
+        fetchStatus();
+      } catch (err) {
+        alert('Gagal reset sesi: ' + err.message);
+      }
+    }
+
+    async function sendTestMessage() {
+      const apiKey = getApiKey();
+      const phone = document.getElementById('testPhone').value.trim();
+      const message = document.getElementById('testMsg').value.trim();
+      const out = document.getElementById('testOutput');
+
+      if (!phone || !message) {
+        out.style.color = '#be1a1a';
+        out.textContent = 'Nomor telepon dan isi pesan wajib diisi.';
+        return;
+      }
+
+      out.style.color = '#475569';
+      out.textContent = 'Mengirim pesan...';
+
+      try {
+        const res = await fetch('/api/v1/send-message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey
+          },
+          body: JSON.stringify({ phone, message })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          out.style.color = '#15803d';
+          out.textContent = 'Pesan berhasil dimasukkan ke antrean WA!';
+        } else {
+          out.style.color = '#be1a1a';
+          out.textContent = 'Gagal: ' + (data.error || 'Terjadi kesalahan.');
+        }
+      } catch (err) {
+        out.style.color = '#be1a1a';
+        out.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    window.onload = fetchStatus;
+  </script>
+</body>
+</html>
