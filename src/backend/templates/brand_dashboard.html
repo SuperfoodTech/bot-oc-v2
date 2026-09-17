@@ -425,16 +425,17 @@
       const action = String(log?.action || '').toUpperCase();
       const reason = String(log?.reason || '');
       const storeName = log.store_name || (log.store_id ? `Store ID ${log.store_id}` : '-');
+      const isSuccess = log?.success !== false;
 
       switch (action) {
         case 'ACTION_OPEN':
         case 'OPEN_STORE':
         case 'OPEN':
-          return { title: 'Bot berhasil membuka outlet', subtitle: storeName };
+          return { title: isSuccess ? 'Bot berhasil membuka outlet' : 'Bot gagal membuka outlet', subtitle: storeName };
         case 'ACTION_CLOSE':
         case 'CLOSE_STORE':
         case 'CLOSE':
-          return { title: 'Bot berhasil menutup outlet', subtitle: storeName };
+          return { title: isSuccess ? 'Bot berhasil menutup outlet' : 'Bot gagal menutup outlet', subtitle: storeName };
         case 'USER_PAUSE_STORE':
         case 'USER_PAUSE':
           return { title: 'Outlet ditutup oleh Merchant', subtitle: storeName };
@@ -592,6 +593,67 @@
       }
     }
 
+    function formatSpecialHoursDate(startStr, endStr) {
+      if (!startStr && startStr !== 0) return '-';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      function parsePart(str) {
+        if (!str && str !== 0) return null;
+        if (typeof str === 'number' || (/^\d{10,13}$/.test(String(str).trim()))) {
+          const ms = typeof str === 'number' ? str : parseInt(str, 10);
+          const dObj = new Date(ms > 1e11 ? ms : ms * 1000);
+          if (isNaN(dObj.getTime())) return null;
+          return { y: dObj.getFullYear(), m: dObj.getMonth(), d: dObj.getDate(), monthName: months[dObj.getMonth()] || '' };
+        }
+        const parts = String(str).trim().split('T')[0].split('-');
+        if (parts.length === 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const d = parseInt(parts[2], 10);
+          return { y, m, d, monthName: months[m] || '' };
+        }
+        return null;
+      }
+      const pStart = parsePart(startStr);
+      const pEnd = parsePart(endStr || startStr);
+      if (!pStart) return String(startStr);
+      if (!pEnd || (pStart.y === pEnd.y && pStart.m === pEnd.m && pStart.d === pEnd.d)) {
+        return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y}`;
+      }
+      if (pStart.y === pEnd.y && pStart.m === pEnd.m) {
+        return `${String(pStart.d).padStart(2, '0')} - ${String(pEnd.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y}`;
+      }
+      if (pStart.y === pEnd.y) {
+        return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} - ${String(pEnd.d).padStart(2, '0')} ${pEnd.monthName} ${pStart.y}`;
+      }
+      return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y} - ${String(pEnd.d).padStart(2, '0')} ${pEnd.monthName} ${pEnd.y}`;
+    }
+
+    function formatSpecialHoursIntervals(intervals) {
+      if (!Array.isArray(intervals) || !intervals.length) {
+        return 'Tutup';
+      }
+      function formatSec(sec) {
+        const s = parseInt(sec, 10);
+        if (isNaN(s)) return '';
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+      const formatted = intervals.map(item => {
+        let from = String(item.time_from || '').replace(/\./g, ':');
+        let to = String(item.time_to || '').replace(/\./g, ':');
+        if (!from && !to && (item.start_relative_sec !== undefined || item.end_relative_sec !== undefined)) {
+          const startSec = Number(item.start_relative_sec || 0);
+          const endSec = Number(item.end_relative_sec || 0);
+          if (startSec === 0 && endSec === 0) return '';
+          from = formatSec(startSec);
+          to = formatSec(endSec);
+        }
+        return from && to ? `${from} - ${to}` : (from || to || '');
+      }).filter(Boolean);
+      return formatted.length ? formatted.join(', ') + ' WIB' : 'Tutup';
+    }
+
     function openScheduleBottomSheet() {
       const sheet = document.getElementById('scheduleBottomSheet');
       const backdrop = document.getElementById('scheduleBackdrop');
@@ -641,11 +703,15 @@
       let specHtml = '';
       if (Array.isArray(specHours) && specHours.length > 0) {
         const specRows = specHours.map(sh => {
-          const dateStr = sh.date || sh.start_date || '-';
-          const timeStr = sh.is_closed ? 'Tutup Sepanjang Hari' : `${sh.start_time || '00:00'} - ${sh.end_time || '00:00'}`;
+          const dateStr = formatSpecialHoursDate(sh.date_start || sh.date || sh.start_date, sh.date_end);
+          const descText = sh.date_desc ? escapeHtml(String(sh.date_desc)) : '';
+          const timeStr = formatSpecialHoursIntervals(sh.intervals);
           return `
             <div class="brand-special-schedule-row">
-              <div class="brand-special-date">${escapeHtml(dateStr)}</div>
+              <div class="brand-special-date">
+                <strong>${escapeHtml(dateStr)}</strong>
+                ${descText ? `<small class="brand-special-desc" style="display:block;font-size:11px;color:#6b7280;margin-top:2px;">${descText}</small>` : ''}
+              </div>
               <div class="brand-special-time">${escapeHtml(timeStr)}</div>
             </div>
           `;

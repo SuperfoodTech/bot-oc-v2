@@ -1789,11 +1789,12 @@
     function getHistorySummary(log, actionLabels) {
       const action = String(log?.action || '').toUpperCase();
       const reason = String(log?.reason || '');
+      const isSuccess = log?.success !== false;
       switch (action) {
         case 'ACTION_OPEN':
-          return { title: 'Bot berhasil membuka outlet', subtitle: log.store_name };
+          return { title: isSuccess ? 'Bot berhasil membuka outlet' : 'Bot gagal membuka outlet', subtitle: log.store_name };
         case 'ACTION_CLOSE':
-          return { title: 'Bot berhasil menutup outlet', subtitle: log.store_name };
+          return { title: isSuccess ? 'Bot berhasil menutup outlet' : 'Bot gagal menutup outlet', subtitle: log.store_name };
         case 'USER_PAUSE_STORE':
           return { title: 'Outlet ditutup oleh Merchant', subtitle: log.store_name };
         case 'USER_RESUME_STORE':

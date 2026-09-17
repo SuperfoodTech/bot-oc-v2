@@ -4,6 +4,7 @@ core/decision.py
 Evaluates outlet actions and pause-aware wake-up hints for the automation bot.
 """
 
+import json
 import math
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
@@ -220,6 +221,80 @@ def is_within_operating_hours(hours_str: str, check_time: Optional[time] = None)
         return False
 
 
+def parse_special_hours_entry(entry: Any, timezone: ZoneInfo) -> Optional[dict]:
+    if not isinstance(entry, dict):
+        return None
+    try:
+        raw_start = entry.get("date_start")
+        raw_end = entry.get("date_end")
+        if raw_start is None or raw_end is None:
+            return None
+        start_dt = datetime.fromtimestamp(int(raw_start) / 1000, tz=timezone)
+        end_dt = datetime.fromtimestamp(int(raw_end) / 1000, tz=timezone)
+        date_type = int(entry.get("date_type", 1))
+        date_desc = str(entry.get("date_desc") or "").strip()
+        intervals = entry.get("intervals") or []
+        return {
+            "start_dt": start_dt,
+            "end_dt": end_dt,
+            "date_type": date_type,
+            "date_desc": date_desc,
+            "intervals": intervals,
+        }
+    except Exception:
+        return None
+
+
+def get_active_special_hours(special_hours: Any, now_dt: datetime, timezone: ZoneInfo) -> Optional[dict]:
+    if not special_hours:
+        return None
+    raw_list = special_hours
+    if isinstance(raw_list, str):
+        try:
+            raw_list = json.loads(raw_list)
+        except Exception:
+            return None
+    if isinstance(raw_list, dict):
+        raw_list = raw_list.get("special_hours") or []
+    if not isinstance(raw_list, list):
+        return None
+
+    for raw_entry in raw_list:
+        parsed = parse_special_hours_entry(raw_entry, timezone)
+        if not parsed:
+            continue
+        if parsed["start_dt"] <= now_dt <= parsed["end_dt"]:
+            return parsed
+    return None
+
+
+def is_within_special_hours_intervals(active_entry: dict, now_dt: datetime) -> bool:
+    date_type = active_entry.get("date_type", 1)
+    if date_type == 1:
+        # Full day close
+        return False
+
+    intervals = active_entry.get("intervals") or []
+    if not intervals:
+        return False
+
+    current_sec = now_dt.hour * 3600 + now_dt.minute * 60 + now_dt.second
+    has_valid_interval = False
+
+    for inv in intervals:
+        if not isinstance(inv, dict):
+            continue
+        s_sec = int(inv.get("start_relative_sec", 0))
+        e_sec = int(inv.get("end_relative_sec", 0))
+        if s_sec == 0 and e_sec == 0:
+            continue
+        has_valid_interval = True
+        if s_sec <= current_sec <= e_sec:
+            return True
+
+    return False
+
+
 def evaluate_outlet_status(
     outlet: MerchantOutlet,
     current_time: Optional[datetime] = None,
@@ -230,7 +305,7 @@ def evaluate_outlet_status(
     1. Status Penangguhan (Ya/Tidak) -> If "Ya", forced CLOSE.
     2. Status Subscription (Aktif/Kedaluwarsa) -> If not "Aktif", Auto Open disabled -> CLOSE.
     3. Active temporary pause -> Keep outlet closed until pause_until expires.
-    4. Operating Hours (Senin-Minggu) -> If outside or unavailable, silently skip.
+    4. Special Hours / Operating Hours (Senin-Minggu) -> If outside or unavailable, silently skip.
     5. Vercel Toggle / Status Utama (On/Off) -> Primary Source of Truth.
     """
     local_tz = outlet_timezone(outlet)
@@ -265,45 +340,57 @@ def evaluate_outlet_status(
                 reason=f"Pause aktif sampai {pause_label}; outlet harus tetap tutup",
             )
 
-    # 4. Check Operating Hours for today
-    weekday_name = WEEKDAY_MAP.get(current_time.weekday(), "Senin")
-    regular_hours = _get_outlet_schedule(outlet)
-    today_hours = regular_hours.get(weekday_name, "")
+    # 4. Check Special Hours & Operating Hours for today
+    special_hours_data = _get_outlet_value(outlet, "shopee_special_hours") or _get_outlet_value(outlet, "special_hours")
+    active_special_hours = get_active_special_hours(special_hours_data, current_time, local_tz)
 
-    if active_pause_until:
-        pause_label = _format_local_label(active_pause_until, local_tz)
+    if active_special_hours:
+        special_desc = active_special_hours.get("date_desc") or "Jadwal Khusus"
+        is_open_special = is_within_special_hours_intervals(active_special_hours, current_time)
+        if not is_open_special:
+            target = TARGET_CLOSE
+            reason = f"Tutup berdasarkan Jadwal Khusus Shopee ({special_desc})"
+            action = ACTION_CLOSE if is_currently_open else ACTION_NO_CHANGE
+            return DecisionResult(target_state=target, action=action, reason=reason)
+    else:
+        weekday_name = WEEKDAY_MAP.get(current_time.weekday(), "Senin")
+        regular_hours = _get_outlet_schedule(outlet)
+        today_hours = regular_hours.get(weekday_name, "")
+
+        if active_pause_until:
+            pause_label = _format_local_label(active_pause_until, local_tz)
+            if require_regular_schedule and not today_hours:
+                return DecisionResult(
+                    target_state=TARGET_CLOSE,
+                    action=ACTION_NO_CHANGE,
+                    reason=f"Pause aktif sampai {pause_label}; jadwal reguler Shopee {weekday_name} belum tersedia",
+                )
+            if not is_within_operating_hours(today_hours, current_time.time()):
+                return DecisionResult(
+                    target_state=TARGET_CLOSE,
+                    action=ACTION_NO_CHANGE,
+                    reason=f"Pause aktif sampai {pause_label}; menunggu sesi reguler berikutnya",
+                )
+            return DecisionResult(
+                target_state=TARGET_CLOSE,
+                action=ACTION_NO_CHANGE,
+                reason=f"Pause aktif sampai {pause_label}; outlet sudah tertutup",
+            )
+
         if require_regular_schedule and not today_hours:
             return DecisionResult(
                 target_state=TARGET_CLOSE,
                 action=ACTION_NO_CHANGE,
-                reason=f"Pause aktif sampai {pause_label}; jadwal reguler Shopee {weekday_name} belum tersedia",
+                reason=f"Jadwal reguler Shopee {weekday_name} tidak tersedia",
             )
+        
         if not is_within_operating_hours(today_hours, current_time.time()):
-            return DecisionResult(
-                target_state=TARGET_CLOSE,
-                action=ACTION_NO_CHANGE,
-                reason=f"Pause aktif sampai {pause_label}; menunggu sesi reguler berikutnya",
-            )
-        return DecisionResult(
-            target_state=TARGET_CLOSE,
-            action=ACTION_NO_CHANGE,
-            reason=f"Pause aktif sampai {pause_label}; outlet sudah tertutup",
-        )
-
-    if require_regular_schedule and not today_hours:
-        return DecisionResult(
-            target_state=TARGET_CLOSE,
-            action=ACTION_NO_CHANGE,
-            reason=f"Jadwal reguler Shopee {weekday_name} tidak tersedia",
-        )
-    
-    if not is_within_operating_hours(today_hours, current_time.time()):
-        # Shopee owns the CLOSED state outside the regular schedule. Do not
-        # translate it into a PAUSE/CLOSE action from the bot.
-        target = TARGET_CLOSE
-        reason = f"Di luar jam operasional ({weekday_name}: {today_hours or 'Tutup'})"
-        action = ACTION_NO_CHANGE
-        return DecisionResult(target_state=target, action=action, reason=reason)
+            # Shopee owns the CLOSED state outside the regular schedule. Do not
+            # translate it into a PAUSE/CLOSE action from the bot.
+            target = TARGET_CLOSE
+            reason = f"Di luar jam operasional ({weekday_name}: {today_hours or 'Tutup'})"
+            action = ACTION_NO_CHANGE
+            return DecisionResult(target_state=target, action=action, reason=reason)
 
     # 5. Vercel Toggle / Status Utama (Source of Truth)
     status_utama_raw = (outlet.status_utama or "").strip().lower()

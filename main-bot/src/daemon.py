@@ -216,6 +216,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             # Dispatch one merchant group at a time. Re-read runtime state after
             # every group so a newly detected mismatch can move to the front.
             processed_keys = set()
+            dispatched_actionable_stores = set()
             cycle_actions = []
             cycle_merchant_groups = []
             total_stores_processed = 0
@@ -226,7 +227,11 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 current_outlets = db.fetch_merchant_outlets_from_db()
                 total_outlets_loaded = max(total_outlets_loaded, len(current_outlets))
                 queue = scheduler.build_queue(current_outlets)
-                available = [item for item in queue if item.merchant_key not in processed_keys]
+                available = [
+                    item for item in queue
+                    if item.merchant_key not in processed_keys
+                    or any(sid not in dispatched_actionable_stores for sid in item.actionable_store_ids)
+                ]
                 selected = scheduler.select_next_group(available)
                 if selected is None and initial_patrol_pending and available:
                     # A fresh process must read live state once before trusting
@@ -238,10 +243,14 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                     next_sleep_reason = "merchant group berikutnya jatuh tempo"
                     break
 
-                is_actionable = selected.actionable_count > 0
-                target_store_ids = set(selected.actionable_store_ids) if is_actionable else None
+                pending_actionable_ids = tuple(
+                    sid for sid in selected.actionable_store_ids if sid not in dispatched_actionable_stores
+                )
+                is_actionable = len(pending_actionable_ids) > 0
+                target_store_ids = set(pending_actionable_ids) if is_actionable else None
 
                 if is_actionable:
+                    dispatched_actionable_stores.update(pending_actionable_ids)
                     log.info(
                         "⚡ [EXPRESS LANE] Dispatching %d actionable store(s) %s for '%s' (Account: %s, P%d)...",
                         len(target_store_ids),

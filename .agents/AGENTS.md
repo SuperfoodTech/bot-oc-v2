@@ -24,7 +24,25 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.22.0`.
+Latest documented release: `1.23.3`.
+
+Dynamic Agency Summary Metric Cards:
+- Kartu metrik ringkasan pada Tab Agency (`#metricTotal`, `#metricOpen`, `#metricClosed`) diperbarui secara dinamis via `updateAgencyStatCards(baseFiltered)` setiap kali pengguna menerapkan filter pencarian, filter pemilik, filter outlet, filter Store ID, maupun filter status, menjaga konsistensi perilaku dengan Tab Virtual Brand (VB).
+
+Virtual Brand Discord Notification Mode Separation (Group Toggle vs Auto-Guarding):
+- Pemicu Brand Control Toggle (User/Timed Expiry): Notifikasi Discord dikirimkan secara **kolektif** (`VB GROUP BERHASIL DIBUKA/DITUTUP BOT`) yang merekap seluruh outlet di bawah brand group.
+- Pemicu Auto-Guarding Keliling (Routine Patrol Recovery): Notifikasi Discord dikirimkan secara **targeted** (`VB OUTLET (GUARDING) BERHASIL DIBUKA/DITUTUP BOT`) yang hanya menampilkan outlet yang diintervensi oleh bot patroli, mencegah kebingungan persepsi operasional seolah seluruh grup terdampak.
+- Pelacakan pemicu dikelola via `_BRAND_TOGGLED_IDS` di `main-vb/src/db.py` dan di-flush di akhir siklus daemon.
+
+Shopee Special Hours Schedule Gate & Priority Evaluation:
+- Jadwal Khusus Shopee (`shopee_special_hours`) memiliki prioritas lebih tinggi daripada Jadwal Reguler (`shopee_regular_hours`).
+- Jika outlet berada dalam periode Jadwal Khusus Tutup (`date_type=1` atau di luar interval buka khusus):
+  - Toggle switch pada dashboard (Admin, Mitra, dan Virtual Brand) otomatis berstatus `disabled`, terkunci di posisi kiri (`state-closed`), berwarna abu-abu (*gray*), dan menampilkan status pill `Sedang Tutup • Jadwal Khusus`.
+  - Bot patroli (`bot-oc` dan `bot-vb`) menetapkan `target_state = TARGET_CLOSE` dan `action = ACTION_NO_CHANGE` (atau `ACTION_CLOSE` jika live status masih buka) tanpa mencoba membuka paksa outlet.
+
+Virtual Brand Discord Notification Aggregation:
+- Notifikasi Discord Virtual Brand (`send_discord_vb_group_summary`) dikirimkan secara atomik per-siklus penuh daemon (`daemon.py`), bukan per-portal individual, untuk mencegah pengiriman rekap bertahap ("mencicil") pada brand multi-portal.
+- Trigger flush notifikasi dieksekusi di akhir siklus evaluasi daemon via `db.flush_pending_brand_notifications()`, sedangkan handler `db.record_log("SYSTEM")` di worker per-portal hanya mencatat log internal tanpa memicu pengiriman webhook ke Discord.
 
 Virtual Brand Dedicated Dashboard & Link Brand Integration:
 - Setiap brand Virtual Brand memiliki dashboard publik mandiri via slug URL `/brand/{slug}` yang dapat diakses langsung oleh PIC brand tanpa memerlukan halaman login password.

@@ -28,6 +28,11 @@ def init_state() -> None:
 
 
 
+_PENDING_BRAND_ACTIONS: dict[str, list[dict]] = {}
+_BRAND_TOGGLED_IDS: set[str] = set()
+_PENDING_LOCK = threading.Lock()
+
+
 def _clean_schedule_fetch_error(value) -> str | None:
     raw_value = str(value or "").strip()
     return raw_value or None
@@ -61,6 +66,8 @@ def apply_all_pending_statuses(conn) -> list[dict[str, Any]]:
         RETURNING id, name, applied_status, pause_until, requested_by
     """).fetchall()
     for row in rows:
+        with _PENDING_LOCK:
+            _BRAND_TOGGLED_IDS.add(str(row["id"]))
         conn.execute(
             """INSERT INTO admin_audit_logs
                (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
@@ -127,6 +134,8 @@ def apply_pending_status(conn, brand_id):
            RETURNING id, name, applied_status, pause_until, requested_by""", (brand_id,)
     ).fetchone()
     if row:
+        with _PENDING_LOCK:
+            _BRAND_TOGGLED_IDS.add(str(row["id"]))
         conn.execute(
             """INSERT INTO admin_audit_logs
                (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
@@ -160,7 +169,7 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
                COALESCE(b.requested_pause_until, b.pause_until)::text AS brand_pause_until,
                o.store_id, o.long_name, p.name AS portal_name,
                sa.username, sa.password_plain, sa.phone, sa.merchant_id_external,
-               os.shopee_actual_status, os.shopee_regular_hours, os.timezone,
+               os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
                os.schedule_fetch_status,
                os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
                os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
@@ -222,6 +231,7 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             status_aktual=actual,
             regular_hours=row.get("shopee_regular_hours") or {},
             shopee_regular_hours=row.get("shopee_regular_hours") or {},
+            shopee_special_hours=row.get("shopee_special_hours") or [],
             timezone=row.get("timezone") or "Asia/Jakarta",
             status_langganan="Aktif",
             penangguhan="Tidak",
@@ -338,10 +348,6 @@ def update_outlet_name(store_id: str, store_name: str) -> None:
         )
 
 
-_PENDING_BRAND_ACTIONS: dict[str, list[dict]] = {}
-_PENDING_LOCK = threading.Lock()
-
-
 def _record_pending_brand_action(brand_id: str, store_id: str, store_name: str, action: str, target_state: str, success: bool, error_message: str | None):
     if not brand_id:
         return
@@ -358,12 +364,14 @@ def _record_pending_brand_action(brand_id: str, store_id: str, store_name: str, 
         })
 
 
-def _flush_pending_brand_notifications():
+def flush_pending_brand_notifications():
     with _PENDING_LOCK:
         if not _PENDING_BRAND_ACTIONS:
             return
         pending = dict(_PENDING_BRAND_ACTIONS)
         _PENDING_BRAND_ACTIONS.clear()
+        toggled_brands = set(_BRAND_TOGGLED_IDS)
+        _BRAND_TOGGLED_IDS.clear()
 
     try:
         from core.notifier import send_discord_vb_group_summary
@@ -381,54 +389,81 @@ def _flush_pending_brand_notifications():
                 is_open = any(a in ("ACTION_OPEN", "USER_OPEN_STORE") for a in actions_types) or applied_status == "ON"
                 summary_action = "ACTION_OPEN" if is_open else "ACTION_CLOSE"
 
-                outlets = conn.execute("""
-                    SELECT o.store_id, COALESCE(o.long_name, o.short_name) AS name,
-                           os.shopee_actual_status, os.vercel_status
-                    FROM vb_brand_outlets bo
-                    JOIN outlets o ON o.id = bo.outlet_id AND o.is_active = true
-                    LEFT JOIN outlet_states os ON os.outlet_id = o.id
-                    WHERE bo.vb_brand_id = %s
-                    ORDER BY o.store_id
-                """, (brand_id,)).fetchall()
+                is_brand_toggle = str(brand_id) in toggled_brands
 
-                if not outlets:
-                    continue
+                if is_brand_toggle:
+                    # Mode Brand Toggle: Rekap Kolektif Seluruh Outlet di bawah Brand
+                    outlets = conn.execute("""
+                        SELECT o.store_id, COALESCE(o.long_name, o.store_id) AS name,
+                               os.shopee_actual_status, os.vercel_status
+                        FROM vb_brand_outlets bo
+                        JOIN outlets o ON o.id = bo.outlet_id AND o.is_active = true
+                        LEFT JOIN outlet_states os ON os.outlet_id = o.id
+                        WHERE bo.vb_brand_id = %s
+                        ORDER BY o.store_id
+                    """, (brand_id,)).fetchall()
 
-                success_items = []
-                failed_items = []
+                    if not outlets:
+                        continue
 
-                for out in outlets:
-                    st_id = str(out["store_id"])
-                    st_name = out["name"] or st_id
-                    live_st = str(out.get("shopee_actual_status") or "").upper()
+                    success_items = []
+                    failed_items = []
 
-                    failed_record = next((a for a in actions if a["store_id"] == st_id and not a.get("success")), None)
+                    for out in outlets:
+                        st_id = str(out["store_id"])
+                        st_name = out["name"] or st_id
+                        live_st = str(out.get("shopee_actual_status") or "").upper()
 
-                    if is_open:
-                        if (live_st in ("ON", "OPEN") or (out.get("vercel_status") == "ON" and live_st != "PAUSE")) and not failed_record:
+                        failed_record = next((a for a in actions if a["store_id"] == st_id and not a.get("success")), None)
+
+                        if is_open:
+                            if (live_st in ("ON", "OPEN") or (out.get("vercel_status") == "ON" and live_st != "PAUSE")) and not failed_record:
+                                success_items.append({"name": st_name, "store_id": st_id})
+                            else:
+                                failed_items.append({"name": st_name, "store_id": st_id})
+                        else:
+                            if (live_st in ("PAUSE", "CLOSED", "OFF")) and not failed_record:
+                                success_items.append({"name": st_name, "store_id": st_id})
+                            else:
+                                failed_items.append({"name": st_name, "store_id": st_id})
+
+                    send_discord_vb_group_summary(
+                        group_name=brand_name,
+                        action=summary_action,
+                        success_items=success_items,
+                        failed_items=failed_items,
+                        is_guarding=False,
+                    )
+                else:
+                    # Mode Auto-Guarding Keliling: Tampilkan HANYA outlet yang dieksekusi oleh bot
+                    success_items = []
+                    failed_items = []
+
+                    for a in actions:
+                        st_id = str(a.get("store_id") or "")
+                        st_name = a.get("store_name") or st_id
+                        if a.get("success"):
                             success_items.append({"name": st_name, "store_id": st_id})
                         else:
                             failed_items.append({"name": st_name, "store_id": st_id})
-                    else:
-                        if (live_st in ("PAUSE", "CLOSED", "OFF")) and not failed_record:
-                            success_items.append({"name": st_name, "store_id": st_id})
-                        else:
-                            failed_items.append({"name": st_name, "store_id": st_id})
 
-                send_discord_vb_group_summary(
-                    group_name=brand_name,
-                    action=summary_action,
-                    success_items=success_items,
-                    failed_items=failed_items
-                )
+                    send_discord_vb_group_summary(
+                        group_name=brand_name,
+                        action=summary_action,
+                        success_items=success_items,
+                        failed_items=failed_items,
+                        is_guarding=True,
+                    )
     except Exception as e:
         print(f"[VB DB NOTIFICATION ERROR] Gagal mengirim summary group Discord: {e}")
+
+
+_flush_pending_brand_notifications = flush_pending_brand_notifications
 
 
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="VB"):
     """Write copied-worker actions as VB logs without mixing regular bot logs."""
     if str(store_id).upper() == "SYSTEM":
-        _flush_pending_brand_notifications()
         return
 
     with connection() as conn:

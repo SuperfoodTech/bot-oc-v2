@@ -108,3 +108,29 @@ def test_worker_skips_schedule_fetch_when_already_ready():
         # get_regular_hours and get_special_hours should NOT be called since schedule is already READY
         mock_get_reg_hours.assert_not_called()
         mock_get_sp_hours.assert_not_called()
+
+
+def test_actionable_portals_bypass_processed_keys():
+    now = datetime(2026, 8, 31, 10, 0, tzinfo=WIB)
+    outlets = [
+        make_outlet("store-1", "Portal 1", status_aktual="ON", status_utama="OFF"),  # Actionable CLOSE
+        make_outlet("store-2", "Portal 2", status_aktual="ON", status_utama="OFF"),  # Actionable CLOSE
+        make_outlet("store-3", "Portal 3", status_aktual="ON", status_utama="OFF"),  # Actionable CLOSE
+    ]
+    # Simulate that Portal 1 and Portal 2 were already processed in this cycle during earlier sweep
+    processed_keys = {("auto7313", "Portal 1"), ("auto7313", "Portal 2")}
+    dispatched_actionable_stores = set()
+
+    queue = build_queue(outlets, now)
+    available = [
+        item for item in queue
+        if item.merchant_key not in processed_keys
+        or any(sid not in dispatched_actionable_stores for sid in item.actionable_store_ids)
+    ]
+
+    # All 3 portals must be available because all 3 have actionable stores
+    assert len(available) == 3
+    selected = select_next_group(available, now)
+    assert selected is not None
+    assert selected.actionable_count == 1
+

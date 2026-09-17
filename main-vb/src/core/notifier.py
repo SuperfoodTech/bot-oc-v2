@@ -150,10 +150,12 @@ def send_discord_vb_group_summary(
     action: str,
     success_items: list,
     failed_items: list = None,
+    is_guarding: bool = False,
     **kwargs
 ):
     """
     Mengirim notifikasi rekap aksi per-VB Group ke Discord Webhook khusus Virtual Brand.
+    Mendukung mode Group Toggle (Kolektif) dan mode Auto-Guarding (Targeted Outlet).
     Mendukung status Full Success (🟢 BUKA / 🔴 TUTUP) & Partial Success (🟠 SEBAGIAN).
     """
     webhook_url = _get_webhook_url()
@@ -173,22 +175,24 @@ def send_discord_vb_group_summary(
     if success_count == 0 and failed_count == 0:
         return
 
+    entity_label = "OUTLET (GUARDING)" if is_guarding else "GROUP"
+
     if failed_count == 0:
         # Sukses Total (All Succeeded)
         emoji = "🟢" if is_open else "🔴"
-        title = f"{emoji} VB GROUP BERHASIL {action_word} BOT"
+        title = f"{emoji} VB {entity_label} BERHASIL {action_word} BOT"
         color = 3066993 if is_open else 15158332
-        hasil_str = f"{success_count} Berhasil"
+        hasil_str = f"{success_count} Outlet Berhasil {action_word.capitalize()}" if is_guarding else f"{success_count} Berhasil"
     elif success_count == 0:
         # Gagal Total (All Failed)
         emoji = "🔴"
-        title = f"🔴 VB GROUP GAGAL {action_word} BOT"
+        title = f"🔴 VB {entity_label} GAGAL {action_word} BOT"
         color = 15158332  # Merah Alert #E74C3C
-        hasil_str = f"{failed_count} Gagal"
+        hasil_str = f"{failed_count} Outlet Gagal {action_word.capitalize()}" if is_guarding else f"{failed_count} Gagal"
     else:
         # Sebagian Berhasil (Partial Success)
         emoji = "🟠"
-        title = f"🟠 VB GROUP SEBAGIAN BERHASIL {action_word} BOT"
+        title = f"🟠 VB {entity_label} SEBAGIAN BERHASIL {action_word} BOT"
         color = 15105570  # Orange #E67E22
         hasil_str = f"{success_count} Berhasil, {failed_count} Gagal"
 

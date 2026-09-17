@@ -1781,6 +1781,7 @@
         merchant_name: outlet?.merchant_name || 'Portal tidak diketahui',
         shopee_status: outlet?.shopee_actual_status || 'UNKNOWN',
         shopee_regular_hours: outlet?.shopee_regular_hours || {},
+        shopee_special_hours: outlet?.shopee_special_hours || [],
         timezone: outlet?.timezone || 'Asia/Jakarta',
         vercel_status: outlet?.vercel_status || 'ON',
         desired_state: outlet?.desired_state,
@@ -2955,15 +2956,19 @@
       }).format(parsed);
     }
 
-    function updateMetrics(stores) {
-      const outletCount = document.getElementById('tabOutletCount');
-      if (outletCount) outletCount.innerText = stores.length;
+    function updateAgencyStatCards(stores) {
       const metric = id => document.getElementById(id);
-      const statusCategories = stores.map(store => getAdminStatusCategory(store));
-      if (metric('metricTotal')) metric('metricTotal').innerText = stores.length;
+      const statusCategories = (stores || []).map(store => getAdminStatusCategory(store));
+      if (metric('metricTotal')) metric('metricTotal').innerText = (stores || []).length;
       if (metric('metricOpen')) metric('metricOpen').innerText = statusCategories.filter(value => value === 'open').length;
       if (metric('metricClosed')) metric('metricClosed').innerText = statusCategories.filter(value => value === 'closed').length;
-      if (metric('metricSubscription')) metric('metricSubscription').innerText = stores.filter(isStoreSubscriptionActive).length;
+      if (metric('metricSubscription')) metric('metricSubscription').innerText = (stores || []).filter(isStoreSubscriptionActive).length;
+    }
+
+    function updateMetrics(stores) {
+      const outletCount = document.getElementById('tabOutletCount');
+      if (outletCount) outletCount.innerText = (stores || []).length;
+      updateAgencyStatCards(stores);
       populateOutletFilters(stores);
       fetchBotStatus();
     }
@@ -4584,15 +4589,16 @@
     function getHistorySummary(log, actionLabels) {
       const action = String(log?.action || '').toUpperCase();
       const reason = String(log?.reason || '');
+      const isSuccess = log?.success !== false;
       switch (action) {
         case 'ACTION_OPEN':
         case 'OPEN_STORE':
         case 'OPEN':
-          return { title: 'Bot berhasil membuka outlet', subtitle: log.store_name };
+          return { title: isSuccess ? 'Bot berhasil membuka outlet' : 'Bot gagal membuka outlet', subtitle: log.store_name };
         case 'ACTION_CLOSE':
         case 'CLOSE_STORE':
         case 'CLOSE':
-          return { title: 'Bot berhasil menutup outlet', subtitle: log.store_name };
+          return { title: isSuccess ? 'Bot berhasil menutup outlet' : 'Bot gagal menutup outlet', subtitle: log.store_name };
         case 'USER_PAUSE_STORE':
           return { title: 'Outlet ditutup oleh Merchant', subtitle: log.store_name };
         case 'USER_RESUME_STORE':
@@ -4617,6 +4623,7 @@
       const filters = getActiveOutletFilters();
       const baseFiltered = allStores.filter(store => matchesOutletBaseFilters(store, filters));
       const filtered = baseFiltered.filter(store => matchesOutletSummaryFilter(store));
+      updateAgencyStatCards(baseFiltered);
       updateOutletSummaryStrip(baseFiltered);
       updateMobileFilterBadge(filters);
       renderAdminTable(filtered);

@@ -347,6 +347,80 @@ def _derive_display_status_bucket(live_state: str, display_toggle_on: bool, desi
     return "open" if desired_state == "OPEN" else "closed"
 
 
+def parse_special_hours_entry(entry: Any, timezone: ZoneInfo) -> Optional[dict]:
+    if not isinstance(entry, dict):
+        return None
+    try:
+        raw_start = entry.get("date_start")
+        raw_end = entry.get("date_end")
+        if raw_start is None or raw_end is None:
+            return None
+        start_dt = datetime.fromtimestamp(int(raw_start) / 1000, tz=timezone)
+        end_dt = datetime.fromtimestamp(int(raw_end) / 1000, tz=timezone)
+        date_type = int(entry.get("date_type", 1))
+        date_desc = str(entry.get("date_desc") or "").strip()
+        intervals = entry.get("intervals") or []
+        return {
+            "start_dt": start_dt,
+            "end_dt": end_dt,
+            "date_type": date_type,
+            "date_desc": date_desc,
+            "intervals": intervals,
+        }
+    except Exception:
+        return None
+
+
+def get_active_special_hours(special_hours: Any, now_dt: datetime, timezone: ZoneInfo) -> Optional[dict]:
+    if not special_hours:
+        return None
+    raw_list = special_hours
+    if isinstance(raw_list, str):
+        try:
+            raw_list = json.loads(raw_list)
+        except Exception:
+            return None
+    if isinstance(raw_list, dict):
+        raw_list = raw_list.get("special_hours") or []
+    if not isinstance(raw_list, list):
+        return None
+
+    for raw_entry in raw_list:
+        parsed = parse_special_hours_entry(raw_entry, timezone)
+        if not parsed:
+            continue
+        if parsed["start_dt"] <= now_dt <= parsed["end_dt"]:
+            return parsed
+    return None
+
+
+def is_within_special_hours_intervals(active_entry: dict, now_dt: datetime) -> bool:
+    date_type = active_entry.get("date_type", 1)
+    if date_type == 1:
+        # Full day close
+        return False
+
+    intervals = active_entry.get("intervals") or []
+    if not intervals:
+        return False
+
+    current_sec = now_dt.hour * 3600 + now_dt.minute * 60 + now_dt.second
+    has_valid_interval = False
+
+    for inv in intervals:
+        if not isinstance(inv, dict):
+            continue
+        s_sec = int(inv.get("start_relative_sec", 0))
+        e_sec = int(inv.get("end_relative_sec", 0))
+        if s_sec == 0 and e_sec == 0:
+            continue
+        has_valid_interval = True
+        if s_sec <= current_sec <= e_sec:
+            return True
+
+    return False
+
+
 def derive_outlet_runtime_state(
     store: Dict[str, Any],
     now_dt: Optional[datetime] = None,
@@ -364,9 +438,20 @@ def derive_outlet_runtime_state(
     pause_until_label = _format_pause_until_local(pause_until_dt, timezone)
     desired_state = _normalize_desired_state(store.get("vercel_status"), pause_until_dt)
     live_state = _normalize_live_state(store.get("shopee_status"))
-    schedule = normalized_schedule if normalized_schedule is not None else normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
-    schedule_available = _normalized_schedule_has_intervals(schedule)
-    within_schedule = schedule_available and _is_within_normalized_schedule(schedule, now_wib)
+
+    special_hours_data = store.get("shopee_special_hours") or store.get("special_hours")
+    active_special_hours = get_active_special_hours(special_hours_data, now_wib, local_tz)
+
+    if active_special_hours:
+        special_hours_desc = active_special_hours.get("date_desc") or "Jadwal Khusus Shopee"
+        within_schedule = is_within_special_hours_intervals(active_special_hours, now_wib)
+        schedule_available = True
+    else:
+        schedule = normalized_schedule if normalized_schedule is not None else normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
+        schedule_available = _normalized_schedule_has_intervals(schedule)
+        within_schedule = schedule_available and _is_within_normalized_schedule(schedule, now_wib)
+        special_hours_desc = None
+
     schedule_fetch_status = _derive_schedule_fetch_status(store, schedule_available=schedule_available)
     schedule_fetch_error = _clean_schedule_fetch_error(store.get("schedule_fetch_error"))
     is_suspended = bool(store.get("is_suspended")) or str(store.get("suspension_status") or "").upper() == "SUSPENDED"
@@ -421,12 +506,19 @@ def derive_outlet_runtime_state(
             display_note = "Permintaan buka sudah tersimpan. Menunggu bot membuka outlet."
     elif desired_state == "OPEN" and not within_schedule:
         bot_phase = "WAITING_SCHEDULE"
-        status_label = "Sedang Tutup • Di luar jadwal"
+        if active_special_hours:
+            status_label = "Sedang Tutup • Jadwal Khusus"
+            display_note = (
+                f"Di luar jam operasional (Jadwal Khusus Shopee: {special_hours_desc}). "
+                "Toggle aktif kembali saat jadwal operasional dimulai."
+            )
+        else:
+            status_label = "Sedang Tutup • Di luar jadwal"
+            display_note = (
+                "Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai. "
+                "Status live Shopee tetap ditampilkan terpisah."
+            )
         status_tone = "closed"
-        display_note = (
-            "Di luar jadwal. Toggle aktif kembali saat jam operasional dimulai. "
-            "Status live Shopee tetap ditampilkan terpisah."
-        )
     elif desired_state == "MANUAL_OFF":
         bot_phase = "AUTOMATION_OFF"
         status_label = "Sedang Tutup • Otomatisasi nonaktif"
@@ -454,6 +546,8 @@ def derive_outlet_runtime_state(
 
     if is_suspended:
         display_toggle_reason = "SUSPENDED"
+    elif active_special_hours and not within_schedule:
+        display_toggle_reason = "SPECIAL_HOURS"
     elif not schedule_available:
         display_toggle_reason = schedule_fetch_status
     elif not within_schedule:
@@ -1086,6 +1180,8 @@ def get_recent_logs(limit=50, store_ids=None):
             COALESCE(o.long_name, 'Bot system') AS store_name,
             al.action,
             al.target_status AS target_state,
+            al.success,
+            COALESCE(al.error_message, '') AS error_message,
             COALESCE(al.reason, '') AS reason
         FROM automation_logs al
         LEFT JOIN outlets o ON o.id = al.outlet_id
@@ -1196,6 +1292,7 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
             pause_until=s.get("pause_until") or "",
             shopee_regular_hours=s.get("shopee_regular_hours") or {},
+            shopee_special_hours=s.get("shopee_special_hours") or [],
             schedule_fetch_status=s.get("schedule_fetch_status") or SCHEDULE_FETCH_NOT_FETCHED_YET,
             schedule_fetch_attempted_at=s.get("schedule_fetch_attempted_at") or "",
             schedule_fetch_succeeded_at=s.get("schedule_fetch_succeeded_at") or "",
