@@ -32,7 +32,7 @@ Seluruh notifikasi Discord di `main-vb/src/core/notifier.py` dipusatkan secara e
   Hasil: 5 Berhasil
 
   Berhasil Dibuka (5):
-  ✅ [Nama Listing] — [Store ID / Link]
+  ✅ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
   ```
 
 ### 2.2 🔴 VB Group Sukses Total Tutup (`CLOSE / PAUSE`)
@@ -44,7 +44,7 @@ Seluruh notifikasi Discord di `main-vb/src/core/notifier.py` dipusatkan secara e
   Hasil: 5 Berhasil
 
   Berhasil Ditutup (5):
-  ✅ [Nama Listing] — [Store ID / Link]
+  ✅ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
   ```
 
 ### 2.3 🟠 VB Group Sebagian Berhasil Buka (`PARTIAL OPEN`)
@@ -56,10 +56,10 @@ Seluruh notifikasi Discord di `main-vb/src/core/notifier.py` dipusatkan secara e
   Hasil: 3 Berhasil, 2 Gagal
 
   Berhasil Dibuka (3):
-  ✅ [Nama Listing] — [Store ID / Link]
+  ✅ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
 
   Gagal Dibuka (2):
-  ❌ [Nama Listing] — [Store ID / Link]
+  ❌ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
   ```
 
 ### 2.4 🟠 VB Group Sebagian Berhasil Tutup (`PARTIAL CLOSE`)
@@ -71,10 +71,10 @@ Seluruh notifikasi Discord di `main-vb/src/core/notifier.py` dipusatkan secara e
   Hasil: 3 Berhasil, 2 Gagal
 
   Berhasil Ditutup (3):
-  ✅ [Nama Listing] — [Store ID / Link]
+  ✅ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
 
   Gagal Ditutup (2):
-  ❌ [Nama Listing] — [Store ID / Link]
+  ❌ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
   ```
 
 ### 2.5 🔴 VB Group Gagal Total Buka (`ALL FAILED OPEN`)
@@ -86,7 +86,7 @@ Seluruh notifikasi Discord di `main-vb/src/core/notifier.py` dipusatkan secara e
   Hasil: 5 Gagal
 
   Gagal Dibuka (5):
-  ❌ [Nama Listing] — [Store ID / Link]
+  ❌ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
   ```
 
 ### 2.6 🔴 VB Group Gagal Total Tutup (`ALL FAILED CLOSE`)
@@ -98,7 +98,7 @@ Seluruh notifikasi Discord di `main-vb/src/core/notifier.py` dipusatkan secara e
   Hasil: 5 Gagal
 
   Gagal Ditutup (5):
-  ❌ [Nama Listing] — [Store ID / Link]
+  ❌ [Nama Listing] — [Store ID] • [Link](https://shopee.co.id/universal-link/now-food/shop/[Store ID])
   ```
 
 ---

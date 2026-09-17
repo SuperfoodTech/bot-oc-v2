@@ -364,14 +364,53 @@ def _record_pending_brand_action(brand_id: str, store_id: str, store_name: str, 
         })
 
 
-def flush_pending_brand_notifications():
+def get_pending_brand_ids() -> list[str]:
+    """Mengembalikan daftar brand_id yang sedang memiliki aksi tertunda di buffer notifikasi."""
+    with _PENDING_LOCK:
+        return list(_PENDING_BRAND_ACTIONS.keys())
+
+
+def get_brand_store_ids(brand_ids: list[str] | set[str]) -> dict[str, set[str]]:
+    """Mengembalikan mapping {brand_id: set(store_ids)} untuk seluruh outlet aktif di bawah brand terkait."""
+    if not brand_ids:
+        return {}
+    res = {}
+    with connection() as conn:
+        rows = conn.execute("""
+            SELECT bo.vb_brand_id, o.store_id
+            FROM vb_brand_outlets bo
+            JOIN outlets o ON o.id = bo.outlet_id
+            WHERE bo.vb_brand_id = ANY(%s) AND o.is_active = true
+        """, (list(brand_ids),)).fetchall()
+        for r in rows:
+            bid = str(r["vb_brand_id"])
+            if bid not in res:
+                res[bid] = set()
+            if r["store_id"]:
+                res[bid].add(str(r["store_id"]))
+    return res
+
+
+def flush_pending_brand_notifications(brand_ids: list[str] | set[str] | None = None):
     with _PENDING_LOCK:
         if not _PENDING_BRAND_ACTIONS:
             return
-        pending = dict(_PENDING_BRAND_ACTIONS)
-        _PENDING_BRAND_ACTIONS.clear()
-        toggled_brands = set(_BRAND_TOGGLED_IDS)
-        _BRAND_TOGGLED_IDS.clear()
+        if brand_ids is not None:
+            target_ids = set(str(b) for b in brand_ids)
+            pending = {bid: list(acts) for bid, acts in _PENDING_BRAND_ACTIONS.items() if bid in target_ids}
+            for bid in pending:
+                del _PENDING_BRAND_ACTIONS[bid]
+            toggled_brands = {bid for bid in _BRAND_TOGGLED_IDS if bid in target_ids}
+            for bid in toggled_brands:
+                _BRAND_TOGGLED_IDS.discard(bid)
+        else:
+            pending = dict(_PENDING_BRAND_ACTIONS)
+            _PENDING_BRAND_ACTIONS.clear()
+            toggled_brands = set(_BRAND_TOGGLED_IDS)
+            _BRAND_TOGGLED_IDS.clear()
+
+    if not pending:
+        return
 
     try:
         from core.notifier import send_discord_vb_group_summary

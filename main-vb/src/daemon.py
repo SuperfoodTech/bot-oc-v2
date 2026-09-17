@@ -286,6 +286,28 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 cycle_merchant_groups.extend(last_result.get("processed_merchant_groups", []))
                 total_stores_processed += last_result.get("total_stores_processed", 0)
 
+                # Check if any brands with pending actions have completed all actionable stores
+                pending_brand_ids = db.get_pending_brand_ids()
+                if pending_brand_ids:
+                    try:
+                        next_outlets = db.fetch_merchant_outlets_from_db()
+                        next_queue = scheduler.build_queue(next_outlets)
+                        remaining_actionable_sids = set()
+                        for item in next_queue:
+                            for sid in item.actionable_store_ids:
+                                if sid not in dispatched_actionable_stores:
+                                    remaining_actionable_sids.add(sid)
+
+                        brand_store_map = db.get_brand_store_ids(pending_brand_ids)
+                        completed_brands = [
+                            bid for bid in pending_brand_ids
+                            if not (brand_store_map.get(bid, set()) & remaining_actionable_sids)
+                        ]
+                        if completed_brands:
+                            db.flush_pending_brand_notifications(brand_ids=completed_brands)
+                    except Exception as brand_flush_err:
+                        log.warning(f"⚠️ Error in immediate brand-completion flush: {brand_flush_err}")
+
                 # One --once invocation completes one full portal sweep.
 
             # Flush aggregated notifications for all processed brands in this cycle

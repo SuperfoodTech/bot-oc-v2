@@ -139,6 +139,73 @@ class TestVbNotificationFlush(unittest.TestCase):
         self.assertEqual(len(call_kwargs["success_items"]), 3)
         self.assertEqual(len(call_kwargs["failed_items"]), 0)
 
+    @patch("core.notifier.send_discord_vb_group_summary")
+    def test_flush_pending_brand_notifications_targeted_brand_ids(self, mock_send_discord):
+        # 1. Setup pending actions for 2 different brands
+        db._record_pending_brand_action(
+            brand_id="brand-A",
+            store_id="101",
+            store_name="Outlet A",
+            action="ACTION_OPEN",
+            target_state="OPEN",
+            success=True,
+            error_message=None,
+        )
+        db._record_pending_brand_action(
+            brand_id="brand-B",
+            store_id="201",
+            store_name="Outlet B",
+            action="ACTION_CLOSE",
+            target_state="CLOSED",
+            success=True,
+            error_message=None,
+        )
+
+        self.assertEqual(set(db.get_pending_brand_ids()), {"brand-A", "brand-B"})
+
+        mock_conn = MagicMock()
+        mock_brand_A = {"id": "brand-A", "name": "Brand Alpha", "applied_status": "ON"}
+
+        def mock_execute(query, params=None):
+            m = MagicMock()
+            if "FROM vb_brands" in query and params and params[0] == "brand-A":
+                m.fetchone.return_value = mock_brand_A
+            elif "FROM vb_brand_outlets" in query:
+                m.fetchall.return_value = [{"vb_brand_id": "brand-A", "store_id": "101"}]
+            else:
+                m.fetchone.return_value = None
+                m.fetchall.return_value = []
+            return m
+
+        mock_conn.execute.side_effect = mock_execute
+
+        # Flush ONLY brand-A
+        with patch.object(db, "connection") as mock_conn_fn:
+            mock_conn_fn.return_value.__enter__.return_value = mock_conn
+            db.flush_pending_brand_notifications(brand_ids=["brand-A"])
+
+        mock_send_discord.assert_called_once()
+        self.assertEqual(mock_send_discord.call_args.kwargs["group_name"], "Brand Alpha")
+
+        # Verify brand-B is STILL in pending queue
+        self.assertEqual(db.get_pending_brand_ids(), ["brand-B"])
+
+    def test_get_brand_store_ids_mapping(self):
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [
+            {"vb_brand_id": "b-1", "store_id": "101"},
+            {"vb_brand_id": "b-1", "store_id": "102"},
+            {"vb_brand_id": "b-2", "store_id": "201"},
+        ]
+        with patch.object(db, "connection") as mock_conn_fn:
+            mock_conn_fn.return_value.__enter__.return_value = mock_conn
+            res = db.get_brand_store_ids(["b-1", "b-2"])
+
+        self.assertEqual(res, {
+            "b-1": {"101", "102"},
+            "b-2": {"201"},
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

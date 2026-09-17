@@ -363,7 +363,7 @@ def request_brand_status_public(slug_or_id: str, status: str, pause_until=None) 
             row = conn.execute(
                 """UPDATE vb_brands
                    SET requested_status=%s, requested_pause_until=%s,
-                       requested_at=now(), requested_by='BRAND_DASHBOARD', updated_at=now()
+                       requested_at=now(), requested_by=NULL, updated_at=now()
                    WHERE id=%s AND is_active=true
                    RETURNING id, name, applied_status, requested_status,
                              requested_at, requested_pause_until""",

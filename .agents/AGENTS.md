@@ -24,7 +24,20 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.4`.
+Latest documented release: `1.23.7`.
+
+Public Virtual Brand Dashboard Toggle UUID & Response Resilience:
+- Toggle status brand dari Dashboard Publik Virtual Brand (`/brand/{slug}`) menetapkan `requested_by = NULL` pada tabel `vb_brands` untuk memenuhi batasan tipe data `UUID` PostgreSQL (`dashboard_accounts.id`).
+- Parsing respons pada frontend `brand_dashboard.html` menerapkan penanganan asinkron yang aman (`try/catch` pada `res.json()`) untuk mencegah crash akibat respons error berformat non-JSON dari server.
+
+Immediate Brand-Completion Notification Delivery:
+- Notifikasi Discord Virtual Brand (`send_discord_vb_group_summary`) dikirimkan secara **instan (< 1-2 detik)** begitu seluruh outlet yang menjadi target aksi dari suatu brand selesai dieksekusi lintas portal, tanpa harus menunggu seluruh siklus keliling patroli (`Cycle`) selesai.
+- Penahanan notifikasi (*hold buffer*) tetap aktif selama masih ada outlet milik brand tersebut di portal lain yang belum selesai diproses, menjamin agregasi atomik tetap terjaga 1 pesan per brand.
+- Pelacakan dilakukan via `get_pending_brand_ids()` dan `get_brand_store_ids()` di `main-vb/src/db.py`, lalu di-flush spesifik via `db.flush_pending_brand_notifications(brand_ids=completed_brands)` di dalam perulangan `main-vb/src/daemon.py`.
+
+ShopeeFood Hyperlink in Virtual Brand Discord Notifications:
+- Seluruh pesan notifikasi Discord bot Virtual Brand (`send_discord_vb_group_summary`) menyertakan tautan ShopeeFood `[Link]` di sebelah kanan Store ID (`✅ Nama Outlet — <store_id> • [Link](https://shopee.co.id/universal-link/now-food/shop/<store_id>)`), baik pada mode Brand Toggle maupun Auto-Guarding (pada daftar berhasil maupun gagal).
+- Jika item tidak memiliki Store ID, format fallback tetap bersih tanpa menghasilkan broken/empty link.
 
 Virtual Brand Dedicated Dashboard UI Simplification:
 - Hero Card Brand (`/brand/{slug}`) tampil bersih (*clean*) dan minimalis tanpa kartu metrik status live ("Live Buka", "Perlu Cek", "Live Tutup") dan tanpa accordion tombol/tabel detail outlet.

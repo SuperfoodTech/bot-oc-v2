@@ -95,3 +95,49 @@ def test_vb_rest_of_day_uses_reference_outlet_schedule(monkeypatch):
     assert captured["brand_id"] == brand_id
     assert captured["status"] == "PAUSED"
     assert captured["pause_until"] == datetime(2026, 9, 1, 7, 0, 0, tzinfo=ZoneInfo("Asia/Jakarta"))
+
+
+def test_public_brand_toggle_contract(monkeypatch):
+    client = TestClient(main_module.app)
+    slug = "ayam-bakar-ori"
+    captured: dict[str, object] = {}
+
+    def fake_get_brand(slug_or_id: str):
+        return {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Ayam Bakar Ori",
+            "slug": "ayam-bakar-ori",
+            "is_schedule_locked": False,
+            "outlets": [],
+        }
+
+    def fake_request_brand_status_public(slug_or_id: str, status: str, pause_until=None):
+        captured["slug_or_id"] = slug_or_id
+        captured["status"] = status
+        captured["pause_until"] = pause_until
+        return {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "name": "Ayam Bakar Ori",
+            "applied_status": "PAUSED",
+            "requested_status": status,
+            "requested_at": None,
+            "requested_pause_until": pause_until,
+        }
+
+    monkeypatch.setattr(main_module.vb, "get_brand_by_slug_or_id", fake_get_brand)
+    monkeypatch.setattr(main_module.vb, "request_brand_status_public", fake_request_brand_status_public)
+
+    # Test ON toggle
+    res_on = client.post(f"/api/v1/brand/{slug}/toggle", json={"status": "ON"})
+    assert res_on.status_code == 200
+    assert captured["slug_or_id"] == slug
+    assert captured["status"] == "ON"
+    assert res_on.json()["success"] is True
+
+    # Test PAUSED toggle (30_min)
+    res_paused = client.post(f"/api/v1/brand/{slug}/toggle", json={"status": "PAUSED", "duration_type": "30_min"})
+    assert res_paused.status_code == 200
+    assert captured["status"] == "PAUSED"
+    assert captured["pause_until"] is not None
+    assert res_paused.json()["success"] is True
+

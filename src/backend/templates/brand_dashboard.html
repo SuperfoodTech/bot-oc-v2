@@ -185,12 +185,17 @@
       }
       try {
         const res = await fetch(`/api/v1/brand/${encodeURIComponent(slug)}`);
-        if (!res.ok) {
-          throw new Error(res.status === 404 ? 'Brand tidak ditemukan.' : 'Gagal memuat data brand.');
+        let json = null;
+        try {
+          json = await res.json();
+        } catch (_) {
+          json = null;
         }
-        const json = await res.json();
-        if (!json.success || !json.brand) {
-          throw new Error('Data brand tidak tersedia.');
+        if (!res.ok) {
+          throw new Error((json && json.detail) ? json.detail : (res.status === 404 ? 'Brand tidak ditemukan.' : 'Gagal memuat data brand.'));
+        }
+        if (!json || !json.success || !json.brand) {
+          throw new Error((json && json.detail) || 'Data brand tidak tersedia.');
         }
         currentBrandData = json.brand;
         renderBrandDashboard(currentBrandData);
@@ -406,9 +411,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
-        if (!res.ok || !json.success) {
-          throw new Error(json.detail || 'Gagal mengubah status brand.');
+        let json = null;
+        try {
+          json = await res.json();
+        } catch (_) {
+          json = null;
+        }
+        if (!res.ok || !json || !json.success) {
+          throw new Error((json && json.detail) || 'Gagal mengubah status brand.');
         }
         currentBrandData = json.brand;
         showToast(status === 'ON' ? 'Permintaan buka brand berhasil dikirim ke bot.' : 'Brand berhasil ditutup sementara.', 'success');

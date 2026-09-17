@@ -12,6 +12,7 @@ import hashlib
 import threading
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime
 
 # Cache deduplikasi notifikasi: {hash_signature: timestamp}
@@ -367,15 +368,23 @@ def send_discord_vb_group_summary(
 
     def _format_item(item):
         if isinstance(item, dict):
-            name = item.get("name", "Listing")
-            info = item.get("store_id") or item.get("link") or ""
+            name = item.get("name") or "Listing"
+            store_id = str(item.get("store_id") or "").strip()
+            info = store_id or str(item.get("link") or "").strip()
         elif isinstance(item, (tuple, list)):
-            name = str(item[0])
-            info = str(item[1]) if len(item) > 1 else ""
+            name = str(item[0]) if len(item) > 0 else "Listing"
+            store_id = str(item[1]).strip() if len(item) > 1 else ""
+            info = store_id
         else:
             name = str(item)
+            store_id = ""
             info = ""
-        return f"{name} — {info}".strip(" —")
+        formatted = f"{name} — {info}".strip(" —") if (name or info) else "Listing"
+        if store_id:
+            safe_id = urllib.parse.quote(store_id)
+            link_md = f" • [Link](https://shopee.co.id/universal-link/now-food/shop/{safe_id})"
+            return f"{formatted}{link_md}"
+        return formatted if formatted else "Listing"
 
     if success_count > 0:
         lines.append(f"**Berhasil {action_word} ({success_count}):**")
