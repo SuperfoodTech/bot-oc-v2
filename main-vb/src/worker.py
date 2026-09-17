@@ -263,6 +263,8 @@ def sync_all_stores(
     execute_actions: bool = True,
     default_interval_seconds: Optional[int] = None,
     target_groups: Optional[set[tuple[str, str]]] = None,
+    target_store_ids: Optional[set[str] | list[str] | tuple[str, ...]] = None,
+    force_schedule_refresh: bool = False,
 ) -> Dict[str, Any]:
     if not SYNC_LOCK.acquire(blocking=False):
         log.warning("⏭️ [BACKEND WORKER] Sync skipped because another cycle is still in progress.")
@@ -302,6 +304,12 @@ def sync_all_stores(
         actions_taken = []
         watched_outlets: List[MerchantOutlet] = []
 
+        normalized_target_store_ids = (
+            {str(sid).strip() for sid in target_store_ids if str(sid).strip()}
+            if target_store_ids is not None
+            else None
+        )
+
         # Group outlets by account and merchant portal (nama_portal)
         # Format: { (username, nama_portal): [outlet1, outlet2, ...] }
         grouped_outlets: Dict[tuple, List[MerchantOutlet]] = {}
@@ -325,8 +333,23 @@ def sync_all_stores(
                 if key in target_groups
             }
 
+        if normalized_target_store_ids is not None:
+            grouped_outlets = {
+                key: [
+                    o for o in merchant_outlets
+                    if str(o.store_id).strip() in normalized_target_store_ids
+                ]
+                for key, merchant_outlets in grouped_outlets.items()
+            }
+            grouped_outlets = {
+                key: merchant_outlets
+                for key, merchant_outlets in grouped_outlets.items()
+                if merchant_outlets
+            }
+
         # Process each merchant portal group
         for (username, portal_name), merchant_outlets in grouped_outlets.items():
+
             log.info(f"🏬 [MERCHANT GROUP] Processing {len(merchant_outlets)} outlets for Merchant Portal: '{portal_name}' (Account: {username})...")
 
             cached = ACTIVE_SESSIONS.get(username)
@@ -488,138 +511,144 @@ def sync_all_stores(
                 outlet.regular_hours = last_known_regular_hours
                 outlet.shopee_regular_hours = last_known_regular_hours
                 schedule_identity_valid = True
+                needs_schedule_fetch = (
+                    force_schedule_refresh
+                    or (not last_known_schedule_available and current_schedule_fetch_status != "FETCHED_EMPTY")
+                    or current_schedule_fetch_status in ("NOT_FETCHED_YET", "FETCH_RETRYING", "STATUS_UNKNOWN", "")
+                )
 
-                if driver_ready and driver:
-                    try:
-                        shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
-                        if isinstance(shopee_hours, dict) and "regular_hours" in shopee_hours:
-                            normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
-                            if not any(normalized_hours.values()):
-                                _mark_schedule_fetch_empty(outlet)
-                            else:
-                                outlet.regular_hours = normalized_hours
-                                outlet.shopee_regular_hours = normalized_hours
-                                outlet.schedule_fetch_status = "READY"
+                if needs_schedule_fetch:
+                    if driver_ready and driver:
+                        try:
+                            shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
+                            if isinstance(shopee_hours, dict) and "regular_hours" in shopee_hours:
+                                normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
+                                if not any(normalized_hours.values()):
+                                    _mark_schedule_fetch_empty(outlet)
+                                else:
+                                    outlet.regular_hours = normalized_hours
+                                    outlet.shopee_regular_hours = normalized_hours
+                                    outlet.schedule_fetch_status = "READY"
 
-                                try:
-                                    db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
-                                except Exception as persist_err:
-                                    log.warning(
-                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Jadwal Shopee Store {outlet.store_id} berhasil diambil "
-                                        f"tetapi gagal disimpan ke DB: {persist_err}"
+                                    try:
+                                        db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                                    except Exception as persist_err:
+                                        log.warning(
+                                            f"  ⚠️ [REGULAR HOURS STATUS SYNC] Jadwal Shopee Store {outlet.store_id} berhasil diambil "
+                                            f"tetapi gagal disimpan ke DB: {persist_err}"
+                                        )
+                                    else:
+                                        log.info(
+                                            f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan "
+                                            f"({sum(bool(v) for v in normalized_hours.values())} hari aktif)."
+                                        )
+                            elif shopee_hours is None:
+                                if current_schedule_fetch_status == "FETCHED_EMPTY":
+                                    log.info(
+                                        f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} mempertahankan status jadwal kosong "
+                                        "karena fetch saat ini tidak mengembalikan data."
+                                    )
+                                elif last_known_schedule_available:
+                                    log.info(
+                                        f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "
+                                        "yang valid karena fetch saat ini tidak mengembalikan data."
                                     )
                                 else:
-                                    log.info(
-                                        f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan "
-                                        f"({sum(bool(v) for v in normalized_hours.values())} hari aktif)."
+                                    _mark_schedule_fetch_retry(outlet, "Shopee tidak mengembalikan data jadwal.")
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
+                                        "Bot akan retry fetch pada patroli berikutnya."
                                     )
-                        elif shopee_hours is None:
-                            if current_schedule_fetch_status == "FETCHED_EMPTY":
-                                log.info(
-                                    f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} mempertahankan status jadwal kosong "
-                                    "karena fetch saat ini tidak mengembalikan data."
-                                )
-                            elif last_known_schedule_available:
-                                log.info(
-                                    f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "
-                                    "yang valid karena fetch saat ini tidak mengembalikan data."
-                                )
                             else:
-                                _mark_schedule_fetch_retry(outlet, "Shopee tidak mengembalikan data jadwal.")
-                                log.warning(
-                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
-                                    "Bot akan retry fetch pada patroli berikutnya."
+                                if current_schedule_fetch_status == "FETCHED_EMPTY":
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
+                                        "Status jadwal kosong terakhir dipertahankan."
+                                    )
+                                elif last_known_schedule_available:
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
+                                        "Tetap memakai jadwal terakhir yang valid."
+                                    )
+                                else:
+                                    _mark_schedule_fetch_retry(outlet, "Response jadwal Shopee tidak valid.")
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
+                                        "Response tidak valid dan bot akan retry."
+                                    )
+                        except store_status.StoreIdentityMismatch as identity_err:
+                            schedule_identity_valid = False
+                            if not last_known_schedule_available and current_schedule_fetch_status != "FETCHED_EMPTY":
+                                _mark_schedule_fetch_retry(
+                                    outlet,
+                                    f"Store identity mismatch saat fetch jadwal: {identity_err}",
                                 )
-                        else:
+                            log.error(
+                                f"  ❌ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: {identity_err}. "
+                                "Tidak ada decision/action yang dijalankan memakai jadwal yang tidak terpercaya."
+                            )
+                        except Exception as hours_err:
                             if current_schedule_fetch_status == "FETCHED_EMPTY":
                                 log.warning(
-                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
+                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
                                     "Status jadwal kosong terakhir dipertahankan."
                                 )
                             elif last_known_schedule_available:
                                 log.warning(
-                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
+                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
                                     "Tetap memakai jadwal terakhir yang valid."
                                 )
                             else:
-                                _mark_schedule_fetch_retry(outlet, "Response jadwal Shopee tidak valid.")
+                                _mark_schedule_fetch_retry(outlet, str(hours_err))
                                 log.warning(
                                     f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
-                                    "Response tidak valid dan bot akan retry."
+                                    "Bot akan retry setelah fetch gagal."
                                 )
-                    except store_status.StoreIdentityMismatch as identity_err:
-                        schedule_identity_valid = False
-                        if not last_known_schedule_available and current_schedule_fetch_status != "FETCHED_EMPTY":
-                            _mark_schedule_fetch_retry(
-                                outlet,
-                                f"Store identity mismatch saat fetch jadwal: {identity_err}",
-                            )
-                        log.error(
-                            f"  ❌ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: {identity_err}. "
-                            "Tidak ada decision/action yang dijalankan memakai jadwal yang tidak terpercaya."
-                        )
-                    except Exception as hours_err:
+
+                        if schedule_identity_valid:
+                            try:
+                                special_res = store_status.get_special_hours(driver, store_id=outlet.store_id)
+                                if isinstance(special_res, dict):
+                                    special_list = special_res.get("special_hours", [])
+                                    outlet.shopee_special_hours = special_list
+                                    try:
+                                        db.update_shopee_special_hours(outlet.store_id, special_list)
+                                    except Exception as sp_persist_err:
+                                        log.warning(
+                                            f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Jadwal khusus Shopee Store {outlet.store_id} berhasil diambil "
+                                            f"tetapi gagal disimpan ke DB: {sp_persist_err}"
+                                        )
+                                    else:
+                                        log.info(
+                                            f"  ✅ [SPECIAL HOURS STATUS SYNC] Store {outlet.store_id} jadwal khusus Shopee tersimpan "
+                                            f"({len(special_list)} entri)."
+                                        )
+                            except store_status.StoreIdentityMismatch as sp_identity_err:
+                                schedule_identity_valid = False
+                                log.error(
+                                    f"  ❌ [SPECIAL HOURS QUARANTINE] Store {outlet.store_id} identity mismatch pada jadwal khusus: {sp_identity_err}"
+                                )
+                            except Exception as sp_err:
+                                log.warning(
+                                    f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Gagal menarik jadwal khusus Shopee Store {outlet.store_id}: {sp_err}"
+                                )
+                    else:
                         if current_schedule_fetch_status == "FETCHED_EMPTY":
-                            log.warning(
-                                f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
-                                "Status jadwal kosong terakhir dipertahankan."
+                            log.info(
+                                f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} mempertahankan status jadwal kosong "
+                                "karena sesi browser belum siap."
                             )
                         elif last_known_schedule_available:
-                            log.warning(
-                                f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
-                                "Tetap memakai jadwal terakhir yang valid."
+                            log.info(
+                                f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "
+                                "yang valid karena sesi browser belum siap."
                             )
                         else:
-                            _mark_schedule_fetch_retry(outlet, str(hours_err))
+                            _mark_schedule_fetch_retry(outlet, "Sesi browser belum siap untuk fetch jadwal.")
                             log.warning(
-                                f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
-                                "Bot akan retry setelah fetch gagal."
+                                f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid "
+                                "karena sesi browser belum siap. Bot akan retry."
                             )
-
-                    if schedule_identity_valid:
-                        try:
-                            special_res = store_status.get_special_hours(driver, store_id=outlet.store_id)
-                            if isinstance(special_res, dict):
-                                special_list = special_res.get("special_hours", [])
-                                outlet.shopee_special_hours = special_list
-                                try:
-                                    db.update_shopee_special_hours(outlet.store_id, special_list)
-                                except Exception as sp_persist_err:
-                                    log.warning(
-                                        f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Jadwal khusus Shopee Store {outlet.store_id} berhasil diambil "
-                                        f"tetapi gagal disimpan ke DB: {sp_persist_err}"
-                                    )
-                                else:
-                                    log.info(
-                                        f"  ✅ [SPECIAL HOURS STATUS SYNC] Store {outlet.store_id} jadwal khusus Shopee tersimpan "
-                                        f"({len(special_list)} entri)."
-                                    )
-                        except store_status.StoreIdentityMismatch as sp_identity_err:
-                            schedule_identity_valid = False
-                            log.error(
-                                f"  ❌ [SPECIAL HOURS QUARANTINE] Store {outlet.store_id} identity mismatch pada jadwal khusus: {sp_identity_err}"
-                            )
-                        except Exception as sp_err:
-                            log.warning(
-                                f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Gagal menarik jadwal khusus Shopee Store {outlet.store_id}: {sp_err}"
-                            )
-                else:
-                    if current_schedule_fetch_status == "FETCHED_EMPTY":
-                        log.info(
-                            f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} mempertahankan status jadwal kosong "
-                            "karena sesi browser belum siap."
-                        )
-                    elif last_known_schedule_available:
-                        log.info(
-                            f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "
-                            "yang valid karena sesi browser belum siap."
-                        )
-                    else:
-                        _mark_schedule_fetch_retry(outlet, "Sesi browser belum siap untuk fetch jadwal.")
-                        log.warning(
-                            f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid "
-                            "karena sesi browser belum siap. Bot akan retry."
-                        )
 
                 if driver_ready and driver:
                     live_identity_valid = True

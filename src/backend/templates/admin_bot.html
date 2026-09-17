@@ -478,8 +478,8 @@
     document.addEventListener("DOMContentLoaded", () => {
       showLogsSkeleton();
       loadFullBotLogs();
-      setInterval(fetchBotStatus, 15000);
-      setInterval(fetchBotActivity, 30000);
+      setInterval(fetchBotStatus, 60000);
+      setInterval(fetchBotActivity, 60000);
       toggleAutoRefreshLogs(document.getElementById('autoRefreshCheckbox'));
     });
 

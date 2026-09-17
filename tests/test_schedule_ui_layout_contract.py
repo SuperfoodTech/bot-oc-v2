@@ -115,8 +115,7 @@ def test_vb_dashboard_uses_schedule_drawer_without_detail_panel_markup():
     assert "<span>Jam Hari Ini</span>" in dashboard_template
     assert "shopee_regular_hours: outlet?.shopee_regular_hours || {}" in dashboard_template
     assert "os.shopee_regular_hours" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
-    assert "os.shopee_special_hours" in (PROJECT_ROOT / "src/backend/vb.py").read_text()
-    assert "<span>Jadwal Khusus</span>" in dashboard_template
+    assert "<span>Link Brand</span>" in dashboard_template
     assert "<span>Link OFD</span>" in dashboard_template
     assert "vb-store-ofd" in dashboard_template
 

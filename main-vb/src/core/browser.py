@@ -726,6 +726,8 @@ def _init_driver(headless: bool = None):
     options.add_argument("--disk-cache-size=52428800")
     options.add_argument("--media-cache-size=52428800")
     options.add_argument("--disable-features=Translate,OptimizationHints,MediaRouter")
+    options.add_argument("--renderer-process-limit=1")
+    options.add_argument("--disable-site-isolation-trials")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
     if headless:
         options.add_argument("--headless=new")
@@ -772,6 +774,23 @@ def _init_driver(headless: bool = None):
         })
     except Exception:
         pass
+    try:
+        driver.execute_cdp_cmd("Network.enable", {})
+        driver.execute_cdp_cmd("Network.setBlockedURLs", {
+            "urls": [
+                "*.woff",
+                "*.woff2",
+                "*.ttf",
+                "*.eot",
+                "*google-analytics.com*",
+                "*googletagmanager.com*",
+                "*facebook.net*",
+                "*sensorsdata*",
+                "*doubleclick.net*",
+            ]
+        })
+    except Exception as e:
+        log.warning(f"⚠️ Failed to enable CDP Network blocking: {e}")
     return driver
 
 

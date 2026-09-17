@@ -3552,35 +3552,7 @@ body {
 .vb-control {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-}
-
-.vb-control .switch-toggle {
-  width: 46px;
-  height: 26px;
-}
-
-.vb-control .slider::before {
-  bottom: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-}
-
-.vb-control .switch-toggle input:checked + .slider {
-  background: #22b56f;
-}
-
-.vb-control .switch-toggle input:checked + .slider::before {
-  transform: translateX(20px);
-}
-
-.vb-control-label {
-  min-width: 28px;
-  color: #6b7280;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  justify-content: flex-end;
 }
 
 .vb-brand-detail {
@@ -3613,7 +3585,7 @@ body {
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.25fr) minmax(85px, 0.65fr) minmax(150px, 1.1fr) minmax(105px, 0.65fr) minmax(115px, 0.75fr) minmax(145px, 0.9fr);
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.25fr) minmax(85px, 0.65fr) minmax(150px, 1.1fr) minmax(105px, 0.65fr) minmax(90px, 0.55fr) minmax(145px, 0.9fr);
   gap: 16px;
   align-items: center;
   padding: 12px 18px;
@@ -3647,6 +3619,7 @@ body {
 .vb-store-status,
 .vb-store-hours,
 .vb-store-special-hours,
+.vb-store-brand-link,
 .vb-store-ofd,
 .vb-store-actions {
   min-width: 0;
@@ -3670,6 +3643,7 @@ body {
 .vb-store-status,
 .vb-store-hours,
 .vb-store-special-hours,
+.vb-store-brand-link,
 .vb-store-ofd,
 .vb-store-actions {
   display: grid;
@@ -4164,13 +4138,14 @@ body.vb-schedule-open {
   }
 
   .vb-brand-toggle {
-    display: grid;
-    justify-items: stretch;
+    display: flex;
+    justify-content: flex-end;
   }
 
   .vb-control {
-    justify-content: space-between;
-    width: 100%;
+    display: inline-flex;
+    justify-content: flex-end;
+    width: auto;
   }
 
   .vb-store-table {
@@ -7530,6 +7505,49 @@ body.vb-schedule-open {
   background: rgba(239, 68, 68, 0.12);
 }
 
+/* Link Brand (Virtual Brand Dashboard) styling for admin table - compact & subtle */
+.admin-table-brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 150ms ease, background-color 150ms ease;
+  width: fit-content;
+}
+
+.admin-table-brand-link svg {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  opacity: 0.85;
+}
+
+.admin-table-brand-link:hover {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.admin-table-brand-link:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+}
+
+:root[data-theme="dark"] .admin-table-brand-link {
+  color: #60a5fa;
+}
+
+:root[data-theme="dark"] .admin-table-brand-link:hover {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+}
+
 .admin-mobile-shopeefood-action {
   padding: 10px 14px;
   border-top: 1px solid var(--line, #e2e8f0);
@@ -10046,4 +10064,565 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     overflow-x: hidden;
     overflow-y: visible;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   VIRTUAL BRAND PUBLIC DASHBOARD STYLES (/brand/{slug})
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.brand-dashboard-body {
+  background-color: var(--page-bg, #f8fafc);
+  color: var(--ink, #0f172a);
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.brand-dashboard-shell {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.brand-loading-panel,
+.brand-error-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.brand-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(190, 26, 26, 0.15);
+  border-top-color: var(--primary, #be1a1a);
+  border-radius: 50%;
+  animation: mobile-fetch-spin 800ms linear infinite;
+  margin-bottom: 14px;
+}
+
+.brand-error-icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.brand-error-panel h2 {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  color: var(--ink, #0f172a);
+}
+
+.brand-error-panel p {
+  font-size: 13px;
+  color: var(--muted, #64748b);
+  margin: 0;
+}
+
+/* Hero Card */
+.brand-hero-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.brand-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.brand-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.brand-hero-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.brand-hero-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink, #0f172a);
+  margin: 0;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.brand-hero-toggle-wrap {
+  flex: 0 0 auto;
+  padding-top: 4px;
+}
+
+/* 3 Metrics Row */
+.brand-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.brand-metric-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 6px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.brand-metric-pill.is-opened {
+  background: #eefaf0;
+  color: #15803d;
+  border: 1px solid rgba(22, 163, 74, 0.15);
+}
+
+.brand-metric-pill.is-failure {
+  background: #fff8eb;
+  color: #b45309;
+  border: 1px solid rgba(217, 119, 6, 0.15);
+}
+
+.brand-metric-pill.is-closed {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid rgba(100, 116, 139, 0.15);
+}
+
+.brand-metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+.brand-metric-value {
+  font-size: 18px;
+  font-weight: 900;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+
+.brand-hero-actions {
+  margin-top: 16px;
+}
+
+.btn-brand-schedule {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--subtle, #f1f5f9);
+  color: var(--ink, #0f172a);
+  border: 1px solid var(--line, #e2e8f0);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.btn-brand-schedule:hover {
+  background: #e2e8f0;
+}
+
+/* Accordion Outlets */
+.brand-outlets-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 16px;
+  padding: 0;
+  margin-bottom: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.brand-accordion-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink, #0f172a);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.brand-accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink, #0f172a);
+}
+
+.brand-accordion-chevron {
+  color: var(--muted, #64748b);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.brand-outlets-collapse {
+  border-top: 1px solid var(--line, #e2e8f0);
+  padding: 0 16px 14px;
+}
+
+.brand-outlets-table-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 4px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted, #64748b);
+  border-bottom: 1px solid var(--line, #f1f5f9);
+}
+
+.brand-outlet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line, #f1f5f9);
+  gap: 12px;
+}
+
+.brand-outlet-row:last-child {
+  border-bottom: none;
+}
+
+.brand-outlet-col-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-outlet-portal {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.brand-outlet-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.brand-outlet-store-id {
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--muted, #64748b);
+  font-weight: 600;
+}
+
+.brand-outlet-col-status {
+  flex: 0 0 auto;
+}
+
+.brand-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.brand-status-pill.is-open {
+  background: #eefaf0;
+  color: #15803d;
+}
+
+.brand-status-pill.is-paused {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.brand-status-pill.is-closed {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.brand-status-pill.is-warning {
+  background: #fff8eb;
+  color: #b45309;
+}
+
+.brand-outlet-empty {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+
+/* Activity Card */
+.brand-activity-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.history-store-id {
+  display: block;
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  margin-top: 1px;
+}
+
+/* Bottom Sheet */
+.brand-bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  animation: fadeIn 150ms ease;
+}
+
+.brand-bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--card-bg, #ffffff);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.brand-bottom-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #cbd5e1;
+  margin: 10px auto 4px;
+  cursor: pointer;
+}
+
+.brand-bottom-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 14px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.brand-bottom-sheet-title-group h3 {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--ink, #0f172a);
+}
+
+.brand-bottom-sheet-title-group p {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  margin: 2px 0 0;
+}
+
+.brand-bottom-sheet-close {
+  background: transparent;
+  border: none;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-bottom-sheet-close:hover {
+  color: var(--ink, #0f172a);
+  background: var(--subtle, #f1f5f9);
+}
+
+.brand-bottom-sheet-body {
+  padding: 16px 20px 28px;
+  overflow-y: auto;
+  max-height: calc(85vh - 70px);
+}
+
+.brand-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.brand-schedule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--subtle, #f8fafc);
+  font-size: 12px;
+}
+
+.brand-schedule-row.is-today {
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.brand-schedule-day {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.today-tag {
+  font-size: 9px;
+  font-weight: 800;
+  background: #2563eb;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.brand-schedule-time {
+  color: var(--muted, #64748b);
+  font-weight: 600;
+}
+
+.brand-special-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line, #e2e8f0);
+}
+
+.brand-special-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink, #0f172a);
+  margin: 0 0 8px;
+}
+
+.brand-special-schedule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--subtle, #f8fafc);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.brand-special-date {
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.brand-special-time {
+  color: #ea580c;
+  font-weight: 700;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Dark Theme Overrides */
+:root[data-theme="dark"] .brand-hero-card,
+:root[data-theme="dark"] .brand-outlets-card,
+:root[data-theme="dark"] .brand-activity-card,
+:root[data-theme="dark"] .brand-bottom-sheet {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+:root[data-theme="dark"] .brand-hero-title,
+:root[data-theme="dark"] .brand-accordion-title,
+:root[data-theme="dark"] .brand-outlet-name,
+:root[data-theme="dark"] .brand-schedule-day,
+:root[data-theme="dark"] .brand-special-title,
+:root[data-theme="dark"] .brand-special-date,
+:root[data-theme="dark"] .brand-bottom-sheet-title-group h3 {
+  color: #f1f5f9;
+}
+
+:root[data-theme="dark"] .btn-brand-schedule {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+:root[data-theme="dark"] .btn-brand-schedule:hover {
+  background: #475569;
+}
+
+:root[data-theme="dark"] .brand-metric-pill.is-closed {
+  background: #0f172a;
+  color: #94a3b8;
+  border-color: #334155;
+}
+
+:root[data-theme="dark"] .brand-status-pill.is-closed {
+  background: #334155;
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .brand-schedule-row,
+:root[data-theme="dark"] .brand-special-schedule-row {
+  background: #0f172a;
+}
+
+:root[data-theme="dark"] .brand-bottom-sheet-handle {
+  background: #475569;
 }

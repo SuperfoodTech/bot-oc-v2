@@ -527,7 +527,7 @@
     let autoRefreshTimer = null;
     let adminEventSource = null;
     let storeFetchGeneration = 0;
-    const ADMIN_OUTLET_SYNC_REFRESH_MS = 15000;
+    const ADMIN_OUTLET_SYNC_REFRESH_MS = 60000;
     const pendingAdminToggleStoreIds = new Set();
     const deferredAdminOutletEvents = new Map();
     const OUTLET_FILTER_FIELD_MAP = {
@@ -1243,12 +1243,23 @@
       loadStoresData();
       startAdminEventStream();
       loadAdminProfile();
-      setInterval(fetchBotStatus, 15000);
+      setInterval(fetchBotStatus, 60000);
       autoRefreshTimer = window.setInterval(() => {
         if (document.visibilityState !== 'visible') return;
         if (getAdminActiveTab() !== 'outlets' || pendingAdminToggleStoreIds.size) return;
         loadStoresData(true);
       }, ADMIN_OUTLET_SYNC_REFRESH_MS);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          if (getAdminActiveTab() === 'outlets' && !pendingAdminToggleStoreIds.size) {
+            loadStoresData(true);
+          } else if (getAdminActiveTab() === 'vb') {
+            loadVBData(true);
+          }
+          fetchBotStatus();
+        }
+      });
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
@@ -1735,7 +1746,7 @@
       return base;
     }
 
-    function getVbStoreView(outlet, storeMap) {
+    function getVbStoreView(outlet, storeMap, brand = null) {
       const storeId = String(outlet?.store_id || '').trim();
       // VB outlets are excluded from the Agency feed. Use the VB API's
       // per-outlet schedule instead of falling back to another outlet.
@@ -1771,6 +1782,20 @@
         statusTooltip: getAdminStatusTooltip(statusStore),
         todayScheduleMarkup: getVbTodayOperatingHours(store),
         specialScheduleMarkup: getVbSpecialHoursCellMarkup(store),
+        brandLinkMarkup: (() => {
+          const bSlug = (brand && brand.slug) ? brand.slug : (brand && brand.name ? String(brand.name).toLowerCase().replace(/[^\w\s-]/g, '').replace(/[-\s]+/g, '-') : 'brand');
+          const bUrl = `/brand/${encodeURIComponent(bSlug)}`;
+          return `
+            <a href="${bUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-brand-link" onclick="event.stopPropagation()" aria-label="Buka Dashboard Brand ${escapeVBHtml(brand?.name || '')}" title="Buka Dashboard Brand">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              <span>Link Brand</span>
+            </a>
+          `;
+        })(),
         linkCellMarkup: (() => {
           const sId = String(store?.store_id || outlet?.store_id || '').trim();
           const ofdUrl = sId ? getShopeeFoodStoreUrl(sId) : '';
@@ -1790,7 +1815,7 @@
       return (brands || []).map(brand => {
         const effectiveStatus = getVbBrandEffectiveStatus(brand);
         const outlets = (brand.outlets || [])
-          .map((outlet, sourceIndex) => ({ outlet: getVbStoreView(outlet, storeMap), sourceIndex }))
+          .map((outlet, sourceIndex) => ({ outlet: getVbStoreView(outlet, storeMap, brand), sourceIndex }))
           .sort((a, b) => getVbPortalOrder(a.outlet.portalName) - getVbPortalOrder(b.outlet.portalName) || a.sourceIndex - b.sourceIndex)
           .map(item => item.outlet);
         return {
@@ -2003,6 +2028,42 @@
         const isPending = pendingVBBrandIds.has(String(brand.id));
         const isOn = brand.effectiveStatus === 'ON';
         const activity = brand.activity || { title: 'Belum ada aktivitas', note: 'Menunggu sinkronisasi brand' };
+
+        const brandOutlets = brand.outlets || [];
+        const hasOutlets = brandOutlets.length > 0;
+        const isScheduleLocked = hasOutlets && brandOutlets.every(o => {
+          const store = o.store || o;
+          return store.bot_phase === 'WAITING_SCHEDULE' || store.within_operating_schedule === false;
+        });
+
+        let vbToggleState = 'paused';
+        if (isScheduleLocked) {
+          vbToggleState = 'closed';
+        } else if (isOn) {
+          vbToggleState = 'open';
+        }
+
+        const isToggleDisabled = isPending || isScheduleLocked;
+        const isToggleChecked = vbToggleState === 'open';
+
+        let vbToggleTooltip = '';
+        if (isPending) {
+          vbToggleTooltip = 'Status: Menyimpan perubahan status grup ke server...';
+        } else if (isScheduleLocked) {
+          vbToggleTooltip = `Status Grup: Di Luar Jadwal Operasional\nKunci Toggle: Seluruh ${brand.visibleStoreCount || brandOutlets.length} Store ID di grup ini sedang tutup di luar jadwal operasional Shopee.`;
+        } else if (isOn) {
+          vbToggleTooltip = `Status Grup: Aktif (ON)\nKeterangan: Seluruh Store ID di grup ini aktif mengikuti jam operasional.\nOpsi: Klik untuk tutup sementara (pause).`;
+        } else {
+          vbToggleTooltip = `Status Grup: Tutup Sementara (Pause/OFF)\nOpsi: Klik untuk buka grup sekarang.`;
+        }
+
+        let vbPillLabel = `Grup ${isOn ? 'ON' : 'OFF'}`;
+        let vbPillClass = isOn ? 'is-on' : 'is-off';
+        if (isScheduleLocked) {
+          vbPillLabel = 'Tutup Jadwal';
+          vbPillClass = 'is-off is-schedule-locked';
+        }
+
         const outletRows = brand.visibleOutlets.length
           ? brand.visibleOutlets.map(outlet => {
             const statusToneClass = outlet.liveState === 'OPEN'
@@ -2032,7 +2093,7 @@
                   <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
                   <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
                   <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
-                  <div class="vb-store-special-hours"><span class="vb-store-field-label">Jadwal Khusus</span>${outlet.specialScheduleMarkup}</div>
+                  <div class="vb-store-brand-link"><span class="vb-store-field-label">Link Brand</span>${outlet.brandLinkMarkup}</div>
                   <div class="vb-store-ofd"><span class="vb-store-field-label">Link OFD</span>${outlet.linkCellMarkup}</div>
                 </div>
               `;
@@ -2046,7 +2107,7 @@
                 <div class="vb-group-eyebrow">Grup VB</div>
                 <h3>${escapeVBHtml(brand.name)}</h3>
                 <div class="vb-group-context">
-                  <span class="vb-status-pill ${isOn ? 'is-on' : 'is-off'}">Grup ${isOn ? 'ON' : 'OFF'}</span>
+                  <span class="vb-status-pill ${vbPillClass}">${vbPillLabel}</span>
                 </div>
                 ${brand.pendingNote ? `<p class="vb-group-note is-pending">${escapeVBHtml(brand.pendingNote)}</p>` : ''}
               </div>
@@ -2079,11 +2140,10 @@
               </div>
               <div class="vb-brand-toggle" onclick="event.stopPropagation()">
                 <div class="vb-control">
-                  <label class="switch-toggle ${isPending ? 'is-toggle-pending' : ''}" aria-busy="${isPending ? 'true' : 'false'}" onclick="event.stopPropagation()">
-                    <input type="checkbox" ${isOn ? 'checked' : ''} ${isPending ? 'disabled' : ''} aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)" onclick="event.stopPropagation()">
+                  <label class="switch-toggle admin-table-toggle state-${vbToggleState} ${isPending ? 'is-toggle-pending' : ''} ${isScheduleLocked ? 'is-schedule-disabled' : ''}" aria-busy="${isPending ? 'true' : 'false'}" title="${escapeVBHtml(vbToggleTooltip)}" onclick="event.stopPropagation()">
+                    <input type="checkbox" ${isToggleChecked ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)" onclick="event.stopPropagation()">
                     <span class="slider"></span>
                   </label>
-                  ${isOn ? '' : '<span class="vb-control-label">OFF</span>'}
                 </div>
               </div>
             </div>
@@ -2095,7 +2155,7 @@
                   <span>Store ID</span>
                   <span>Status</span>
                   <span>Jam Hari Ini</span>
-                  <span>Jadwal Khusus</span>
+                  <span>Link Brand</span>
                   <span>Link OFD</span>
                 </div>
                 ${outletRows}
@@ -2145,6 +2205,18 @@
     function handleVbToggleChange(brandId, control) {
       const brand = allVBBrands.find(item => String(item.id) === String(brandId));
       if (!brand || !control) return;
+      const brandViews = buildVbBrandViews([brand]);
+      const brandView = brandViews[0];
+      const brandOutlets = brandView?.outlets || [];
+      const isScheduleLocked = brandOutlets.length > 0 && brandOutlets.every(o => {
+        const store = o.store || o;
+        return store.bot_phase === 'WAITING_SCHEDULE' || store.within_operating_schedule === false;
+      });
+      if (isScheduleLocked) {
+        control.checked = false;
+        showToast('Seluruh outlet di grup ini sedang tutup di luar jadwal operasional Shopee sehingga toggle dikunci.', 'warning');
+        return;
+      }
       if (!control.checked) {
         control.checked = true;
         openVbPauseModal(brand.id, brand.name);

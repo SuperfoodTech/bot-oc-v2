@@ -238,19 +238,35 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                     next_sleep_reason = "merchant group berikutnya jatuh tempo"
                     break
 
-                log.info(
-                    "🏬 [MERCHANT SCHEDULER] Dispatching %s outlets for '%s' (Account: %s, P%d)...",
-                    selected.outlet_count,
-                    selected.portal_name,
-                    selected.username,
-                    selected.priority,
-                )
+                is_actionable = selected.actionable_count > 0
+                target_store_ids = set(selected.actionable_store_ids) if is_actionable else None
+
+                if is_actionable:
+                    log.info(
+                        "⚡ [EXPRESS LANE] Dispatching %d actionable store(s) %s for '%s' (Account: %s, P%d)...",
+                        len(target_store_ids),
+                        target_store_ids,
+                        selected.portal_name,
+                        selected.username,
+                        selected.priority,
+                    )
+                else:
+                    log.info(
+                        "🚶 [PATROL LANE] Dispatching %s outlets for '%s' (Account: %s, P%d)...",
+                        selected.outlet_count,
+                        selected.portal_name,
+                        selected.username,
+                        selected.priority,
+                    )
+
                 last_result = worker.sync_all_stores(
                     execute_actions=not dry_run,
                     default_interval_seconds=interval_seconds,
                     target_groups={selected.merchant_key},
+                    target_store_ids=target_store_ids,
                 )
-                processed_keys.add(selected.merchant_key)
+                if not is_actionable:
+                    processed_keys.add(selected.merchant_key)
                 cycle_actions.extend(last_result.get("actions_taken", []))
                 cycle_merchant_groups.extend(last_result.get("processed_merchant_groups", []))
                 total_stores_processed += last_result.get("total_stores_processed", 0)

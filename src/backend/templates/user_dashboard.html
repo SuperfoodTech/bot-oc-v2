@@ -298,7 +298,7 @@
     const USER_LOGIN_BUTTON_LABEL = 'Masuk';
     const USER_LOGIN_PENDING_LABEL = 'Memeriksa...';
     const USER_LOGIN_RESTORE_LABEL = 'Memuat dashboard...';
-    const USER_OUTLET_SYNC_REFRESH_MS = 15000;
+    const USER_OUTLET_SYNC_REFRESH_MS = 60000;
     const MITRA_STATUS_TONE_CLASS = {
       open: 'is-open',
       closed: 'is-closed',
@@ -472,6 +472,16 @@
         const savedPasscode = activePasscode || sessionStorage.getItem(userSessionKey);
         if (savedPasscode) doLogin(savedPasscode, true);
       }, USER_OUTLET_SYNC_REFRESH_MS);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          const hasVisibleDashboard = currentUserOutlets.length && document.getElementById('dashboardSection').style.display !== 'none';
+          if (hasVisibleDashboard && !userLoginInFlight && !pendingToggleStoreIds.size && !selectedStoreId && !resumeStoreId) {
+            const savedPasscode = activePasscode || sessionStorage.getItem(userSessionKey);
+            if (savedPasscode) doLogin(savedPasscode, true);
+          }
+        }
+      });
 
       // Google OAuth Redirect Click Event
       document.getElementById('googleLoginBtn').addEventListener('click', () => {

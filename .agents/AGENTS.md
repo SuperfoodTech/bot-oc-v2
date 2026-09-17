@@ -24,12 +24,41 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.18.3`.
+Latest documented release: `1.20.0`.
+
+Virtual Brand Dedicated Dashboard & Link Brand Integration:
+- Setiap brand Virtual Brand memiliki dashboard publik mandiri via slug URL `/brand/{slug}` yang dapat diakses langsung oleh PIC brand tanpa memerlukan halaman login password.
+- Brand Hero Card menampilkan nama brand, switch toggle 3-state tanpa label teks, 3 metrik status live (Live Buka, Perlu Cek, Live Tutup), dan tombol "Lihat Jadwal Operasional" yang membuka drawer bottom sheet jadwal 7 hari dari store ID pertama.
+- Daftar outlet ditampilkan dalam format accordion collapsible (arrow down/up) dengan isi 2 kolom ringkas: Nama Outlet (listing/portal & Store ID) dan Status Live/Bot (tanpa link ShopeeFood di dashboard brand).
+- Kolom ke-6 pada tabel outlet VB di Admin Dashboard (`admin_dashboard.html`) menampilkan "Link Brand" yang menghubungkan baris outlet ke dashboard brand masing-masing.
+
+Penyederhanaan Visual 3-State Toggle & Eliminasi Label Teks:
+- Seluruh switch toggle status (Agency, VB, Mitra) tampil bersih (*clean*) tanpa label teks pendamping saat dalam kondisi non-aktif/mati/terkunci.
+- State di luar jadwal operasional (`state-closed`): toggle terkunci di posisi kiri, warna abu-abu (*gray*), berstatus `disabled`, tanpa label teks.
+- State tutup/pause manual dalam jam operasional (`state-paused`): toggle di posisi kiri, warna merah (*red*), tanpa label teks.
+- State buka/aktif dalam jam operasional (`state-open`): toggle di posisi kanan, warna hijau (*green*), tanpa label teks.
+
+Virtual Brand Schedule-Aware Toggle Lock & UI Parity:
+- Switch toggle Brand VB pada `admin_dashboard.html` menerapkan aturan pagar jadwal operasional yang identik dengan Dashboard Agency dan Mitra.
+- Jika seluruh outlet di bawah brand berada di luar jadwal operasional (`bot_phase === 'WAITING_SCHEDULE'` atau `within_operating_schedule === false`), toggle switch terkunci ke posisi non-aktif (`state-closed`), berstatus `disabled`, menampilkan status pill `"Tutup Jadwal"`, dan memblokir klik toggle manual dengan pesan peringatan edukatif.
+
+Dual-Speed Hybrid Scheduler & On-Demand Targeted Execution:
+- Engine worker `sync_all_stores` pada `main-bot/src/worker.py` dan `main-vb/src/worker.py` mendukung parameter `target_store_ids` untuk mengeksekusi aksi buka/tutup toko secara spesifik (Express Lane < 5 detik) tanpa me-loop seluruh toko di dalam portal.
+- Pemanggilan API `get_regular_hours` dan `get_special_hours` dilewati (*skip*) pada siklus patroli rutin jika data jadwal toko sudah tersimpan valid di database (`READY` / `FETCHED_EMPTY`), dan hanya dipanggil jika status jadwal masih `NOT_FETCHED_YET`, `FETCH_RETRYING`, atau dipicu `force_schedule_refresh=True`.
+- `scheduler.py` memisahkan toko actionable (`actionable_store_ids`) dari pemeriksaan rutin heartbeat, dan daemon memprioritaskan dispatch portal yang memiliki toko actionable.
+- Selesai eksekusi Express Lane di sebuah portal, bot memanfaatkan sesi aktif portal saat ini (*portal locality preference*) tanpa melakukan perpindahan merchant bolak-balik yang sia-sia (*zero ping-pong switch*).
+
 
 Optimasi Memori & Pencegahan Out of Memory (OOM):
-- Instance Chromium/Chrome pada `src/core/browser.py` dan `main-vb/src/core/browser.py` wajib menggunakan flag hemat memori: `--blink-settings=imagesEnabled=false`, limit V8 heap `--js-flags=--max-old-space-size=512`, cache disk/media `--disk-cache-size=52428800` & `--media-cache-size=52428800`, serta `--disable-features=Translate,OptimizationHints,MediaRouter`.
+- Instance Chromium/Chrome pada `src/core/browser.py` dan `main-vb/src/core/browser.py` wajib menggunakan flag hemat memori: `--blink-settings=imagesEnabled=false`, limit V8 heap `--js-flags=--max-old-space-size=512`, cache disk/media `--disk-cache-size=52428800` & `--media-cache-size=52428800`, `--disable-features=Translate,OptimizationHints,MediaRouter`, `--renderer-process-limit=1`, dan `--disable-site-isolation-trials`.
+- Network Interception CDP (`Network.setBlockedURLs`) memblokir font web (`*.woff`, `*.woff2`, `*.ttf`, `*.eot`) dan tracker pihak ketiga (*google-analytics*, *doubleclick*, *sensorsdata*, dll.) tanpa memblokir script JS, CSS, atau endpoint API Shopee.
 - Setiap iterasi evaluasi loop utama daemon (`main-bot/src/daemon.py` dan `main-vb/src/daemon.py`) wajib menyertakan `gc.collect()` di dalam blok `finally:` untuk membebaskan cyclic reference memory leak secara deterministik.
 - Penyesuaian konfigurasi browser dan pembersihan memori dilarang menginterupsi bot secara mendadak atau mematikan session 24/7 yang sedang aktif.
+
+Frekuensi Polling Web & Efisiensi Database:
+- Polling periodik cadangan pada Admin Dashboard (`ADMIN_OUTLET_SYNC_REFRESH_MS`), Dashboard Mitra (`USER_OUTLET_SYNC_REFRESH_MS`), dan Bot Monitoring menggunakan interval `60000ms` (60 detik) untuk menjaga efisiensi resource PostgreSQL dan CPU Web.
+- Event listener `visibilitychange` aktif di dashboard Admin dan Mitra untuk melakukan sinkronisasi instan saat user memfokuskan kembali tab browser.
+- Saluran Server-Sent Events (SSE) `/api/v1/admin/events` tetap menjadi saluran utama pengiriman perubahan state toko secara real-time (< 200ms).
 
 Notifikasi Discord Virtual Brand (`send_discord_vb_group_summary`):
 - Notifikasi Virtual Brand dikirimkan secara eksklusif ke `DISCORD_WEBHOOK_VB_URL` dalam format rekap summary per-VB Brand (bukan per-portal atau per-outlet individual) untuk 6 skenario utama (Full Open, Full Close, Partial Open, Partial Close, All Failed Open, All Failed Close).

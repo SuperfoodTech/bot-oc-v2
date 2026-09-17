@@ -58,6 +58,7 @@ class MerchantQueueItem:
     due_store_ids: tuple[str, ...]
     outlet_count: int
     actionable_count: int
+    actionable_store_ids: tuple[str, ...]
     reasons: tuple[str, ...]
 
 
@@ -154,6 +155,7 @@ def build_queue(outlets: Iterable[MerchantOutlet], now: Optional[datetime] = Non
         earliest = min(state.due_at for state in states)
         priority = max(state.priority for state in states)
         due_states = [state for state in states if state.due_at <= now]
+        actionable_states = [state for state in states if state.actionable and state.due_at <= now]
         queue.append(MerchantQueueItem(
             merchant_key=key,
             username=key[0],
@@ -162,7 +164,8 @@ def build_queue(outlets: Iterable[MerchantOutlet], now: Optional[datetime] = Non
             priority=priority,
             due_store_ids=tuple(state.store_id for state in due_states),
             outlet_count=len(states),
-            actionable_count=sum(state.actionable for state in states if state.due_at <= now),
+            actionable_count=len(actionable_states),
+            actionable_store_ids=tuple(state.store_id for state in actionable_states),
             reasons=tuple(dict.fromkeys(state.reason for state in states)),
         ))
     return sorted(queue, key=lambda item: (-item.priority, item.due_at, -item.actionable_count, item.merchant_key))

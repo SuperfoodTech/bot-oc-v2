@@ -41,8 +41,16 @@ def _store_control_map(conn) -> dict[str, dict[str, Any]]:
     }
 
 
+import re
+
+
 def normalize_brand(name: str) -> str:
     return " ".join((name or "").strip().split()).casefold()
+
+
+def slugify(text: str) -> str:
+    slug = re.sub(r"[^\w\s-]", "", text or "").strip().lower()
+    return re.sub(r"[-\s]+", "-", slug) or "brand"
 
 
 def pick_pause_reference_outlet(outlets: list[dict[str, Any]] | None) -> dict[str, Any] | None:
@@ -72,6 +80,7 @@ def list_brands() -> list[dict[str, Any]]:
                ORDER BY b.name_normalized"""
         ).fetchall())
         for row in rows:
+            row["slug"] = slugify(row["name"])
             stores = list(conn.execute(
                 """SELECT o.store_id, o.long_name, p.name AS merchant_name,
                           os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
@@ -189,6 +198,207 @@ def request_status(brand_id: str, status: str, admin_id: str, pause_until=None) 
                        VALUES (%s, 'VB', %s, 'ACTIVE', 'ACTIVE', %s, %s, %s, %s, true, NULL, %s)""",
                     (out["outlet_id"], brand_id, out["vercel_status"] or "OFF",
                      out["shopee_actual_status"] or "UNKNOWN", target_state, admin_action, reason_text),
+                )
+            return row
+
+
+import uuid
+
+
+def get_brand_by_slug_or_id(slug_or_id: str) -> dict[str, Any] | None:
+    """Fetch complete brand data for public brand dashboard by slug or ID."""
+    with get_db_connection() as conn:
+        brand_row = None
+        cleaned_target = str(slug_or_id or "").strip()
+        if not cleaned_target:
+            return None
+
+        # Check if it is a valid UUID
+        try:
+            parsed_uuid = str(uuid.UUID(cleaned_target))
+            brand_row = conn.execute(
+                """SELECT id, name, applied_status, requested_status, requested_at,
+                          pause_until, requested_pause_until, last_applied_at, last_patrolled_at
+                   FROM vb_brands WHERE id=%s AND is_active=true""",
+                (parsed_uuid,),
+            ).fetchone()
+        except (ValueError, AttributeError):
+            pass
+
+        if not brand_row and cleaned_target.isdigit():
+            brand_row = conn.execute(
+                """SELECT id, name, applied_status, requested_status, requested_at,
+                          pause_until, requested_pause_until, last_applied_at, last_patrolled_at
+                   FROM vb_brands WHERE id=%s AND is_active=true""",
+                (int(cleaned_target),),
+            ).fetchone()
+
+        if not brand_row:
+            all_brands = conn.execute(
+                """SELECT id, name, applied_status, requested_status, requested_at,
+                          pause_until, requested_pause_until, last_applied_at, last_patrolled_at
+                   FROM vb_brands WHERE is_active=true"""
+            ).fetchall()
+            target_norm = cleaned_target.casefold()
+            for b in all_brands:
+                b_slug = slugify(b["name"])
+                if b_slug == target_norm or b["name"].strip().casefold() == target_norm:
+                    brand_row = b
+                    break
+
+        if not brand_row:
+            return None
+
+        brand_id = brand_row["id"]
+        store_controls = _store_control_map(conn)
+        stores = list(conn.execute(
+            """SELECT o.store_id, o.long_name, p.name AS merchant_name,
+                      os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
+                      os.schedule_fetch_status,
+                      os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
+                      os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
+                      COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error
+               FROM vb_brand_outlets bo
+               JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
+               JOIN portals p ON p.id=o.portal_id AND p.is_active=true
+               LEFT JOIN outlet_states os ON os.outlet_id=o.id
+               WHERE bo.vb_brand_id=%s
+                 AND o.store_id ~ '^[0-9]+$'
+                 AND p.name !~* '^(status|status import|import status)$'
+               ORDER BY p.name, o.store_id""",
+            (brand_id,),
+        ).fetchall())
+
+        opened_count = 0
+        failure_count = 0
+        closed_count = 0
+        first_valid_schedule = None
+        first_special_hours = None
+
+        for store in stores:
+            control = store_controls.get(str(store["store_id"]), {})
+            effective_status = control.get("status", "ON")
+            reg_hours = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
+            store["shopee_regular_hours"] = reg_hours
+            store["shopee_special_hours"] = store.get("shopee_special_hours") or []
+            store["timezone"] = normalize_timezone(store.get("timezone"))
+            store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
+            store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
+            store["pause_until"] = brand_row.get("requested_pause_until") or brand_row.get("pause_until")
+            runtime_state = derive_outlet_runtime_state(store)
+            store.update(runtime_state)
+
+            live = store.get("shopee_status") or "UNKNOWN"
+            is_error = bool(store.get("schedule_fetch_error") or store.get("bot_phase") == "ACTION_FAILED")
+            if is_error:
+                failure_count += 1
+            elif live == "OPEN":
+                opened_count += 1
+            elif live in ("CLOSED", "PAUSE"):
+                closed_count += 1
+            else:
+                failure_count += 1
+
+            if not first_valid_schedule and any(reg_hours.values()):
+                first_valid_schedule = reg_hours
+                first_special_hours = store.get("shopee_special_hours") or []
+
+        # Audit logs for this brand
+        history_logs = list(conn.execute(
+            """SELECT al.id, to_char(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
+                      COALESCE(o.store_id, '') AS store_id,
+                      COALESCE(o.long_name, p.name, b.name) AS store_name,
+                      p.name AS portal_name,
+                      al.action, al.target_status, al.success, COALESCE(al.reason, '') AS reason
+               FROM automation_logs al
+               JOIN vb_brands b ON b.id=al.vb_brand_id
+               LEFT JOIN outlets o ON o.id=al.outlet_id
+               LEFT JOIN portals p ON p.id=o.portal_id
+               WHERE al.vb_brand_id=%s
+               ORDER BY al.id DESC LIMIT 10""",
+            (brand_id,),
+        ).fetchall())
+
+        slug = slugify(brand_row["name"])
+        is_schedule_locked = len(stores) > 0 and all(
+            s.get("bot_phase") == "WAITING_SCHEDULE" or s.get("within_operating_schedule") is False
+            for s in stores
+        )
+
+        effective_status = brand_row.get("requested_status") or brand_row.get("applied_status") or "ON"
+
+        return {
+            "id": brand_row["id"],
+            "name": brand_row["name"],
+            "slug": slug,
+            "applied_status": brand_row["applied_status"],
+            "requested_status": brand_row["requested_status"],
+            "effective_status": effective_status,
+            "pause_until": brand_row["pause_until"],
+            "requested_pause_until": brand_row["requested_pause_until"],
+            "is_schedule_locked": is_schedule_locked,
+            "status_counts": {
+                "opened": opened_count,
+                "failure": failure_count,
+                "close": closed_count,
+                "total": len(stores),
+            },
+            "schedule": {
+                "regular_hours": first_valid_schedule or {},
+                "special_hours": first_special_hours or [],
+            },
+            "outlets": stores,
+            "history_logs": history_logs,
+        }
+
+
+def request_brand_status_public(slug_or_id: str, status: str, pause_until=None) -> dict[str, Any] | None:
+    """Execute brand toggle directly from public brand dashboard."""
+    brand = get_brand_by_slug_or_id(slug_or_id)
+    if not brand:
+        return None
+    brand_id = brand["id"]
+    with get_db_connection() as conn:
+        with conn.transaction():
+            row = conn.execute(
+                """UPDATE vb_brands
+                   SET requested_status=%s, requested_pause_until=%s,
+                       requested_at=now(), requested_by='BRAND_DASHBOARD', updated_at=now()
+                   WHERE id=%s AND is_active=true
+                   RETURNING id, name, applied_status, requested_status,
+                             requested_at, requested_pause_until""",
+                (status, pause_until if status == "PAUSED" else None, brand_id),
+            ).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                """INSERT INTO admin_audit_logs
+                   (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
+                   VALUES (NULL, %s, 'VB_CONTROL_STATUS_REQUESTED', %s, %s, %s)""",
+                (brand_id,
+                 Jsonb({"applied_status": row["applied_status"]}),
+                 Jsonb({"requested_status": row["requested_status"]}),
+                 "Perubahan status diminta oleh Brand melalui Dashboard Brand"),
+            )
+            outlets_for_brand = conn.execute(
+                """SELECT bo.outlet_id, os.vercel_status, os.shopee_actual_status
+                   FROM vb_brand_outlets bo
+                   LEFT JOIN outlet_states os ON os.outlet_id = bo.outlet_id
+                   WHERE bo.vb_brand_id = %s""",
+                (brand_id,),
+            ).fetchall()
+            brand_action = "USER_PAUSE_STORE" if status in ("PAUSED", "OFF") else "USER_RESUME_STORE"
+            target_state = "PAUSED" if status == "PAUSED" else ("CLOSED" if status == "OFF" else "OPEN")
+            reason_text = "Outlet ditutup oleh Brand" if status in ("PAUSED", "OFF") else "Outlet dibuka oleh Brand"
+            for out in outlets_for_brand:
+                conn.execute(
+                    """INSERT INTO automation_logs
+                       (outlet_id, mode, vb_brand_id, suspension_status, subscription_status,
+                        vercel_status_before, shopee_status_before, target_status, action,
+                        success, error_message, reason)
+                       VALUES (%s, 'VB', %s, 'ACTIVE', 'ACTIVE', %s, %s, %s, %s, true, NULL, %s)""",
+                    (out["outlet_id"], brand_id, out["vercel_status"] or "OFF",
+                     out["shopee_actual_status"] or "UNKNOWN", target_state, brand_action, reason_text),
                 )
             return row
 

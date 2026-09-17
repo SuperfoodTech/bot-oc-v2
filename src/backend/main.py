@@ -464,6 +464,14 @@ def user_page(slug: Optional[str] = None):
     return HTMLResponse(content=user_html.read_text(encoding="utf-8"))
 
 
+@app.get("/brand/{slug}", response_class=HTMLResponse, summary="Public Virtual Brand Dashboard Web Page")
+def brand_page(slug: str):
+    brand_html = TEMPLATES_DIR / "brand_dashboard.html"
+    if not brand_html.exists():
+        raise HTTPException(status_code=404, detail="Brand dashboard template not found.")
+    return HTMLResponse(content=brand_html.read_text(encoding="utf-8"))
+
+
 # ── SERVICE HEALTHCHECK ────────────────────────────────────────────────────────
 
 @app.get("/api/v1/health", summary="Service Health Check")
@@ -560,6 +568,70 @@ def admin_vb_import(admin: dict = Depends(require_admin)):
         return {"success": True, "summary": vb.import_sheet(admin["sub"])}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Import VB gagal: {exc}") from exc
+
+
+# ── PUBLIC BRAND DASHBOARD API ────────────────────────────────────────────────
+
+@app.get("/api/v1/brand/{slug}", summary="Public: Get Virtual Brand Detail by Slug or ID")
+def public_brand_detail(slug: str):
+    brand = vb.get_brand_by_slug_or_id(slug)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand tidak ditemukan.")
+    return {"success": True, "brand": brand}
+
+
+@app.post("/api/v1/brand/{slug}/toggle", summary="Public: Toggle Virtual Brand Status")
+def public_brand_toggle(slug: str, req: VBStatusRequest):
+    requested = req.status.strip().upper()
+    if requested not in {"ON", "PAUSED"}:
+        raise HTTPException(status_code=422, detail="Status VB harus ON atau PAUSED.")
+
+    brand = vb.get_brand_by_slug_or_id(slug)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand tidak ditemukan.")
+
+    if requested == "ON" and brand.get("is_schedule_locked"):
+        raise HTTPException(status_code=400, detail="Seluruh outlet brand sedang di luar jadwal operasional.")
+
+    pause_until = None
+    duration_type = (req.duration_type or "").strip().lower()
+    if requested == "PAUSED":
+        now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+        try:
+            if duration_type in {"rest_of_day", "sepanjang_hari", "today"}:
+                reference_outlet = vb.pick_pause_reference_outlet(brand.get("outlets"))
+                if not reference_outlet or not any((reference_outlet.get("shopee_regular_hours") or {}).values()):
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Jadwal operasional outlet referensi brand ini belum tersedia.",
+                    )
+                pause_until, _duration_mins, _label = resolve_pause_window(
+                    now_dt,
+                    duration_type,
+                    schedule=reference_outlet.get("shopee_regular_hours") or {},
+                    timezone=normalize_timezone(reference_outlet.get("timezone")),
+                    allow_default=False,
+                )
+            else:
+                pause_until, _duration_mins, _label = resolve_pause_window(
+                    now_dt,
+                    duration_type,
+                    custom_until=req.custom_until,
+                    custom_minutes=req.custom_minutes,
+                    allow_default=False,
+                )
+        except ValueError as exc:
+            message = str(exc)
+            if message == "Durasi pause wajib dipilih.":
+                message = "Durasi pause VB wajib dipilih."
+            raise HTTPException(status_code=422, detail=message) from exc
+
+    result = vb.request_brand_status_public(slug, requested, pause_until=pause_until)
+    if not result:
+        raise HTTPException(status_code=400, detail="Gagal mengubah status brand.")
+
+    updated_brand = vb.get_brand_by_slug_or_id(slug)
+    return {"success": True, "brand": updated_brand}
 
 
 @app.post("/api/v1/admin/generate-link", summary="Admin: Generate Unique User Link")
