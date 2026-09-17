@@ -1,49 +1,50 @@
-# Definition of Done (DoD) - Immediate Brand-Completion Notification Delivery
+# Definition of Done (DoD) - Virtual Brand Notification Direction & Status Evaluation Fix
 
-**Fitur**: Pengiriman Notifikasi Discord Instan Saat Seluruh Outlet Brand Selesai Dieksekusi  
-**Modul**: `main-vb/src/db.py`, `main-vb/src/daemon.py`, `tests/`  
-**Target Release**: Release 1.23.6  
+**Fitur**: Perbaikan Penentuan Arah & Evaluasi Notifikasi Discord Virtual Brand (Brand Toggle & Guarding)  
+**Modul**: `main-vb/src/db.py`, `tests/test_vb_notification_flush.py`  
+**Target Release**: Release 1.23.8  
 
-Dokumen ini menetapkan kriteria kelayakan (*Acceptance Criteria*) dan standar kualitas (*Quality Gates*) sebelum fitur pengiriman notifikasi instan berbasis penyelesaian eksekusi brand (*Brand-Completion Immediate Flush*) dinyatakan selesai (*Done*).
+Dokumen ini menetapkan kriteria kelayakan (*Acceptance Criteria*) dan standar kualitas (*Quality Gates*) sebelum perbaikan logika evaluasi arah notifikasi Discord Virtual Brand dinyatakan selesai (*Done*).
 
 ---
 
 ## 1. Kriteria Fungsional (Functional Acceptance Criteria)
 
-### A. Immediate Brand-Level Notification Dispatch
-- [ ] **Instant Delivery on Completion**: Begitu seluruh outlet yang menjadi target aksi dari sebuah brand selesai dieksekusi (di seluruh portal yang bersangkutan), notifikasi Discord untuk brand tersebut dikirimkan secara instan (< 1–2 detik) tanpa harus menunggu seluruh siklus patroli keliling (*Cycle*) selesai.
-- [ ] **Zero Fragmentation (No Partial/Mencicil per Portal)**: Untuk brand multi-portal, notifikasi tetap ditahan (*hold*) sampai portal terakhir yang memuat outlet brand tersebut selesai diproses, sehingga Discord tetap hanya menerima **1 pesan rekap ringkas per brand**.
-- [ ] **Comprehensive Outcome Support**:
-  - Full Success (🟢 BUKA / 🔴 TUTUP): Dikirim instan saat seluruh outlet sukses.
-  - Partial Success (🟠 SEBAGIAN): Dikirim instan saat seluruh target outlet telah dicoba dan sebagian gagal.
-  - All Failed (🔴 GAGAL): Dikirim instan saat seluruh target outlet telah dicoba dan semua gagal.
-  - Auto-Guarding (🟢/🔴/🟠 TARGETED): Dikirim instan saat aksi pemulihan outlet selesai.
+### A. Deterministic Notification Direction Evaluation
+- [ ] **Strict Status-Driven Evaluation for Brand Toggle**:
+  - Pada mode Brand Toggle (`is_brand_toggle == True`), penentuan jenis aksi (`summary_action` dan `is_open`) **100% dipandu oleh `applied_status` brand** (`applied_status == "ON"` -> `ACTION_OPEN` / DIBUKA; `applied_status == "PAUSED"` -> `ACTION_CLOSE` / DITUTUP).
+  - Menghilangkan logika `any(a in ("ACTION_OPEN", ...) for a in actions_types)` yang rentan terhadap kontaminasi sisa aksi patroli lama.
+- [ ] **Majority/Executed Action Evaluation for Auto-Guarding**:
+  - Pada mode Auto-Guarding (`is_brand_toggle == False`), arah aksi ditentukan berdasarkan dominasi aksi pemulihan aktual yang dieksekusi (`open_count >= close_count`), dengan fallback ke `applied_status`.
+- [ ] **Stale Buffer Purging on Status Apply**:
+  - Saat status toggle baru diaplikasikan pada brand di `apply_all_pending_statuses`, buffer `_PENDING_BRAND_ACTIONS[brand_id]` dibersihkan dari aksi lama sebelum eksekusi dimulai agar tidak ada sisa catatan aksi sebelumnya.
 
-### B. Fallback & Safety Net
-- [ ] **End-of-Cycle Safety Sweep**: Di akhir siklus daemon (`while RUNNING:` loop selesai), `db.flush_pending_brand_notifications()` tetap dipanggil sebagai jaring pengaman (*safety net*) untuk memastikan tidak ada pesan pending yang tertinggal.
-- [ ] **Targeted Brand Flush Support**: Fungsi `db.flush_pending_brand_notifications(brand_ids=...)` mendukung pembersihan selektif hanya untuk brand yang telah selesai, menjaga buffer brand lain yang masih memiliki sisa antrean.
+### B. Accurate Success & Failure Categorization
+- [ ] **Brand Toggle Close**: Jika brand di-pause/tutup (`applied_status == 'PAUSED'`), seluruh outlet yang berhasil di-pause (`live_st in ('PAUSE', 'CLOSED', 'OFF')`) tanpa kegagalan tercatat masuk ke kategori **Berhasil Ditutup**, bukan Gagal Dibuka.
+- [ ] **Brand Toggle Open**: Jika brand di-buka (`applied_status == 'ON'`), seluruh outlet yang aktif (`live_st in ('ON', 'OPEN')`) masuk ke kategori **Berhasil Dibuka**.
 
 ---
 
 ## 2. Kriteria Kualitas Kode & Integritas Arsitektur (Technical Quality Gates)
 
-- [ ] **Worker Byte-for-Byte Parity**: File `main-vb/src/worker.py` **WAJIB tetap 100% identik byte-for-byte** dengan `main-bot/src/worker.py`. Logika orchestrasi murni berada di `main-vb/src/daemon.py` dan `main-vb/src/db.py`.
-- [ ] **Thread-Safe Queue Manipulation**: Manipulasi buffer `_PENDING_BRAND_ACTIONS` dan `_BRAND_TOGGLED_IDS` aman dari *race conditions* menggunakan `_PENDING_LOCK`.
-- [ ] **Non-Interruption / Zero Downtime**: Tidak ada penghentian container `fm-bot` atau interupsi session browser di `bot-vb`.
+- [ ] **Worker Byte-for-Byte Parity**: File `main-vb/src/worker.py` **WAJIB tetap 100% identik byte-for-byte** dengan `main-bot/src/worker.py`. Seluruh penyesuaian hanya berada di adapter `main-vb/src/db.py`.
+- [ ] **Thread-Safe Buffer Operations**: Seluruh manipulasi buffer `_PENDING_BRAND_ACTIONS` dan `_BRAND_TOGGLED_IDS` terlindungi mutex `_PENDING_LOCK`.
+- [ ] **Zero Downtime**: Penyesuaian adapter di `main-vb/src/db.py` tidak menginterupsi jalannya daemon patroli.
 
 ---
 
 ## 3. Kriteria Pengujian & Verifikasi (Testing & Validation)
 
 - [ ] **Unit Tests**:
-  - Pengujian `flush_pending_brand_notifications(brand_ids=...)` hanya mengirim dan menghapus brand yang ditargetkan.
-  - Pengujian simulasi multi-portal: Portal 1 selesai -> buffer ditahan -> Portal 2 selesai -> notifikasi ter-flush seketika.
+  - Test case untuk skenario replikasi issue: Brand di-toggle PAUSED saat buffer memiliki sisa `ACTION_OPEN` dari patroli sebelumnya, memastikan notifikasi dikirim sebagai `ACTION_CLOSE` dengan status SUKSES.
+  - Test case untuk Brand di-toggle ON.
+  - Test case untuk Auto-Guarding mode (Open & Close).
   - Test suite pada `tests/test_vb_notification_flush.py` lulus 100%.
-- [ ] **Regression Suite**: Seluruh test suite (55+ tests) lulus tanpa regresi.
+- [ ] **Full Regression**: Seluruh unit test suite lulus tanpa error/regresi.
 
 ---
 
 ## 4. Kriteria Rilis & Dokumentasi (Release Compliance)
 
-- [ ] **Dokumentasi Rilis**: Membuat file update `update/1.23.6.md` yang memuat `Whats New`, `Spesifikasi`, dan `Handling`.
-- [ ] **Pencatatan Versi di AGENTS.md**: Memperbarui nomor rilis terbaru dan poin aturan di `.agents/AGENTS.md`.
+- [ ] **Dokumentasi Rilis**: Membuat file update `update/1.23.8.md` yang memuat ringkasan issue, akar masalah, perbaikan logika, dan spesifikasi penanganan.
+- [ ] **Pencatatan Versi di AGENTS.md & UPDATES.md**: Memperbarui nomor rilis terbaru (`1.23.8`) dan mencatat aturan determinasi arah notifikasi pada `.agents/AGENTS.md` dan `UPDATES.md`.

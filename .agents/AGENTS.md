@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.7`.
+Latest documented release: `1.23.8`.
+
+Virtual Brand Notification Direction & Evaluation Determinism:
+- Pada mode Brand Toggle (`is_brand_toggle == True`), penentuan jenis notifikasi Discord (`summary_action` dan `is_open`) di `main-vb/src/db.py` **100% dipandu oleh `applied_status` brand** (`applied_status == "ON"` -> `ACTION_OPEN` / DIBUKA; `applied_status == "PAUSED"` -> `ACTION_CLOSE` / DITUTUP), mengeliminasi kontaminasi sisa log aksi patroli lama via `any()`.
+- Pada mode Auto-Guarding (`is_brand_toggle == False`), penentuan arah notifikasi dihitung dari dominasi aksi aktual (`open_count >= close_count`) dengan fallback ke `applied_status`.
+- Saat status toggle baru diaplikasikan pada brand (`apply_all_pending_statuses` & `apply_pending_status_if_needed`), buffer `_PENDING_BRAND_ACTIONS[brand_id]` dibersihkan secara atomik sebelum eksekusi dimulai.
 
 Public Virtual Brand Dashboard Toggle UUID & Response Resilience:
 - Toggle status brand dari Dashboard Publik Virtual Brand (`/brand/{slug}`) menetapkan `requested_by = NULL` pada tabel `vb_brands` untuk memenuhi batasan tipe data `UUID` PostgreSQL (`dashboard_accounts.id`).

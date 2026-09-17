@@ -68,6 +68,7 @@ def apply_all_pending_statuses(conn) -> list[dict[str, Any]]:
     for row in rows:
         with _PENDING_LOCK:
             _BRAND_TOGGLED_IDS.add(str(row["id"]))
+            _PENDING_BRAND_ACTIONS.pop(str(row["id"]), None)
         conn.execute(
             """INSERT INTO admin_audit_logs
                (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
@@ -136,6 +137,7 @@ def apply_pending_status(conn, brand_id):
     if row:
         with _PENDING_LOCK:
             _BRAND_TOGGLED_IDS.add(str(row["id"]))
+            _PENDING_BRAND_ACTIONS.pop(str(row["id"]), None)
         conn.execute(
             """INSERT INTO admin_audit_logs
                (admin_account_id, vb_brand_id, action, old_value, new_value, reason)
@@ -424,11 +426,20 @@ def flush_pending_brand_notifications(brand_ids: list[str] | set[str] | None = N
                 brand_name = brand["name"] or "Virtual Brand Group"
                 applied_status = str(brand.get("applied_status") or "ON").upper()
 
-                actions_types = [a["action"] for a in actions if a.get("action")]
-                is_open = any(a in ("ACTION_OPEN", "USER_OPEN_STORE") for a in actions_types) or applied_status == "ON"
-                summary_action = "ACTION_OPEN" if is_open else "ACTION_CLOSE"
-
                 is_brand_toggle = str(brand_id) in toggled_brands
+
+                if is_brand_toggle:
+                    is_open = (applied_status == "ON")
+                else:
+                    actions_types = [a["action"] for a in actions if a.get("action")]
+                    open_count = sum(1 for a in actions_types if a in ("ACTION_OPEN", "USER_OPEN_STORE"))
+                    close_count = sum(1 for a in actions_types if a in ("ACTION_CLOSE", "USER_PAUSE_STORE", "ADMIN_PAUSE_STORE"))
+                    if open_count + close_count > 0:
+                        is_open = open_count >= close_count
+                    else:
+                        is_open = (applied_status == "ON")
+
+                summary_action = "ACTION_OPEN" if is_open else "ACTION_CLOSE"
 
                 if is_brand_toggle:
                     # Mode Brand Toggle: Rekap Kolektif Seluruh Outlet di bawah Brand

@@ -206,6 +206,121 @@ class TestVbNotificationFlush(unittest.TestCase):
             "b-2": {"201"},
         })
 
+    @patch("core.notifier.send_discord_vb_group_summary")
+    def test_flush_brand_toggle_paused_with_stale_open_action_sends_close_summary(self, mock_send_discord):
+        """Replication test: Brand is toggled to PAUSED, but has a stale ACTION_OPEN in buffer from patrol.
+        The notification MUST be ACTION_CLOSE (TUTUP) and all successfully paused stores MUST be in success_items."""
+        with db._PENDING_LOCK:
+            db._BRAND_TOGGLED_IDS.add("brand-mbah-brow")
+
+        # Stale action from patrol right before toggle
+        db._record_pending_brand_action(
+            brand_id="brand-mbah-brow",
+            store_id="22354195",
+            store_name="Nasi Sambal Ayam & Ikan, HotShot",
+            action="ACTION_OPEN",
+            target_state="OPEN",
+            success=True,
+            error_message=None,
+        )
+        # 5 actions close from toggle execution
+        for sid, sname in [
+            ("22354195", "Nasi Sambal Ayam & Ikan, HotShot"),
+            ("22426761", "Penyetan Pawon Ngebul"),
+            ("21941720", "Waroeng Penyetan, Lokarasa"),
+            ("21941674", "Nasi Ayam Penyet, Foodnesia"),
+            ("21941790", "Penyetan Maknyus, WonderFood"),
+        ]:
+            db._record_pending_brand_action(
+                brand_id="brand-mbah-brow",
+                store_id=sid,
+                store_name=sname,
+                action="ACTION_CLOSE",
+                target_state="CLOSED",
+                success=True,
+                error_message=None,
+            )
+
+        mock_conn = MagicMock()
+        mock_brand = {"id": "brand-mbah-brow", "name": "Warkop Penyetan Uleg Mbah Brow", "applied_status": "PAUSED"}
+        mock_outlets = [
+            {"store_id": "21941674", "name": "Nasi Ayam Penyet, Foodnesia", "shopee_actual_status": "PAUSE", "vercel_status": "OFF"},
+            {"store_id": "21941720", "name": "Waroeng Penyetan, Lokarasa", "shopee_actual_status": "PAUSE", "vercel_status": "OFF"},
+            {"store_id": "21941790", "name": "Penyetan Maknyus, WonderFood", "shopee_actual_status": "PAUSE", "vercel_status": "OFF"},
+            {"store_id": "22354195", "name": "Nasi Sambal Ayam & Ikan, HotShot", "shopee_actual_status": "PAUSE", "vercel_status": "OFF"},
+            {"store_id": "22426761", "name": "Penyetan Pawon Ngebul", "shopee_actual_status": "PAUSE", "vercel_status": "OFF"},
+        ]
+
+        def mock_execute(query, params=None):
+            m = MagicMock()
+            if "FROM vb_brands" in query:
+                m.fetchone.return_value = mock_brand
+            elif "FROM vb_brand_outlets" in query:
+                m.fetchall.return_value = mock_outlets
+            else:
+                m.fetchall.return_value = []
+                m.fetchone.return_value = None
+            return m
+
+        mock_conn.execute.side_effect = mock_execute
+
+        with patch.object(db, "connection") as mock_conn_fn:
+            mock_conn_fn.return_value.__enter__.return_value = mock_conn
+            db.flush_pending_brand_notifications()
+
+        mock_send_discord.assert_called_once()
+        call_kwargs = mock_send_discord.call_args.kwargs
+        self.assertEqual(call_kwargs["group_name"], "Warkop Penyetan Uleg Mbah Brow")
+        self.assertEqual(call_kwargs["action"], "ACTION_CLOSE")
+        self.assertFalse(call_kwargs["is_guarding"])
+        self.assertEqual(len(call_kwargs["success_items"]), 5)
+        self.assertEqual(len(call_kwargs["failed_items"]), 0)
+
+    @patch("core.notifier.send_discord_vb_group_summary")
+    def test_flush_guarding_mode_close_majority(self, mock_send_discord):
+        """Guarding mode: Guarding action triggered close on 2 outlets."""
+        db._record_pending_brand_action(
+            brand_id="brand-1",
+            store_id="101",
+            store_name="Outlet A",
+            action="ACTION_CLOSE",
+            target_state="CLOSED",
+            success=True,
+            error_message=None,
+        )
+        db._record_pending_brand_action(
+            brand_id="brand-1",
+            store_id="102",
+            store_name="Outlet B",
+            action="ACTION_CLOSE",
+            target_state="CLOSED",
+            success=True,
+            error_message=None,
+        )
+
+        mock_conn = MagicMock()
+        mock_brand = {"id": "brand-1", "name": "Brand Test", "applied_status": "PAUSED"}
+
+        def mock_execute(query, params=None):
+            m = MagicMock()
+            if "FROM vb_brands" in query:
+                m.fetchone.return_value = mock_brand
+            return m
+
+        mock_conn.execute.side_effect = mock_execute
+
+        with patch.object(db, "connection") as mock_conn_fn:
+            mock_conn_fn.return_value.__enter__.return_value = mock_conn
+            db.flush_pending_brand_notifications()
+
+        mock_send_discord.assert_called_once()
+        call_kwargs = mock_send_discord.call_args.kwargs
+        self.assertEqual(call_kwargs["group_name"], "Brand Test")
+        self.assertEqual(call_kwargs["action"], "ACTION_CLOSE")
+        self.assertTrue(call_kwargs["is_guarding"])
+        self.assertEqual(len(call_kwargs["success_items"]), 2)
+        self.assertEqual(len(call_kwargs["failed_items"]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
