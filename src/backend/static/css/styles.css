@@ -9505,16 +9505,8 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     backdrop-filter: blur(18px);
   }
 
-  .admin-shell.is-tab-vb .admin-sidebar-nav,
-  .admin-shell[data-active-tab="vb"] .admin-sidebar-nav {
+  .admin-shell .admin-sidebar-nav #tabBtnLogs {
     display: none !important;
-  }
-
-  .admin-shell.is-tab-vb #paneVB.active,
-  .admin-shell[data-active-tab="vb"] #paneVB.active,
-  .admin-shell.is-tab-vb .vb-page-shell,
-  .admin-shell[data-active-tab="vb"] .vb-page-shell {
-    padding-bottom: 24px !important;
   }
 
   .admin-shell .admin-sidebar-nav .tab-btn {
