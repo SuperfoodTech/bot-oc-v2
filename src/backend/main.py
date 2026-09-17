@@ -1388,6 +1388,38 @@ class WATestRequest(BaseModel):
     message: str
 
 
+@app.get("/admin/wa/console", response_class=HTMLResponse, summary="Admin: WhatsApp Gateway Console Proxy")
+def get_wa_console_html(admin: dict = Depends(require_admin)):
+    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    html_content = None
+
+    if wa_url:
+        try:
+            req = urllib.request.Request(
+                f"{wa_url.rstrip('/')}/",
+                headers={"User-Agent": "FoodMaster-Backend"}
+            )
+            with urllib.request.urlopen(req, timeout=4.0) as resp:
+                if resp.status == 200:
+                    html_content = resp.read().decode('utf-8', errors='ignore')
+        except Exception:
+            pass
+
+    if not html_content:
+        local_index = os.path.join(PROJECT_ROOT, "bot-wa", "public", "index.html")
+        if os.path.exists(local_index):
+            with open(local_index, "r", encoding="utf-8") as f:
+                html_content = f.read()
+
+    if html_content:
+        html_content = html_content.replace("fetch('/api/v1/status')", "fetch('/api/v1/admin/wa/status')")
+        html_content = html_content.replace("fetch('/api/v1/logout'", "fetch('/api/v1/admin/wa/logout'")
+        html_content = html_content.replace("fetch('/api/v1/send-message'", "fetch('/api/v1/admin/wa/test'")
+        return HTMLResponse(content=html_content)
+
+    return HTMLResponse(content="<div style='padding: 24px; font-family: sans-serif; color: #dc2626;'><h3>Gagal memuat WhatsApp Gateway Console</h3><p>Server bot-wa tidak merespons atau file console tidak ditemukan.</p></div>", status_code=500)
+
+
 @app.get("/api/v1/admin/wa/status", summary="Admin: Get WhatsApp Gateway Status & QR Code")
 def get_wa_gateway_status(admin: dict = Depends(require_admin)):
     wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
