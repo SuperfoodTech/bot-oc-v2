@@ -18,7 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260917-v126-fixoverflow">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260917-v131-brandlinklevel">
 </head>
 
 <body x-data="adminApp()">
@@ -2094,6 +2094,19 @@
           vbPillClass = 'is-off is-schedule-locked';
         }
 
+        const bSlug = (brand && brand.slug) ? brand.slug : (brand && brand.name ? String(brand.name).toLowerCase().replace(/[^\w\s-]/g, '').replace(/[-\s]+/g, '-') : 'brand');
+        const bUrl = `/brand/${encodeURIComponent(bSlug)}`;
+        const brandLinkMarkup = `
+          <a href="${bUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-brand-link" onclick="event.stopPropagation()" aria-label="Buka Dashboard Brand ${escapeVBHtml(brand?.name || '')}" title="Buka Dashboard Brand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            <span>Link Brand</span>
+          </a>
+        `;
+
         const outletRows = brand.visibleOutlets.length
           ? brand.visibleOutlets.map(outlet => {
             const statusToneClass = outlet.liveState === 'OPEN'
@@ -2123,7 +2136,6 @@
                   <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
                   <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
                   <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
-                  <div class="vb-store-brand-link"><span class="vb-store-field-label">Link Brand</span>${outlet.brandLinkMarkup}</div>
                   <div class="vb-store-ofd"><span class="vb-store-field-label">Link OFD</span>${outlet.linkCellMarkup}</div>
                 </div>
               `;
@@ -2138,6 +2150,7 @@
                 <h3>${escapeVBHtml(brand.name)}</h3>
                 <div class="vb-group-context">
                   <span class="vb-status-pill ${vbPillClass}">${vbPillLabel}</span>
+                  ${brandLinkMarkup}
                 </div>
                 ${brand.pendingNote ? `<p class="vb-group-note is-pending">${escapeVBHtml(brand.pendingNote)}</p>` : ''}
               </div>
@@ -2185,7 +2198,6 @@
                   <span>Store ID</span>
                   <span>Status</span>
                   <span>Jam Hari Ini</span>
-                  <span>Link Brand</span>
                   <span>Link OFD</span>
                 </div>
                 ${outletRows}
@@ -2838,7 +2850,10 @@
         const activeBrands = summary.brands_active || 0;
         const summaryText = `Brand aktif: ${Math.max(0, activeBrands)} · Dinonaktifkan: ${summary.brands_deactivated || 0} · Outlet baru: ${created} · Relasi: ${summary.outlets_linked || 0} · Missing: ${missing}`;
         const summaryEl = document.getElementById('vbImportSummary');
-        if (summaryEl) summaryEl.textContent = summaryText;
+        if (summaryEl) {
+          summaryEl.textContent = summaryText;
+          summaryEl.hidden = false;
+        }
         showToast(`Import selesai. ${summaryText}`, missing ? 'warning' : 'success');
         await loadVBData();
       } catch (err) {

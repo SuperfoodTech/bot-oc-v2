@@ -3168,6 +3168,17 @@ body {
   font-weight: 600;
 }
 
+.vb-import-summary:empty,
+.vb-import-summary[hidden] {
+  display: none !important;
+}
+
+.admin-shell.is-tab-vb .admin-page-header,
+.admin-shell[data-active-tab="vb"] .admin-page-header,
+body[data-admin-tab="vb"] .admin-shell .admin-page-header {
+  margin-bottom: 16px;
+}
+
 .vb-mobile-toolbar {
   display: none;
 }
@@ -3585,11 +3596,11 @@ body {
 .vb-store-table-head,
 .vb-store-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.25fr) minmax(85px, 0.65fr) minmax(150px, 1.1fr) minmax(105px, 0.65fr) minmax(90px, 0.55fr) minmax(145px, 0.9fr);
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.25fr) minmax(85px, 0.65fr) minmax(150px, 1.1fr) minmax(105px, 0.65fr) minmax(145px, 0.9fr);
   gap: 16px;
   align-items: center;
   padding: 12px 18px;
-  min-width: 960px;
+  min-width: 900px;
 }
 
 .vb-store-table-head {
@@ -4062,7 +4073,7 @@ body.vb-schedule-open {
   .vb-page-shell {
     height: auto;
     overflow: visible;
-    padding-bottom: 92px;
+    padding-bottom: 0;
   }
 
   .vb-panel {
@@ -4120,38 +4131,60 @@ body.vb-schedule-open {
   }
 
   .vb-brand-card {
-    padding: 12px 14px;
+    padding: 12px;
     border-radius: 14px;
   }
 
   .vb-brand-card-head {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 8px 12px;
-    align-items: center;
+    grid-template-rows: auto auto;
+    gap: 6px 10px;
+    align-items: start;
     padding: 2px;
     margin: 0;
   }
 
   .vb-group-identity {
+    grid-column: 1;
+    grid-row: 1;
     min-width: 0;
-    gap: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
   }
 
   .vb-group-eyebrow {
     font-size: 10px;
+    font-weight: 700;
+    color: #8b9199;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.2;
   }
 
   .vb-brand-card h3 {
     font-size: 16px;
+    font-weight: 700;
     line-height: 1.25;
     letter-spacing: -0.02em;
+    color: #111317;
+    margin: 0;
+  }
+
+  .vb-group-context {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 2px;
   }
 
   .vb-brand-toggle {
+    grid-column: 2;
+    grid-row: 1;
     display: flex;
     justify-content: flex-end;
-    align-self: center;
+    align-self: flex-start;
+    padding-top: 2px;
   }
 
   .vb-control {
@@ -4162,11 +4195,12 @@ body.vb-schedule-open {
 
   .vb-group-summary {
     grid-column: 1 / -1;
+    grid-row: 2;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 8px;
     padding-top: 8px;
-    margin-top: 2px;
+    margin-top: 4px;
     border-top: 1px solid #f1f3f5;
   }
 
@@ -4178,6 +4212,7 @@ body.vb-schedule-open {
   .vb-group-summary-item span {
     font-size: 10px;
     white-space: nowrap;
+    color: #71767f;
   }
 
   .vb-group-summary-item strong {
@@ -4190,11 +4225,22 @@ body.vb-schedule-open {
     display: none;
   }
 
+  .vb-brand-detail {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f3f5;
+  }
+
   .vb-store-table {
-    border-radius: 14px;
+    border-radius: 12px;
     width: 100% !important;
     min-width: 0 !important;
     overflow-x: hidden;
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .vb-store-table-head {
@@ -4202,14 +4248,189 @@ body.vb-schedule-open {
   }
 
   .vb-store-row {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 10px;
+    align-items: start;
+    padding: 10px 12px;
+    border: 1px solid #eef0f3;
+    border-radius: 10px;
+    background: #f8fafc;
     min-width: 0 !important;
     width: 100% !important;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
   }
 
-  .vb-store-field-label {
+  .vb-store-row:hover,
+  .vb-store-row:active {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+
+  /* 1. Portal (Row 1, Left) */
+  .vb-store-row .vb-store-main {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .vb-store-row .vb-store-main .vb-store-main-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .vb-store-row .vb-store-main-value strong {
+    font-size: 12px;
+    font-weight: 700;
+    color: #111317;
+  }
+
+  /* 2. Status Utama (Row 1, Right) */
+  .vb-store-row .vb-store-status {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .vb-store-row .vb-store-status strong {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+
+  .vb-store-row .vb-store-status small {
+    font-size: 9.5px;
+    color: #64748b;
+    line-height: 1.25;
+    margin-top: 1px;
     display: block;
+    max-width: 170px;
+    text-align: right;
+    word-break: break-word;
+  }
+
+  /* 3. Nama Listing (Row 2, Spans full width) */
+  .vb-store-row .vb-store-name {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 4px;
+    border-top: 1px dashed #e2e8f0;
+    min-width: 0;
+  }
+
+  .vb-store-row .vb-store-name-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  /* 4. Store ID (Row 3, Left) */
+  .vb-store-row .vb-store-id {
+    grid-column: 1;
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    align-self: center;
+  }
+
+  .vb-store-row .vb-store-id code {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #1e293b;
+    background: #e2e8f0;
+    padding: 2px 6px;
+    border-radius: 5px;
+    display: inline-block;
+    width: fit-content;
+  }
+
+  /* 5. Jam Hari Ini (Row 3, Right) */
+  .vb-store-row .vb-store-hours {
+    grid-column: 2;
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 2px;
+    min-width: 0;
+    align-self: center;
+  }
+
+  .vb-store-row .vb-store-hours .today-operating-hours {
+    justify-items: end;
+  }
+
+  .vb-store-row .vb-store-hours .operating-time {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+  }
+
+  /* 6. Link OFD (Row 4) */
+  .vb-store-row .vb-store-ofd .vb-store-field-label {
+    display: none;
+  }
+
+  .vb-store-row .vb-store-ofd {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-top: 4px;
+    border-top: 1px dashed #e2e8f0;
+    min-width: 0;
+  }
+
+  /* Field Labels */
+  .vb-store-row .vb-store-field-label {
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    color: #8a9098;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+
+  .vb-store-row .admin-table-shopeefood-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #ea580c;
+    background: transparent !important;
+    border: none !important;
+    padding: 2px 0;
+    text-decoration: none;
+    line-height: 1.2;
+    width: fit-content;
+  }
+
+  .vb-store-row .admin-table-shopeefood-link:hover {
+    text-decoration: underline;
   }
 
   .vb-store-actions {
@@ -9548,7 +9769,7 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   .settings-page-shell {
     height: auto;
     overflow: visible;
-    padding-bottom: calc(104px + env(safe-area-inset-bottom));
+    padding-bottom: 0 !important;
   }
 
   .admin-shell .admin-sidebar-nav {
@@ -9665,7 +9886,7 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   }
 
   .admin-shell .admin-main {
-    padding: 14px 16px calc(112px + env(safe-area-inset-bottom));
+    padding: 14px 16px calc(76px + env(safe-area-inset-bottom));
     overflow: visible;
   }
 
@@ -9683,10 +9904,14 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     line-height: 1.15;
   }
 
-  .admin-shell .admin-main #paneOutlets .table-card.outlet-section {
+  .admin-shell .admin-main #paneOutlets .table-card.outlet-section,
+  .admin-shell .admin-main #paneVB .table-card.vb-table-card,
+  .vb-table-card {
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
   }
 
   .admin-shell .admin-main .mobile-summary-strip {
@@ -9868,9 +10093,20 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     display: none !important;
   }
 
+  .admin-shell .admin-page-header .admin-actions {
+    display: none !important;
+  }
+
   body[data-admin-tab="outlets"] .admin-shell .admin-page-header .admin-header-search,
   body[data-admin-tab="vb"] .admin-shell .admin-page-header .admin-header-search {
     display: none;
+  }
+
+  .admin-shell.is-tab-vb .admin-page-header,
+  .admin-shell[data-active-tab="vb"] .admin-page-header,
+  body[data-admin-tab="vb"] .admin-shell .admin-page-header {
+    margin: 0 0 10px !important;
+    gap: 0 !important;
   }
 
   .vb-mobile-toolbar {

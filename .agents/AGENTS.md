@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.8`.
+Latest documented release: `1.23.9`.
+
+Virtual Brand Link Level Placement & Card UI Optimization:
+- Tombol **Link Brand** (`admin-table-brand-link`) dipindahkan dari level kartu outlet (`.vb-store-row`) ke level header kartu brand (`.vb-brand-card-head` / `.vb-group-identity`), berdampingan dengan pill status grup (`.vb-status-pill`).
+- Tabel outlet desktop (`.vb-store-table`) disederhanakan dari 7 kolom menjadi 6 kolom (`Portal`, `Nama Listing`, `Store ID`, `Status`, `Jam Hari Ini`, `Link OFD`).
+- Header whitespace dan margin bawah halaman VB dioptimalkan untuk tampilan desktop dan mobile yang bersih dan padat.
 
 Virtual Brand Notification Direction & Evaluation Determinism:
 - Pada mode Brand Toggle (`is_brand_toggle == True`), penentuan jenis notifikasi Discord (`summary_action` dan `is_open`) di `main-vb/src/db.py` **100% dipandu oleh `applied_status` brand** (`applied_status == "ON"` -> `ACTION_OPEN` / DIBUKA; `applied_status == "PAUSED"` -> `ACTION_CLOSE` / DITUTUP), mengeliminasi kontaminasi sisa log aksi patroli lama via `any()`.
