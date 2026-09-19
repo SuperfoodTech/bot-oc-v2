@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.9`.
+Latest documented release: `1.23.10`.
+
+Virtual Brand Dedicated Dashboard 1:1 Pause Modal & Custom Picker:
+- Modal konfirmasi penutupan sementara di Dashboard Publik Virtual Brand (`/brand/{slug}`) dibuat **1:1 identik** dengan Admin VB Modal dan Dashboard Mitra (mencakup step indicator, judul dinamis `Tutup <Nama Brand>`, box preview waktu auto-buka, opsi radio `30 Menit`, `60 Menit`, `Sepanjang Hari`, dan `Durasi lain`).
+- Mengintegrasikan Custom Date & Time Picker popover lengkap: navigasi bulan kalender, proteksi tanggal lampau & batas maksimal 6 bulan, dropdown jam:menit WIB, dan tombol Batal/Pilih.
+- Memperbaiki penanganan visibilitas modal overlay (`.active`, `hidden`, `aria-hidden`) agar interaksi switch toggle pada halaman Virtual Brand berjalan mulus tanpa terblokir.
 
 Virtual Brand Link Level Placement & Card UI Optimization:
 - Tombol **Link Brand** (`admin-table-brand-link`) dipindahkan dari level kartu outlet (`.vb-store-row`) ke level header kartu brand (`.vb-brand-card-head` / `.vb-group-identity`), berdampingan dengan pill status grup (`.vb-status-pill`).
