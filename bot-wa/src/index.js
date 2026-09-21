@@ -13,6 +13,7 @@ const QRCodeGenerator = require('qrcode');
 const pino = require('pino');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 dotenv.config();
 
@@ -166,8 +167,26 @@ function normalizePhoneNumber(rawPhone) {
   return cleaned;
 }
 
+// Anti-Spam / Deduplication Cache (TTL 5 Menit)
+const DEDUP_TTL_MS = 5 * 60 * 1000;
+const dedupCache = new Map();
+
+function checkAndMarkDuplicate(dedupKey) {
+  if (!dedupKey) return false;
+  const now = Date.now();
+  // Cleanup expired items
+  for (const [k, ts] of dedupCache.entries()) {
+    if (now - ts > DEDUP_TTL_MS) dedupCache.delete(k);
+  }
+  if (dedupCache.has(dedupKey)) {
+    return true;
+  }
+  dedupCache.set(dedupKey, now);
+  return false;
+}
+
 /**
- * Worker Penangan Antrean Pesan (Anti-Ban Rate Limiting)
+ * Worker Penangan Antrean Pesan (Anti-Ban & Anti-Spam Rate Limiting)
  */
 async function processQueue() {
   if (isProcessingQueue || queue.length === 0) return;
@@ -184,20 +203,35 @@ async function processQueue() {
         throw new Error(`Nomor telepon tidak valid: ${task.phone}`);
       }
       const formattedJid = cleaned + '@s.whatsapp.net';
+
+      // 1. Simulasi status mengetik (Human Emulation)
+      try {
+        await sock.sendPresenceUpdate('composing', formattedJid);
+        const typingDelay = Math.floor(800 + Math.random() * 800); // 800ms - 1600ms
+        await new Promise((r) => setTimeout(r, typingDelay));
+        await sock.sendPresenceUpdate('paused', formattedJid);
+      } catch (presErr) {
+        // Abaikan error presence jika network lambat
+      }
+
+      // 2. Kirim pesan aktual
       await sock.sendMessage(formattedJid, { text: task.message });
+      logger.info({ phone: task.phone, jid: formattedJid }, 'Pesan WA berhasil terkirim');
       if (task.resolve) task.resolve({ success: true, phone: task.phone, jid: formattedJid });
     } catch (err) {
       logger.error({ err: err.message, phone: task.phone }, 'Gagal mengirim pesan WA');
       if (task.reject) task.reject(err);
     }
-    // Delay 1.5 detik antar kiriman pesan untuk mencegah penangguhan nomor
-    await new Promise((r) => setTimeout(r, 1500));
+
+    // 3. Jeda aman acak (Jitter Pacing: 2.5s - 4.5s) antar pesan untuk perlindungan anti-ban
+    const safeJitterDelay = Math.floor(2500 + Math.random() * 2000);
+    await new Promise((r) => setTimeout(r, safeJitterDelay));
   }
 
   isProcessingQueue = false;
 }
 
-function enqueueMessage(phoneInput, message) {
+function enqueueMessage(phoneInput, message, dedupKey = null) {
   if (!phoneInput) return Promise.resolve({ success: false, error: 'Nomor kosong' });
   const phoneList = String(phoneInput)
     .split(/[,;\n]+/)
@@ -208,8 +242,27 @@ function enqueueMessage(phoneInput, message) {
     return Promise.resolve({ success: false, error: 'Nomor kosong' });
   }
 
+  // Cek deduplikasi jika diberikan dedupKey
+  if (dedupKey && checkAndMarkDuplicate(dedupKey)) {
+    logger.warn({ dedupKey, phoneInput }, '[ANTI-SPAM] Pesan duplikat dicegah (cooldown 5 menit aktif)');
+    return Promise.resolve({ success: true, deduplicated: true, message: 'Pesan duplikat dicegah oleh proteksi Anti-Spam.' });
+  }
+
+  // Batasi kapasitas antrean maksimal 100 pesan
+  if (queue.length >= 100) {
+    logger.warn('Kapasitas antrean pesan WA penuh (100). Pesan baru diabaikan untuk proteksi.');
+    return Promise.resolve({ success: false, error: 'Antrean pesan WA penuh.' });
+  }
+
   const promises = phoneList.map(phone => {
     return new Promise((resolve, reject) => {
+      // Hindari duplikasi task identik di antrean yang belum terproses
+      const isAlreadyInQueue = queue.some(t => t.phone === phone && t.message === message);
+      if (isAlreadyInQueue) {
+        logger.info({ phone }, '[QUEUE DEDUP] Pesan identik sudah ada di antrean.');
+        resolve({ success: true, deduplicated: true });
+        return;
+      }
       queue.push({ phone, message, resolve, reject });
     });
   });
@@ -224,66 +277,227 @@ function enqueueMessage(phoneInput, message) {
 function buildNotificationText(body) {
   const { event_type, platform, merchant_name, outlet_name, store_id, action, live_status, error_type, detail, timestamp } = body;
   const timeStr = timestamp || new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-  const platformName = platform || 'Shopee';
+
+  const cleanStoreId = String(store_id || '').trim();
+  const shopeeLink = cleanStoreId && cleanStoreId !== '-' && cleanStoreId !== 'SYSTEM'
+    ? `https://shopee.co.id/universal-link/now-food/shop/${cleanStoreId}`
+    : '-';
 
   if (event_type === 'ACTION_OPEN') {
     return (
-      `🟢 *[OUTLET DIBUKA]*\n\n` +
-      `Halo *${merchant_name}*,\n` +
-      `Outlet *${outlet_name}* (${platformName} - ID: ${store_id || '-'}) telah *BERHASIL DIBUKA* oleh bot patroli.\n\n` +
-      `Waktu: ${timeStr}\n` +
-      `Status Live: OPEN\n\n` +
-      `_Pesan otomatis dari Bot FoodMaster System._`
+      `🟢 *OUTLET BERHASIL DIBUKA BOT*\n\n` +
+      `Nama Outlet: *${outlet_name}*\n` +
+      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Lihat di ShopeeFood:\n${shopeeLink}\n\n` +
+      `FoodMaster Bot Team\n` +
+      `WA CS: wa.me/6285183151531`
     );
   }
 
   if (event_type === 'ACTION_CLOSE' || event_type === 'ACTION_PAUSE') {
     return (
-      `🟡 *[OUTLET DITUTUP / PAUSE]*\n\n` +
-      `Halo *${merchant_name}*,\n` +
-      `Outlet *${outlet_name}* (${platformName} - ID: ${store_id || '-'}) telah *BERHASIL DITUTUP* oleh bot patroli.\n\n` +
-      `Waktu: ${timeStr}\n` +
-      `Status Live: PAUSE / CLOSED\n\n` +
-      `_Pesan otomatis dari Bot FoodMaster System._`
+      `🔴 *OUTLET BERHASIL DITUTUP BOT*\n\n` +
+      `Nama Outlet: *${outlet_name}*\n` +
+      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Lihat di ShopeeFood:\n${shopeeLink}\n\n` +
+      `FoodMaster Bot Team\n` +
+      `WA CS: wa.me/6285183151531`
     );
   }
 
   if (event_type === 'ACTION_SKIPPED') {
     return (
-      `⚠️ *[OUTLET DI-SKIP (JADWAL KHUSUS)]*\n\n` +
-      `Halo *${merchant_name}*,\n` +
-      `Outlet *${outlet_name}* (${platformName}) di-SKIP dari paksa status.\n\n` +
-      `Status Live Shopee: *${live_status || 'UNKNOWN'}*\n` +
-      `Ekspektasi Aksi: *${action || '-'}*\n` +
-      `Catatan: Toko memiliki Jadwal Khusus / Libur di Shopee.\n` +
-      `Waktu: ${timeStr}\n\n` +
-      `_Pesan otomatis dari Bot FoodMaster System._`
+      `⚠️ *OUTLET DI-SKIP (JADWAL KHUSUS)*\n\n` +
+      `Nama Outlet: *${outlet_name}*\n` +
+      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Status Shopee: *${live_status || 'UNKNOWN'}*\n` +
+      `Catatan: Toko memiliki Jadwal Khusus / Libur.\n\n` +
+      `FoodMaster Bot Team\n` +
+      `WA CS: wa.me/6285183151531`
     );
   }
 
   if (event_type === 'BOT_ERROR') {
     return (
-      `❌ *[PERINGATAN EROR BOT]*\n\n` +
-      `Perhatian Admin/Merchant *${merchant_name}*,\n` +
-      `Terjadi kendala patroli pada outlet *${outlet_name}* (${platformName}).\n\n` +
+      `❌ *PERINGATAN EROR BOT PATROLI*\n\n` +
+      `Nama Outlet: *${outlet_name}*\n` +
+      `Store ID: *${cleanStoreId || '-'}*\n` +
       `Tipe Error: ${error_type || 'Unknown Exception'}\n` +
-      `Detail: ${detail || 'Gagal melakukan konfirmasi status'}\n` +
-      `Waktu: ${timeStr}\n\n` +
-      `_Pesan otomatis dari Bot FoodMaster System._`
+      `Detail: ${detail || 'Gagal memverifikasi status'}\n\n` +
+      `FoodMaster Bot Team\n` +
+      `WA CS: wa.me/6285183151531`
     );
   }
 
   // Fallback Pesan Generik
   return (
-    `ℹ️ *[NOTIFIKASI FOODMASTER]*\n\n` +
-    `Merchant: *${merchant_name}*\n` +
-    `Outlet: *${outlet_name}*\n` +
-    `Informasi: ${detail || action || 'Pesan dari sistem'}\n` +
-    `Waktu: ${timeStr}`
+    `ℹ️ *NOTIFIKASI FOODMASTER*\n\n` +
+    `Nama Outlet: *${outlet_name}*\n` +
+    `Store ID: *${cleanStoreId || '-'}*\n` +
+    `Informasi: ${detail || action || 'Pesan dari sistem'}\n\n` +
+    `FoodMaster Bot Team\n` +
+    `WA CS: wa.me/6285183151531`
   );
 }
 
-// ================= ROUTE API =================
+// Agency Google Sheet URL
+const GOOGLE_SHEETS_CSV_URL = process.env.GOOGLE_SHEETS_CSV_URL || 
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/pub?gid=0&single=true&output=csv';
+
+let cachedOwnersData = null;
+let lastFetchTimestamp = 0;
+
+// Helper Parse CSV
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length === 0) return [];
+  
+  function parseLine(line) {
+    const values = [];
+    let current = '';
+    let insideQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (insideQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    return values;
+  }
+
+  const rawHeaders = parseLine(lines[0]);
+  const headers = rawHeaders.map(h => h.trim().toLowerCase());
+
+  function findCol(patterns, exclude = []) {
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      if (exclude.some(ex => h.includes(ex))) continue;
+      if (patterns.some(p => h.includes(p))) return i;
+    }
+    return -1;
+  }
+
+  const colOwner = findCol(['nama pemilik', 'pemilik'], ['wa', 'hp', 'no']);
+  const colPhone = findCol(['nomor hp', 'wa', 'whatsapp', 'hp', 'telepon']);
+  const colStatus = findCol(['status'], ['langganan', 'subscription']);
+  const colPaket = findCol(['paket', 'package']);
+  const colMulai = findCol(['mulai', 'start']);
+  const colBerakhir = findCol(['berakhir', 'expired', 'end']);
+  const colPortal = findCol(['nama portal', 'portal', 'merchant']);
+  const colStoreId = findCol(['store id', 'store_id', 'store']);
+  const colNamaListing = findCol(['nama listing', 'nama panjang', 'listing', 'outlet'], ['portal']);
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseLine(lines[i]);
+    if (!vals || vals.length === 0) continue;
+    const getVal = (idx) => (idx >= 0 && idx < vals.length ? vals[idx].trim() : '');
+
+    const ownerName = getVal(colOwner >= 0 ? colOwner : 0);
+    if (!ownerName) continue;
+
+    rows.push({
+      owner: ownerName,
+      phone: getVal(colPhone >= 0 ? colPhone : 1),
+      status: getVal(colStatus >= 0 ? colStatus : 2) || 'Aktif',
+      package: getVal(colPaket >= 0 ? colPaket : 3) || '-',
+      start_date: getVal(colMulai >= 0 ? colMulai : 4) || '-',
+      end_date: getVal(colBerakhir >= 0 ? colBerakhir : 5) || '-',
+      portal: getVal(colPortal >= 0 ? colPortal : 8),
+      store_id: getVal(colStoreId >= 0 ? colStoreId : 9),
+      outlet_name: getVal(colNamaListing >= 0 ? colNamaListing : 10) || getVal(colStoreId >= 0 ? colStoreId : 9)
+    });
+  }
+  return rows;
+}
+
+function downloadCsvText(targetUrl, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects < 0) return reject(new Error('Too many redirects'));
+    const req = https.get(targetUrl, { family: 4, timeout: 15000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return downloadCsvText(res.headers.location, maxRedirects - 1).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+      }
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout fetching Google Sheet CSV'));
+    });
+  });
+}
+
+async function fetchAgencyOwnersFromSheet() {
+  try {
+    const csvText = await downloadCsvText(GOOGLE_SHEETS_CSV_URL);
+    const rows = parseCSV(csvText);
+
+    const ownersMap = {};
+    for (const r of rows) {
+      const owner = r.owner;
+      if (!owner) continue;
+
+      if (!ownersMap[owner]) {
+        ownersMap[owner] = {
+          owner: owner,
+          phones: [],
+          package: r.package,
+          subscription_status: r.status,
+          start_date: r.start_date,
+          end_date: r.end_date,
+          outlets: []
+        };
+      }
+
+      if (r.phone && r.phone !== '-' && !ownersMap[owner].phones.includes(r.phone)) {
+        ownersMap[owner].phones.push(r.phone);
+      }
+
+      if (r.store_id || r.outlet_name) {
+        ownersMap[owner].outlets.push({
+          store_id: r.store_id,
+          outlet_name: r.outlet_name || r.store_id,
+          portal: r.portal,
+          status: r.status,
+          package: r.package
+        });
+      }
+    }
+
+    const ownersList = Object.values(ownersMap).sort((a, b) => a.owner.localeCompare(b.owner));
+    cachedOwnersData = ownersList;
+    lastFetchTimestamp = Date.now();
+    logger.info({ totalOwners: ownersList.length, totalOutlets: rows.length }, 'Data Owner Agency Google Sheet berhasil di-fetch.');
+    return ownersList;
+  } catch (err) {
+    logger.error({ err: err.message }, 'Gagal fetch Agency Google Sheet, mencoba fallback cache/file');
+    return cachedOwnersData || [];
+  }
+}
+
+async function getOwnersData(forceRefresh = false) {
+  if (!forceRefresh && cachedOwnersData && (Date.now() - lastFetchTimestamp < 300000)) {
+    return cachedOwnersData;
+  }
+  return await fetchAgencyOwnersFromSheet();
+}
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -305,6 +519,38 @@ app.get('/api/v1/status', (req, res) => {
     user: userInfo || null,
     queue_length: queue.length
   });
+});
+
+// Owners & Configuration route (Grouped by Unique Owner from Agency Sheet)
+app.get('/api/v1/owners', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === 'true' || req.query.sync === '1';
+    const owners = await getOwnersData(forceRefresh);
+    res.json({
+      success: true,
+      total_owners: owners.length,
+      total_outlets: owners.reduce((acc, o) => acc + (o.outlets ? o.outlets.length : 0), 0),
+      data: owners
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Sync Agency Sheet route
+app.post('/api/v1/sync-sheet', async (req, res) => {
+  try {
+    const owners = await getOwnersData(true);
+    res.json({
+      success: true,
+      message: 'Data Google Sheet Agency berhasil disinkronkan.',
+      total_owners: owners.length,
+      total_outlets: owners.reduce((acc, o) => acc + (o.outlets ? o.outlets.length : 0), 0),
+      data: owners
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // Logout & Reset Session Route
@@ -343,7 +589,7 @@ app.post('/api/v1/logout', authenticateApiKey, async (req, res) => {
 
 // Direct Send Message Route
 app.post('/api/v1/send-message', authenticateApiKey, async (req, res) => {
-  const { phone, message } = req.body;
+  const { phone, message, dedup_key } = req.body;
 
   if (!phone || !message) {
     return res.status(400).json({
@@ -353,10 +599,11 @@ app.post('/api/v1/send-message', authenticateApiKey, async (req, res) => {
   }
 
   try {
-    const result = await enqueueMessage(phone, message);
+    const key = dedup_key || `${phone}:${message.slice(0, 32)}`;
+    const result = await enqueueMessage(phone, message, key);
     res.json({
       success: true,
-      message: 'Pesan berhasil dimasukkan ke dalam antrean WA.',
+      message: 'Pesan berhasil diproses ke dalam antrean WA.',
       data: result
     });
   } catch (err) {
@@ -369,7 +616,7 @@ app.post('/api/v1/send-message', authenticateApiKey, async (req, res) => {
 
 // Webhook Bot Action Notification Route (Used by bot-oc and bot-vb)
 app.post('/api/v1/webhook/bot-action', authenticateApiKey, async (req, res) => {
-  const { phone, merchant_name, outlet_name } = req.body;
+  const { phone, merchant_name, outlet_name, store_id, event_type } = req.body;
 
   if (!phone || !merchant_name || !outlet_name) {
     return res.status(400).json({
@@ -378,14 +625,16 @@ app.post('/api/v1/webhook/bot-action', authenticateApiKey, async (req, res) => {
     });
   }
 
+  const dedupKey = `BOT:${phone}:${event_type || 'ACT'}:${store_id || outlet_name}`;
   const messageText = buildNotificationText(req.body);
 
   try {
-    enqueueMessage(phone, messageText);
+    const result = await enqueueMessage(phone, messageText, dedupKey);
     res.json({
       success: true,
-      message: 'Webhook diterima dan notifikasi WA dijadwalkan.',
-      event_type: req.body.event_type || 'GENERAL'
+      message: 'Webhook diterima dan notifikasi WA diproses.',
+      event_type: event_type || 'GENERAL',
+      deduplicated: Boolean(result && result.deduplicated)
     });
   } catch (err) {
     res.status(500).json({

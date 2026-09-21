@@ -53,3 +53,12 @@ build/
 # Database dumps & backups
 *.sql
 !database/migrations/*.sql
+
+# Node.js & Baileys
+node_modules/
+bot-wa/node_modules/
+auth_info_baileys/
+bot-wa/auth_info_baileys/
+package-lock.json
+bot-wa/package-lock.json
+

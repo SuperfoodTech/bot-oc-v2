@@ -4,6 +4,7 @@ main.py
 FastAPI Backend Application serving REST API endpoints, Admin Desktop Dashboard, and Mobile-First User Link Dashboard.
 """
 
+import csv
 import sys
 import base64
 import hashlib
@@ -1388,22 +1389,44 @@ class WATestRequest(BaseModel):
     message: str
 
 
+def _get_wa_gateway_candidate_urls() -> List[str]:
+    configured = os.getenv("WA_GATEWAY_URL", "").strip()
+    candidates = []
+    if configured:
+        candidates.append(configured.rstrip("/"))
+    candidates.extend([
+        "http://172.17.0.1:3002",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+        "http://host.docker.internal:3002"
+    ])
+    seen = set()
+    result = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            result.append(c)
+    return result
+
+
 @app.get("/admin/wa/console", response_class=HTMLResponse, summary="Admin: WhatsApp Gateway Console Proxy")
 def get_wa_console_html(admin: dict = Depends(require_admin)):
-    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    candidate_urls = _get_wa_gateway_candidate_urls()
     html_content = None
 
-    if wa_url:
+    for wa_url in candidate_urls:
         try:
             req = urllib.request.Request(
                 f"{wa_url.rstrip('/')}/",
                 headers={"User-Agent": "FoodMaster-Backend"}
             )
-            with urllib.request.urlopen(req, timeout=4.0) as resp:
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
                 if resp.status == 200:
                     html_content = resp.read().decode('utf-8', errors='ignore')
+                    if html_content:
+                        break
         except Exception:
-            pass
+            continue
 
     if not html_content:
         local_index = os.path.join(PROJECT_ROOT, "bot-wa", "public", "index.html")
@@ -1412,119 +1435,209 @@ def get_wa_console_html(admin: dict = Depends(require_admin)):
                 html_content = f.read()
 
     if html_content:
-        html_content = html_content.replace("fetch('/api/v1/status')", "fetch('/api/v1/admin/wa/status')")
-        html_content = html_content.replace("fetch('/api/v1/logout'", "fetch('/api/v1/admin/wa/logout'")
-        html_content = html_content.replace("fetch('/api/v1/send-message'", "fetch('/api/v1/admin/wa/test'")
+        html_content = html_content.replace("'/api/v1/status'", "'/api/v1/admin/wa/status'")
+        html_content = html_content.replace('"/api/v1/status"', '"/api/v1/admin/wa/status"')
+        html_content = html_content.replace("'/api/v1/logout'", "'/api/v1/admin/wa/logout'")
+        html_content = html_content.replace('"/api/v1/logout"', '"/api/v1/admin/wa/logout"')
+        html_content = html_content.replace("'/api/v1/send-message'", "'/api/v1/admin/wa/test'")
+        html_content = html_content.replace('"/api/v1/send-message"', '"/api/v1/admin/wa/test"')
+        html_content = html_content.replace("'/api/v1/owners'", "'/api/v1/admin/wa/owners'")
+        html_content = html_content.replace('"/api/v1/owners"', '"/api/v1/admin/wa/owners"')
+        html_content = html_content.replace("'/api/v1/sync-sheet'", "'/api/v1/admin/wa/sync-sheet'")
+        html_content = html_content.replace('"/api/v1/sync-sheet"', '"/api/v1/admin/wa/sync-sheet"')
         return HTMLResponse(content=html_content)
 
     return HTMLResponse(content="<div style='padding: 24px; font-family: sans-serif; color: #dc2626;'><h3>Gagal memuat WhatsApp Gateway Console</h3><p>Server bot-wa tidak merespons atau file console tidak ditemukan.</p></div>", status_code=500)
 
 
+def _get_agency_owners_list() -> List[Dict[str, Any]]:
+    """Ambil data pemilik unik (unique owners) langsung dari Google Sheet Agency / PostgreSQL DB."""
+    from core.sheets import fetch_merchant_outlets
+    outlets = []
+    try:
+        outlets = fetch_merchant_outlets()
+    except Exception as exc:
+        logging.warning("Gagal fetch fresh Google Sheet Agency untuk daftar owner WA: %s", exc)
+        outlets = []
+
+    owners_map: Dict[str, Dict[str, Any]] = {}
+
+    if outlets:
+        for o in outlets:
+            owner = (o.nama_pemilik or "").strip()
+            if not owner:
+                continue
+            if owner not in owners_map:
+                owners_map[owner] = {
+                    "owner": owner,
+                    "phones": [],
+                    "package": o.paket or "-",
+                    "subscription_status": o.status_langganan or "Aktif",
+                    "start_date": o.tanggal_mulai_layanan or "-",
+                    "end_date": o.tanggal_berakhir_layanan or "-",
+                    "outlets": []
+                }
+            phone = (o.hp or "").strip()
+            if phone and phone != "-" and phone not in owners_map[owner]["phones"]:
+                owners_map[owner]["phones"].append(phone)
+
+            owners_map[owner]["outlets"].append({
+                "store_id": o.store_id,
+                "outlet_name": o.nama_panjang_outlet or o.nama_portal or o.store_id,
+                "portal": o.nama_portal,
+                "status": o.import_status,
+                "package": o.paket,
+            })
+    else:
+        stores = state.get_all_stores()
+        for s in stores:
+            owner = (s.get("nama_pemilik") or "").strip()
+            if not owner:
+                continue
+            if owner not in owners_map:
+                owners_map[owner] = {
+                    "owner": owner,
+                    "phones": [],
+                    "package": s.get("paket") or "-",
+                    "subscription_status": s.get("subscription_status") or "Aktif",
+                    "start_date": s.get("tanggal_mulai_layanan") or "-",
+                    "end_date": s.get("tanggal_berakhir_layanan") or "-",
+                    "outlets": []
+                }
+            phone = (s.get("hp") or "").strip()
+            if phone and phone != "-" and phone not in owners_map[owner]["phones"]:
+                owners_map[owner]["phones"].append(phone)
+
+            owners_map[owner]["outlets"].append({
+                "store_id": s.get("store_id"),
+                "outlet_name": s.get("store_name"),
+                "portal": s.get("merchant_name"),
+                "status": "Aktif" if s.get("is_active") else "Nonaktif",
+                "package": s.get("paket"),
+            })
+
+    return sorted(list(owners_map.values()), key=lambda x: x["owner"])
+
+
+@app.get("/api/v1/admin/wa/owners", summary="Admin: Get WhatsApp Bot Owners & Outlets List")
+def get_wa_owners_list(admin: dict = Depends(require_admin)):
+    owners = _get_agency_owners_list()
+    total_outlets = sum(len(o.get("outlets", [])) for o in owners)
+    return {
+        "success": True,
+        "total_owners": len(owners),
+        "total_outlets": total_outlets,
+        "data": owners
+    }
+
+
+@app.post("/api/v1/admin/wa/sync-sheet", summary="Admin: Sync WhatsApp Owners from Agency Sheet")
+def sync_wa_agency_sheet(admin: dict = Depends(require_admin)):
+    owners = _get_agency_owners_list()
+    total_outlets = sum(len(o.get("outlets", [])) for o in owners)
+    return {
+        "success": True,
+        "message": "Data Agency Google Sheet berhasil disinkronkan.",
+        "total_owners": len(owners),
+        "total_outlets": total_outlets,
+        "data": owners
+    }
+
+
 @app.get("/api/v1/admin/wa/status", summary="Admin: Get WhatsApp Gateway Status & QR Code")
 def get_wa_gateway_status(admin: dict = Depends(require_admin)):
-    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    candidate_urls = _get_wa_gateway_candidate_urls()
     wa_key = os.getenv("WA_GATEWAY_KEY", "foodmaster-wa-secret-2026-key").strip()
 
-    if not wa_url:
-        return {
-            "success": True,
-            "wa_status": "OFFLINE",
-            "gateway_url": "-",
-            "qr_code_raw": None,
-            "queue_length": 0,
-            "error": "Environment variable WA_GATEWAY_URL belum dikonfigurasi."
-        }
-
-    try:
-        req = urllib.request.Request(
-            f"{wa_url.rstrip('/')}/api/v1/status",
-            headers={
-                "User-Agent": "FoodMaster-Backend",
-                "X-API-Key": wa_key
-            }
-        )
-        with urllib.request.urlopen(req, timeout=4.0) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode())
-                data["gateway_url"] = wa_url
-                return data
-    except Exception as e:
-        return {
-            "success": True,
-            "wa_status": "OFFLINE",
-            "gateway_url": wa_url,
-            "qr_code_raw": None,
-            "queue_length": 0,
-            "error": f"Tidak dapat terhubung ke Gateway WA: {e}"
-        }
+    last_error = "Tidak ada URL gateway yang merespons."
+    for wa_url in candidate_urls:
+        try:
+            req = urllib.request.Request(
+                f"{wa_url.rstrip('/')}/api/v1/status",
+                headers={
+                    "User-Agent": "FoodMaster-Backend",
+                    "X-API-Key": wa_key
+                }
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode())
+                    data["gateway_url"] = wa_url
+                    return data
+        except Exception as e:
+            last_error = str(e)
+            continue
 
     return {
         "success": True,
         "wa_status": "OFFLINE",
-        "gateway_url": wa_url,
+        "gateway_url": candidate_urls[0] if candidate_urls else "-",
         "qr_code_raw": None,
-        "queue_length": 0
+        "queue_length": 0,
+        "error": f"Tidak dapat terhubung ke Gateway WA: {last_error}"
     }
 
 
 @app.post("/api/v1/admin/wa/logout", summary="Admin: Disconnect / Reset WA Session")
 def logout_wa_gateway_session(admin: dict = Depends(require_admin)):
-    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    candidate_urls = _get_wa_gateway_candidate_urls()
     wa_key = os.getenv("WA_GATEWAY_KEY", "foodmaster-wa-secret-2026-key").strip()
 
-    try:
-        req = urllib.request.Request(
-            f"{wa_url.rstrip('/')}/api/v1/logout",
-            data=b"{}",
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "FoodMaster-Backend",
-                "X-API-Key": wa_key
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode())
-                state.record_log(
-                    store_id="SYSTEM",
-                    store_name="WhatsApp Gateway",
-                    action="ADMIN_RESET_WA_SESSION",
-                    target_state="DISCONNECTED",
-                    reason=f"Admin {admin.get('username')} memicu reset sesi WA via Dashboard"
-                )
-                return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gagal melakukan logout sesi WA: {e}")
+    for wa_url in candidate_urls:
+        try:
+            req = urllib.request.Request(
+                f"{wa_url.rstrip('/')}/api/v1/logout",
+                data=b"{}",
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "FoodMaster-Backend",
+                    "X-API-Key": wa_key
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=4.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode())
+                    state.record_log(
+                        store_id="SYSTEM",
+                        store_name="WhatsApp Gateway",
+                        action="ADMIN_RESET_WA_SESSION",
+                        target_state="DISCONNECTED",
+                        reason=f"Admin {admin.get('username')} memicu reset sesi WA via Dashboard"
+                    )
+                    return data
+        except Exception:
+            continue
 
-    return {"success": False, "error": "Respons tidak dikenal dari gateway."}
+    raise HTTPException(status_code=500, detail="Gagal melakukan logout sesi WA ke gateway.")
 
 
 @app.post("/api/v1/admin/wa/test", summary="Admin: Send Test WhatsApp Message")
 def send_test_wa_message_endpoint(req_body: WATestRequest, admin: dict = Depends(require_admin)):
-    wa_url = os.getenv("WA_GATEWAY_URL", "http://168.144.143.203:3002").strip()
+    candidate_urls = _get_wa_gateway_candidate_urls()
     wa_key = os.getenv("WA_GATEWAY_KEY", "foodmaster-wa-secret-2026-key").strip()
 
     if not req_body.phone or not req_body.message:
         raise HTTPException(status_code=400, detail="Nomor telepon dan isi pesan wajib diisi.")
 
-    try:
-        payload = json.dumps({"phone": req_body.phone, "message": req_body.message}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{wa_url.rstrip('/')}/api/v1/send-message",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "FoodMaster-Backend",
-                "X-API-Key": wa_key
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            if resp.status == 200:
-                return json.loads(resp.read().decode())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gagal mengirim pesan tes WA: {e}")
+    for wa_url in candidate_urls:
+        try:
+            payload = json.dumps({"phone": req_body.phone, "message": req_body.message}).encode("utf-8")
+            req = urllib.request.Request(
+                f"{wa_url.rstrip('/')}/api/v1/send-message",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "FoodMaster-Backend",
+                    "X-API-Key": wa_key
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=4.0) as resp:
+                if resp.status == 200:
+                    return json.loads(resp.read().decode())
+        except Exception:
+            continue
 
-    return {"success": False, "error": "Respons tidak dikenal dari gateway."}
+    raise HTTPException(status_code=500, detail="Gagal mengirim pesan tes WA ke gateway.")
 

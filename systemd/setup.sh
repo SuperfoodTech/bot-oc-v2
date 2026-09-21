@@ -13,12 +13,16 @@ if [ ! -f "${UV_BIN}" ]; then
   exit 1
 fi
 
+NODE_BIN=$(which node || echo "/home/${CURRENT_USER}/.nvm/versions/node/$(ls /home/${CURRENT_USER}/.nvm/versions/node 2>/dev/null | tail -n 1)/bin/node")
+NODE_BIN_DIR=$(dirname "${NODE_BIN}" 2>/dev/null || echo "/usr/local/bin")
+
 echo "=================================================="
 echo "🚀 FoodMaster Systemd Service Setup"
 echo "=================================================="
 echo "User        : ${CURRENT_USER}"
 echo "Project Dir : ${PROJECT_DIR}"
 echo "uv Binary   : ${UV_BIN}"
+echo "Node Binary : ${NODE_BIN}"
 echo "=================================================="
 
 # Function to render template
@@ -36,6 +40,8 @@ render_service() {
   sed -e "s|%USER%|${CURRENT_USER}|g" \
       -e "s|%PROJECT_DIR%|${PROJECT_DIR}|g" \
       -e "s|%UV_BIN%|${UV_BIN}|g" \
+      -e "s|%NODE_BIN%|${NODE_BIN}|g" \
+      -e "s|%NODE_BIN_DIR%|${NODE_BIN_DIR}|g" \
       "${src_file}" | sudo tee "${dest_file}" > /dev/null
 
   sudo chmod 644 "${dest_file}"
@@ -46,6 +52,7 @@ render_service() {
 render_service "bot-oc"
 render_service "bot-vb"
 render_service "bot-web"
+render_service "bot-wa"
 
 echo "🔄 Menjalankan systemctl daemon-reload..."
 sudo systemctl daemon-reload
@@ -57,17 +64,15 @@ echo "▶️ Menjalankan service:"
 echo "   sudo systemctl start bot-oc"
 echo "   sudo systemctl start bot-vb"
 echo "   sudo systemctl start bot-web"
+echo "   sudo systemctl start bot-wa"
 echo ""
 echo "🔁 Auto-start saat boot server:"
-echo "   sudo systemctl enable bot-oc bot-vb bot-web"
+echo "   sudo systemctl enable bot-oc bot-vb bot-web bot-wa"
 echo ""
 echo "📊 Melihat status service:"
-echo "   sudo systemctl status bot-oc"
-echo "   sudo systemctl status bot-vb"
-echo "   sudo systemctl status bot-web"
+echo "   sudo systemctl status bot-wa"
 echo ""
 echo "📜 Melihat real-time log:"
-echo "   journalctl -u bot-oc -f"
-echo "   journalctl -u bot-vb -f"
-echo "   journalctl -u bot-web -f"
+echo "   journalctl -u bot-wa -f"
 echo "=================================================="
+

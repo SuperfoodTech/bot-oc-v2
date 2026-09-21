@@ -12,114 +12,108 @@
   <style>
     :root {
       --accent: #BE1A1A;
-      --ink: #111827;
-      --muted: #4b5563;
+      --ink: #0f172a;
+      --muted: #64748b;
       --surface: #ffffff;
       --canvas: #f8fafc;
       --line: #e2e8f0;
       --success: #16a34a;
       --warning: #d97706;
       --danger: #be1a1a;
-      --radius: 18px;
+      --radius: 14px;
     }
     * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
     body {
       margin: 0;
-      padding: 0;
+      padding: 20px 16px;
       background: var(--canvas);
       color: var(--ink);
       min-height: 100vh;
-      display: grid;
-      place-items: center;
     }
-    .container {
-      width: min(100%, 720px);
-      margin: 32px 16px;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-      padding: 32px;
+    .page-container {
+      max-width: 1360px;
+      margin: 0 auto;
     }
-    .header {
-      margin-bottom: 24px;
+    
+    /* Header */
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
     }
-    .step-indicator {
-      display: inline-block;
-      color: #15803d;
-      background: #dcfce7;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-    h1 {
-      margin: 4px 0 6px;
-      font-size: 24px;
+    .header-title-group h1 {
+      margin: 0 0 4px;
+      font-size: 20px;
       font-weight: 800;
       color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    .subtitle {
-      color: var(--muted);
-      font-size: 14px;
+    .header-title-group p {
       margin: 0;
+      font-size: 13px;
+      color: var(--muted);
     }
-    .api-key-box {
-      margin-top: 16px;
-      padding: 12px 16px;
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      border-radius: 12px;
+    .header-actions {
       display: flex;
       gap: 10px;
       align-items: center;
     }
-    .api-key-box input {
-      flex: 1;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 13px;
-    }
-    .status-grid {
+
+    /* Metric Stats Row */
+    .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 12px;
-      margin: 24px 0;
+      margin-bottom: 20px;
     }
-    .stat-card {
-      padding: 14px 16px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+      transition: transform 0.15s ease;
     }
-    .stat-label {
-      display: block;
-      color: #64748b;
+    .metric-card:hover { transform: translateY(-2px); }
+    .metric-label {
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      color: var(--muted);
+      letter-spacing: .04em;
     }
-    .stat-value {
-      font-size: 14px;
-      font-weight: 700;
+    .metric-value {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
+
+    /* Badges */
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 800;
+      font-size: 11px;
+      font-weight: 700;
     }
-    .badge-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .badge-dot { width: 7px; height: 7px; border-radius: 50%; }
     .badge-connected { background: #dcfce7; color: #15803d; }
-    .badge-connected .badge-dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.2); }
+    .badge-connected .badge-dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.25); }
     .badge-connecting { background: #e0f2fe; color: #0369a1; }
     .badge-connecting .badge-dot { background: #0284c7; animation: pulse 1.5s infinite; }
     .badge-qr { background: #fef3c7; color: #b45309; }
@@ -127,330 +121,885 @@
     .badge-offline { background: #fee2e2; color: #991515; }
     .badge-offline .badge-dot { background: #be1a1a; }
 
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
 
-    .qr-card {
-      padding: 24px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 16px;
-      text-align: center;
+    /* 2-Column Split Layout */
+    .split-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+      align-items: start;
     }
-    .qr-frame {
-      display: inline-block;
-      padding: 16px;
-      background: #ffffff;
-      border: 2px solid #e2e8f0;
-      border-radius: 14px;
-      margin: 16px 0;
+    @media (max-width: 1024px) {
+      .split-layout {
+        grid-template-columns: 1fr;
+      }
     }
-    .instructions {
-      text-align: left;
-      background: #ffffff;
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      margin-top: 16px;
-    }
-    .instructions ol { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.6; }
-    
-    .connected-card {
-      padding: 32px 24px;
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 16px;
-      text-align: center;
-    }
-    .connecting-card {
-      padding: 36px 24px;
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      border-radius: 16px;
-      text-align: center;
-    }
-    .connected-icon {
-      width: 52px; height: 52px; background: #16a34a; color: #fff;
-      border-radius: 50%; display: grid; place-items: center; margin: 0 auto 12px;
-    }
-    .connected-icon svg { width: 28px; height: 28px; }
 
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .card-title {
+      margin: 0 0 14px;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* Buttons */
     .btn {
-      padding: 10px 18px;
-      border-radius: 10px;
-      font-size: 13px;
+      padding: 7px 14px;
+      border-radius: 9px;
+      font-size: 12px;
       font-weight: 700;
       cursor: pointer;
       border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       transition: all 0.2s ease;
+      text-decoration: none;
     }
-    .btn-primary { background: #111827; color: #fff; }
-    .btn-primary:hover { background: #1f2937; }
-    .btn-outline { background: transparent; border: 1px solid #cbd5e1; color: #0f172a; }
-    .btn-danger { background: #fee2e2; color: #991515; border: 1px solid #fca5a5; }
+    .btn-primary { background: #be1a1a; color: #fff; }
+    .btn-primary:hover { background: #991515; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-outline { background: #ffffff; border: 1px solid var(--line); color: var(--ink); }
+    .btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .btn-danger { background: #fee2e2; color: #991515; border: 1px solid #fecaca; }
     .btn-danger:hover { background: #fecaca; }
+    .btn-compact { padding: 4px 8px; font-size: 11px; border-radius: 6px; }
 
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
-    .form-group { margin-top: 16px; text-align: left; }
-    .form-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
-    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
-    .msg-output { margin-top: 10px; font-size: 13px; font-weight: 600; }
+    /* Left Column Components */
+    .device-info-box {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .device-avatar {
+      width: 44px;
+      height: 44px;
+      background: #16a34a;
+      color: #fff;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .device-meta h4 {
+      margin: 0 0 2px;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .device-meta p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: monospace;
+    }
+
+    /* QR Code Container & Scanner Effect */
+    .qr-container {
+      text-align: center;
+      padding: 6px 0;
+    }
+    .qr-frame-wrapper {
+      position: relative;
+      display: inline-block;
+      padding: 12px;
+      background: #ffffff;
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    }
+
+    /* ANIMATED CHECKMARK & SUCCESS TRANSITION */
+    .scan-success-card {
+      text-align: center;
+      padding: 30px 16px;
+      background: #ffffff;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(22, 163, 74, 0.08);
+      animation: zoomIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes zoomIn {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .checkmark-wrapper {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      display: block;
+      stroke-width: 3.5;
+      stroke: #16a34a;
+      stroke-miterlimit: 10;
+      margin: 0 auto 12px;
+      box-shadow: inset 0px 0px 0px #16a34a;
+      animation: checkFill .4s ease-in-out .4s forwards, checkScale .3s ease-in-out .9s both;
+    }
+    .checkmark-circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 3.5;
+      stroke-miterlimit: 10;
+      stroke: #16a34a;
+      fill: none;
+      animation: checkStroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .checkmark-check {
+      transform-origin: 50% 50%;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: checkStroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+    }
+    @keyframes checkStroke {
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes checkScale {
+      0%, 100% { transform: none; }
+      50% { transform: scale3d(1.1, 1.1, 1); }
+    }
+    @keyframes checkFill {
+      100% { box-shadow: inset 0px 0px 0px 36px #dcfce7; }
+    }
+    .transition-progress-bg {
+      width: 100%;
+      max-width: 220px;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      margin: 14px auto 6px;
+      overflow: hidden;
+    }
+    .transition-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #16a34a, #22c55e);
+      border-radius: 999px;
+      transition: width 1.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Connected Active Banner */
+    .connected-banner {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 20px 16px;
+      text-align: center;
+    }
+    .connected-banner h4 {
+      margin: 8px 0 4px;
+      color: #15803d;
+      font-size: 15px;
+      font-weight: 800;
+    }
+    .connected-banner p {
+      margin: 0;
+      font-size: 12px;
+      color: #166534;
+    }
+
+    /* Right Column: Table Toolbar & Search */
+    .table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 320px;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 12px;
+      background: #ffffff;
+      outline: none;
+    }
+    .search-box input:focus {
+      border-color: #0f172a;
+    }
+    .search-box svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Owners Table */
+    .table-wrapper {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+    table.owners-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    table.owners-table th {
+      background: #f8fafc;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+    }
+    table.owners-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    table.owners-table tr:last-child td {
+      border-bottom: none;
+    }
+    table.owners-table tr:hover td {
+      background: #fcfcfd;
+    }
+
+    .owner-info-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .owner-avatar-init {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #e0e7ff;
+      color: #3730a3;
+      font-weight: 800;
+      font-size: 14px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .owner-name-meta h4 {
+      margin: 0 0 2px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .owner-name-meta span {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .wa-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      font-family: monospace;
+      transition: all 0.15s ease;
+    }
+    .wa-link-btn:hover {
+      background: #bbf7d0;
+      color: #166534;
+    }
+
+    .outlet-chip-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .outlet-chip-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    /* Accordion Outlet Rows */
+    .outlet-expand-box {
+      background: #f8fafc;
+      border-top: 1px dashed var(--line);
+      padding: 10px 14px;
+    }
+    .outlet-mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .outlet-mini-table th {
+      background: transparent;
+      padding: 6px 8px;
+      font-size: 10px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+    }
+    .outlet-mini-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .outlet-mini-table tr:last-child td { border-bottom: none; }
+
+    /* Alert Toast */
+    .toast-alert {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      z-index: 9999;
+      display: none;
+      animation: slideUp 0.3s ease;
+    }
+    /* Modal Overlay & Card */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 99999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      animation: modalZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalZoomIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <div class="header" style="margin-bottom: 20px;">
-      <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #111827;">FoodMaster WhatsApp Gateway</h1>
-    </div>
-
-    <input type="hidden" id="apiKeyInput" value="foodmaster-wa-secret-2026-key">
-
-    <div class="status-grid">
-      <div class="stat-card">
-        <span class="stat-label">Status Koneksi</span>
-        <div id="statusBadge" class="badge badge-offline">
-          <span class="badge-dot"></span>
-          <strong id="statusText">Memuat...</strong>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <span class="stat-label">Antrean Pesan</span>
-        <span id="queueLengthText" class="stat-value">0 pesan</span>
-      </div>
-
-      <div class="stat-card">
-        <span class="stat-label">Update Terakhir</span>
-        <span id="lastUpdateText" class="stat-value" style="font-size: 12px; color: #475569;">-</span>
-      </div>
-    </div>
-
-    <div id="qrReadyCard" class="qr-card" style="display: none;">
-      <h3 style="margin: 0 0 12px;">Scan QR Code WhatsApp</h3>
-      <div class="qr-frame" style="margin: 0 auto;">
-        <img id="qrImage" src="" style="width: 240px; height: 240px; display: block; margin: 0 auto; border-radius: 8px;" alt="QR Code WhatsApp">
-      </div>
-    </div>
-
-    <div id="connectingCard" class="connecting-card" style="display: none;">
-      <div class="wa-spinner" style="width: 32px; height: 32px; margin: 0 auto 12px; border-width: 3px; border-top-color: #0284c7;"></div>
-      <h3 style="margin: 0 0 6px; color: #0369a1;">Menghubungkan Sesi WhatsApp...</h3>
-      <p style="margin: 0; color: #075985; font-size: 13px;">Sedang memverifikasi enkripsi sesi WhatsApp setelah scan. Mohon tunggu sebentar...</p>
-    </div>
-
-    <div id="connectedCard" class="connected-card" style="display: none;">
-      <div class="connected-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
-      <h3 style="margin: 0 0 6px; color: #14532d;">WhatsApp Berhasil Terhubung 24/7!</h3>
-      <p style="margin: 0 0 16px; color: #166534; font-size: 13px;">Sesi login aktif. Bot siap mengirim notifikasi otomatis patroli outlet FoodMaster.</p>
+<div class="page-container">
+  <!-- Main 2-Column Split Layout -->
+  <div class="split-layout">
+    
+    <!-- SISI KIRI: Konfigurasi Scan & Bot WA -->
+    <div class="left-col">
       
-      <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; text-align: left; max-width: 380px; margin: 0 auto;">
-        <div id="userNameRow" style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase;">Nama Akun:</span>
-          <strong id="connectedUserName" style="font-size: 14px; color: #0f172a;">-</strong>
+      <!-- Card 1: Status & Perangkat WA -->
+      <div class="card" id="heroStatusCard">
+        <div class="card-title">
+          <span>Koneksi WhatsApp</span>
+          <span id="connBadge" class="badge badge-connecting">
+            <span class="badge-dot"></span>
+            <span id="connBadgeText">MEMERIKSA...</span>
+          </span>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase;">Nomor Telepon:</span>
-          <strong id="connectedUserPhone" style="font-size: 14px; color: #16a34a;">-</strong>
+
+        <div class="device-info-box">
+          <div class="device-avatar" id="deviceAvatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="device-meta">
+            <h4 id="deviceName">Perangkat WhatsApp</h4>
+            <p id="devicePhone">-</p>
+          </div>
         </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" style="flex: 1;" onclick="checkStatus()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Cek Sesi
+          </button>
+          <button class="btn btn-danger" id="logoutBtn" style="display: none;" onclick="logoutSession()">
+            Putuskan Sesi
+          </button>
+        </div>
+      </div>
+
+      <!-- Card 2: QR Scanner & Pairing Box -->
+      <div class="card" id="qrCard">
+        <div class="card-title">
+          <span>Scanner & Pairing QR</span>
+        </div>
+
+        <!-- Initializing View -->
+        <div id="initView" style="text-align: center; padding: 24px 0;">
+          <div style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #0f172a; border-radius: 50%; margin: 0 auto 12px; animation: spin 0.8s linear infinite;"></div>
+          <p style="margin: 0; font-size: 13px; color: var(--muted); font-weight: 600;">Memuat status bot WhatsApp...</p>
+        </div>
+
+        <!-- QR Ready View -->
+        <div id="qrReadyView" style="display: none;" class="qr-container">
+          <div class="qr-frame-wrapper">
+            <img id="qrImage" src="" alt="WhatsApp QR Code" style="width: 220px; height: 220px; display: block; margin: 0 auto; border-radius: 8px; object-fit: contain;">
+            <canvas id="qrCanvas" style="display: none; width: 220px; height: 220px; margin: 0 auto;"></canvas>
+          </div>
+        </div>
+
+        <!-- Scan Success / Connecting Animated View -->
+        <div id="scanSuccessView" style="display: none;" class="scan-success-card">
+          <svg class="checkmark-wrapper" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+            <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+          </svg>
+          <h3 style="margin: 0 0 6px; font-size: 16px; font-weight: 800; color: #15803d;">Scan Berhasil!</h3>
+          <p style="margin: 0; font-size: 12px; color: #166534;">Menyiapkan sesi & menyinkronkan data...</p>
+          <div class="transition-progress-bg">
+            <div id="scanProgressBar" class="transition-progress-bar"></div>
+          </div>
+        </div>
+
+        <!-- Connected Active View -->
+        <div id="connectedActiveView" style="display: none;" class="connected-banner">
+          <div style="width: 48px; height: 48px; background: #16a34a; color: #fff; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 10px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h4>WhatsApp Aktif 24/7</h4>
+          <p>Bot siap mengirimkan notifikasi patroli buka/tutup outlet secara otomatis.</p>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- SISI KANAN: Konfigurasi Data Table Owner & Nomor Agency -->
+    <div class="right-col">
+      <div class="card">
+        <!-- Toolbar Search, Counter & Actions -->
+        <div class="table-toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="ownerSearchInput" placeholder="Cari nama owner, nomor HP, atau outlet..." oninput="filterOwnersTable()">
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div style="font-size: 12px; color: var(--muted); font-weight: 600;" id="tableCounterInfo">
+              0 owner
+            </div>
+            <button class="btn btn-primary btn-compact" id="btnSyncSheet" onclick="syncAgencySheet()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 5h16v14H4z" />
+                <path d="M8 9h8M8 13h5M8 17h8" />
+                <path d="m16 12 2 2 2-2" />
+              </svg>
+              <span>Fetch dari Sheet</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Table Responsive Wrapper -->
+        <div class="table-wrapper">
+          <table class="owners-table">
+            <thead>
+              <tr>
+                <th style="width: 260px;">Owner</th>
+                <th style="width: 240px;">No. WA</th>
+                <th>Outlet terdaftar</th>
+              </tr>
+            </thead>
+            <tbody id="ownersTableBody">
+              <tr>
+                <td colspan="3" style="text-align: center; padding: 32px; color: var(--muted);">
+                  Memuat data pemilik Agency...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
       </div>
     </div>
 
-    <div class="actions">
-      <button class="btn btn-primary" id="btnRefresh" onclick="manualRefreshStatus(this)" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
-        <span class="btn-spinner" style="display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite;"></span>
-        <span class="btn-text">Refresh Status</span>
+<div id="toastAlert" class="toast-alert"></div>
+
+<!-- MODAL: KONFIRMASI PUTUS SESI WHATSAPP -->
+<div class="modal-overlay" id="waLogoutModal" aria-hidden="true" onclick="handleModalBackdrop(event)">
+  <div class="modal-card" style="max-width: 380px; text-align: center;">
+    <h3 style="margin: 0 0 20px; font-size: 16px; font-weight: 800; color: #0f172a;">Putuskan Koneksi WhatsApp?</h3>
+
+    <div style="display: flex; gap: 10px; justify-content: center;">
+      <button type="button" class="btn btn-outline" style="flex: 1;" onclick="closeLogoutModal()">Batal</button>
+      <button type="button" id="btnConfirmLogout" class="btn btn-primary" style="flex: 1; background: #dc2626;" onclick="executeLogout()">
+        Ya, Putuskan Sesi
       </button>
-      <button class="btn btn-danger" onclick="logoutSession()">Reset / Logout Sesi WA</button>
-    </div>
-
-    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line);">
-      <h3 style="font-size: 15px; margin: 0 0 4px;">Tes Kirim Pesan WhatsApp</h3>
-      <p class="subtitle" style="font-size: 12px;">Uji pengiriman notifikasi langsung ke nomor telepon.</p>
-
-      <div class="form-group">
-        <label>Nomor Telepon Tujuan (cth: 081234567890)</label>
-        <input id="testPhone" class="form-input" placeholder="081234567890">
-      </div>
-      <div class="form-group">
-        <label>Isi Pesan</label>
-        <textarea id="testMsg" class="form-input" rows="2" placeholder="Halo, ini pesan tes dari FoodMaster WA Gateway."></textarea>
-      </div>
-      <button class="btn btn-primary" style="margin-top: 12px;" onclick="sendTestMessage()">Kirim Pesan Tes</button>
-      <div id="testOutput" class="msg-output"></div>
     </div>
   </div>
+</div>
 
-  <script>
-    let pollTimer = null;
+<script>
+  let currentWaStatus = 'INITIALIZING';
+  let pollInterval = null;
+  let allOwnersData = [];
 
-    async function manualRefreshStatus(btn) {
-      if (btn) {
-        btn.disabled = true;
-        const spinner = btn.querySelector('.btn-spinner');
-        const text = btn.querySelector('.btn-text');
-        if (spinner) spinner.style.display = 'inline-block';
-        if (text) text.textContent = 'Memeriksa...';
+  const AVATAR_COLORS = [
+    { bg: '#fee2e2', text: '#991b1b' },
+    { bg: '#fef3c7', text: '#92400e' },
+    { bg: '#dcfce7', text: '#166534' },
+    { bg: '#e0f2fe', text: '#075985' },
+    { bg: '#f3e8ff', text: '#6b21a8' },
+    { bg: '#ffe4e6', text: '#9f1239' }
+  ];
+
+  function getAvatarColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash += str.charCodeAt(i);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+
+  function showToast(msg, duration = 3000) {
+    const el = document.getElementById('toastAlert');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, duration);
+  }
+
+  async function checkStatus() {
+    try {
+      const res = await fetch('/api/v1/status');
+      const data = await res.json();
+      updateStatusUI(data);
+    } catch (e) {
+      console.error('Error fetching WA status:', e);
+      updateStatusUI({ wa_status: 'OFFLINE', user: null });
+    }
+  }
+
+  async function loadOwners(forceSync = false) {
+    try {
+      const url = forceSync ? '/api/v1/sync-sheet' : '/api/v1/owners';
+      const method = forceSync ? 'POST' : 'GET';
+      const res = await fetch(url, { method });
+      const data = await res.json();
+      if (data && data.data) {
+        allOwnersData = data.data;
+        renderOwnersTable(allOwnersData);
+      }
+    } catch (e) {
+      console.error('Error loading owners data:', e);
+    }
+  }
+
+  function updateStatusUI(data) {
+    const status = data.wa_status || 'DISCONNECTED';
+    const user = data.user;
+    const qrRaw = data.qr_code_raw;
+    const qrImage = data.qr_code_image;
+
+    // Badges & Actions
+    const connBadge = document.getElementById('connBadge');
+    const connBadgeText = document.getElementById('connBadgeText');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    connBadge.className = 'badge';
+
+    // Views
+    const initView = document.getElementById('initView');
+    const qrReadyView = document.getElementById('qrReadyView');
+    const scanSuccessView = document.getElementById('scanSuccessView');
+    const connectedActiveView = document.getElementById('connectedActiveView');
+
+    initView.style.display = 'none';
+    qrReadyView.style.display = 'none';
+    scanSuccessView.style.display = 'none';
+    connectedActiveView.style.display = 'none';
+
+    if (status === 'CONNECTED') {
+      connBadge.classList.add('badge-connected');
+      connBadgeText.textContent = 'TERHUBUNG';
+
+      const phone = (user && user.phone) ? user.phone : '-';
+      const name = (user && user.name) ? user.name : 'FoodMaster Bot WA';
+      document.getElementById('deviceName').textContent = name;
+      document.getElementById('devicePhone').textContent = phone;
+      document.getElementById('deviceAvatar').innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+      
+      connectedActiveView.style.display = 'block';
+      logoutBtn.style.display = 'inline-flex';
+    } else if (status === 'QR_READY' || qrImage || qrRaw) {
+      connBadge.classList.add('badge-qr');
+      connBadgeText.textContent = 'SIAP SCAN';
+
+      document.getElementById('deviceName').textContent = 'Perangkat WhatsApp';
+      document.getElementById('devicePhone').textContent = 'Belum terhubung';
+      
+      qrReadyView.style.display = 'block';
+      logoutBtn.style.display = 'none';
+
+      const imgEl = document.getElementById('qrImage');
+      const canvasEl = document.getElementById('qrCanvas');
+
+      if (qrImage) {
+        imgEl.src = qrImage;
+        imgEl.style.display = 'block';
+        canvasEl.style.display = 'none';
+      } else if (qrRaw && window.QRCode) {
+        QRCode.toDataURL(qrRaw, { width: 220, margin: 1, color: { dark: '#0f172a', light: '#ffffff' } }, (err, url) => {
+          if (!err && url) {
+            imgEl.src = url;
+            imgEl.style.display = 'block';
+            canvasEl.style.display = 'none';
+          }
+        });
+      }
+    } else if (status === 'CONNECTING') {
+      connBadge.classList.add('badge-connecting');
+      connBadgeText.textContent = 'MENYAMBUNG...';
+      metricStatus.textContent = 'Menyambungkan';
+      metricStatus.style.color = '#0369a1';
+
+      scanSuccessView.style.display = 'block';
+      const pBar = document.getElementById('scanProgressBar');
+      pBar.style.width = '0%';
+      setTimeout(() => { pBar.style.width = '100%'; }, 100);
+      logoutBtn.style.display = 'none';
+    } else {
+      connBadge.classList.add('badge-offline');
+      connBadgeText.textContent = 'TERPUTUS';
+      metricStatus.textContent = 'Terputus';
+      metricStatus.style.color = '#991515';
+      metricPhone.textContent = '-';
+
+      document.getElementById('deviceName').textContent = 'Perangkat WhatsApp';
+      document.getElementById('devicePhone').textContent = 'Tidak aktif';
+      initView.style.display = 'block';
+      logoutBtn.style.display = 'none';
+    }
+  }
+
+  function renderOwnersTable(owners) {
+    const tbody = document.getElementById('ownersTableBody');
+    if (!owners || owners.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 24px; color: var(--muted);">Tidak ada data pemilik Agency ditemukan.</td></tr>`;
+      document.getElementById('tableCounterInfo').textContent = '0 owner';
+      return;
+    }
+
+    document.getElementById('tableCounterInfo').textContent = `${owners.length} owner`;
+
+    let html = '';
+    owners.forEach((o, idx) => {
+      const phones = (o.phones || []).filter(p => p && p !== '-');
+      const outlets = o.outlets || [];
+      
+      let phoneHtml = '';
+      if (phones.length > 0) {
+        phoneHtml = phones.map(p => {
+          let clean = p.replace(/[^0-9]/g, '');
+          if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+          return `<a href="https://wa.me/${clean}" target="_blank" class="wa-link-btn" title="Klik untuk chat WA">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            ${p}
+          </a>`;
+        }).join(' ');
+      } else {
+        phoneHtml = `<span style="font-size: 11px; color: var(--muted); font-style: italic;">Belum diatur di Sheet</span>`;
       }
 
-      const minWait = new Promise(resolve => setTimeout(resolve, 400));
-      await Promise.all([fetchStatus(), minWait]);
+      html += `
+        <tr>
+          <td>
+            <div class="owner-info-cell">
+              <div class="owner-name-meta">
+                <h4 style="margin: 0; font-size: 13px; font-weight: 800; color: var(--ink);">${o.owner}</h4>
+              </div>
+            </div>
+          </td>
+          <td>${phoneHtml}</td>
+          <td>
+            <button class="outlet-chip-btn" onclick="toggleOutletExpand('expand-${idx}')">
+              ${outlets.length} outlet
+            </button>
+          </td>
+        </tr>
+        <tr id="expand-${idx}" style="display: none;">
+          <td colspan="3" style="padding: 0;">
+            <div class="outlet-expand-box">
+              <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); margin-bottom: 6px;">
+                Rincian Outlet ${o.owner}:
+              </div>
+              <table class="outlet-mini-table">
+                <thead>
+                  <tr>
+                    <th>Nama Listing Outlet</th>
+                    <th>Store ID</th>
+                    <th>Nama Portal</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${outlets.map(st => `
+                    <tr>
+                      <td style="font-weight: 700; color: var(--ink);">${st.outlet_name}</td>
+                      <td style="font-family: monospace; color: var(--muted);">${st.store_id || '-'}</td>
+                      <td><span class="badge" style="background: #f1f5f9; color: #334155;">${st.portal || '-'}</span></td>
+                      <td><span class="badge ${st.status === 'Aktif' ? 'badge-connected' : 'badge-offline'}">${st.status || 'Aktif'}</span></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
 
-      const lastUpd = document.getElementById('lastUpdateText');
-      if (lastUpd) {
-        lastUpd.style.transition = 'color 0.2s ease, transform 0.2s ease';
-        lastUpd.style.color = '#16a34a';
-        setTimeout(() => { lastUpd.style.color = '#475569'; }, 800);
-      }
+    tbody.innerHTML = html;
+  }
 
+  function toggleOutletExpand(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+  }
+
+  function filterOwnersTable() {
+    const q = (document.getElementById('ownerSearchInput').value || '').toLowerCase().trim();
+    if (!q) {
+      renderOwnersTable(allOwnersData);
+      return;
+    }
+    const filtered = allOwnersData.filter(o => {
+      const matchOwner = (o.owner || '').toLowerCase().includes(q);
+      const matchPhone = (o.phones || []).some(p => p.toLowerCase().includes(q));
+      const matchOutlet = (o.outlets || []).some(st => 
+        (st.outlet_name || '').toLowerCase().includes(q) || 
+        (st.store_id || '').toLowerCase().includes(q) ||
+        (st.portal || '').toLowerCase().includes(q)
+      );
+      return matchOwner || matchPhone || matchOutlet;
+    });
+    renderOwnersTable(filtered);
+  }
+
+  async function syncAgencySheet() {
+    const btn = document.getElementById('btnSyncSheet');
+    btn.disabled = true;
+    btn.innerHTML = `<div style="width: 12px; height: 12px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite;"></div> Menarik...`;
+    showToast('Menyinkronkan data Google Sheet Agency...');
+    await loadOwners(true);
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5M8 17h8" /><path d="m16 12 2 2 2-2" /></svg> <span>Fetch dari Sheet</span>`;
+    showToast('Data Agency Google Sheet berhasil disinkronkan!');
+  }
+
+  function openLogoutModal() {
+    const modal = document.getElementById('waLogoutModal');
+    if (modal) modal.classList.add('active');
+  }
+
+  function closeLogoutModal() {
+    const modal = document.getElementById('waLogoutModal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  function handleModalBackdrop(e) {
+    if (e.target && e.target.classList.contains('modal-overlay')) {
+      closeLogoutModal();
+    }
+  }
+
+  async function executeLogout() {
+    const btn = document.getElementById('btnConfirmLogout');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Memutuskan...';
+    }
+    closeLogoutModal();
+    try {
+      showToast('Memutuskan sesi WhatsApp...');
+      await fetch('/api/v1/logout', { method: 'POST' });
+      checkStatus();
+      showToast('Sesi WhatsApp berhasil diputuskan.');
+    } catch (e) {
+      alert('Gagal logout: ' + e.message);
+    } finally {
       if (btn) {
-        const spinner = btn.querySelector('.btn-spinner');
-        const text = btn.querySelector('.btn-text');
-        if (spinner) spinner.style.display = 'none';
-        if (text) text.textContent = 'Refresh Status';
         btn.disabled = false;
+        btn.textContent = 'Ya, Putuskan Sesi';
       }
     }
+  }
 
-    function getApiKey() {
-      const val = document.getElementById('apiKeyInput').value.trim();
-      return val || 'foodmaster-wa-secret-2026-key';
-    }
+  function logoutSession() {
+    openLogoutModal();
+  }
 
-    async function fetchStatus() {
-      const apiKey = getApiKey();
-      const badge = document.getElementById('statusBadge');
-      const text = document.getElementById('statusText');
-      const queue = document.getElementById('queueLengthText');
-      const lastUpd = document.getElementById('lastUpdateText');
-      const qrCard = document.getElementById('qrReadyCard');
-      const connCard = document.getElementById('connectedCard');
-      const connectingCard = document.getElementById('connectingCard');
-      const qrImg = document.getElementById('qrImage');
+  function refreshAll(manual = false) {
+    checkStatus();
+    loadOwners(false);
+    if (manual) showToast('Data berhasil diperbarui');
+  }
 
-      try {
-        const res = await fetch('/api/v1/status');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
+  // Initialization & Polling
+  window.addEventListener('DOMContentLoaded', () => {
+    refreshAll(false);
+    pollInterval = setInterval(checkStatus, 2500);
+  });
+</script>
 
-        const status = data.wa_status || 'OFFLINE';
-        queue.textContent = (data.queue_length || 0) + ' pesan';
-        lastUpd.textContent = new Date().toLocaleTimeString('id-ID');
-
-        badge.className = 'badge ';
-        if (status === 'CONNECTED') {
-          badge.classList.add('badge-connected');
-          text.textContent = 'Terhubung 24/7';
-          qrCard.style.display = 'none';
-          connectingCard.style.display = 'none';
-          connCard.style.display = 'block';
-          if (data.user) {
-            document.getElementById('connectedUserPhone').textContent = data.user.phone || '-';
-            const nameRow = document.getElementById('userNameRow');
-            if (data.user.name) {
-              nameRow.style.display = 'flex';
-              document.getElementById('connectedUserName').textContent = data.user.name;
-            } else {
-              nameRow.style.display = 'none';
-            }
-          }
-        } else if (status === 'CONNECTING' || status === 'INITIALIZING') {
-          badge.classList.add('badge-connecting');
-          text.textContent = 'Menghubungkan Sesi WA...';
-          qrCard.style.display = 'none';
-          connectingCard.style.display = 'block';
-          connCard.style.display = 'none';
-        } else if (status === 'QR_READY') {
-          badge.classList.add('badge-qr');
-          text.textContent = 'Siap Scan QR';
-          qrCard.style.display = 'block';
-          connectingCard.style.display = 'none';
-          connCard.style.display = 'none';
-          if (data.qr_code_image) {
-            qrImg.src = data.qr_code_image;
-          }
-        } else {
-          badge.classList.add('badge-offline');
-          text.textContent = status;
-          qrCard.style.display = 'none';
-          connectingCard.style.display = 'none';
-          connCard.style.display = 'none';
-        }
-
-        if (pollTimer) clearTimeout(pollTimer);
-        pollTimer = setTimeout(fetchStatus, 3000);
-      } catch (err) {
-        badge.className = 'badge badge-offline';
-        text.textContent = 'Offline / Gagal Koneksi';
-        qrCard.style.display = 'none';
-        connCard.style.display = 'none';
-        if (pollTimer) clearTimeout(pollTimer);
-        pollTimer = setTimeout(fetchStatus, 5000);
-      }
-    }
-
-    async function logoutSession() {
-      if (!confirm('Apakah Anda yakin ingin reset / logout sesi WA?')) return;
-      const apiKey = getApiKey();
-      try {
-        const res = await fetch('/api/v1/logout', {
-          method: 'POST',
-          headers: { 'X-API-Key': apiKey }
-        });
-        const data = await res.json();
-        alert(data.message || 'Sesi di-reset.');
-        fetchStatus();
-      } catch (err) {
-        alert('Gagal reset sesi: ' + err.message);
-      }
-    }
-
-    async function sendTestMessage() {
-      const apiKey = getApiKey();
-      const phone = document.getElementById('testPhone').value.trim();
-      const message = document.getElementById('testMsg').value.trim();
-      const out = document.getElementById('testOutput');
-
-      if (!phone || !message) {
-        out.style.color = '#be1a1a';
-        out.textContent = 'Nomor telepon dan isi pesan wajib diisi.';
-        return;
-      }
-
-      out.style.color = '#475569';
-      out.textContent = 'Mengirim pesan...';
-
-      try {
-        const res = await fetch('/api/v1/send-message', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': apiKey
-          },
-          body: JSON.stringify({ phone, message })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          out.style.color = '#15803d';
-          out.textContent = 'Pesan berhasil dimasukkan ke antrean WA!';
-        } else {
-          out.style.color = '#be1a1a';
-          out.textContent = 'Gagal: ' + (data.error || 'Terjadi kesalahan.');
-        }
-      } catch (err) {
-        out.style.color = '#be1a1a';
-        out.textContent = 'Error: ' + err.message;
-      }
-    }
-
-    window.onload = fetchStatus;
-  </script>
 </body>
 </html>

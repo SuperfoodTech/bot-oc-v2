@@ -1,6 +1,827 @@
-{# ── TAB PANE: WHATSAPP GATEWAY ── #}
+{# ── TAB PANE: WHATSAPP GATEWAY NATIVE ── #}
 <div class="tab-pane" :class="{ 'active': currentTab === 'wa' }" id="paneWA">
-  <div class="wa-page-shell" style="padding: 0; overflow: hidden; height: 100%;">
-    <iframe id="waIframe" src="/admin/wa/console" style="width: 100%; height: 100%; min-height: 750px; border: none; display: block;" title="WhatsApp Gateway Console"></iframe>
+  <div class="wa-page-shell">
+    
+    <!-- 2-Column Native Split Layout -->
+    <div class="wa-split-layout">
+      
+      <!-- SISI KIRI: Status Koneksi & Scanner QR -->
+      <div class="wa-left-col">
+        
+        <!-- Card 1: Status Perangkat WhatsApp -->
+        <div class="wa-card" id="waStatusCard">
+          <div class="wa-card-title">
+            <span>Koneksi WhatsApp</span>
+            <span id="waConnBadge" class="wa-badge wa-badge-connecting">
+              <span class="wa-badge-dot"></span>
+              <span id="waConnBadgeText">MEMERIKSA...</span>
+            </span>
+          </div>
+
+          <div class="wa-device-box">
+            <div class="wa-device-avatar" id="waDeviceAvatar">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="wa-device-meta">
+              <h4 id="waDeviceName">Perangkat WhatsApp</h4>
+              <p id="waDevicePhone">-</p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="wa-btn wa-btn-outline" style="flex: 1;" onclick="fetchWaStatus(true)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              Cek Sesi
+            </button>
+            <button class="wa-btn wa-btn-danger" id="waLogoutBtn" style="display: none;" onclick="logoutWaSession()">
+              Putuskan Sesi
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: QR Scanner & Status Aktif -->
+        <div class="wa-card" id="waQrCard">
+          <div class="wa-card-title">
+            <span>Scanner & Pairing QR</span>
+          </div>
+
+          <!-- Initializing View -->
+          <div id="waInitView" style="text-align: center; padding: 24px 0;">
+            <div class="wa-spinner" style="margin: 0 auto 12px;"></div>
+            <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 600;">Memuat status WhatsApp...</p>
+          </div>
+
+          <!-- QR Ready View -->
+          <div id="waQrReadyView" style="display: none;" class="wa-qr-container">
+            <div class="wa-qr-frame">
+              <img id="waQrImage" src="" alt="WhatsApp QR Code" style="width: 220px; height: 220px; display: block; margin: 0 auto; border-radius: 8px; object-fit: contain;">
+              <canvas id="waQrCanvas" style="display: none; width: 220px; height: 220px; margin: 0 auto;"></canvas>
+            </div>
+          </div>
+
+          <!-- Scan Success / Connecting Animated View -->
+          <div id="waScanSuccessView" style="display: none;" class="wa-scan-success">
+            <svg class="wa-checkmark-wrapper" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+              <circle class="wa-checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+              <path class="wa-checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+            <h3 style="margin: 0 0 6px; font-size: 16px; font-weight: 800; color: #15803d;">Scan Berhasil!</h3>
+            <p style="margin: 0; font-size: 12px; color: #166534;">Menyiapkan sesi & menyinkronkan data...</p>
+            <div class="wa-progress-bg">
+              <div id="waScanProgressBar" class="wa-progress-bar"></div>
+            </div>
+          </div>
+
+          <!-- Connected Active View -->
+          <div id="waConnectedActiveView" style="display: none;" class="wa-connected-banner">
+            <div style="width: 48px; height: 48px; background: #16a34a; color: #fff; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 10px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>WhatsApp Aktif 24/7</h4>
+            <p>Bot siap mengirimkan notifikasi patroli buka/tutup outlet secara otomatis.</p>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- SISI KANAN: Tabel Data Owner & Nomor Agency -->
+      <div class="wa-right-col">
+        <div class="wa-card">
+          <!-- Toolbar Search, Counter & Actions -->
+          <div class="wa-toolbar">
+            <div class="wa-search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="waOwnerSearchInput" placeholder="Cari nama owner, nomor HP, atau outlet..." oninput="filterWaOwnersTable()">
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <div style="font-size: 12px; color: #64748b; font-weight: 600;" id="waTableCounterInfo">
+                0 owner
+              </div>
+              <button class="btn-primary fetch-sheet-button" id="btnWaSyncSheet" onclick="syncWaAgencySheet()" style="min-height: 34px; padding: 0 12px; font-size: 11px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 5h16v14H4z" />
+                  <path d="M8 9h8M8 13h5M8 17h8" />
+                  <path d="m16 12 2 2 2-2" />
+                </svg>
+                <span>Fetch dari Sheet</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Responsive Wrapper -->
+          <div class="wa-table-wrapper">
+            <table class="wa-owners-table">
+              <thead>
+                <tr>
+                  <th style="width: 260px;">Owner</th>
+                  <th style="width: 240px;">No. WA</th>
+                  <th>Outlet terdaftar</th>
+                </tr>
+              </thead>
+              <tbody id="waOwnersTableBody">
+                <tr>
+                  <td colspan="3" style="text-align: center; padding: 32px; color: #64748b;">
+                    Memuat data pemilik Agency...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL: KONFIRMASI PUTUS SESI WHATSAPP -->
+  <div class="modal-overlay" id="waLogoutModal" aria-hidden="true" onclick="handleWaModalBackdrop(event)">
+    <div class="modal-card" style="max-width: 380px; text-align: center;">
+      <h3 class="card-title" style="color: #0f172a; margin: 0 0 20px; font-size: 16px; justify-content: center;">Putuskan Koneksi WhatsApp?</h3>
+
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button type="button" class="btn-outline" style="flex: 1;" onclick="closeWaLogoutModal()">Batal</button>
+        <button type="button" id="btnConfirmLogoutWa" class="btn-primary" style="flex: 1; background: #dc2626; border-color: #dc2626;" onclick="executeWaLogout()">
+          Ya, Putuskan Sesi
+        </button>
+      </div>
+    </div>
   </div>
 </div>
+
+<style>
+  .wa-page-shell {
+    padding: 16px 20px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .wa-split-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 1024px) {
+    .wa-split-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .wa-left-col, .wa-right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .wa-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+  }
+  .wa-card-title {
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* Badges */
+  .wa-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .wa-badge-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .wa-badge-connected { background: #dcfce7; color: #15803d; }
+  .wa-badge-connected .wa-badge-dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.25); }
+  .wa-badge-connecting { background: #e0f2fe; color: #0369a1; }
+  .wa-badge-connecting .wa-badge-dot { background: #0284c7; animation: waPulse 1.5s infinite; }
+  .wa-badge-qr { background: #fef3c7; color: #b45309; }
+  .wa-badge-qr .wa-badge-dot { background: #d97706; animation: waPulse 1.5s infinite; }
+  .wa-badge-offline { background: #fee2e2; color: #991515; }
+  .wa-badge-offline .wa-badge-dot { background: #be1a1a; }
+
+  @keyframes waPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  @keyframes waSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .wa-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #0f172a;
+    border-radius: 50%;
+    animation: waSpin 0.8s linear infinite;
+  }
+
+  /* Device Info Box */
+  .wa-device-box {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  .wa-device-avatar {
+    width: 44px;
+    height: 44px;
+    background: #16a34a;
+    color: #fff;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .wa-device-meta h4 {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .wa-device-meta p {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+    font-family: monospace;
+  }
+
+  /* Buttons */
+  .wa-btn {
+    padding: 7px 14px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  .wa-btn-outline { background: #ffffff; border: 1px solid #e2e8f0; color: #0f172a; }
+  .wa-btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+  .wa-btn-danger { background: #fee2e2; color: #991515; border: 1px solid #fecaca; }
+  .wa-btn-danger:hover { background: #fecaca; }
+
+  /* QR Frame */
+  .wa-qr-container {
+    text-align: center;
+    padding: 6px 0;
+  }
+  .wa-qr-frame {
+    position: relative;
+    display: inline-block;
+    padding: 12px;
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  }
+
+  /* Success Banner */
+  .wa-scan-success {
+    text-align: center;
+    padding: 30px 16px;
+    background: #ffffff;
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(22, 163, 74, 0.08);
+  }
+  .wa-checkmark-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: block;
+    stroke-width: 3.5;
+    stroke: #16a34a;
+    stroke-miterlimit: 10;
+    margin: 0 auto 12px;
+    box-shadow: inset 0px 0px 0px #16a34a;
+    animation: waCheckFill .4s ease-in-out .4s forwards;
+  }
+  .wa-checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 3.5;
+    stroke-miterlimit: 10;
+    stroke: #16a34a;
+    fill: none;
+    animation: waCheckStroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+  }
+  .wa-checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: waCheckStroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+  }
+  @keyframes waCheckStroke { 100% { stroke-dashoffset: 0; } }
+  @keyframes waCheckFill { 100% { box-shadow: inset 0px 0px 0px 36px #dcfce7; } }
+  .wa-progress-bg {
+    width: 100%;
+    max-width: 220px;
+    height: 5px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    margin: 14px auto 6px;
+    overflow: hidden;
+  }
+  .wa-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+    border-radius: 999px;
+    transition: width 1.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .wa-connected-banner {
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .wa-connected-banner h4 {
+    margin: 8px 0 4px;
+    color: #15803d;
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .wa-connected-banner p {
+    margin: 0;
+    font-size: 12px;
+    color: #166534;
+  }
+
+  /* Toolbar */
+  .wa-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .wa-search-box {
+    position: relative;
+    flex: 1;
+    max-width: 320px;
+  }
+  .wa-search-box input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 12px;
+    background: #ffffff;
+    outline: none;
+    box-sizing: border-box;
+  }
+  .wa-search-box input:focus {
+    border-color: #0f172a;
+  }
+  .wa-search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Table */
+  .wa-table-wrapper {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+  }
+  table.wa-owners-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13px;
+  }
+  table.wa-owners-table th {
+    background: #f8fafc;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  table.wa-owners-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  table.wa-owners-table tr:last-child td {
+    border-bottom: none;
+  }
+  table.wa-owners-table tr:hover td {
+    background: #fcfcfd;
+  }
+
+  .wa-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    font-family: monospace;
+    transition: all 0.15s ease;
+  }
+  .wa-link-btn:hover {
+    background: #bbf7d0;
+    color: #166534;
+  }
+
+  .wa-outlet-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .wa-outlet-chip:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .wa-outlet-expand-box {
+    background: #f8fafc;
+    border-top: 1px dashed #e2e8f0;
+    padding: 10px 14px;
+  }
+  .wa-outlet-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .wa-outlet-mini-table th {
+    background: transparent;
+    padding: 6px 8px;
+    font-size: 10px;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .wa-outlet-mini-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #edf2f7;
+  }
+  .wa-outlet-mini-table tr:last-child td { border-bottom: none; }
+</style>
+
+<script>
+  let waStatusPollInterval = null;
+  let allWaOwnersData = [];
+
+  function initWaTab() {
+    fetchWaStatus();
+    loadWaOwners(false);
+    if (waStatusPollInterval) clearInterval(waStatusPollInterval);
+    waStatusPollInterval = setInterval(() => {
+      if (getAdminActiveTab() === 'wa') {
+        fetchWaStatus();
+      }
+    }, 3000);
+  }
+
+  async function fetchWaStatus(manual = false) {
+    const connBadge = document.getElementById('waConnBadge');
+    const connBadgeText = document.getElementById('waConnBadgeText');
+    const logoutBtn = document.getElementById('waLogoutBtn');
+    const initView = document.getElementById('waInitView');
+    const qrReadyView = document.getElementById('waQrReadyView');
+    const scanSuccessView = document.getElementById('waScanSuccessView');
+    const connectedActiveView = document.getElementById('waConnectedActiveView');
+
+    try {
+      const res = await fetch('/api/v1/admin/wa/status');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const status = data.wa_status || 'DISCONNECTED';
+      const user = data.user;
+      const qrRaw = data.qr_code_raw;
+      const qrImage = data.qr_code_image;
+
+      if (connBadge) connBadge.className = 'wa-badge';
+      if (initView) initView.style.display = 'none';
+      if (qrReadyView) qrReadyView.style.display = 'none';
+      if (scanSuccessView) scanSuccessView.style.display = 'none';
+      if (connectedActiveView) connectedActiveView.style.display = 'none';
+
+      if (status === 'CONNECTED') {
+        if (connBadge) {
+          connBadge.classList.add('wa-badge-connected');
+          connBadgeText.textContent = 'TERHUBUNG';
+        }
+        const phone = (user && user.phone) ? user.phone : '-';
+        const name = (user && user.name) ? user.name : 'FoodMaster Bot WA';
+        const dName = document.getElementById('waDeviceName');
+        const dPhone = document.getElementById('waDevicePhone');
+        const dAvatar = document.getElementById('waDeviceAvatar');
+        if (dName) dName.textContent = name;
+        if (dPhone) dPhone.textContent = phone;
+        if (dAvatar) dAvatar.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+
+        if (connectedActiveView) connectedActiveView.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+      } else if (status === 'QR_READY' || qrImage || qrRaw) {
+        if (connBadge) {
+          connBadge.classList.add('wa-badge-qr');
+          connBadgeText.textContent = 'SIAP SCAN';
+        }
+        const dName = document.getElementById('waDeviceName');
+        const dPhone = document.getElementById('waDevicePhone');
+        if (dName) dName.textContent = 'Perangkat WhatsApp';
+        if (dPhone) dPhone.textContent = 'Belum terhubung';
+
+        if (qrReadyView) qrReadyView.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+
+        const imgEl = document.getElementById('waQrImage');
+        const canvasEl = document.getElementById('waQrCanvas');
+
+        if (qrImage && imgEl) {
+          imgEl.src = qrImage;
+          imgEl.style.display = 'block';
+          if (canvasEl) canvasEl.style.display = 'none';
+        } else if (qrRaw && typeof QRCode !== 'undefined' && canvasEl) {
+          QRCode.toCanvas(canvasEl, qrRaw, { width: 220, margin: 1, color: { dark: '#0f172a', light: '#ffffff' } }, function (err) {
+            if (!err) {
+              canvasEl.style.display = 'block';
+              if (imgEl) imgEl.style.display = 'none';
+            }
+          });
+        }
+      } else if (status === 'CONNECTING') {
+        if (connBadge) {
+          connBadge.classList.add('wa-badge-connecting');
+          connBadgeText.textContent = 'MENYAMBUNG...';
+        }
+        if (scanSuccessView) {
+          scanSuccessView.style.display = 'block';
+          const pBar = document.getElementById('waScanProgressBar');
+          if (pBar) {
+            pBar.style.width = '0%';
+            setTimeout(() => { pBar.style.width = '100%'; }, 100);
+          }
+        }
+        if (logoutBtn) logoutBtn.style.display = 'none';
+      } else {
+        if (connBadge) {
+          connBadge.classList.add('wa-badge-offline');
+          connBadgeText.textContent = 'TERPUTUS';
+        }
+        const dName = document.getElementById('waDeviceName');
+        const dPhone = document.getElementById('waDevicePhone');
+        if (dName) dName.textContent = 'Perangkat WhatsApp';
+        if (dPhone) dPhone.textContent = 'Tidak aktif';
+        if (initView) initView.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+      }
+
+      if (manual && typeof showAdminToast === 'function') {
+        showAdminToast('Status WhatsApp diperbarui', 'info');
+      }
+    } catch (err) {
+      console.error('Error fetch WA status:', err);
+      if (connBadge) {
+        connBadge.className = 'wa-badge wa-badge-offline';
+        if (connBadgeText) connBadgeText.textContent = 'OFFLINE';
+      }
+      if (initView) initView.style.display = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'none';
+    }
+  }
+
+  async function loadWaOwners(forceSync = false) {
+    try {
+      const url = forceSync ? '/api/v1/admin/wa/sync-sheet' : '/api/v1/admin/wa/owners';
+      const method = forceSync ? 'POST' : 'GET';
+      const res = await fetch(url, { method });
+      const data = await res.json();
+      if (data && data.data) {
+        allWaOwnersData = data.data;
+        renderWaOwnersTable(allWaOwnersData);
+      }
+    } catch (e) {
+      console.error('Error loading WA owners data:', e);
+    }
+  }
+
+  function renderWaOwnersTable(owners) {
+    const tbody = document.getElementById('waOwnersTableBody');
+    const counterEl = document.getElementById('waTableCounterInfo');
+    if (!owners || owners.length === 0) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 24px; color: #64748b;">Tidak ada data pemilik Agency ditemukan.</td></tr>`;
+      if (counterEl) counterEl.textContent = '0 owner';
+      return;
+    }
+
+    if (counterEl) counterEl.textContent = `${owners.length} owner`;
+
+    let html = '';
+    owners.forEach((o, idx) => {
+      const phones = (o.phones || []).filter(p => p && p !== '-');
+      const outlets = o.outlets || [];
+
+      let phoneHtml = '';
+      if (phones.length > 0) {
+        phoneHtml = phones.map(p => {
+          let clean = p.replace(/[^0-9]/g, '');
+          if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+          return `<a href="https://wa.me/${clean}" target="_blank" class="wa-link-btn" title="Klik untuk chat WA">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            ${p}
+          </a>`;
+        }).join(' ');
+      } else {
+        phoneHtml = `<span style="font-size: 11px; color: #64748b; font-style: italic;">Belum diatur di Sheet</span>`;
+      }
+
+      html += `
+        <tr>
+          <td>
+            <div style="font-size: 13px; font-weight: 800; color: #0f172a;">${o.owner}</div>
+          </td>
+          <td>${phoneHtml}</td>
+          <td>
+            <button class="wa-outlet-chip" onclick="toggleWaOutletExpand('wa-expand-${idx}')">
+              ${outlets.length} outlet
+            </button>
+          </td>
+        </tr>
+        <tr id="wa-expand-${idx}" style="display: none;">
+          <td colspan="3" style="padding: 0;">
+            <div class="wa-outlet-expand-box">
+              <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 6px;">
+                Rincian Outlet ${o.owner}:
+              </div>
+              <table class="wa-outlet-mini-table">
+                <thead>
+                  <tr>
+                    <th>Nama Listing Outlet</th>
+                    <th>Store ID</th>
+                    <th>Nama Portal</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${outlets.map(st => `
+                    <tr>
+                      <td style="font-weight: 700; color: #0f172a;">${st.outlet_name}</td>
+                      <td style="font-family: monospace; color: #64748b;">${st.store_id || '-'}</td>
+                      <td><span class="badge" style="background: #f1f5f9; color: #334155;">${st.portal || '-'}</span></td>
+                      <td><span class="badge ${st.status === 'Aktif' ? 'badge-open' : 'badge-closed'}">${st.status || 'Aktif'}</span></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+
+    if (tbody) tbody.innerHTML = html;
+  }
+
+  function toggleWaOutletExpand(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+  }
+
+  function filterWaOwnersTable() {
+    const q = (document.getElementById('waOwnerSearchInput').value || '').toLowerCase().trim();
+    if (!q) {
+      renderWaOwnersTable(allWaOwnersData);
+      return;
+    }
+    const filtered = allWaOwnersData.filter(o => {
+      const matchOwner = (o.owner || '').toLowerCase().includes(q);
+      const matchPhone = (o.phones || []).some(p => p.toLowerCase().includes(q));
+      const matchOutlet = (o.outlets || []).some(st => 
+        (st.outlet_name || '').toLowerCase().includes(q) || 
+        (st.store_id || '').toLowerCase().includes(q) ||
+        (st.portal || '').toLowerCase().includes(q)
+      );
+      return matchOwner || matchPhone || matchOutlet;
+    });
+    renderWaOwnersTable(filtered);
+  }
+
+  async function syncWaAgencySheet() {
+    const btn = document.getElementById('btnWaSyncSheet');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<div style="width: 12px; height: 12px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: waSpin 0.6s linear infinite; display: inline-block;"></div> <span>Menarik...</span>`;
+    }
+    if (typeof showAdminToast === 'function') {
+      showAdminToast('Menyinkronkan data Google Sheet Agency...', 'info');
+    }
+    await loadWaOwners(true);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5M8 17h8" /><path d="m16 12 2 2 2-2" /></svg> <span>Fetch dari Sheet</span>`;
+    }
+    if (typeof showAdminToast === 'function') {
+      showAdminToast('Data Agency Google Sheet berhasil disinkronkan!', 'success');
+    }
+  }
+
+  function openWaLogoutModal() {
+    const modal = document.getElementById('waLogoutModal');
+    if (modal) {
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  function closeWaLogoutModal() {
+    const modal = document.getElementById('waLogoutModal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function handleWaModalBackdrop(e) {
+    if (e.target && e.target.classList.contains('modal-overlay')) {
+      closeWaLogoutModal();
+    }
+  }
+
+  async function executeWaLogout() {
+    const btn = document.getElementById('btnConfirmLogoutWa');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Memutuskan...';
+    }
+    closeWaLogoutModal();
+    try {
+      if (typeof showAdminToast === 'function') {
+        showAdminToast('Memutuskan sesi WhatsApp...', 'info');
+      }
+      await fetch('/api/v1/admin/wa/logout', { method: 'POST' });
+      fetchWaStatus();
+      if (typeof showAdminToast === 'function') {
+        showAdminToast('Sesi WhatsApp berhasil diputuskan', 'success');
+      }
+    } catch (e) {
+      if (typeof showAdminToast === 'function') {
+        showAdminToast('Gagal logout: ' + e.message, 'error');
+      } else {
+        alert('Gagal logout: ' + e.message);
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Ya, Putuskan Sesi';
+      }
+    }
+  }
+
+  function logoutWaSession() {
+    openWaLogoutModal();
+  }
+</script>

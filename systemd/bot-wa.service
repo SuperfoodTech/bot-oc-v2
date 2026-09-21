@@ -1,0 +1,24 @@
+[Unit]
+Description=FoodMaster WhatsApp Gateway Baileys Microservice
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%PROJECT_DIR%/bot-wa
+Environment="NODE_ENV=production"
+Environment="PORT=3002"
+Environment="WA_API_KEY=foodmaster-wa-secret-2026-key"
+Environment="WA_AUTH_DIR=%PROJECT_DIR%/bot-wa/auth_info_baileys"
+Environment="PATH=%NODE_BIN_DIR%:/usr/local/bin:/usr/bin:/bin"
+ExecStart=%NODE_BIN% src/index.js
+Restart=always
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

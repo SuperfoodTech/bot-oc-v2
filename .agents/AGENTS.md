@@ -24,7 +24,16 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.18`.
+Latest documented release: `1.23.19`.
+
+Native WhatsApp Gateway Integration, Two-Tier Anti-Spam / Anti-Ban Deduplication & Unified Dashboard UI:
+- Mengintegrasikan tab WhatsApp Gateway (`admin_tab_wa.html`) secara langsung ke dalam Single Page Application (SPA) dashboard admin port utama tanpa pembungkus `<iframe>` eksternal.
+- Menyediakan UI pemantauan real-time: status koneksi, scan QR canvas interaktif, metrik antrean/pesan terkirim, tombol sinkronisasi sheet Google Drive (`Fetch dari Sheet`), daftar owner & outlet terhubung, serta modal konfirmasi putus sesi kustom yang bersih dan elegan.
+- Menerapkan *Two-Tier Anti-Spam & Anti-Ban Deduplication Architecture*:
+  - Lapis 1 (Backend Web & Bot Core di `src/core/notifier.py`): In-memory TTL cache 5 menit untuk mencegah duplicate webhook dispatch.
+  - Lapis 2 (Gateway Engine di `bot-wa/src/index.js`): In-memory TTL cache 5 menit (`_sentHistory` dedup key), deduplikasi antrean aktif, batas antrean aman (`MAX_QUEUE_SIZE`), humanized typing simulation (`composing`), dan jeda pengiriman dinamis 2.5s - 4.5s.
+- Menyelaraskan 1:1 format template pesan WhatsApp Agency dengan Discord Webhook resmi, dilengkapi hyperlink ShopeeFood per-outlet dan footer CS FoodMaster.
+- Menyediakan automated systemd service installer (`systemd/setup.sh` & `systemd/bot-wa.service`) untuk menjamin operasional gateway berjalan independen dan auto-restart.
 
 Deterministic Python Runtime Memory Reclamation & Proactive Browser Recycling:
 - Mengintegrasikan pemanggilan C `libc.so.6` `malloc_trim(0)` di dalam blok `finally:` pada loop evaluasi utama `main-bot/src/daemon.py` dan `main-vb/src/daemon.py` setelah `gc.collect()`, mengembalikan *unmapped memory pages* dan *arena fragmentation* Python langsung ke Kernel Linux OS secara deterministik di setiap akhir siklus patroli.

@@ -356,6 +356,11 @@ def send_wa_webhook_async(
     if not wa_gateway_url or not phone:
         return
 
+    sig_raw = f"WA:{event_type}:{store_id}:{phone}"
+    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
+    if _is_duplicate(sig_hash):
+        return
+
     now_str = timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S WIB")
 
     payload = {

@@ -1405,7 +1405,9 @@
         if (pane) pane.classList.add('active');
         const waShell = pane ? pane.querySelector('.wa-page-shell') : null;
         if (waShell) waShell.scrollTop = 0;
-        fetchWaStatus();
+        if (typeof initWaTab === 'function') {
+          initWaTab();
+        }
       } else if (tabName === 'settings') {
         const btn = document.getElementById('tabBtnSettings');
         const pane = document.getElementById('paneSettings');
@@ -5192,112 +5194,7 @@
       window.location.href = '/admin/login';
     }
 
-    /* ── WHATSAPP GATEWAY JS CONTROLLER ── */
-    let waPollTimer = null;
-
-    async function fetchWaStatus() {
-      const badge = document.getElementById('waStatusBadge');
-      const statusText = document.getElementById('waStatusText');
-      const urlText = document.getElementById('waGatewayUrlText');
-      const queueText = document.getElementById('waQueueLengthText');
-      const lastCheck = document.getElementById('waLastCheckText');
-      const qrReadyCard = document.getElementById('waQrReadyState');
-      const connectedCard = document.getElementById('waConnectedState');
-      const offlineCard = document.getElementById('waOfflineState');
-      const offlineMsg = document.getElementById('waOfflineMessage');
-
-      try {
-        const res = await fetch('/api/v1/admin/wa/status');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        if (urlText) urlText.textContent = data.gateway_url || 'http://168.144.143.203:3002';
-        if (queueText) queueText.textContent = `${data.queue_length || 0} pesan`;
-        if (lastCheck) lastCheck.textContent = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
-
-        const status = data.wa_status || 'OFFLINE';
-
-        if (badge && statusText) {
-          badge.className = 'wa-status-badge ';
-          if (status === 'CONNECTED') {
-            badge.classList.add('wa-status-connected');
-            statusText.textContent = 'Terhubung 24/7';
-          } else if (status === 'QR_READY') {
-            badge.classList.add('wa-status-qr');
-            statusText.textContent = 'Siap Scan QR';
-          } else {
-            badge.classList.add('wa-status-offline');
-            statusText.textContent = status === 'OFFLINE' ? 'Offline' : status;
-          }
-        }
-
-        if (status === 'CONNECTED') {
-          if (qrReadyCard) qrReadyCard.style.display = 'none';
-          if (connectedCard) connectedCard.style.display = 'block';
-          if (offlineCard) offlineCard.style.display = 'none';
-        } else if (status === 'QR_READY' && data.qr_code_raw) {
-          if (qrReadyCard) qrReadyCard.style.display = 'block';
-          if (connectedCard) connectedCard.style.display = 'none';
-          if (offlineCard) offlineCard.style.display = 'none';
-          renderWaQrCode(data.qr_code_raw);
-        } else {
-          if (qrReadyCard) qrReadyCard.style.display = 'none';
-          if (connectedCard) connectedCard.style.display = 'none';
-          if (offlineCard) offlineCard.style.display = 'block';
-          if (offlineMsg) offlineMsg.textContent = data.error || 'Gateway WhatsApp sedang tidak terhubung atau offline.';
-        }
-
-        if (getAdminActiveTab() === 'wa' && (status === 'QR_READY' || status === 'INITIALIZING')) {
-          scheduleWaPoll(4000);
-        }
-      } catch (err) {
-        if (badge && statusText) {
-          badge.className = 'wa-status-badge wa-status-offline';
-          statusText.textContent = 'Offline';
-        }
-        if (qrReadyCard) qrReadyCard.style.display = 'none';
-        if (connectedCard) connectedCard.style.display = 'none';
-        if (offlineCard) offlineCard.style.display = 'block';
-        if (offlineMsg) offlineMsg.textContent = `Gagal terhubung ke backend: ${err.message}`;
-      }
-    }
-
-    function scheduleWaPoll(ms = 4000) {
-      if (waPollTimer) clearTimeout(waPollTimer);
-      waPollTimer = setTimeout(() => {
-        if (getAdminActiveTab() === 'wa') {
-          fetchWaStatus();
-        }
-      }, ms);
-    }
-
-    function renderWaQrCode(qrRaw) {
-      const canvas = document.getElementById('waQrCanvas');
-      if (!canvas) return;
-      if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
-        QRCode.toCanvas(canvas, qrRaw, { width: 240, margin: 2, color: { dark: '#0f172a', light: '#ffffff' } }, function (error) {
-          if (error) console.error('Gagal render QR Canvas:', error);
-        });
-      }
-    }
-
-    async function logoutWaSession() {
-      if (!confirm('Apakah Anda yakin ingin melakukan Disconnect / Reset Sesi WhatsApp? Kunci sesi lama akan dihapus dan QR Code baru akan dibuat.')) {
-        return;
-      }
-      try {
-        const res = await fetch('/api/v1/admin/wa/logout', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          alert('Sesi WhatsApp berhasil di-logout. Memuat status baru...');
-          fetchWaStatus();
-        } else {
-          alert('Gagal reset sesi: ' + (data.error || 'Unknown error'));
-        }
-      } catch (err) {
-        alert('Gagal menghubungi backend: ' + err.message);
-      }
-    }
+    /* ── WHATSAPP GATEWAY (NATIVE TAB) ── */
 
     async function sendTestWaMessage() {
       const phoneInput = document.getElementById('waTestPhone');
