@@ -16,8 +16,9 @@ import signal
 import argparse
 import os
 import fcntl
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -39,6 +40,8 @@ log = get_logger("daemon")
 
 RUNNING = True
 IDLE_REEVALUATION_SECONDS = 30
+LOCAL_TZ = ZoneInfo("Asia/Jakarta")
+FAILED_RETRY_TRACKER: dict[str, dict] = {}
 
 
 import fcntl
@@ -226,7 +229,50 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             while RUNNING:
                 current_outlets = db.fetch_merchant_outlets_from_db()
                 total_outlets_loaded = max(total_outlets_loaded, len(current_outlets))
+
+                # Prune inactive / turned OFF outlets from retry tracker
+                now_dt = datetime.now(LOCAL_TZ)
+                outlet_by_sid = {o.store_id: o for o in current_outlets}
+                for sid in list(FAILED_RETRY_TRACKER.keys()):
+                    out = outlet_by_sid.get(sid)
+                    if not out:
+                        FAILED_RETRY_TRACKER.pop(sid, None)
+                        continue
+                    tgt = (out.status_utama or "OFF").strip().upper()
+                    if tgt in ("OFF", "CLOSE", "CLOSED") or out.penangguhan.strip().lower() == "ya":
+                        FAILED_RETRY_TRACKER.pop(sid, None)
+
+                # Check which retries are due right now
+                due_retry_sids = {
+                    sid for sid, info in FAILED_RETRY_TRACKER.items()
+                    if info.get("next_retry_at") and info["next_retry_at"] <= now_dt
+                }
+
                 queue = scheduler.build_queue(current_outlets)
+                # If any due retry stores exist, ensure their merchant item has priority 100 and includes those sids
+                if due_retry_sids:
+                    augmented_queue = []
+                    for item in queue:
+                        item_sids = {o.store_id for o in current_outlets if scheduler.merchant_key(o) == item.merchant_key}
+                        item_retries = tuple(sid for sid in due_retry_sids if sid in item_sids)
+                        if item_retries:
+                            combined_actionable = tuple(dict.fromkeys(item.actionable_store_ids + item_retries))
+                            augmented_queue.append(scheduler.MerchantQueueItem(
+                                merchant_key=item.merchant_key,
+                                username=item.username,
+                                portal_name=item.portal_name,
+                                due_at=min(item.due_at, now_dt),
+                                priority=max(item.priority, 100),
+                                due_store_ids=tuple(dict.fromkeys(item.due_store_ids + item_retries)),
+                                outlet_count=item.outlet_count,
+                                actionable_count=len(combined_actionable),
+                                actionable_store_ids=combined_actionable,
+                                reasons=item.reasons + ("priority action retry",),
+                            ))
+                        else:
+                            augmented_queue.append(item)
+                    queue = sorted(augmented_queue, key=lambda it: (-it.priority, it.due_at, -it.actionable_count, it.merchant_key))
+
                 available = [
                     item for item in queue
                     if item.merchant_key not in processed_keys
@@ -251,14 +297,26 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
 
                 if is_actionable:
                     dispatched_actionable_stores.update(pending_actionable_ids)
-                    log.info(
-                        "⚡ [EXPRESS LANE] Dispatching %d actionable store(s) %s for '%s' (Account: %s, P%d)...",
-                        len(target_store_ids),
-                        target_store_ids,
-                        selected.portal_name,
-                        selected.username,
-                        selected.priority,
-                    )
+                    retry_matches = [sid for sid in pending_actionable_ids if sid in due_retry_sids]
+                    if retry_matches:
+                        log.info(
+                            "⚡ [RETRY EXPRESS LANE] Dispatching %d actionable store(s) (including %d retry: %s) for '%s' (Account: %s, P%d)...",
+                            len(target_store_ids),
+                            len(retry_matches),
+                            retry_matches,
+                            selected.portal_name,
+                            selected.username,
+                            selected.priority,
+                        )
+                    else:
+                        log.info(
+                            "⚡ [EXPRESS LANE] Dispatching %d actionable store(s) %s for '%s' (Account: %s, P%d)...",
+                            len(target_store_ids),
+                            target_store_ids,
+                            selected.portal_name,
+                            selected.username,
+                            selected.priority,
+                        )
                 else:
                     log.info(
                         "🚶 [PATROL LANE] Dispatching %s outlets for '%s' (Account: %s, P%d)...",
@@ -276,6 +334,41 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 )
                 if not is_actionable:
                     processed_keys.add(selected.merchant_key)
+                
+                # Update FAILED_RETRY_TRACKER based on action results
+                for act in last_result.get("actions_taken", []):
+                    sid = act.get("store_id")
+                    if not sid or sid == "SYSTEM":
+                        continue
+                    is_success = bool(act.get("success"))
+                    if is_success:
+                        if sid in FAILED_RETRY_TRACKER:
+                            log.info(
+                                f"  ✅ [RETRY RESOLVED] Store {sid} ({act.get('store_name')}) recovered successfully and removed from retry collection."
+                            )
+                            FAILED_RETRY_TRACKER.pop(sid, None)
+                    else:
+                        info = FAILED_RETRY_TRACKER.get(sid, {
+                            "merchant_key": act.get("merchant_key") or selected.merchant_key,
+                            "attempts": 0,
+                            "action": act.get("action"),
+                        })
+                        info["attempts"] += 1
+                        info["last_reason"] = act.get("reason", "")
+                        if info["attempts"] == 1:
+                            delay_sec = 15
+                        elif info["attempts"] == 2:
+                            delay_sec = 45
+                        elif info["attempts"] == 3:
+                            delay_sec = 90
+                        else:
+                            delay_sec = 900  # 15 minutes cooldown after 3+ consecutive failures
+                            log.warning(
+                                f"  ⚠️ [RETRY COOLDOWN] Store {sid} reached {info['attempts']} failed attempts. Cooling down for 15 minutes."
+                            )
+                        info["next_retry_at"] = datetime.now(LOCAL_TZ) + timedelta(seconds=delay_sec)
+                        FAILED_RETRY_TRACKER[sid] = info
+
                 cycle_actions.extend(last_result.get("actions_taken", []))
                 cycle_merchant_groups.extend(last_result.get("processed_merchant_groups", []))
                 total_stores_processed += last_result.get("total_stores_processed", 0)
@@ -305,6 +398,20 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                 # can interrupt a stale heartbeat or boundary hint.
                 next_sleep_seconds = IDLE_REEVALUATION_SECONDS
                 next_sleep_reason = "re-evaluasi state ringan"
+
+            # Check if any pending retry in FAILED_RETRY_TRACKER needs an earlier wake up
+            if FAILED_RETRY_TRACKER:
+                now_check = datetime.now(LOCAL_TZ)
+                pending_delays = [
+                    (info["next_retry_at"] - now_check).total_seconds()
+                    for info in FAILED_RETRY_TRACKER.values()
+                    if info.get("next_retry_at") and info["next_retry_at"] > now_check
+                ]
+                if pending_delays:
+                    min_retry_delay = max(5, int(min(pending_delays)))
+                    if min_retry_delay < next_sleep_seconds:
+                        next_sleep_seconds = min_retry_delay
+                        next_sleep_reason = "antrean retry outlet gagal"
             
             try:
                 import bot_api

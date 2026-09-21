@@ -107,8 +107,8 @@ def list_brands() -> list[dict[str, Any]]:
                 store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
                 store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
                 store["duplicate_brand_count"] = control.get("brand_count", 1)
-                store["duplicate_brand_warning"] = control.get("brand_count", 1) > 1
-                store["pause_until"] = row.get("requested_pause_until") or row.get("pause_until")
+                effective_brand_status = row.get("requested_status") or row.get("applied_status") or "ON"
+                store["pause_until"] = (row.get("requested_pause_until") or row.get("pause_until")) if effective_brand_status == "PAUSED" else None
                 store.update(derive_outlet_runtime_state(store))
             row["outlets"] = stores
             row["outlet_count"] = len(stores)
@@ -147,11 +147,8 @@ def brand_detail(brand_id: str) -> dict[str, Any] | None:
             store["shopee_regular_hours"] = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
             store["shopee_special_hours"] = store.get("shopee_special_hours") or []
             store["timezone"] = normalize_timezone(store.get("timezone"))
-            store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
-            store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
-            store["duplicate_brand_count"] = control.get("brand_count", 1)
-            store["duplicate_brand_warning"] = control.get("brand_count", 1) > 1
-            store["pause_until"] = brand.get("requested_pause_until") or brand.get("pause_until")
+            effective_brand_status = brand.get("requested_status") or brand.get("applied_status") or "ON"
+            store["pause_until"] = (brand.get("requested_pause_until") or brand.get("pause_until")) if effective_brand_status == "PAUSED" else None
             store.update(derive_outlet_runtime_state(store))
         return {**brand, "outlets": stores}
 
@@ -162,11 +159,12 @@ def request_status(brand_id: str, status: str, admin_id: str, pause_until=None) 
             row = conn.execute(
                 """UPDATE vb_brands
                    SET requested_status=%s, requested_pause_until=%s,
+                       pause_until=CASE WHEN %s='PAUSED' THEN pause_until ELSE NULL END,
                        requested_at=now(), requested_by=%s, updated_at=now()
                    WHERE id=%s AND is_active=true
                    RETURNING id, name, applied_status, requested_status,
                              requested_at, requested_pause_until""",
-                (status, pause_until if status == "PAUSED" else None, admin_id, brand_id),
+                (status, pause_until if status == "PAUSED" else None, status, admin_id, brand_id),
             ).fetchone()
             if not row:
                 return None
@@ -284,11 +282,12 @@ def get_brand_by_slug_or_id(slug_or_id: str) -> dict[str, Any] | None:
             store["timezone"] = normalize_timezone(store.get("timezone"))
             store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
             store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
-            store["pause_until"] = brand_row.get("requested_pause_until") or brand_row.get("pause_until")
+            effective_brand_status = brand_row.get("requested_status") or brand_row.get("applied_status") or "ON"
+            store["pause_until"] = (brand_row.get("requested_pause_until") or brand_row.get("pause_until")) if effective_brand_status == "PAUSED" else None
             runtime_state = derive_outlet_runtime_state(store)
             store.update(runtime_state)
 
-            live = store.get("shopee_status") or "UNKNOWN"
+            live = store.get("live_state") or "UNKNOWN"
             is_error = bool(store.get("schedule_fetch_error") or store.get("bot_phase") == "ACTION_FAILED")
             if is_error:
                 failure_count += 1
@@ -334,8 +333,8 @@ def get_brand_by_slug_or_id(slug_or_id: str) -> dict[str, Any] | None:
             "applied_status": brand_row["applied_status"],
             "requested_status": brand_row["requested_status"],
             "effective_status": effective_status,
-            "pause_until": brand_row["pause_until"],
-            "requested_pause_until": brand_row["requested_pause_until"],
+            "pause_until": brand_row["pause_until"] if effective_status == "PAUSED" else None,
+            "requested_pause_until": brand_row["requested_pause_until"] if effective_status == "PAUSED" else None,
             "is_schedule_locked": is_schedule_locked,
             "status_counts": {
                 "opened": opened_count,
@@ -363,11 +362,12 @@ def request_brand_status_public(slug_or_id: str, status: str, pause_until=None) 
             row = conn.execute(
                 """UPDATE vb_brands
                    SET requested_status=%s, requested_pause_until=%s,
+                       pause_until=CASE WHEN %s='PAUSED' THEN pause_until ELSE NULL END,
                        requested_at=now(), requested_by=NULL, updated_at=now()
                    WHERE id=%s AND is_active=true
                    RETURNING id, name, applied_status, requested_status,
                              requested_at, requested_pause_until""",
-                (status, pause_until if status == "PAUSED" else None, brand_id),
+                (status, pause_until if status == "PAUSED" else None, status, brand_id),
             ).fetchone()
             if not row:
                 return None

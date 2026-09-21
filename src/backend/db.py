@@ -1160,10 +1160,29 @@ def update_outlet_name(store_id: str, store_name: str) -> None:
 
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="REGULAR"):
     with get_db_connection() as conn:
-        outlet = conn.execute("SELECT id FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
+        outlet = conn.execute("SELECT id, long_name FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
         if not outlet: return
+        outlet_full_name = store_name or (outlet["long_name"] if outlet else None) or "Outlet"
         row = conn.execute("SELECT vercel_status,shopee_actual_status,suspension_status FROM outlet_states WHERE outlet_id=%s", (outlet["id"],)).fetchone() or {}
         conn.execute("INSERT INTO automation_logs (outlet_id,mode,suspension_status,subscription_status,vercel_status_before,shopee_status_before,target_status,action,success,error_message,reason) VALUES (%s,%s,%s,'ACTIVE',%s,%s,%s,%s,%s,%s,%s)", (outlet["id"], mode, row.get("suspension_status", "ACTIVE"), row.get("vercel_status", "OFF"), row.get("shopee_actual_status", "UNKNOWN"), target_state, action, success, error_message, reason))
+        
+        # Trigger notifikasi Discord khusus Agency jika aksi buka/tutup berhasil
+        if mode == "REGULAR" and success and action in ("ACTION_OPEN", "ACTION_CLOSE", "USER_RESUME_STORE", "USER_PAUSE_STORE", "OPEN", "PAUSE"):
+            try:
+                import importlib
+                import core.notifier
+                if not hasattr(core.notifier, "send_discord_agency_action_notification"):
+                    importlib.reload(core.notifier)
+                core.notifier.send_discord_agency_action_notification(
+                    outlet_name=outlet_full_name,
+                    store_id=store_id,
+                    action=action,
+                    success=success
+                )
+            except Exception as _e:
+                print(f"[DISCORD AGENCY NOTIF ERROR] {_e}")
+
+
         if not success:
             conn.execute("""INSERT INTO automation_errors
                 (mode, outlet_id, store_id, merchant_name, action, attempt_count, error_type, error_message)
@@ -1171,6 +1190,7 @@ def record_log(store_id, store_name, action, target_state, reason, success=True,
                 FROM outlets o JOIN portals p ON p.id=o.portal_id WHERE o.id=%s""",
                 (mode, action, error_message or reason or "Automation action failed", outlet["id"]))
         conn.execute("UPDATE outlet_states SET last_action_at=now(), last_checked_at=now(), updated_at=now() WHERE outlet_id=%s", (outlet["id"],))
+
 def get_recent_logs(limit=50, store_ids=None):
     query = """
         SELECT

@@ -91,6 +91,31 @@ def _get_webhook_url(is_vb: bool = False) -> str:
     return url
 
 
+def _get_agency_webhook_url() -> str:
+    """
+    Mengambil URL Webhook khusus Agency (DISCORD_WEBHOOK_AGENCY_URL),
+    dengan fallback ke DISCORD_WEBHOOK_URL jika belum dikonfigurasi.
+    Mendukung dynamic reload dari .env tanpa restart process.
+    """
+    agency_url = os.getenv("DISCORD_WEBHOOK_AGENCY_URL", "").strip() or os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    if not agency_url:
+        try:
+            from pathlib import Path
+            import dotenv
+            base_dir = Path(__file__).resolve().parent
+            for _ in range(5):
+                env_candidate = base_dir / ".env"
+                if env_candidate.exists():
+                    vals = dotenv.dotenv_values(str(env_candidate))
+                    agency_url = vals.get("DISCORD_WEBHOOK_AGENCY_URL", "").strip() or vals.get("DISCORD_WEBHOOK_URL", "").strip()
+                    if agency_url:
+                        break
+                base_dir = base_dir.parent
+        except Exception:
+            pass
+    return agency_url
+
+
 
 def _get_footer_text(is_vb: bool = False) -> str:
     if _is_vb_environment(is_vb):
@@ -137,6 +162,59 @@ def _send_payload_async(webhook_url: str, payload: dict):
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
+
+
+def send_discord_agency_action_notification(
+    outlet_name: str,
+    store_id: str,
+    action: str,
+    success: bool = True
+):
+    """
+    Mengirimkan notifikasi aksi pembukaan / penutupan outlet Agency (Bot-OC) ke Discord Webhook.
+    Format pesan 1:1 sesuai standar FoodMaster Bot Team dan menyertakan hyperlink ShopeeFood tanpa embel-embel guarding.
+    """
+    if not success:
+        return
+
+    webhook_url = _get_agency_webhook_url()
+    if not webhook_url:
+        return
+
+    act = str(action).upper()
+    is_open = act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE")
+
+    if is_open:
+        header = "🟢 OUTLET BERHASIL DIBUKA BOT"
+    else:
+        header = "🔴 OUTLET BERHASIL DITUTUP BOT"
+
+    clean_store_id = str(store_id or "").strip()
+    if clean_store_id and clean_store_id != "SYSTEM":
+        safe_id = urllib.parse.quote(clean_store_id)
+        shopee_link_md = f"[Link ShopeeFood](https://shopee.co.id/universal-link/now-food/shop/{safe_id})"
+    else:
+        shopee_link_md = "-"
+
+    content_text = (
+        f"{header}\n"
+        f"Nama Outlet: {outlet_name}\n"
+        f"Store ID: {clean_store_id}\n"
+        f"Lihat di ShopeeFood:\n"
+        f"{shopee_link_md}\n\n"
+        f"FoodMaster Bot Team\n"
+        f"WA CS: wa.me/6285183151531"
+    )
+
+    sig_raw = f"AGENCY:{header}:{clean_store_id}"
+    sig_hash = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
+    if _is_duplicate(sig_hash):
+        return
+
+    payload = {
+        "content": content_text
+    }
+    _send_payload_async(webhook_url, payload)
 
 
 def send_discord_error(
@@ -189,23 +267,31 @@ def send_discord_success(
 ):
     """
     Event success handler:
-    - Discord: Ditiadakan (No-Op), karena Discord eksklusif hanya untuk Rekap VB Group.
+    - Discord: Diteruskan khusus Bot-OC ke Discord Webhook Agency via send_discord_agency_action_notification.
     - WhatsApp Gateway: Diteruskan khusus Bot-OC via send_wa_webhook_async jika phone tersedia.
     """
-    if not _is_vb_environment(is_vb) and phone:
-        act = str(action).upper()
-        event = "ACTION_OPEN" if act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE") else "ACTION_CLOSE"
-        send_wa_webhook_async(
-            event_type=event,
-            phone=phone,
-            merchant=merchant,
-            outlet=outlet,
-            platform=platform,
+    if not _is_vb_environment(is_vb):
+        send_discord_agency_action_notification(
+            outlet_name=outlet,
             store_id=store_id,
             action=action,
-            is_vb=False
+            success=True
         )
+        if phone:
+            act = str(action).upper()
+            event = "ACTION_OPEN" if act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE") else "ACTION_CLOSE"
+            send_wa_webhook_async(
+                event_type=event,
+                phone=phone,
+                merchant=merchant,
+                outlet=outlet,
+                platform=platform,
+                store_id=store_id,
+                action=action,
+                is_vb=False
+            )
     return
+
 
 
 def send_discord_skipped(

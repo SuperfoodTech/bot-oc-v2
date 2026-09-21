@@ -64,6 +64,11 @@
             </div>
           </div>
 
+          <!-- Meta Status & Jadwal (Identik gaya Mitra Agency) -->
+          <div class="mitra-outlet-meta" id="brandHeroMeta">
+            <!-- Rendered via JS -->
+          </div>
+
           <div class="brand-hero-actions">
             <button type="button" class="btn-brand-action btn-brand-schedule" onclick="openScheduleBottomSheet()">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
@@ -248,6 +253,141 @@
       document.getElementById('brandErrorMessage').textContent = message;
     }
 
+    const clockIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 15"></polyline></svg>`;
+
+    function getPauseEndDate(value) {
+      if (!value) return null;
+      if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+      let str = String(value || '').trim();
+      if (!str) return null;
+      if (!str.includes('T') && str.includes(' ')) str = str.replace(' ', 'T');
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += '+07:00';
+      const date = new Date(str);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function formatRemainingPause(value) {
+      const end = getPauseEndDate(value);
+      if (!end) return '';
+      const remainingMinutes = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 60000));
+      if (remainingMinutes === 0) return 'Selesai';
+      const hours = Math.floor(remainingMinutes / 60);
+      const minutes = remainingMinutes % 60;
+      const parts = [];
+      if (hours) parts.push(`${hours} jam`);
+      if (minutes || !hours) parts.push(`${minutes} menit`);
+      return `Tersisa ${parts.join(' ')}`;
+    }
+
+    function formatPauseResumeInline(value) {
+      const end = getPauseEndDate(value);
+      if (!end) return '';
+      const remainingText = formatRemainingPause(value);
+      const dateParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(end).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const nowParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const timeParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(end).reduce((acc, part) => (acc[part.type] = part.value, acc), {});
+      const isToday = dateParts.year === nowParts.year && dateParts.month === nowParts.month && dateParts.day === nowParts.day;
+      const reopenText = isToday
+        ? `Akan buka kembali pada ${timeParts.hour}:${timeParts.minute} WIB`
+        : `Akan buka kembali ${dateParts.day}/${dateParts.month}, ${timeParts.hour}:${timeParts.minute} WIB`;
+      return remainingText && remainingText !== 'Selesai'
+        ? `${reopenText} · ${remainingText}`
+        : reopenText;
+    }
+
+    function getBrandStatusLabel(brand) {
+      const outlets = brand.outlets || [];
+      const totalCount = outlets.length;
+      const openedCount = outlets.filter(o => {
+        const live = String(o.live_state || o.shopee_status || o.shopee_actual_status || '').toUpperCase();
+        return live === 'OPEN' || live === 'ON';
+      }).length;
+      const closedCount = outlets.filter(o => {
+        const live = String(o.live_state || o.shopee_status || o.shopee_actual_status || '').toUpperCase();
+        return live === 'CLOSED' || live === 'OFF' || live === 'PAUSE' || live === 'PAUSED';
+      }).length;
+      const anyPendingPause = outlets.some(o => o.bot_phase === 'PENDING_PAUSE');
+      const isScheduleLocked = Boolean(brand.is_schedule_locked);
+      const isOn = (brand.requested_status || brand.applied_status) === 'ON';
+      const pauseUntil = brand.requested_pause_until || brand.pause_until;
+
+      if (isScheduleLocked) {
+        return 'Di luar jam operasional';
+      }
+
+      // Jika Brand status ON (mode buka)
+      if (isOn) {
+        // Jika sudah 1 saja outlet dibuka (atau lebih), hapus tulisannya (sisakan jadwal hari ini saja)
+        if (openedCount >= 1) {
+          return '';
+        }
+        // Jika masih 0 outlet yang dibuka (masih dalam proses pembukaan)
+        return 'Bot sedang dalam proses pembukaan outlet';
+      }
+
+      // Jika Brand status OFF / PAUSED (mode tutup)
+      // untuk on ke off semisal masih ada outlet yang masih belum atau gagal , label nya itu 'Bot sedang dalam proses penutupan outlet'
+      if (openedCount > 0 || anyPendingPause || (totalCount > 0 && closedCount < totalCount)) {
+        return 'Bot sedang dalam proses penutupan outlet';
+      }
+
+      if (pauseUntil) {
+        const formatted = formatPauseResumeInline(pauseUntil);
+        if (formatted) return formatted;
+      }
+      return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
+    }
+
+    function getTodayOperatingHoursSummary(brand) {
+      const schedule = brand.schedule || {};
+      const regHours = schedule.regular_hours || {};
+      const dayNames = [
+        { key: 'monday', label: 'Senin' },
+        { key: 'tuesday', label: 'Selasa' },
+        { key: 'wednesday', label: 'Rabu' },
+        { key: 'thursday', label: 'Kamis' },
+        { key: 'friday', label: 'Jumat' },
+        { key: 'saturday', label: 'Sabtu' },
+        { key: 'sunday', label: 'Minggu' }
+      ];
+
+      const now = new Date();
+      const dayIndex = (now.getDay() + 6) % 7; // Monday=0 ... Sunday=6
+      const todayObj = dayNames[dayIndex];
+      const slots = regHours[todayObj.label] || regHours[todayObj.key] || [];
+
+      if (Array.isArray(slots) && slots.length > 0) {
+        return slots.map(s => {
+          if (typeof s === 'string') return s;
+          const start = String(s.start_time || s[0] || '00:00').slice(0, 5);
+          const end = String(s.end_time || s[1] || '00:00').slice(0, 5);
+          return `${start} - ${end}`;
+        }).join(', ');
+      }
+
+      const firstOutlet = (brand.outlets || [])[0];
+      if (firstOutlet && firstOutlet.today_operating_hours) {
+        return firstOutlet.today_operating_hours;
+      }
+
+      return 'Tutup';
+    }
+
     function renderBrandDashboard(brand) {
       document.getElementById('brandLoadingState').hidden = true;
       document.getElementById('brandErrorState').hidden = true;
@@ -279,6 +419,22 @@
         toggleLabel.title = 'Brand Aktif (ON). Klik untuk tutup sementara.';
       } else {
         toggleLabel.title = 'Brand Tutup Sementara. Klik untuk buka sekarang.';
+      }
+
+      // Render Meta (Status label & Jam hari ini - gaya mitra agency)
+      const statusLabel = getBrandStatusLabel(brand);
+      const todayHours = getTodayOperatingHoursSummary(brand);
+      const heroMetaEl = document.getElementById('brandHeroMeta');
+      if (heroMetaEl) {
+        let metaHtml = '';
+        if (statusLabel) {
+          metaHtml += `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(statusLabel)}</span></div>`;
+        }
+        if (todayHours) {
+          metaHtml += `<div class="mitra-outlet-meta-row">${clockIcon}<span><strong>Jadwal hari ini:</strong> ${escapeHtml(todayHours)}</span></div>`;
+        }
+        heroMetaEl.innerHTML = metaHtml;
+        heroMetaEl.hidden = !metaHtml;
       }
 
       // Render History Logs

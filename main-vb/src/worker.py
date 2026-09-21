@@ -122,6 +122,22 @@ def _normalize_shopee_regular_hours(payload: Dict[str, Any]) -> Dict[str, List[s
     return normalized
 
 
+def _is_schedule_stale(outlet: MerchantOutlet, now_dt: datetime) -> bool:
+    """Check if schedule was fetched > 24 hours ago or before today's start date."""
+    succeeded_at_str = str(getattr(outlet, "schedule_fetch_succeeded_at", "") or "").strip()
+    if not succeeded_at_str:
+        return False
+    try:
+        clean_str = succeeded_at_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=now_dt.tzinfo)
+        today_midnight = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        return dt < today_midnight or (now_dt - dt).total_seconds() > 86400
+    except Exception:
+        return False
+
+
 def _mark_schedule_fetch_retry(outlet: MerchantOutlet, message: str) -> None:
     outlet.schedule_fetch_status = "FETCH_RETRYING"
     try:
@@ -511,8 +527,10 @@ def sync_all_stores(
                 outlet.regular_hours = last_known_regular_hours
                 outlet.shopee_regular_hours = last_known_regular_hours
                 schedule_identity_valid = True
+                is_stale_schedule = _is_schedule_stale(outlet, datetime.now(local_tz))
                 needs_schedule_fetch = (
                     force_schedule_refresh
+                    or is_stale_schedule
                     or (not last_known_schedule_available and current_schedule_fetch_status != "FETCHED_EMPTY")
                     or current_schedule_fetch_status in ("NOT_FETCHED_YET", "FETCH_RETRYING", "STATUS_UNKNOWN", "")
                 )
@@ -735,6 +753,10 @@ def sync_all_stores(
                                     _request_post_action_recheck(
                                         f"post-action verify mismatch untuk Store {outlet.store_id}: live {verified_st}, expected {expected_st}"
                                     )
+                                    _mark_schedule_fetch_retry(
+                                        outlet,
+                                        f"Verification mismatch ({verified_st} != {expected_st}): re-fetching schedule on next pass"
+                                    )
                                 else:
                                     verification_ok = True
                             else:
@@ -763,6 +785,9 @@ def sync_all_stores(
                         "action": decision.action,
                         "target_state": decision.target_state,
                         "reason": reason_text,
+                        "success": action_success,
+                        "action_result": action_result,
+                        "merchant_key": (outlet.username, outlet.nama_portal),
                     })
 
                     db.record_log(

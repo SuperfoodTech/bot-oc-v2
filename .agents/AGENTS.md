@@ -24,7 +24,45 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.10`.
+Latest documented release: `1.23.17`.
+
+Instant Boundary & Schedule Express Lane Dispatch (<3s Zero Order Leak):
+- Mengubah flag `actionable` pada event boundary waktu kritis di `main-bot/src/scheduler.py` dan `main-vb/src/scheduler.py` (`P1_BOUNDARY`, `P1_PAUSE_EXPIRY`, dan `P2_NEXT_SCHEDULE`) dari `False` menjadi `True` (saat memenuhi syarat eligibilitas Auto Open).
+- Menambahkan parameter `grace_seconds` (120 detik) pada `get_next_schedule_start` (`src/core/decision.py` dan `main-vb/src/core/decision.py`), memastikan saat jam boundary tiba (misal pergantian sesi jam 10:00:00 WIB), outlet target seketika dikenali sebagai `actionable` dan langsung masuk ke jalur `⚡ [EXPRESS LANE]`.
+- Mengeliminasi jeda antrean portal sweep 40–60 detik sehingga penutupan ulang toko yang sedang pause maupun pembukaan toko saat jam buka reguler dieksekusi secara instan (< 1-3 detik) tanpa risiko kebobolan order masuk.
+
+Dedicated Transient Action Failure Priority Retry Queue & Auto-Schedule Refresh on Mismatch:
+- Mengintegrasikan antrean prioritas pemulihan cepat (*Priority Retry Queue* via `FAILED_RETRY_TRACKER`) pada `main-bot/src/daemon.py` dan `main-vb/src/daemon.py` untuk mengeksekusi ulang outlet yang mengalami kegagalan sesaat (*transient failure* / *dropdown timeout* / *delay network*) dalam jeda 15s -> 45s -> 90s melalui jalur cepat `[RETRY EXPRESS LANE]` tanpa harus menunggu putaran keliling penuh (*floor sweep*).
+- Menyediakan batas pengaman *exponential backoff & cooldown* 15 menit jika outlet gagal lebih dari 3 kali berturut-turut untuk mencegah *resource starvation*.
+- Mengintegrasikan deteksi otomatis jadwal kedaluwarsa (*TTL 24 jam / Daily Schedule Staleness Check*) pada `worker.py` (`_is_schedule_stale`) untuk menjamin jadwal khusus (*Special Hours*) Shopee harian otomatis ter-update.
+- Menambahkan auto-trigger reset jadwal (`_mark_schedule_fetch_retry`) saat terjadi `VERIFICATION_MISMATCH` pasca-eksekusi, memastikan jika toko gagal dibuka akibat jadwal khusus baru yang belum ter-fetch, bot akan langsung menarik ulang jadwal khusus dan reguler pada kunjungan berikutnya.
+
+Virtual Brand Dedicated Dashboard Toggle Resume & Clean Open Schedule State:
+- Memperbaiki transisi toggle status dari OFF/PAUSED kembali ke ON pada Dashboard Brand (`/brand/{slug}` & `src/backend/vb.py`): memastikan `pause_until` dan `requested_pause_until` direset menjadi `NULL` secara atomik saat status brand diminta `ON`, sehingga tidak lagi terjebak pada state pause lama.
+- Menghapus label teks `'Sedang buka'` saat outlet brand sudah aktif buka (`openedCount >= 1`), sehingga Hero Card hanya menyajikan baris jadwal operasional hari ini (`Jadwal hari ini: HH:mm - HH:mm WIB`) yang bersih dan rapi.
+
+Virtual Brand Live State Normalization & Status Count Determinism:
+- Memperbaiki penentuan agregasi status live outlet Virtual Brand pada `get_brand_by_slug_or_id` (`src/backend/vb.py`) dan frontend `brand_dashboard.html`.
+- Menggunakan `store.get("live_state")` yang sudah dinormalisasi oleh `derive_outlet_runtime_state` (mengenali nilai mentah Shopee API seperti `"ON"` / `"OFF"` / `"PAUSE"` menjadi `"OPEN"` / `"CLOSED"` / `"PAUSE"`), mengeliminasi false positive status `failure_count` / "Perlu Cek" dan label antrean pembukaan semu pada brand yang seluruh outletnya sudah aktif buka.
+
+Virtual Brand Dedicated Dashboard Clean Meta & Dynamic Transition Status:
+- Mengembalikan Hero Card Dashboard Publik Virtual Brand (`/brand/{slug}`) ke tampilan bersih (*clean*) dan minimalis tanpa kartu metrik ("Live Buka", "Perlu Cek", "Live Tutup") dan tanpa accordion detail outlet.
+- Mengintegrasikan baris meta status & jam hari ini (`.mitra-outlet-meta` & `.mitra-outlet-meta-row`) dengan ikon jam yang 1:1 identik dengan Dashboard Mitra Agency (terletak di atas tombol aksi "Lihat Jadwal").
+- Logika label status dinamis:
+  - **Transisi ON -> OFF (Penutupan)**: Selama masih ada outlet yang belum tutup atau gagal tutup, menampilkan label `'Bot sedang dalam proses penutupan outlet'`. Saat seluruh outlet telah tertutup, menampilkan estimasi waktu buka kembali (`Akan buka kembali pada HH:mm WIB` / pause-resume) atau `'Akan dibuka kembali saat otomatisasi diaktifkan.'`.
+  - **Transisi OFF -> ON (Pembukaan)**: Jika minimal sudah ada satu outlet yang berhasil dibuka oleh bot (`openedCount >= 1`), label otomatis berubah menjadi `'Sedang buka'`. Jika belum ada outlet yang berhasil dibuka (masih antrean), menampilkan `'Bot sedang dalam proses pembukaan outlet'`.
+  - **Di Luar Jam Operasional**: Menampilkan `'Di luar jam operasional'` dan jadwal hari ini.
+
+Agency Outlet Action Discord Webhook Notifications:
+- Mengintegrasikan notifikasi Discord Webhook khusus Agency (`DISCORD_WEBHOOK_AGENCY_URL` / `DISCORD_WEBHOOK_URL`) saat bot patroli berhasil membuka (`🟢 OUTLET BERHASIL DIBUKA BOT`) atau menutup (`🔴 OUTLET BERHASIL DITUTUP BOT`) outlet Agency.
+- Format pesan menyajikan Nama Outlet, Store ID, hyperlink ShopeeFood (`[Link ShopeeFood](https://shopee.co.id/universal-link/now-food/shop/<store_id>)`), dan footer resmi FoodMaster Bot Team (WA CS: `wa.me/6285183151531`).
+- Notifikasi Agency disajikan bersih tanpa label atau embel-embel "GUARDING" baik pada pemicu patroli otomatis maupun manual.
+- Mendukung deduplikasi pesan atomik (cache TTL 5 menit) dan pengiriman asinkron via `send_discord_agency_action_notification` di `src/core/notifier.py` yang dipanggil melalui `db.record_log` (`src/backend/db.py`) serta `send_discord_success`.
+
+Virtual Brand Dedicated Dashboard Outlet Status Aggregation & Breakdown:
+- Mengintegrasikan baris 3 kartu metrik ringkasan status live (`.brand-metrics-row`) pada Hero Card Dashboard Mitra VB (`/brand/{slug}`): `Live Buka` (`.is-opened`), `Perlu Cek` (`.is-failure`), dan `Live Tutup` (`.is-closed`).
+- Menambahkan tombol aksi `Daftar Outlet (N)` berdampingan dengan `Lihat Jadwal` pada `.brand-hero-actions`.
+- Menambahkan komponen kartu accordion collapsible `Daftar Outlet` (`.brand-outlets-card`) yang menyajikan breakdown macam-macam outlet di bawah brand (menampilkan nama portal/merchant, nama listing, Store ID, badge status live interaktif, serta subteks jam hari ini / antrean bot).
 
 Virtual Brand Dedicated Dashboard 1:1 Pause Modal & Custom Picker:
 - Modal konfirmasi penutupan sementara di Dashboard Publik Virtual Brand (`/brand/{slug}`) dibuat **1:1 identik** dengan Admin VB Modal dan Dashboard Mitra (mencakup step indicator, judul dinamis `Tutup <Nama Brand>`, box preview waktu auto-buka, opsi radio `30 Menit`, `60 Menit`, `Sepanjang Hari`, dan `Durasi lain`).

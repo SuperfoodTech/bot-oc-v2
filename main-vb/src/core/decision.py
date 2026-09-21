@@ -107,7 +107,7 @@ def get_active_pause_until(outlet: Any, current_time: Optional[datetime] = None)
     return pause_until
 
 
-def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, not_after: Optional[datetime] = None, timezone: ZoneInfo = LOCAL_TZ) -> Optional[datetime]:
+def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, not_after: Optional[datetime] = None, timezone: ZoneInfo = LOCAL_TZ, grace_seconds: int = 120) -> Optional[datetime]:
     now_local = _coerce_local_datetime(now_dt, timezone) or datetime.now(timezone)
     deadline = _coerce_local_datetime(not_after, timezone)
     schedule = schedule or {}
@@ -123,7 +123,7 @@ def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, n
                 candidate_date.day,
                 tzinfo=timezone,
             ) + timedelta(minutes=start_minutes)
-            if candidate_dt <= now_local:
+            if candidate_dt < now_local - timedelta(seconds=grace_seconds):
                 continue
             if deadline and candidate_dt >= deadline:
                 continue

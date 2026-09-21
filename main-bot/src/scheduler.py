@@ -103,17 +103,22 @@ def derive_outlet_due(outlet: MerchantOutlet, now: Optional[datetime] = None) ->
             "desired tutup tetapi Shopee masih buka", "PAUSE", live, True,
         )
 
+    is_suspended = (outlet.penangguhan or "").strip().lower() == "ya"
+    is_subscribed = (outlet.status_langganan or "").strip().lower() in ("aktif", "active")
+    status_utama = (outlet.status_utama or "OFF").strip().upper()
+    is_auto_open_eligible = (status_utama == "ON" and not is_suspended and is_subscribed)
+
     pause_until = get_active_pause_until(outlet, current_time=now)
     if pause_until:
         next_start = get_next_schedule_start(_schedule(outlet), now, not_after=pause_until, timezone=outlet_timezone(outlet))
         if next_start:
             return OutletDueState(
                 outlet.store_id, key, next_start, P1_BOUNDARY,
-                "menunggu boundary sesi reguler saat pause aktif", "PAUSE", live, False,
+                "menunggu boundary sesi reguler saat pause aktif", "PAUSE", live, True,
             )
         return OutletDueState(
             outlet.store_id, key, pause_until, P1_PAUSE_EXPIRY,
-            "menunggu pause berakhir", "PAUSE", live, False,
+            "menunggu pause berakhir", "PAUSE", live, is_auto_open_eligible,
         )
 
     if not has_schedule:
@@ -127,11 +132,10 @@ def derive_outlet_due(outlet: MerchantOutlet, now: Optional[datetime] = None) ->
         if next_start:
             return OutletDueState(
                 outlet.store_id, key, next_start, P2_NEXT_SCHEDULE,
-                "menunggu jadwal reguler berikutnya", "OPEN", live, False,
+                "menunggu jadwal reguler berikutnya", "OPEN", live, is_auto_open_eligible,
             )
 
-    status_utama = (outlet.status_utama or "OFF").strip().upper()
-    if status_utama in {"OFF", "CLOSE", "CLOSED"} or outlet.penangguhan.strip().lower() == "ya":
+    if status_utama in {"OFF", "CLOSE", "CLOSED"} or is_suspended:
         return OutletDueState(
             outlet.store_id, key, now + timedelta(seconds=INACTIVE_HEARTBEAT_SECONDS),
             P5_INACTIVE, "outlet tutup dan tidak membutuhkan aksi", "MANUAL_OFF", live, False,
