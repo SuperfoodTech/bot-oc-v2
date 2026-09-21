@@ -183,23 +183,19 @@ def send_discord_vb_group_summary(
         emoji = "🟢" if is_open else "🔴"
         title = f"{emoji} VB {entity_label} BERHASIL {action_word} BOT"
         color = 3066993 if is_open else 15158332
-        hasil_str = f"{success_count} Outlet Berhasil {action_word.capitalize()}" if is_guarding else f"{success_count} Berhasil"
     elif success_count == 0:
         # Gagal Total (All Failed)
         emoji = "🔴"
         title = f"🔴 VB {entity_label} GAGAL {action_word} BOT"
         color = 15158332  # Merah Alert #E74C3C
-        hasil_str = f"{failed_count} Outlet Gagal {action_word.capitalize()}" if is_guarding else f"{failed_count} Gagal"
     else:
         # Sebagian Berhasil (Partial Success)
         emoji = "🟠"
         title = f"🟠 VB {entity_label} SEBAGIAN BERHASIL {action_word} BOT"
         color = 15105570  # Orange #E67E22
-        hasil_str = f"{success_count} Berhasil, {failed_count} Gagal"
 
     lines = [
         f"**VB Group:** {group_name}",
-        f"**Hasil:** {hasil_str}",
         ""
     ]
 

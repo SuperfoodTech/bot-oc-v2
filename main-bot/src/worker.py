@@ -217,6 +217,39 @@ def warmup_all_account_sessions():
             log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' warmup exception: {ex}")
 
 
+def recycle_browser_sessions():
+    """
+    Safely closes active browser instance(s) to release all Chromium native DOM/C++ memory,
+    and immediately spins up a fresh browser instance using the existing on-disk profile.
+    Must be called only during safe idle windows to guarantee zero cold-start latency.
+    """
+    log.info("🧹 [BROWSER RECYCLE] Starting proactive browser instance recycling...")
+    with SYNC_LOCK:
+        for username, session in list(ACTIVE_SESSIONS.items()):
+            driver = session.get("driver") if isinstance(session, dict) else None
+            if driver:
+                try:
+                    log.info(f"🧹 [BROWSER RECYCLE] Terminating stale browser session for '{username}'...")
+                    browser.cleanup_driver_process(driver)
+                except Exception as clean_err:
+                    log.warning(f"⚠️ [BROWSER RECYCLE] Cleanup warning for '{username}': {clean_err}")
+        ACTIVE_SESSIONS.clear()
+
+        # Flush Python cyclic references & glibc memory arena
+        try:
+            import gc
+            import ctypes
+            gc.collect()
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
+
+        # Re-warmup fresh browser instance with existing profile
+        log.info("🚀 [BROWSER RECYCLE] Re-warming fresh browser session...")
+        warmup_all_account_sessions()
+        log.info("✅ [BROWSER RECYCLE] Proactive browser recycling completed successfully.")
+
+
 def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
     """
     Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.

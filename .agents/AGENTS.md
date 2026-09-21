@@ -24,7 +24,13 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.17`.
+Latest documented release: `1.23.18`.
+
+Deterministic Python Runtime Memory Reclamation & Proactive Browser Recycling:
+- Mengintegrasikan pemanggilan C `libc.so.6` `malloc_trim(0)` di dalam blok `finally:` pada loop evaluasi utama `main-bot/src/daemon.py` dan `main-vb/src/daemon.py` setelah `gc.collect()`, mengembalikan *unmapped memory pages* dan *arena fragmentation* Python langsung ke Kernel Linux OS secara deterministik di setiap akhir siklus patroli.
+- Mengintegrasikan Proactive Browser Recycling (`recycle_browser_sessions`) setiap 100 siklus patroli (`BROWSER_RECYCLE_INTERVAL_CYCLES`) yang hanya dieksekusi pada *safe idle window* (Zero Demand, Zero Pending Retry, dan jeda tidur aman $\ge 30\text{--}60$ detik).
+- Menerapkan *Instant Re-warmup* saat idle sehingga browser baru langsung siap tempur di latar belakang (Zero Cold-Start & Zero OTP) dan mereset penggunaan RAM Chrome kembali ke $\sim 80\text{ MB}$.
+- Menambahkan flag Chromium `--disable-features=BackForwardCache` pada `src/core/browser.py` untuk mematikan penimbunan riwayat snapshot DOM di memori browser.
 
 Instant Boundary & Schedule Express Lane Dispatch (<3s Zero Order Leak):
 - Mengubah flag `actionable` pada event boundary waktu kritis di `main-bot/src/scheduler.py` dan `main-vb/src/scheduler.py` (`P1_BOUNDARY`, `P1_PAUSE_EXPIRY`, dan `P2_NEXT_SCHEDULE`) dari `False` menjadi `True` (saat memenuhi syarat eligibilitas Auto Open).

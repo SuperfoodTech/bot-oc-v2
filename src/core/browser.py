@@ -725,7 +725,7 @@ def _init_driver(headless: bool = None):
     options.add_argument("--js-flags=--max-old-space-size=512")
     options.add_argument("--disk-cache-size=52428800")
     options.add_argument("--media-cache-size=52428800")
-    options.add_argument("--disable-features=Translate,OptimizationHints,MediaRouter")
+    options.add_argument("--disable-features=BackForwardCache,Translate,OptimizationHints,MediaRouter")
     options.add_argument("--renderer-process-limit=1")
     options.add_argument("--disable-site-isolation-trials")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])

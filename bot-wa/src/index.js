@@ -155,6 +155,17 @@ async function connectToWhatsApp() {
   }
 }
 
+function normalizePhoneNumber(rawPhone) {
+  let cleaned = String(rawPhone || '').replace(/[^0-9]/g, '');
+  if (!cleaned) return '';
+  if (cleaned.startsWith('0')) {
+    cleaned = '62' + cleaned.slice(1);
+  } else if (cleaned.startsWith('8')) {
+    cleaned = '62' + cleaned;
+  }
+  return cleaned;
+}
+
 /**
  * Worker Penangan Antrean Pesan (Anti-Ban Rate Limiting)
  */
@@ -168,9 +179,13 @@ async function processQueue() {
       if (waStatus !== 'CONNECTED' || !sock) {
         throw new Error('Koneksi WhatsApp sedang tidak terhubung.');
       }
-      const formattedPhone = task.phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-      await sock.sendMessage(formattedPhone, { text: task.message });
-      if (task.resolve) task.resolve({ success: true, phone: task.phone });
+      const cleaned = normalizePhoneNumber(task.phone);
+      if (!cleaned) {
+        throw new Error(`Nomor telepon tidak valid: ${task.phone}`);
+      }
+      const formattedJid = cleaned + '@s.whatsapp.net';
+      await sock.sendMessage(formattedJid, { text: task.message });
+      if (task.resolve) task.resolve({ success: true, phone: task.phone, jid: formattedJid });
     } catch (err) {
       logger.error({ err: err.message, phone: task.phone }, 'Gagal mengirim pesan WA');
       if (task.reject) task.reject(err);
@@ -182,11 +197,25 @@ async function processQueue() {
   isProcessingQueue = false;
 }
 
-function enqueueMessage(phone, message) {
-  return new Promise((resolve, reject) => {
-    queue.push({ phone, message, resolve, reject });
-    processQueue();
+function enqueueMessage(phoneInput, message) {
+  if (!phoneInput) return Promise.resolve({ success: false, error: 'Nomor kosong' });
+  const phoneList = String(phoneInput)
+    .split(/[,;\n]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  if (phoneList.length === 0) {
+    return Promise.resolve({ success: false, error: 'Nomor kosong' });
+  }
+
+  const promises = phoneList.map(phone => {
+    return new Promise((resolve, reject) => {
+      queue.push({ phone, message, resolve, reject });
+    });
   });
+
+  processQueue();
+  return Promise.all(promises);
 }
 
 /**

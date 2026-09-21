@@ -167,6 +167,8 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             log.warning(f"⚠️ [SERVICE STARTUP] Warmup warning: {e}")
 
     cycle_count = 0
+    recycle_pending = False
+    recycle_interval_cycles = int(os.getenv("BROWSER_RECYCLE_INTERVAL_CYCLES", "100"))
 
     while RUNNING:
         # Check if bot is paused — check both in-memory state AND persisted file state
@@ -460,12 +462,48 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
             else:
                 log.info(f"  💤 All stores in sync. No actions required.")
 
+            # Proactive Browser Recycling Evaluation
+            if cycle_count % recycle_interval_cycles == 0:
+                recycle_pending = True
+
+            if recycle_pending and not dry_run:
+                has_no_actions = len(result.get("actions_taken", [])) == 0
+                has_safe_sleep_window = next_sleep_seconds >= IDLE_REEVALUATION_SECONDS
+                is_no_pending_retry = len(FAILED_RETRY_TRACKER) == 0
+
+                if has_no_actions and has_safe_sleep_window and is_no_pending_retry:
+                    log.info(
+                        f"🧹 [PROACTIVE RECYCLE] Safe idle window detected (0 actions, sleep {next_sleep_seconds}s). "
+                        "Recycling browser session to reclaim Chromium native memory..."
+                    )
+                    try:
+                        worker.recycle_browser_sessions()
+                        recycle_pending = False
+                    except Exception as recycle_err:
+                        log.warning(f"⚠️ [PROACTIVE RECYCLE] Browser recycling error: {recycle_err}")
+                else:
+                    defer_reasons = []
+                    if not has_no_actions:
+                        defer_reasons.append(f"{len(result.get('actions_taken', []))} actions taken")
+                    if not has_safe_sleep_window:
+                        defer_reasons.append(f"short sleep window ({next_sleep_seconds}s < {IDLE_REEVALUATION_SECONDS}s)")
+                    if not is_no_pending_retry:
+                        defer_reasons.append(f"{len(FAILED_RETRY_TRACKER)} retry pending")
+                    log.info(
+                        f"⏳ [PROACTIVE RECYCLE DEFERRED] Deferring recycle to next idle cycle (Reason: {', '.join(defer_reasons)})."
+                    )
+
         except Exception as e:
             log.error(f"❌ Error in daemon cycle #{cycle_count}: {e}")
         finally:
             try:
                 import gc
                 gc.collect()
+            except Exception:
+                pass
+            try:
+                import ctypes
+                ctypes.CDLL("libc.so.6").malloc_trim(0)
             except Exception:
                 pass
 
