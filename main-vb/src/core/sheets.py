@@ -108,7 +108,7 @@ def fetch_merchant_outlets(csv_url: str = GOOGLE_SHEETS_CSV_URL) -> List[Merchan
     col_password = find_col(["akses kata sandi", "kata sandi", "password", "pass"], exclude=["vercel", "dashboard"], default=6)
     col_nama_portal = find_col(["nama portal", "portal", "merchant"], default=7)
     col_store_id = find_col(["store id", "store_id", "store"], default=8)
-    col_nama_panjang = find_col(["nama panjang", "panjang", "outlet"], exclude=["portal"], default=9)
+    col_nama_panjang = find_col(["nama listing", "listing", "nama panjang", "panjang", "outlet"], exclude=["portal"], default=9)
     col_vercel_password = find_col(["vercel", "dashboard"], default=10)
 
     outlets: List[MerchantOutlet] = []
