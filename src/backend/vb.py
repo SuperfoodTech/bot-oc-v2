@@ -14,11 +14,25 @@ from core.timezones import normalize_timezone
 
 VB_SHEET_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
-    "2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/"
-    "pub?gid=401458905&single=true&output=csv"
+    "2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/"
+    "pub?gid=935753758&single=true&output=csv"
 )
 VB_OWNER_NAME = "VB"
 VB_ACCOUNT_USERNAME = "auto7313"
+
+PORTAL_NAME_MAP = {
+    "doeat": "Gurame Bakar, Do Eat",
+    "do eat": "Gurame Bakar, Do Eat",
+    "gurame bakar, do eat": "Gurame Bakar, Do Eat",
+    "superfood": "SuperFood",
+    "wonderfood": "WonderFood",
+    "lokarasa": "LOKARASA",
+}
+
+
+def normalize_portal_name(raw_portal: str) -> str:
+    clean = " ".join((raw_portal or "").strip().split())
+    return PORTAL_NAME_MAP.get(clean.casefold(), clean)
 
 
 def _store_control_map(conn) -> dict[str, dict[str, Any]]:
@@ -53,6 +67,46 @@ def slugify(text: str) -> str:
     return re.sub(r"[-\s]+", "-", slug) or "brand"
 
 
+GENERIC_VB_OWNER_NAMES = {
+    "",
+    "-",
+    "vb",
+    "owner vb",
+    "owner-vb",
+    "virtual brand",
+    "virtual-brand",
+}
+
+
+def normalize_owner_name(raw_owner: str | None) -> str:
+    return " ".join((raw_owner or "").strip().split())
+
+
+def is_generic_owner_name(raw_owner: str | None) -> bool:
+    return normalize_owner_name(raw_owner).casefold() in GENERIC_VB_OWNER_NAMES
+
+
+def slugify_owner_name(raw_owner: str | None) -> str:
+    owner_name = normalize_owner_name(raw_owner)
+    if not owner_name:
+        return "vb"
+    slug = slugify(owner_name)
+    return slug if slug != "brand" else "vb"
+
+
+def resolve_brand_owner_name(item: dict[str, Any], existing_owner_name: str | None = None) -> str:
+    owner_candidates = [item.get("owner")]
+    owner_candidates.extend(store.get("owner") for store in (item.get("stores") or []))
+    parsed_owner_name = next((owner for owner in (normalize_owner_name(value) for value in owner_candidates) if owner), "")
+    persisted_owner_name = normalize_owner_name(existing_owner_name)
+
+    if parsed_owner_name and not is_generic_owner_name(parsed_owner_name):
+        return parsed_owner_name
+    if persisted_owner_name and not is_generic_owner_name(persisted_owner_name):
+        return persisted_owner_name
+    return parsed_owner_name or persisted_owner_name or VB_OWNER_NAME
+
+
 def pick_pause_reference_outlet(outlets: list[dict[str, Any]] | None) -> dict[str, Any] | None:
     normalized_outlets: list[dict[str, Any]] = []
     for outlet in outlets or []:
@@ -74,13 +128,18 @@ def list_brands() -> list[dict[str, Any]]:
         rows = list(conn.execute(
             """SELECT b.id, b.name, b.applied_status, b.requested_status,
                       b.requested_at, b.pause_until, b.requested_pause_until,
-                      b.last_applied_at, b.last_patrolled_at
+                      b.last_applied_at, b.last_patrolled_at,
+                      COALESCE(NULLIF(BTRIM(b.owner_name), ''), 'VB') AS owner_name,
+                      COALESCE(NULLIF(BTRIM(b.owner_slug), ''), '') AS owner_slug
                FROM vb_brands b
                WHERE b.is_active=true
-               ORDER BY b.name_normalized"""
+               ORDER BY COALESCE(NULLIF(BTRIM(b.owner_name), ''), 'VB'), b.name_normalized"""
         ).fetchall())
         for row in rows:
             row["slug"] = slugify(row["name"])
+            row["owner_name"] = resolve_brand_owner_name({"owner": row.get("owner_name")})
+            if not row.get("owner_slug"):
+                row["owner_slug"] = slugify_owner_name(row["owner_name"])
             stores = list(conn.execute(
                 """SELECT o.store_id, o.long_name, p.name AS merchant_name,
                           os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
@@ -203,151 +262,187 @@ def request_status(brand_id: str, status: str, admin_id: str, pause_until=None) 
 import uuid
 
 
+def _build_single_brand_detail(conn, brand_row: dict[str, Any], store_controls: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    brand_id = brand_row["id"]
+    stores = list(conn.execute(
+        """SELECT o.store_id, o.long_name, p.name AS merchant_name,
+                  os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
+                  os.schedule_fetch_status,
+                  os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
+                  os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
+                  COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error
+           FROM vb_brand_outlets bo
+           JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
+           JOIN portals p ON p.id=o.portal_id AND p.is_active=true
+           LEFT JOIN outlet_states os ON os.outlet_id=o.id
+           WHERE bo.vb_brand_id=%s
+             AND o.store_id ~ '^[0-9]+$'
+             AND p.name !~* '^(status|status import|import status)$'
+           ORDER BY p.name, o.store_id""",
+        (brand_id,),
+    ).fetchall())
+
+    opened_count = 0
+    failure_count = 0
+    closed_count = 0
+    first_valid_schedule = None
+    first_special_hours = None
+
+    for store in stores:
+        control = store_controls.get(str(store["store_id"]), {})
+        effective_status = control.get("status", "ON")
+        reg_hours = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
+        store["shopee_regular_hours"] = reg_hours
+        store["shopee_special_hours"] = store.get("shopee_special_hours") or []
+        store["timezone"] = normalize_timezone(store.get("timezone"))
+        store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
+        store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
+        effective_brand_status = brand_row.get("requested_status") or brand_row.get("applied_status") or "ON"
+        store["pause_until"] = (brand_row.get("requested_pause_until") or brand_row.get("pause_until")) if effective_brand_status == "PAUSED" else None
+        runtime_state = derive_outlet_runtime_state(store)
+        store.update(runtime_state)
+
+        live = store.get("live_state") or "UNKNOWN"
+        is_error = bool(store.get("schedule_fetch_error") or store.get("bot_phase") == "ACTION_FAILED")
+        if is_error:
+            failure_count += 1
+        elif live == "OPEN":
+            opened_count += 1
+        elif live in ("CLOSED", "PAUSE"):
+            closed_count += 1
+        else:
+            failure_count += 1
+
+        if not first_valid_schedule and any(reg_hours.values()):
+            first_valid_schedule = reg_hours
+            first_special_hours = store.get("shopee_special_hours") or []
+
+    history_logs = list(conn.execute(
+        """SELECT al.id, to_char(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
+                  COALESCE(o.store_id, '') AS store_id,
+                  COALESCE(o.long_name, p.name, b.name) AS store_name,
+                  p.name AS portal_name,
+                  al.action, al.target_status, al.success, COALESCE(al.reason, '') AS reason
+           FROM automation_logs al
+           JOIN vb_brands b ON b.id=al.vb_brand_id
+           LEFT JOIN outlets o ON o.id=al.outlet_id
+           LEFT JOIN portals p ON p.id=o.portal_id
+           WHERE al.vb_brand_id=%s
+           ORDER BY al.id DESC LIMIT 10""",
+        (brand_id,),
+    ).fetchall())
+
+    slug = slugify(brand_row["name"])
+    is_schedule_locked = len(stores) > 0 and all(
+        s.get("bot_phase") == "WAITING_SCHEDULE" or s.get("within_operating_schedule") is False
+        for s in stores
+    )
+
+    effective_status = brand_row.get("requested_status") or brand_row.get("applied_status") or "ON"
+    owner_name = resolve_brand_owner_name({"owner": brand_row.get("owner_name")})
+    owner_slug = brand_row.get("owner_slug") or slugify_owner_name(owner_name)
+
+    return {
+        "id": brand_row["id"],
+        "name": brand_row["name"],
+        "slug": slug,
+        "owner_name": owner_name,
+        "owner_slug": owner_slug,
+        "applied_status": brand_row["applied_status"],
+        "requested_status": brand_row["requested_status"],
+        "effective_status": effective_status,
+        "pause_until": brand_row["pause_until"] if effective_status == "PAUSED" else None,
+        "requested_pause_until": brand_row["requested_pause_until"] if effective_status == "PAUSED" else None,
+        "is_schedule_locked": is_schedule_locked,
+        "status_counts": {
+            "opened": opened_count,
+            "failure": failure_count,
+            "close": closed_count,
+            "total": len(stores),
+        },
+        "schedule": {
+            "regular_hours": first_valid_schedule or {},
+            "special_hours": first_special_hours or [],
+        },
+        "outlets": stores,
+        "history_logs": history_logs,
+    }
+
+
 def get_brand_by_slug_or_id(slug_or_id: str) -> dict[str, Any] | None:
     """Fetch complete brand data for public brand dashboard by slug or ID."""
-    with get_db_connection() as conn:
-        brand_row = None
-        cleaned_target = str(slug_or_id or "").strip()
-        if not cleaned_target:
-            return None
+    cleaned_target = (slug_or_id or "").strip()
+    if not cleaned_target:
+        return None
 
-        # Check if it is a valid UUID
+    with get_db_connection() as conn:
+        store_controls = _store_control_map(conn)
+        target_norm = cleaned_target.casefold()
+
+        all_active_brands = list(conn.execute(
+            """SELECT id, name, applied_status, requested_status, requested_at,
+                      pause_until, requested_pause_until, last_applied_at, last_patrolled_at,
+                      COALESCE(NULLIF(BTRIM(owner_name), ''), 'VB') AS owner_name,
+                      COALESCE(NULLIF(BTRIM(owner_slug), ''), '') AS owner_slug
+               FROM vb_brands WHERE is_active=true
+               ORDER BY name_normalized"""
+        ).fetchall())
+
+        for b in all_active_brands:
+            b["owner_name"] = resolve_brand_owner_name({"owner": b.get("owner_name")})
+            if not b.get("owner_slug"):
+                b["owner_slug"] = slugify_owner_name(b.get("owner_name"))
+
+        # 1. Check if slug matches an owner_slug directly
+        owner_matched_brands = [b for b in all_active_brands if b["owner_slug"] == target_norm]
+
+        if owner_matched_brands:
+            detailed_brands = [_build_single_brand_detail(conn, b, store_controls) for b in owner_matched_brands]
+            primary_brand = detailed_brands[0]
+            owner_name = resolve_brand_owner_name({"owner": primary_brand.get("owner_name")})
+            owner_slug = primary_brand.get("owner_slug") or slugify_owner_name(owner_name)
+            return {
+                **primary_brand,
+                "owner_name": owner_name,
+                "owner_slug": owner_slug,
+                "brands": detailed_brands,
+                "brand_count": len(detailed_brands),
+            }
+
+        # 2. Check if slug matches a brand ID or brand slug
+        parsed_uuid = None
         try:
             parsed_uuid = str(uuid.UUID(cleaned_target))
-            brand_row = conn.execute(
-                """SELECT id, name, applied_status, requested_status, requested_at,
-                          pause_until, requested_pause_until, last_applied_at, last_patrolled_at
-                   FROM vb_brands WHERE id=%s AND is_active=true""",
-                (parsed_uuid,),
-            ).fetchone()
         except (ValueError, AttributeError):
             pass
 
-        if not brand_row and cleaned_target.isdigit():
-            brand_row = conn.execute(
-                """SELECT id, name, applied_status, requested_status, requested_at,
-                          pause_until, requested_pause_until, last_applied_at, last_patrolled_at
-                   FROM vb_brands WHERE id=%s AND is_active=true""",
-                (int(cleaned_target),),
-            ).fetchone()
+        target_brand = None
+        for b in all_active_brands:
+            b_slug = slugify(b["name"])
+            if (parsed_uuid and str(b["id"]) == parsed_uuid) or (cleaned_target.isdigit() and str(b["id"]) == cleaned_target) or b_slug == target_norm or b["name"].strip().casefold() == target_norm:
+                target_brand = b
+                break
 
-        if not brand_row:
-            all_brands = conn.execute(
-                """SELECT id, name, applied_status, requested_status, requested_at,
-                          pause_until, requested_pause_until, last_applied_at, last_patrolled_at
-                   FROM vb_brands WHERE is_active=true"""
-            ).fetchall()
-            target_norm = cleaned_target.casefold()
-            for b in all_brands:
-                b_slug = slugify(b["name"])
-                if b_slug == target_norm or b["name"].strip().casefold() == target_norm:
-                    brand_row = b
-                    break
-
-        if not brand_row:
+        if not target_brand:
             return None
 
-        brand_id = brand_row["id"]
-        store_controls = _store_control_map(conn)
-        stores = list(conn.execute(
-            """SELECT o.store_id, o.long_name, p.name AS merchant_name,
-                      os.shopee_actual_status, os.shopee_regular_hours, os.shopee_special_hours, os.timezone,
-                      os.schedule_fetch_status,
-                      os.schedule_fetch_attempted_at::text AS schedule_fetch_attempted_at,
-                      os.schedule_fetch_succeeded_at::text AS schedule_fetch_succeeded_at,
-                      COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error
-               FROM vb_brand_outlets bo
-               JOIN outlets o ON o.id=bo.outlet_id AND o.is_active=true
-               JOIN portals p ON p.id=o.portal_id AND p.is_active=true
-               LEFT JOIN outlet_states os ON os.outlet_id=o.id
-               WHERE bo.vb_brand_id=%s
-                 AND o.store_id ~ '^[0-9]+$'
-                 AND p.name !~* '^(status|status import|import status)$'
-               ORDER BY p.name, o.store_id""",
-            (brand_id,),
-        ).fetchall())
-
-        opened_count = 0
-        failure_count = 0
-        closed_count = 0
-        first_valid_schedule = None
-        first_special_hours = None
-
-        for store in stores:
-            control = store_controls.get(str(store["store_id"]), {})
-            effective_status = control.get("status", "ON")
-            reg_hours = normalize_shopee_regular_hours(store.get("shopee_regular_hours"))
-            store["shopee_regular_hours"] = reg_hours
-            store["shopee_special_hours"] = store.get("shopee_special_hours") or []
-            store["timezone"] = normalize_timezone(store.get("timezone"))
-            store["shopee_status"] = store.get("shopee_actual_status") or "UNKNOWN"
-            store["vercel_status"] = "ON" if effective_status == "ON" else "OFF"
-            effective_brand_status = brand_row.get("requested_status") or brand_row.get("applied_status") or "ON"
-            store["pause_until"] = (brand_row.get("requested_pause_until") or brand_row.get("pause_until")) if effective_brand_status == "PAUSED" else None
-            runtime_state = derive_outlet_runtime_state(store)
-            store.update(runtime_state)
-
-            live = store.get("live_state") or "UNKNOWN"
-            is_error = bool(store.get("schedule_fetch_error") or store.get("bot_phase") == "ACTION_FAILED")
-            if is_error:
-                failure_count += 1
-            elif live == "OPEN":
-                opened_count += 1
-            elif live in ("CLOSED", "PAUSE"):
-                closed_count += 1
-            else:
-                failure_count += 1
-
-            if not first_valid_schedule and any(reg_hours.values()):
-                first_valid_schedule = reg_hours
-                first_special_hours = store.get("shopee_special_hours") or []
-
-        # Audit logs for this brand
-        history_logs = list(conn.execute(
-            """SELECT al.id, to_char(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
-                      COALESCE(o.store_id, '') AS store_id,
-                      COALESCE(o.long_name, p.name, b.name) AS store_name,
-                      p.name AS portal_name,
-                      al.action, al.target_status, al.success, COALESCE(al.reason, '') AS reason
-               FROM automation_logs al
-               JOIN vb_brands b ON b.id=al.vb_brand_id
-               LEFT JOIN outlets o ON o.id=al.outlet_id
-               LEFT JOIN portals p ON p.id=o.portal_id
-               WHERE al.vb_brand_id=%s
-               ORDER BY al.id DESC LIMIT 10""",
-            (brand_id,),
-        ).fetchall())
-
-        slug = slugify(brand_row["name"])
-        is_schedule_locked = len(stores) > 0 and all(
-            s.get("bot_phase") == "WAITING_SCHEDULE" or s.get("within_operating_schedule") is False
-            for s in stores
-        )
-
-        effective_status = brand_row.get("requested_status") or brand_row.get("applied_status") or "ON"
+        # Find all sibling brands under the same owner
+        target_owner_slug = target_brand["owner_slug"]
+        sibling_brands = [b for b in all_active_brands if b["owner_slug"] == target_owner_slug]
+        detailed_brands = [_build_single_brand_detail(conn, b, store_controls) for b in sibling_brands]
+        
+        # Ensure target brand is first in list
+        detailed_brands.sort(key=lambda item: 0 if str(item["id"]) == str(target_brand["id"]) else 1)
+        primary_brand = detailed_brands[0]
+        owner_name = resolve_brand_owner_name({"owner": primary_brand.get("owner_name")})
+        owner_slug = primary_brand.get("owner_slug") or slugify_owner_name(owner_name)
 
         return {
-            "id": brand_row["id"],
-            "name": brand_row["name"],
-            "slug": slug,
-            "applied_status": brand_row["applied_status"],
-            "requested_status": brand_row["requested_status"],
-            "effective_status": effective_status,
-            "pause_until": brand_row["pause_until"] if effective_status == "PAUSED" else None,
-            "requested_pause_until": brand_row["requested_pause_until"] if effective_status == "PAUSED" else None,
-            "is_schedule_locked": is_schedule_locked,
-            "status_counts": {
-                "opened": opened_count,
-                "failure": failure_count,
-                "close": closed_count,
-                "total": len(stores),
-            },
-            "schedule": {
-                "regular_hours": first_valid_schedule or {},
-                "special_hours": first_special_hours or [],
-            },
-            "outlets": stores,
-            "history_logs": history_logs,
+            **primary_brand,
+            "owner_name": owner_name,
+            "owner_slug": owner_slug,
+            "brands": detailed_brands,
+            "brand_count": len(detailed_brands),
         }
 
 
@@ -407,10 +502,65 @@ def _parse_matrix(content: str) -> list[dict[str, Any]]:
     rows = list(csv.reader(io.StringIO(content)))
     if not rows:
         return []
-    headers = rows[0]
+    headers = [h.strip().casefold() for h in rows[0]]
+    is_relational = any("outlet" in h or "brand" in h for h in headers) and any("store" in h for h in headers)
+
+    if is_relational:
+        col_owner = next((i for i, h in enumerate(headers) if any(token in h for token in ("owner", "pemilik", "pic"))), -1)
+        col_outlet = next((i for i, h in enumerate(headers) if "outlet" in h or "brand" in h), -1)
+        col_portal = next((i for i, h in enumerate(headers) if "portal" in h or "merchant" in h), -1)
+        col_store_id = next((i for i, h in enumerate(headers) if "store" in h), -1)
+        col_status = next((i for i, h in enumerate(headers) if "status" in h), -1)
+
+        brands_map: dict[str, dict[str, Any]] = {}
+        for row_number, row in enumerate(rows[1:], start=2):
+            if not row or not any(cell.strip() for cell in row):
+                continue
+
+            def get_val(idx: int) -> str:
+                return row[idx].strip() if 0 <= idx < len(row) else ""
+
+            brand_raw = get_val(col_outlet)
+            portal_raw = get_val(col_portal)
+            store_id_raw = get_val(col_store_id)
+            owner_raw = normalize_owner_name(get_val(col_owner))
+            status_raw = get_val(col_status) if col_status >= 0 else "Aktif"
+
+            # Strict Validation Gate:
+            # 1. Brand must be non-empty
+            # 2. Portal must be non-empty
+            # 3. Store ID must be purely numeric digits
+            if not brand_raw or not portal_raw or not store_id_raw or not store_id_raw.isdigit():
+                continue
+
+            normalized_portal = normalize_portal_name(portal_raw)
+            normalized_b = normalize_brand(brand_raw)
+            is_active = status_raw.casefold() == "aktif" if status_raw else True
+
+            if normalized_b not in brands_map:
+                brands_map[normalized_b] = {
+                    "row_number": row_number,
+                    "brand": brand_raw,
+                    "owner": owner_raw,
+                    "status": status_raw or "Aktif",
+                    "is_active": is_active,
+                    "stores": [],
+                }
+            elif not brands_map[normalized_b]["owner"] and owner_raw:
+                brands_map[normalized_b]["owner"] = owner_raw
+
+            brands_map[normalized_b]["stores"].append({
+                "store_id": store_id_raw,
+                "source_column": normalized_portal,
+                "owner": owner_raw,
+            })
+
+        return [b for b in brands_map.values() if b["stores"]]
+
+    # Fallback to legacy matrix format
     status_index = next(
         (index for index, header in enumerate(headers)
-         if header.strip().casefold() in {"status", "status import", "import status"}),
+         if header in {"status", "status import", "import status"}),
         None,
     )
     matrix = []
@@ -424,15 +574,17 @@ def _parse_matrix(content: str) -> list[dict[str, Any]]:
             if col_index == status_index:
                 continue
             header_name = headers[col_index].strip() if col_index < len(headers) else ""
-            if header_name.casefold() in {"status", "status import", "import status", "nama outlet asli"}:
+            if header_name in {"status", "status import", "import status", "nama outlet asli"}:
                 continue
             clean_val = value.strip()
-            if clean_val and clean_val.isdigit():
+            clean_portal = normalize_portal_name(header_name)
+            if clean_val and clean_val.isdigit() and clean_portal:
                 stores.append({
                     "store_id": clean_val,
-                    "source_column": header_name,
+                    "source_column": clean_portal,
                 })
-        matrix.append({"row_number": row_number, "brand": row[0].strip(), "status": status, "is_active": is_active, "stores": stores})
+        if stores:
+            matrix.append({"row_number": row_number, "brand": row[0].strip(), "status": status, "is_active": is_active, "stores": stores})
     return matrix
 
 
@@ -467,16 +619,20 @@ def import_sheet(admin_id: str) -> dict[str, Any]:
             owner_id = owner["id"]
             for item in matrix:
                 existing_brand = conn.execute(
-                    "SELECT is_active FROM vb_brands WHERE name_normalized=%s",
+                    "SELECT is_active, owner_name FROM vb_brands WHERE name_normalized=%s",
                     (normalize_brand(item["brand"]),),
                 ).fetchone()
+                owner_name = resolve_brand_owner_name(item, existing_brand["owner_name"] if existing_brand else None)
+                owner_slug = slugify_owner_name(owner_name)
                 brand = conn.execute(
-                    """INSERT INTO vb_brands (name, name_normalized, is_active)
-                       VALUES (%s, %s, %s)
+                    """INSERT INTO vb_brands (name, name_normalized, is_active, owner_name, owner_slug)
+                       VALUES (%s, %s, %s, %s, %s)
                        ON CONFLICT (name_normalized) DO UPDATE SET
-                         name=EXCLUDED.name, is_active=EXCLUDED.is_active, updated_at=now()
+                         name=EXCLUDED.name, is_active=EXCLUDED.is_active,
+                         owner_name=EXCLUDED.owner_name, owner_slug=EXCLUDED.owner_slug,
+                         updated_at=now()
                        RETURNING id, is_active, (xmax = 0) AS inserted""",
-                    (item["brand"], normalize_brand(item["brand"]), item["is_active"]),
+                    (item["brand"], normalize_brand(item["brand"]), item["is_active"], owner_name, owner_slug),
                 ).fetchone()
                 if brand["inserted"]:
                     brands_created += 1
@@ -538,12 +694,18 @@ def import_sheet(admin_id: str) -> dict[str, Any]:
                         (brand["id"], outlet["id"], store["source_column"]),
                     )
                     outlets_linked += 1
-            conn.execute(
-                """INSERT INTO admin_audit_logs (admin_account_id, action, new_value, reason)
-                   VALUES (%s, 'VB_IMPORT', %s, %s)""",
-                (admin_id, Jsonb({"brands_seen": len(matrix), "brands_created": brands_created, "brands_activated": brands_activated, "brands_deactivated": brands_deactivated, "outlets_created": outlets_created, "outlets_linked": outlets_linked}),
-                 "Import matrix Virtual Brand dari Google Sheet"),
-            )
+            admin_row = None
+            if admin_id and str(admin_id) != "00000000-0000-0000-0000-000000000000":
+                admin_row = conn.execute("SELECT id FROM dashboard_accounts WHERE id=%s", (admin_id,)).fetchone()
+            if not admin_row:
+                admin_row = conn.execute("SELECT id FROM dashboard_accounts ORDER BY id LIMIT 1").fetchone()
+            if admin_row:
+                conn.execute(
+                    """INSERT INTO admin_audit_logs (admin_account_id, action, new_value, reason)
+                       VALUES (%s, 'VB_IMPORT', %s, %s)""",
+                    (admin_row["id"], Jsonb({"brands_seen": len(matrix), "brands_created": brands_created, "brands_activated": brands_activated, "brands_deactivated": brands_deactivated, "outlets_created": outlets_created, "outlets_linked": outlets_linked}),
+                     "Import matrix Virtual Brand dari Google Sheet"),
+                )
     return {
         "brands_seen": len(matrix),
         "brands_active": sum(1 for item in matrix if item["is_active"]),

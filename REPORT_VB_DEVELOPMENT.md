@@ -7,50 +7,51 @@ Status dokumen: bahan diskusi, belum merupakan spesifikasi final dan belum mengu
 `VB` adalah mode operasional yang berbeda dari bot-oc outlet biasa:
 
 - kontrol ditampilkan satu baris per brand/merk;
-- kunci brand berasal dari kolom `Nama Outlet Asli`;
-- satu brand memiliki banyak outlet/store ID;
+- kunci brand berasal dari kolom `Outlet`;
+- satu brand memiliki banyak baris outlet/store ID;
 - outlet dapat tersebar pada beberapa merchant/portal Shopee;
 - satu toggle brand berlaku ke seluruh outlet brand tersebut;
 - default toggle brand adalah `ON`;
 - ketika brand diubah ke `OFF`, seluruh outlet yang tergabung pada brand tersebut menjadi target penutupan;
 - ketika brand diubah ke `ON`, seluruh outlet yang tergabung menjadi target pembukaan, dengan tetap memperhatikan aturan operasional yang nantinya disepakati.
 
-Makna pentingnya: pada mode VB, `Nama Outlet Asli` bukan nama outlet yang dikontrol satu per satu, melainkan identitas virtual brand/group. Store ID tetap menjadi target teknis aksi di Shopee.
+Makna pentingnya: pada mode VB, kolom `Outlet` merepresentasikan identitas virtual brand/group yang mengikat banyak Store ID lintas portal. Store ID tetap menjadi target teknis aksi di Shopee.
 
 ## 2. Hasil pembacaan spreadsheet
 
 Sumber data yang dibaca:
 
-<https://docs.google.com/spreadsheets/d/e/2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/pub?gid=2099001096&single=true&output=csv>
+<https://docs.google.com/spreadsheets/d/e/2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/pub?gid=935753758&single=true&output=csv>
 
 Struktur aktual CSV:
 
 | Posisi | Header | Makna untuk VB |
 |---|---|---|
-| 1 | `Nama Outlet Asli` | Nama brand/group, kunci utama VB |
-| 2 | `SuperFood` | Merchant/portal; isi berupa Store ID |
-| 3 | `WonderFood` | Merchant/portal; isi berupa Store ID |
-| 4 | `Lokarasa` | Merchant/portal; isi berupa Store ID |
-| 5–7 | `Gurame Bakar, Do Eat` | Merchant/portal yang sama, tetapi memiliki beberapa kolom outlet |
+| 1 | `Owner` | Nama pemilik brand/orang yang bertanggung jawab |
+| 2 | `Outlet` | Nama brand/group, kunci utama VB |
+| 3 | `Portal` | Merchant/portal Shopee |
+| 4 | `Store ID` | ID toko numerik ShopeeFood |
 
 Temuan data:
 
-- 27 brand/group pada baris data;
-- 6 kolom merchant, tetapi hanya 4 nama merchant unik;
-- 107 Store ID terisi dan semuanya unik pada snapshot ini;
-- satu brand dapat mempunyai Store ID pada 1 sampai 4 merchant unik;
-- header `Gurame Bakar, Do Eat` berulang tiga kali. Posisi kolom harus dipertahankan saat parsing karena setiap kolom berisi outlet berbeda;
-- spreadsheet ini tidak menyediakan kolom toggle VB. Toggle harus dikelola oleh aplikasi/database;
+- 113 baris outlet valid pada snapshot ini;
+- 29 brand/group unik;
+- 22 owner unik;
+- 4 portal unik: `SuperFood`, `WonderFood`, `LOKARASA`, `DoEat`;
+- 113 Store ID terisi dan semuanya unik pada snapshot ini;
+- satu brand dapat mempunyai Store ID pada 1 sampai 4 portal unik;
+- spreadsheet ini tidak menyediakan kolom toggle VB. Toggle tetap dikelola oleh aplikasi/database;
 - spreadsheet ini tidak menyediakan status aktual Shopee. Status aktual tetap harus dibaca dari Shopee saat cycle.
 
 Contoh pola grouping:
 
 ```text
 Brand: Katsunami
+  Owner                  -> Fivy Azlina
   SuperFood              -> 21758652
   WonderFood             -> 21897202
-  Lokarasa               -> 21901665
-  Gurame Bakar, Do Eat   -> 22426766, 22386259, 22300083
+  LOKARASA               -> 21901665
+  DoEat                  -> 22426766, 22386259
 ```
 
 ## 3. Landasan sistem bot-oc yang sudah ada
@@ -103,7 +104,7 @@ Untuk VB, posisi toggle harus dipindahkan secara konseptual dari level outlet ke
 | Aspek | Bot-oc biasa | VB |
 |---|---|---|
 | Baris UI | Satu outlet | Satu brand |
-| Kunci kontrol | Store/outlet | `Nama Outlet Asli`/brand |
+| Kunci kontrol | Store/outlet | `Outlet`/brand |
 | Target aksi | Satu Store ID | Semua Store ID brand |
 | Relasi merchant | Outlet berada pada satu portal | Brand dapat lintas portal |
 | Toggle | Per outlet | Satu per brand |
@@ -129,7 +130,7 @@ Bentuk konseptual tabel:
 ### `vb_brands`
 
 - `id` — primary key;
-- `name` — nilai normalisasi dari `Nama Outlet Asli`;
+- `name` — nilai normalisasi dari kolom `Outlet`;
 - `display_name` — nama yang ditampilkan di tab;
 - `control_status` — `ON`/`OFF`, default `ON`;
 - `is_active` — mengaktifkan/nonaktifkan konfigurasi brand;
@@ -165,19 +166,20 @@ Log level brand saja tidak cukup untuk troubleshooting karena satu cycle dapat b
 
 ## 6. Import mapping yang diusulkan
 
-Spreadsheet VB berbentuk matrix, sehingga proses import perlu diubah dari parser baris-outlet menjadi parser matrix:
+Spreadsheet VB aktif berbentuk relasional 4 kolom, sehingga proses import membaca satu baris sebagai satu relasi owner-brand-portal-store:
 
 ```text
 for setiap baris:
-    brand = kolom pertama
-    untuk setiap kolom merchant mulai kolom kedua:
-        jika cell berisi Store ID:
-            buat/temukan outlet berdasarkan Store ID
-            buat/temukan brand berdasarkan brand
-            buat relasi brand -> outlet
+    owner = kolom Owner
+    brand = kolom Outlet
+    portal = kolom Portal
+    store_id = kolom Store ID
+    jika portal dan store_id valid:
+        buat/temukan outlet berdasarkan Store ID
+        buat/temukan brand berdasarkan brand
+        tautkan owner ke brand
+        buat relasi brand -> outlet
 ```
-
-Header merchant yang berulang tidak boleh digabung secara naif sebelum cell diproses. Posisi kolom 5, 6, dan 7 semuanya harus menghasilkan relasi outlet terpisah di bawah merchant `Gurame Bakar, Do Eat`.
 
 Import harus idempotent: menjalankan import ulang tidak boleh menggandakan brand, outlet, atau relasi. Brand yang hilang dari snapshot baru juga perlu kebijakan eksplisit: nonaktifkan, hapus relasi, atau pertahankan sebagai data historis. Rekomendasi awal adalah tidak menghapus otomatis.
 
@@ -187,7 +189,7 @@ Kolom UI minimum per baris:
 
 | Kolom | Keterangan |
 |---|---|
-| Brand | `Nama Outlet Asli` |
+| Brand | `Outlet` |
 | Jumlah outlet | Total Store ID yang terhubung |
 | Merchant | Daftar merchant unik, atau ringkasan jumlah merchant |
 | Toggle VB | ON/OFF, default ON |
@@ -204,7 +206,7 @@ Saat toggle diubah:
 5. aksi dijalankan per Store ID, grouped by account dan portal;
 6. hasil setiap outlet disimpan, termasuk jika hanya sebagian berhasil.
 
-Default `ON` hanya berarti desired/control state baru untuk VB. Pada initial import, sistem tetap perlu menentukan apakah langsung menjalankan pembukaan semua 107 outlet atau menunggu cycle pertama setelah validasi. Rekomendasi aman untuk diskusi: import state `ON`, lalu cycle normal melakukan rekonsiliasi dan log eksplisit.
+Default `ON` hanya berarti desired/control state baru untuk VB. Pada initial import, sistem tetap perlu menentukan apakah langsung menjalankan pembukaan semua 113 outlet atau menunggu cycle pertama setelah validasi. Rekomendasi aman untuk diskusi: import state `ON`, lalu cycle normal melakukan rekonsiliasi dan log eksplisit.
 
 ## 8. Rancangan cycle VB
 
@@ -253,7 +255,7 @@ Rekomendasi saya adalah opsi pertama dengan migration baru, setelah aturan bisni
 
 Sebelum implementasi, perlu dikunci:
 
-- apakah `Nama Outlet Asli` selalu brand, atau ada baris yang sebenarnya nama outlet individual;
+- apakah nilai pada kolom `Outlet` selalu brand, atau ada baris yang sebenarnya nama outlet individual;
 - apakah satu Store ID boleh terhubung ke lebih dari satu brand;
 - apakah ON VB melewati subscription, suspension, dan jam operasional bot-oc, atau VB hanya mengikuti toggle brand;
 - apakah OFF harus langsung menutup semua outlet atau hanya memengaruhi cycle berikutnya;

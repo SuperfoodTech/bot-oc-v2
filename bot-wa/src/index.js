@@ -342,7 +342,7 @@ function buildNotificationText(body) {
 
 // Agency Google Sheet URL
 const GOOGLE_SHEETS_CSV_URL = process.env.GOOGLE_SHEETS_CSV_URL || 
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/pub?gid=0&single=true&output=csv';
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/pub?gid=890126027&single=true&output=csv';
 
 let cachedOwnersData = null;
 let lastFetchTimestamp = 0;

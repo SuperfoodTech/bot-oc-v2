@@ -96,6 +96,12 @@ def init_db() -> None:
         migration13_path = base_dir / "013_schedule_fetch_status.sql"
         if migration13_path.exists():
             conn.execute(migration13_path.read_text(encoding="utf-8"))
+        migration14_path = base_dir / "014_shopee_special_hours.sql"
+        if migration14_path.exists():
+            conn.execute(migration14_path.read_text(encoding="utf-8"))
+        migration15_path = base_dir / "015_vb_brand_owner.sql"
+        if migration15_path.exists():
+            conn.execute(migration15_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")

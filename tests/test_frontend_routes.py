@@ -71,6 +71,13 @@ def test_frontend_rendering():
     assert "FoodMaster Auto-Open" in r.text
     log.info("   -> Result: PASSED (Mitra Slug Route Rendered)")
 
+    log.info("\n5️⃣ Testing GET /brand/fivy-azlina (Public Brand Dashboard)...")
+    r = client.get("/brand/fivy-azlina")
+    assert r.status_code == 200
+    assert 'id="brandCardsList"' in r.text
+    assert 'id="brandOwnerActivityCard"' in r.text
+    log.info("   -> Result: PASSED (Public Brand Dashboard Rendered)")
+
     print("\n" + "=" * 90)
     log.info("🎉 ALL FRONTEND WEB ROUTES AND ASSETS TESTED AND PASSED 100%!")
     print("=" * 90)

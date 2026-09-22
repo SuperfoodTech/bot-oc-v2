@@ -15,8 +15,8 @@ load_dotenv()
 GOOGLE_SHEETS_CSV_URL = os.getenv(
     "GOOGLE_SHEETS_CSV_URL",
     "https://docs.google.com/spreadsheets/d/e/"
-    "2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/"
-    "pub?gid=0&single=true&output=csv",
+    "2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/"
+    "pub?gid=890126027&single=true&output=csv",
 )
 
 WEEKDAY_MAP = {

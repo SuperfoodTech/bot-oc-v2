@@ -4,6 +4,137 @@ Dokumen ini berisi rangkuman arsitektur, spesifikasi notifikasi, dan aturan oper
 
 ---
 
+## 0. Handover Update - 2026-09-22
+
+### A. Agency Google Sheet Source Sudah Pindah
+
+- Source Agency aktif sekarang menggunakan published CSV:
+  - `https://docs.google.com/spreadsheets/d/e/2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/pub?gid=890126027&single=true&output=csv`
+- Header sheet baru yang sudah tervalidasi:
+  - `Nama Pemilik`
+  - `Nomor HP`
+  - `Status Bot`
+  - `Paket`
+  - `Tanggal Mulai Layanan`
+  - `Tanggal Berakhir Layanan`
+  - `Akses Username`
+  - `Akses Kata Sandi`
+  - `Nama Portal`
+  - `Store ID`
+  - `Nama Listing`
+  - `Vercel Kata Sandi`
+- Secara teknis parser Agency tidak perlu perubahan schema karena parser mencari kolom berbasis nama header, dan `Status Bot` tetap tertangkap oleh matcher `status`.
+
+File runtime/fallback yang sudah diarahkan ke source baru:
+
+- `.env`
+- `src/core/sheets.py`
+- `main-vb/src/core/sheets.py`
+- `main-vb/src/sheets.py`
+- `main-bot/src/sheets.py`
+- `bot-wa/src/index.js`
+
+Catatan operasional penting:
+
+- Untuk perubahan `GOOGLE_SHEETS_CSV_URL` di `.env`, `docker restart fm-backend` saja tidak cukup jika env container belum berubah.
+- Gunakan recreate container web:
+  - `docker compose up -d --force-recreate --no-deps web`
+- Setelah recreate, verifikasi env aktif:
+  - `docker inspect fm-backend --format '{{range .Config.Env}}{{println .}}{{end}}' | rg '^GOOGLE_SHEETS_CSV_URL='`
+
+### B. Virtual Brand Source Aktif
+
+- Source VB aktif tetap published CSV relasional 4 kolom:
+  - `https://docs.google.com/spreadsheets/d/e/2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/pub?gid=935753758&single=true&output=csv`
+- Struktur aktif:
+  - `Owner`
+  - `Outlet`
+  - `Portal`
+  - `Store ID`
+- Snapshot tervalidasi saat handover:
+  - `113` row outlet valid
+  - `29` brand
+  - `22` owner
+  - `4` portal unik
+  - `113` Store ID unik
+
+File runtime VB yang aktif:
+
+- `src/backend/vb.py`
+- `main-vb/src/backend/vb.py`
+- `main-vb/src/importer.py`
+
+### C. Perubahan Backend VB
+
+- Owner VB sekarang tidak lagi dipaksa menjadi `VB`.
+- Import VB sudah menyimpan owner asli per brand:
+  - `owner_name`
+  - `owner_slug`
+- Endpoint public brand sekarang mendukung owner dashboard multi-brand:
+  - `/brand/{owner_slug}`
+- Jika satu owner memiliki lebih dari satu brand, response brand dashboard akan mengembalikan agregasi owner-level dengan `brands[]`.
+
+File penting:
+
+- `src/backend/vb.py`
+- `main-vb/src/backend/vb.py`
+- `main-vb/src/importer.py`
+- `src/backend/db.py`
+- `main-vb/src/backend/db.py`
+- `database/migrations/015_vb_brand_owner.sql`
+
+### D. Perubahan Frontend Dashboard VB
+
+Perubahan public owner dashboard:
+
+- Satu owner bisa menampilkan beberapa card brand dalam satu halaman.
+- Toggle sekarang berada per brand, bukan di level owner.
+- Card summary owner lama sudah dihapus.
+- Label `Brand X dari Y` sudah dihapus.
+- Baris metrik `Live Buka / Perlu Cek / Live Tutup` sudah dihapus dari card brand.
+- Log aktivitas per-brand sudah dipindah menjadi satu panel aktivitas gabungan di level owner.
+- Panel aktivitas owner mendukung:
+  - filter chip per brand
+  - default ringkas
+  - tombol `Lihat semua aktivitas`
+
+File penting:
+
+- `src/backend/templates/brand_dashboard.html`
+- `src/backend/static/css/styles.css`
+
+Perubahan admin tab VB:
+
+- Grouping owner sekarang berdasarkan owner asli dari sheet/import terbaru.
+- Header owner lebih ringkas:
+  - icon profile dihapus
+  - nama owner + pill `Brand` dan `Store ID` satu baris
+  - tombol `Link Dashboard` biru dengan teks putih
+
+File penting:
+
+- `src/backend/templates/admin_dashboard.html`
+- `src/backend/static/css/styles.css`
+
+### E. Testing Yang Sudah Dilakukan
+
+- `uv run pytest tests/test_vb_owner_grouping.py tests/test_vb_pause_contract.py`
+- `uv run pytest tests/test_frontend_routes.py`
+
+Catatan:
+
+- `tests/test_frontend_routes.py` sudah diperbarui untuk memastikan route public brand owner dashboard tetap ter-render.
+- `tests/test_vb_owner_grouping.py` ditambahkan untuk mengunci perilaku owner grouping VB.
+
+### F. Dokumentasi Yang Sudah Diselaraskan
+
+- `DoD.md`
+- `REPORT_VB_DEVELOPMENT.md`
+
+Keduanya sudah disesuaikan dengan source VB aktif dan tidak lagi merujuk format/published sheet lama untuk jalur runtime yang dipakai saat ini.
+
+---
+
 ## 1. Ringkasan Arsitektur Notifikasi
 
 Sistem notifikasi dipisahkan secara tegas berdasarkan jenis bot dan platform tujuan:

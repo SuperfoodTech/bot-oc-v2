@@ -3387,6 +3387,221 @@ body[data-admin-tab="vb"] .admin-shell .admin-page-header {
 .vb-empty-state span { color: #777d86; font-size: 12px; }
 .vb-empty-state .btn-outline { margin-top: 6px; min-height: 36px; }
 
+.vb-owner-card {
+  margin-bottom: 24px;
+  background: transparent;
+  border-radius: 14px;
+}
+
+.vb-owner-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  user-select: none;
+  margin-bottom: 16px;
+}
+
+.vb-owner-head:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.vb-owner-card.is-collapsed .vb-owner-head {
+  margin-bottom: 0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.vb-owner-head:focus-visible {
+  outline: 2px solid #be1a1a;
+  outline-offset: 2px;
+}
+
+.vb-owner-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vb-owner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vb-owner-mainline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.vb-owner-eyebrow {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.vb-owner-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.vb-owner-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vb-owner-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.vb-owner-summary-pill strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.vb-owner-summary-pill span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.vb-owner-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  justify-self: end;
+}
+
+.vb-owner-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  width: auto;
+  flex: 0 0 auto;
+  background: #2563eb;
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.16);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.vb-owner-link:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.vb-owner-link svg {
+  width: 14px;
+  height: 14px;
+  opacity: 1;
+}
+
+.vb-owner-link span {
+  display: inline;
+  color: inherit;
+}
+
+.vb-owner-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid #dbe4ee;
+  border-radius: 999px;
+  color: #64748b;
+  transition: transform 150ms ease;
+}
+
+.vb-owner-card:not(.is-collapsed) .vb-owner-chevron {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 980px) {
+  .vb-owner-head {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: flex-start;
+  }
+
+  .vb-owner-right {
+    justify-self: start;
+  }
+
+  .vb-owner-title {
+    white-space: normal;
+  }
+}
+
+:root[data-theme="dark"] .vb-owner-summary {
+  color: #94a3b8;
+}
+
+:root[data-theme="dark"] .vb-owner-link {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #93c5fd;
+}
+
+:root[data-theme="dark"] .vb-owner-link:hover {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(147, 197, 253, 0.3);
+  color: #bfdbfe;
+}
+
+.vb-owner-body {
+  display: grid;
+  gap: 16px;
+  padding-left: 12px;
+  border-left: 2px dashed #e2e8f0;
+  margin-left: 26px;
+}
+
 .vb-brand-card {
   padding: 10px 14px;
   background: #fff;
@@ -10454,6 +10669,20 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
+.brand-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.brand-cards-list .brand-hero-card {
+  margin-bottom: 0;
+}
+
+.brand-owner-summary .mitra-outlet-meta {
+  margin-top: 12px;
+}
+
 .brand-hero-top {
   display: flex;
   align-items: flex-start;
@@ -10755,6 +10984,99 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
+.brand-history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.brand-history-filter-chip {
+  border: 1px solid #d7dee8;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 999px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.brand-history-filter-chip:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.brand-history-filter-chip.is-active {
+  background: rgba(190, 26, 26, 0.1);
+  border-color: rgba(190, 26, 26, 0.24);
+  color: #be1a1a;
+  box-shadow: 0 0 0 3px rgba(190, 26, 26, 0.08);
+}
+
+.brand-owner-history-list {
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.brand-owner-history-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.brand-owner-history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.brand-owner-history-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+
+.brand-owner-history-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+.history-brand-chip {
+  display: inline-flex !important;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 24px;
+  margin: 0 0 6px !important;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1;
+}
+
+.brand-history-more {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 12px;
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.brand-history-more:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
 .history-store-id {
   display: block;
   font-size: 11px;
@@ -10941,6 +11263,29 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   border-color: #334155;
 }
 
+:root[data-theme="dark"] .brand-history-filter-chip {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .brand-history-filter-chip:hover {
+  background: #162033;
+  border-color: #475569;
+}
+
+:root[data-theme="dark"] .brand-history-filter-chip.is-active {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.28);
+  color: #fecaca;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.08);
+}
+
+:root[data-theme="dark"] .history-brand-chip {
+  background: rgba(96, 165, 250, 0.16);
+  color: #bfdbfe !important;
+}
+
 :root[data-theme="dark"] .brand-hero-title,
 :root[data-theme="dark"] .brand-accordion-title,
 :root[data-theme="dark"] .brand-outlet-name,
@@ -10979,6 +11324,17 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 
 :root[data-theme="dark"] .brand-bottom-sheet-handle {
   background: #475569;
+}
+
+:root[data-theme="dark"] .brand-history-more {
+  background: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+:root[data-theme="dark"] .brand-history-more:hover {
+  background: #162033;
+  border-color: #475569;
 }
 
 /* ── WHATSAPP GATEWAY TAB STYLES ── */

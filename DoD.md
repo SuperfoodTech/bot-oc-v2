@@ -1,50 +1,59 @@
-# Definition of Done (DoD) - Virtual Brand Notification Direction & Status Evaluation Fix
+# Definition of Done (DoD) — Virtual Brand (VB) Sheet Migration & Strict Ingestion Gate
 
-**Fitur**: Perbaikan Penentuan Arah & Evaluasi Notifikasi Discord Virtual Brand (Brand Toggle & Guarding)  
-**Modul**: `main-vb/src/db.py`, `tests/test_vb_notification_flush.py`  
-**Target Release**: Release 1.23.8  
-
-Dokumen ini menetapkan kriteria kelayakan (*Acceptance Criteria*) dan standar kualitas (*Quality Gates*) sebelum perbaikan logika evaluasi arah notifikasi Discord Virtual Brand dinyatakan selesai (*Done*).
+Dokumen ini mendefinisikan kriteria penyelesaian (*Definition of Done*) untuk implementasi migrasi spreadsheet Virtual Brand (VB) ke format relasional 4-kolom (`Owner`, `Outlet`, `Portal`, `Store ID`), normalisasi nama portal (`DoEat` $\rightarrow$ `Gurame Bakar, Do Eat`), serta aturan validasi data ketat sebelum disimpan ke database untuk dieksekusi bot.
 
 ---
 
-## 1. Kriteria Fungsional (Functional Acceptance Criteria)
+## 1. Kriteria Penerimaan (*Acceptance Criteria*)
 
-### A. Deterministic Notification Direction Evaluation
-- [ ] **Strict Status-Driven Evaluation for Brand Toggle**:
-  - Pada mode Brand Toggle (`is_brand_toggle == True`), penentuan jenis aksi (`summary_action` dan `is_open`) **100% dipandu oleh `applied_status` brand** (`applied_status == "ON"` -> `ACTION_OPEN` / DIBUKA; `applied_status == "PAUSED"` -> `ACTION_CLOSE` / DITUTUP).
-  - Menghilangkan logika `any(a in ("ACTION_OPEN", ...) for a in actions_types)` yang rentan terhadap kontaminasi sisa aksi patroli lama.
-- [ ] **Majority/Executed Action Evaluation for Auto-Guarding**:
-  - Pada mode Auto-Guarding (`is_brand_toggle == False`), arah aksi ditentukan berdasarkan dominasi aksi pemulihan aktual yang dieksekusi (`open_count >= close_count`), dengan fallback ke `applied_status`.
-- [ ] **Stale Buffer Purging on Status Apply**:
-  - Saat status toggle baru diaplikasikan pada brand di `apply_all_pending_statuses`, buffer `_PENDING_BRAND_ACTIONS[brand_id]` dibersihkan dari aksi lama sebelum eksekusi dimulai agar tidak ada sisa catatan aksi sebelumnya.
+### A. Format & Parsing Spreadsheet Baru
+- [ ] **URL Spreadsheet Terhubung**: Menggunakan endpoint resmi Google Sheets CSV Virtual Brand aktif `gid=935753758`.
+- [ ] **Struktur 4-Kolom Terpetakan Sempurna**:
+  - Kolom 1: `Owner` (Nama pemilik asli, misal: *A Isyah, Amir, Dina, Mahrudin, dll.*).
+  - Kolom 2: `Outlet` (Nama Virtual Brand, misal: *Ayam Geprek Suroboyo Ampel, Baru Rasa, Katsunami, dll.*).
+  - Kolom 3: `Portal` (Nama merchant portal, misal: *SuperFood, WonderFood, LOKARASA, DoEat*).
+  - Kolom 4: `Store ID` (ID toko numerik ShopeeFood, misal: *21758641, 22299093, dll.*).
+- [ ] **Backward / Fallback Compatibility**: Parser memiliki deteksi cerdas yang mampu mengenali format relasional 4-kolom maupun matrix lama secara adaptif tanpa crash.
 
-### B. Accurate Success & Failure Categorization
-- [ ] **Brand Toggle Close**: Jika brand di-pause/tutup (`applied_status == 'PAUSED'`), seluruh outlet yang berhasil di-pause (`live_st in ('PAUSE', 'CLOSED', 'OFF')`) tanpa kegagalan tercatat masuk ke kategori **Berhasil Ditutup**, bukan Gagal Dibuka.
-- [ ] **Brand Toggle Open**: Jika brand di-buka (`applied_status == 'ON'`), seluruh outlet yang aktif (`live_st in ('ON', 'OPEN')`) masuk ke kategori **Berhasil Dibuka**.
+### B. Portal Aliasing & Normalization
+- [ ] **Mapping Otomatis DoEat**: Nilai `"DoEat"`, `"do eat"`, `"doeat"`, maupun `"Gurame Bakar, Do Eat"` secara deterministik dinormalisasi menjadi nama resmi Shopee Partner:
+  $$\textbf{"Gurame Bakar, Do Eat"}$$
+- [ ] **Normalisasi Portal Lainnya**:
+  - `"superfood"` / `"SuperFood"` $\rightarrow$ `"SuperFood"`
+  - `"wonderfood"` / `"WonderFood"` $\rightarrow$ `"WonderFood"`
+  - `"lokarasa"` / `"LOKARASA"` $\rightarrow$ `"LOKARASA"`
 
----
-
-## 2. Kriteria Kualitas Kode & Integritas Arsitektur (Technical Quality Gates)
-
-- [ ] **Worker Byte-for-Byte Parity**: File `main-vb/src/worker.py` **WAJIB tetap 100% identik byte-for-byte** dengan `main-bot/src/worker.py`. Seluruh penyesuaian hanya berada di adapter `main-vb/src/db.py`.
-- [ ] **Thread-Safe Buffer Operations**: Seluruh manipulasi buffer `_PENDING_BRAND_ACTIONS` dan `_BRAND_TOGGLED_IDS` terlindungi mutex `_PENDING_LOCK`.
-- [ ] **Zero Downtime**: Penyesuaian adapter di `main-vb/src/db.py` tidak menginterupsi jalannya daemon patroli.
-
----
-
-## 3. Kriteria Pengujian & Verifikasi (Testing & Validation)
-
-- [ ] **Unit Tests**:
-  - Test case untuk skenario replikasi issue: Brand di-toggle PAUSED saat buffer memiliki sisa `ACTION_OPEN` dari patroli sebelumnya, memastikan notifikasi dikirim sebagai `ACTION_CLOSE` dengan status SUKSES.
-  - Test case untuk Brand di-toggle ON.
-  - Test case untuk Auto-Guarding mode (Open & Close).
-  - Test suite pada `tests/test_vb_notification_flush.py` lulus 100%.
-- [ ] **Full Regression**: Seluruh unit test suite lulus tanpa error/regresi.
+### C. Validasi Ketat (*Strict Data Ingestion Gate*)
+- [ ] **Validasi Store ID**:
+  - Wajib terisi dan berupa angka digit murni (`store_id.strip().isdigit()`).
+  - Baris dengan Store ID kosong, bernilai teks seperti `"-", "#N/A", "undefined"`, atau non-digit **dilarang masuk ke database** dan otomatis di-skip.
+- [ ] **Validasi Portal**:
+  - Wajib terisi dan valid.
+  - Baris dengan kolom portal kosong **dilarang masuk ke database** dan otomatis di-skip.
+- [ ] **Validasi Brand**:
+  - Wajib memiliki nama brand/outlet yang jelas. Baris kosong diabaikan.
+- [ ] **Proteksi Bot Execution**:
+  - Dashboard Admin, Dashboard Mitra VB, dan Bot Daemon (`fm-bot-vb`) hanya membaca data yang tersimpan valid di tabel database (`outlets` & `vb_brand_outlets`). Toko yang tidak valid tidak akan pernah dimuat atau dieksekusi oleh bot.
 
 ---
 
-## 4. Kriteria Rilis & Dokumentasi (Release Compliance)
+## 2. Kriteria Kualitas & Integritas Data
 
-- [ ] **Dokumentasi Rilis**: Membuat file update `update/1.23.8.md` yang memuat ringkasan issue, akar masalah, perbaikan logika, dan spesifikasi penanganan.
-- [ ] **Pencatatan Versi di AGENTS.md & UPDATES.md**: Memperbarui nomor rilis terbaru (`1.23.8`) dan mencatat aturan determinasi arah notifikasi pada `.agents/AGENTS.md` dan `UPDATES.md`.
+- [ ] **Idempotensi Import**: Menjalankan import berkali-kali menghasilkan data yang konsisten (tidak membuat duplikasi data toko, brand, atau relasi).
+- [ ] **Pembersihan Stale Brands**: Brand yang sudah tidak ada di spreadsheet aktif otomatis dinonaktifkan (`is_active = false`) agar tidak membebani siklus patroli bot.
+- [ ] **Pencatatan Audit Log**: Setiap aktivitas import sheet mencatat detail ringkasan ke `admin_audit_logs` (jumlah brand, outlet dibuat, outlet di-link, baris di-skip).
+
+---
+
+## 3. Kriteria Verifikasi & Pengujian (*Testing Criteria*)
+
+- [ ] **Unit / Local Script Test**:
+  - Pengujian live fetch terhadap CSV `gid=935753758` sukses memproses 113 outlet valid dari 29 brand dan 22 owner.
+  - Pengujian baris invalid (mock data tanpa store ID / tanpa portal) terbukti 100% di-skip.
+  - Test suite `pytest` pada modul worker dan backend berjalan hijau (*PASS*).
+- [ ] **Zero-Downtime Deployment**:
+  - Update service backend web dieksekusi dengan perintah:
+    ```bash
+    docker compose build web && docker compose up -d --no-deps web
+    ```
+  - Sesi bot Selenium (`fm-bot` & `fm-bot-vb`) tetap berjalan aktif 24/7 tanpa interupsi.

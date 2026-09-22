@@ -18,7 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260917-v131-brandlinklevel">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260922-v137-vb-owner-inline-pills">
 </head>
 
 <body x-data="adminApp()">
@@ -1511,6 +1511,17 @@
       }[char]));
     }
 
+    function normalizeVbOwnerName(value) {
+      const normalized = String(value ?? '').trim().replace(/\s+/g, ' ');
+      return normalized || 'VB';
+    }
+
+    function slugifyVbOwnerName(value) {
+      const ownerName = normalizeVbOwnerName(value);
+      const slug = ownerName.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[-\s]+/g, '-');
+      return slug || 'vb';
+    }
+
     function seedVbExpandedBrands(brands) {
       if (hasSeededVbExpandedDefaults) return;
       const firstBrand = brands[0];
@@ -2055,159 +2066,239 @@
         return;
       }
 
-      body.innerHTML = brands.map(brand => {
-        const isExpanded = vbExpandedBrandIds.has(String(brand.id));
-        const isPending = pendingVBBrandIds.has(String(brand.id));
-        const isOn = brand.effectiveStatus === 'ON';
-        const activity = brand.activity || { title: 'Belum ada aktivitas', note: 'Menunggu sinkronisasi brand' };
-
-        const brandOutlets = brand.outlets || [];
-        const hasOutlets = brandOutlets.length > 0;
-        const isScheduleLocked = hasOutlets && brandOutlets.every(o => {
-          const store = o.store || o;
-          return store.bot_phase === 'WAITING_SCHEDULE' || store.within_operating_schedule === false;
-        });
-
-        let vbToggleState = 'paused';
-        if (isScheduleLocked) {
-          vbToggleState = 'closed';
-        } else if (isOn) {
-          vbToggleState = 'open';
+      // Group brands by owner
+      const ownerGroupsMap = new Map();
+      brands.forEach(brand => {
+        const ownerName = normalizeVbOwnerName(brand.owner_name);
+        const ownerSlug = String(brand.owner_slug || '').trim() || slugifyVbOwnerName(ownerName);
+        if (!ownerGroupsMap.has(ownerSlug)) {
+          ownerGroupsMap.set(ownerSlug, {
+            ownerKey: ownerSlug,
+            ownerName,
+            ownerSlug,
+            brands: []
+          });
         }
-
-        const isToggleDisabled = isPending || isScheduleLocked;
-        const isToggleChecked = vbToggleState === 'open';
-
-        let vbToggleTooltip = '';
-        if (isPending) {
-          vbToggleTooltip = 'Status: Menyimpan perubahan status grup ke server...';
-        } else if (isScheduleLocked) {
-          vbToggleTooltip = `Status Grup: Di Luar Jadwal Operasional\nKunci Toggle: Seluruh ${brand.visibleStoreCount || brandOutlets.length} Store ID di grup ini sedang tutup di luar jadwal operasional Shopee.`;
-        } else if (isOn) {
-          vbToggleTooltip = `Status Grup: Aktif (ON)\nKeterangan: Seluruh Store ID di grup ini aktif mengikuti jam operasional.\nOpsi: Klik untuk tutup sementara (pause).`;
-        } else {
-          vbToggleTooltip = `Status Grup: Tutup Sementara (Pause/OFF)\nOpsi: Klik untuk buka grup sekarang.`;
+        const ownerGroup = ownerGroupsMap.get(ownerSlug);
+        if (ownerGroup.ownerName === 'VB' && ownerName !== 'VB') {
+          ownerGroup.ownerName = ownerName;
         }
+        ownerGroup.brands.push(brand);
+      });
 
-        let vbPillLabel = `Grup ${isOn ? 'ON' : 'OFF'}`;
-        let vbPillClass = isOn ? 'is-on' : 'is-off';
-        if (isScheduleLocked) {
-          vbPillLabel = 'Tutup Jadwal';
-          vbPillClass = 'is-off is-schedule-locked';
-        }
+      body.innerHTML = Array.from(ownerGroupsMap.values()).map(group => {
+        const isOwnerCollapsed = vbCollapsedOwnerKeys.has(group.ownerKey);
+        const totalOwnerStores = group.brands.reduce((sum, b) => sum + (b.visibleStoreCount || 0), 0);
 
-        const bSlug = (brand && brand.slug) ? brand.slug : (brand && brand.name ? String(brand.name).toLowerCase().replace(/[^\w\s-]/g, '').replace(/[-\s]+/g, '-') : 'brand');
-        const bUrl = `/brand/${encodeURIComponent(bSlug)}`;
-        const brandLinkMarkup = `
-          <a href="${bUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-brand-link" onclick="event.stopPropagation()" aria-label="Buka Dashboard Brand ${escapeVBHtml(brand?.name || '')}" title="Buka Dashboard Brand">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-            <span>Link Brand</span>
-          </a>
-        `;
+        const brandCardsMarkup = group.brands.map(brand => {
+          const isExpanded = vbExpandedBrandIds.has(String(brand.id));
+          const isPending = pendingVBBrandIds.has(String(brand.id));
+          const isOn = brand.effectiveStatus === 'ON';
+          const activity = brand.activity || { title: 'Belum ada aktivitas', note: 'Menunggu sinkronisasi brand' };
 
-        const outletRows = brand.visibleOutlets.length
-          ? brand.visibleOutlets.map(outlet => {
-            const statusToneClass = outlet.liveState === 'OPEN'
-              ? 'is-open'
-              : (outlet.liveState === 'PAUSE'
-                ? 'is-paused'
-                : (outlet.liveState === 'CLOSED' ? 'is-closed' : 'is-unknown'));
-            const outletLabel = outlet.portalName;
-            const portalColorClass = `vb-portal-${Math.min(getVbPortalOrder(outlet.portalName), 3)}`;
-            const statusPresentation = outlet.statusPresentation || { label: 'Status sedang dicek bot', className: 'table-status is-warning' };
-            const statusTooltip = outlet.statusTooltip || 'Status live dan fase bot belum tersedia.';
-            return `
-                <div class="vb-store-row ${portalColorClass}" role="button" tabindex="0" aria-label="Lihat jadwal ${escapeVBHtml(outlet.storeName || outletLabel)} (Store ID ${escapeVBHtml(outlet.storeId)})" onclick="openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this); }">
-                  <div class="vb-store-main">
-                    <span class="vb-store-field-label">Portal</span>
-                    <div class="vb-store-main-value">
-                      <span class="vb-store-dot ${statusToneClass}" title="${escapeVBHtml(outlet.livePresentation.label)}"></span>
-                      <div class="vb-store-copy">
-                        <strong>${escapeVBHtml(outletLabel)}</strong>
+          const brandOutlets = brand.outlets || [];
+          const hasOutlets = brandOutlets.length > 0;
+          const isScheduleLocked = hasOutlets && brandOutlets.every(o => {
+            const store = o.store || o;
+            return store.bot_phase === 'WAITING_SCHEDULE' || store.within_operating_schedule === false;
+          });
+
+          let vbToggleState = 'paused';
+          if (isScheduleLocked) {
+            vbToggleState = 'closed';
+          } else if (isOn) {
+            vbToggleState = 'open';
+          }
+
+          const isToggleDisabled = isPending || isScheduleLocked;
+          const isToggleChecked = vbToggleState === 'open';
+
+          let vbToggleTooltip = '';
+          if (isPending) {
+            vbToggleTooltip = 'Status: Menyimpan perubahan status brand ke server...';
+          } else if (isScheduleLocked) {
+            vbToggleTooltip = `Status Brand: Di Luar Jadwal Operasional\nKunci Toggle: Seluruh ${brand.visibleStoreCount || brandOutlets.length} Store ID di brand ini sedang tutup di luar jadwal operasional Shopee.`;
+          } else if (isOn) {
+            vbToggleTooltip = `Status Brand: Aktif (ON)\nKeterangan: Seluruh Store ID di brand ini aktif mengikuti jam operasional.\nOpsi: Klik untuk tutup sementara (pause).`;
+          } else {
+            vbToggleTooltip = `Status Brand: Tutup Sementara (Pause/OFF)\nOpsi: Klik untuk buka brand sekarang.`;
+          }
+
+          let vbPillLabel = `Brand ${isOn ? 'ON' : 'OFF'}`;
+          let vbPillClass = isOn ? 'is-on' : 'is-off';
+          if (isScheduleLocked) {
+            vbPillLabel = 'Tutup Jadwal';
+            vbPillClass = 'is-off is-schedule-locked';
+          }
+
+          const outletRows = brand.visibleOutlets.length
+            ? brand.visibleOutlets.map(outlet => {
+              const statusToneClass = outlet.liveState === 'OPEN'
+                ? 'is-open'
+                : (outlet.liveState === 'PAUSE'
+                  ? 'is-paused'
+                  : (outlet.liveState === 'CLOSED' ? 'is-closed' : 'is-unknown'));
+              const outletLabel = outlet.portalName;
+              const portalColorClass = `vb-portal-${Math.min(getVbPortalOrder(outlet.portalName), 3)}`;
+              const statusPresentation = outlet.statusPresentation || { label: 'Status sedang dicek bot', className: 'table-status is-warning' };
+              const statusTooltip = outlet.statusTooltip || 'Status live dan fase bot belum tersedia.';
+              return `
+                  <div class="vb-store-row ${portalColorClass}" role="button" tabindex="0" aria-label="Lihat jadwal ${escapeVBHtml(outlet.storeName || outletLabel)} (Store ID ${escapeVBHtml(outlet.storeId)})" onclick="openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openVbScheduleDrawer('${brand.id}', '${escapeVBHtml(outlet.storeId)}', this); }">
+                    <div class="vb-store-main">
+                      <span class="vb-store-field-label">Portal</span>
+                      <div class="vb-store-main-value">
+                        <span class="vb-store-dot ${statusToneClass}" title="${escapeVBHtml(outlet.livePresentation.label)}"></span>
+                        <div class="vb-store-copy">
+                          <strong>${escapeVBHtml(outletLabel)}</strong>
+                        </div>
                       </div>
                     </div>
+                    <div class="vb-store-name">
+                      <span class="vb-store-field-label">Nama Listing</span>
+                      <span class="vb-store-name-text">${escapeVBHtml(outlet.storeName || '-')}</span>
+                    </div>
+                    <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
+                    <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
+                    <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
+                    <div class="vb-store-ofd"><span class="vb-store-field-label">Link OFD</span>${outlet.linkCellMarkup}</div>
                   </div>
-                  <div class="vb-store-name">
-                    <span class="vb-store-field-label">Nama Listing</span>
-                    <span class="vb-store-name-text">${escapeVBHtml(outlet.storeName || '-')}</span>
+                `;
+            }).join('')
+            : '<div class="vb-store-empty">Tidak ada Store ID yang sesuai di grup ini.</div>';
+
+          return `
+            <article class="vb-brand-card ${isExpanded ? 'is-expanded' : ''}" id="vb-card-${brand.id}">
+              <div class="vb-brand-card-head" role="button" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-label="Brand ${escapeVBHtml(brand.name)}: klik untuk detail, double click untuk expand/collapse semua" onclick="handleVbBrandCardHeadClick('${brand.id}', event)" onkeydown="handleVbBrandCardHeadKeyDown('${brand.id}', event)">
+                <div class="vb-group-identity">
+                  <div class="vb-group-eyebrow">Brand</div>
+                  <h3>${escapeVBHtml(brand.name)}</h3>
+                  <div class="vb-group-context">
+                    <span class="vb-status-pill ${vbPillClass}">${vbPillLabel}</span>
                   </div>
-                  <div class="vb-store-id"><span class="vb-store-field-label">Store ID</span><code>${escapeVBHtml(outlet.storeId)}</code></div>
-                  <div class="vb-store-status"><span class="vb-store-field-label">Status utama</span><strong class="${statusPresentation.className}" title="${escapeVBHtml(statusTooltip)}">${escapeVBHtml(statusPresentation.label)}</strong><small>${escapeVBHtml(outlet.statusSubtext || '')}</small></div>
-                  <div class="vb-store-hours"><span class="vb-store-field-label">Jam Hari Ini</span>${outlet.todayScheduleMarkup}</div>
-                  <div class="vb-store-ofd"><span class="vb-store-field-label">Link OFD</span>${outlet.linkCellMarkup}</div>
+                  ${brand.pendingNote ? `<p class="vb-group-note is-pending">${escapeVBHtml(brand.pendingNote)}</p>` : ''}
                 </div>
-              `;
-          }).join('')
-          : '<div class="vb-store-empty">Tidak ada Store ID yang sesuai di grup ini.</div>';
+                <div class="vb-group-summary">
+                  <div class="vb-group-summary-item">
+                    <span>Live Buka</span>
+                    <strong class="vb-summary-opened">${brand.statusCounts.opened}</strong>
+                  </div>
+                  <div class="vb-group-summary-item">
+                    <span>Perlu cek</span>
+                    <strong class="vb-summary-failure">${brand.statusCounts.failure}</strong>
+                  </div>
+                  <div class="vb-group-summary-item">
+                    <span>Live Tutup</span>
+                    <strong class="vb-summary-close">${brand.statusCounts.close}</strong>
+                  </div>
+                  <div class="vb-group-summary-item">
+                    <span>Merchant</span>
+                    <strong>${brand.visibleMerchantCount || 0}</strong>
+                  </div>
+                  <div class="vb-group-summary-item">
+                    <span>Store ID</span>
+                    <strong>${brand.visibleStoreCount || 0}</strong>
+                  </div>
+                  <div class="vb-group-summary-item is-activity">
+                    <span>Aktivitas Terakhir</span>
+                    <strong>${escapeVBHtml(activity.title)}</strong>
+                    <small>${escapeVBHtml(activity.note)}</small>
+                  </div>
+                </div>
+                <div class="vb-brand-toggle" onclick="event.stopPropagation()">
+                  <div class="vb-control">
+                    <label class="switch-toggle admin-table-toggle state-${vbToggleState} ${isPending ? 'is-toggle-pending' : ''} ${isScheduleLocked ? 'is-schedule-disabled' : ''}" aria-busy="${isPending ? 'true' : 'false'}" title="${escapeVBHtml(vbToggleTooltip)}" onclick="event.stopPropagation()">
+                      <input type="checkbox" ${isToggleChecked ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)" onclick="event.stopPropagation()">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="vb-brand-detail" ${isExpanded ? '' : 'hidden'}>
+                <div class="vb-store-table">
+                  <div class="vb-store-table-head">
+                    <span>Portal</span>
+                    <span>Nama Listing</span>
+                    <span>Store ID</span>
+                    <span>Status</span>
+                    <span>Jam Hari Ini</span>
+                    <span>Link OFD</span>
+                  </div>
+                  ${outletRows}
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('');
 
         return `
-          <article class="vb-brand-card ${isExpanded ? 'is-expanded' : ''}" id="vb-card-${brand.id}">
-            <div class="vb-brand-card-head" role="button" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-label="Grup ${escapeVBHtml(brand.name)}: klik untuk detail, double click untuk expand/collapse semua" onclick="handleVbBrandCardHeadClick('${brand.id}', event)" onkeydown="handleVbBrandCardHeadKeyDown('${brand.id}', event)">
-              <div class="vb-group-identity">
-                <div class="vb-group-eyebrow">Grup VB</div>
-                <h3>${escapeVBHtml(brand.name)}</h3>
-                <div class="vb-group-context">
-                  <span class="vb-status-pill ${vbPillClass}">${vbPillLabel}</span>
-                  ${brandLinkMarkup}
-                </div>
-                ${brand.pendingNote ? `<p class="vb-group-note is-pending">${escapeVBHtml(brand.pendingNote)}</p>` : ''}
-              </div>
-              <div class="vb-group-summary">
-                <div class="vb-group-summary-item">
-                  <span>Live Buka</span>
-                  <strong class="vb-summary-opened">${brand.statusCounts.opened}</strong>
-                </div>
-                <div class="vb-group-summary-item">
-                  <span>Perlu cek</span>
-                  <strong class="vb-summary-failure">${brand.statusCounts.failure}</strong>
-                </div>
-                <div class="vb-group-summary-item">
-                  <span>Live Tutup</span>
-                  <strong class="vb-summary-close">${brand.statusCounts.close}</strong>
-                </div>
-                <div class="vb-group-summary-item">
-                  <span>Merchant</span>
-                  <strong>${brand.visibleMerchantCount || 0}</strong>
-                </div>
-                <div class="vb-group-summary-item">
-                  <span>Store ID</span>
-                  <strong>${brand.visibleStoreCount || 0}</strong>
-                </div>
-                <div class="vb-group-summary-item is-activity">
-                  <span>Aktivitas Terakhir</span>
-                  <strong>${escapeVBHtml(activity.title)}</strong>
-                  <small>${escapeVBHtml(activity.note)}</small>
+          <div class="vb-owner-card ${isOwnerCollapsed ? 'is-collapsed' : ''}" data-owner-key="${escapeVBHtml(group.ownerKey)}" id="vb-owner-${escapeVBHtml(group.ownerSlug)}">
+            <div class="vb-owner-head" role="button" tabindex="0" onclick="toggleVbOwnerSection('${group.ownerKey}')" onkeydown="handleVbOwnerHeadKeyDown('${group.ownerKey}', event)">
+              <div class="vb-owner-left">
+                <div class="vb-owner-info">
+                  <span class="vb-owner-eyebrow">Owner</span>
+                  <div class="vb-owner-mainline">
+                    <h3 class="vb-owner-title">${escapeVBHtml(group.ownerName)}</h3>
+                    <div class="vb-owner-meta">
+                      <span class="vb-owner-summary-pill">
+                        <strong>${group.brands.length}</strong>
+                        <span>Brand</span>
+                      </span>
+                      <span class="vb-owner-summary-pill">
+                        <strong>${totalOwnerStores}</strong>
+                        <span>Store ID</span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="vb-brand-toggle" onclick="event.stopPropagation()">
-                <div class="vb-control">
-                  <label class="switch-toggle admin-table-toggle state-${vbToggleState} ${isPending ? 'is-toggle-pending' : ''} ${isScheduleLocked ? 'is-schedule-disabled' : ''}" aria-busy="${isPending ? 'true' : 'false'}" title="${escapeVBHtml(vbToggleTooltip)}" onclick="event.stopPropagation()">
-                    <input type="checkbox" ${isToggleChecked ? 'checked' : ''} ${isToggleDisabled ? 'disabled' : ''} aria-disabled="${isToggleDisabled ? 'true' : 'false'}" aria-label="Ubah status ${escapeVBHtml(brand.name)}" onchange="handleVbToggleChange('${brand.id}', this)" onclick="event.stopPropagation()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
+              <div class="vb-owner-right">
+                <a href="/brand/${encodeURIComponent(group.ownerSlug)}" target="_blank" rel="noopener noreferrer" class="vb-owner-link" onclick="event.stopPropagation()" aria-label="Buka Dashboard Owner ${escapeVBHtml(group.ownerName)}" title="Buka Dashboard Owner">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  <span>Link Dashboard</span>
+                </a>
+                <button type="button" class="vb-owner-chevron" aria-label="Toggle ${escapeVBHtml(group.ownerName)}" tabindex="-1">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
               </div>
             </div>
-            <div class="vb-brand-detail" ${isExpanded ? '' : 'hidden'}>
-              <div class="vb-store-table">
-                <div class="vb-store-table-head">
-                  <span>Portal</span>
-                  <span>Nama Listing</span>
-                  <span>Store ID</span>
-                  <span>Status</span>
-                  <span>Jam Hari Ini</span>
-                  <span>Link OFD</span>
-                </div>
-                ${outletRows}
-              </div>
+            <div class="vb-owner-body" ${isOwnerCollapsed ? 'hidden' : ''}>
+              ${brandCardsMarkup}
             </div>
-          </article>
+          </div>
         `;
       }).join('');
+    }
+
+    let vbCollapsedOwnerKeys = new Set();
+
+    function toggleVbOwnerSection(ownerKey) {
+      if (!ownerKey) return;
+      const isCollapsed = vbCollapsedOwnerKeys.has(ownerKey);
+      if (isCollapsed) {
+        vbCollapsedOwnerKeys.delete(ownerKey);
+      } else {
+        vbCollapsedOwnerKeys.add(ownerKey);
+      }
+      const ownerCards = document.querySelectorAll(`.vb-owner-card[data-owner-key="${CSS.escape(ownerKey)}"]`);
+      ownerCards.forEach(card => {
+        card.classList.toggle('is-collapsed', !isCollapsed);
+        const body = card.querySelector('.vb-owner-body');
+        if (body) body.hidden = !isCollapsed;
+      });
+    }
+
+    function handleVbOwnerHeadKeyDown(ownerKey, event) {
+      if (event.target.closest('a, button, input, select, label, .switch-toggle')) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleVbOwnerSection(ownerKey);
+      }
     }
 
     function updateVbResultsSummary(brands, totalBrands, filters) {

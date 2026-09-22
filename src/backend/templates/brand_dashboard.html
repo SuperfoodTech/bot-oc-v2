@@ -10,7 +10,7 @@
   <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260917-brand-v2">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260922-brand-owner-v2">
 </head>
 
 <body class="brand-dashboard-body">
@@ -49,48 +49,14 @@
       </div>
 
       <div id="brandDashboardContent" class="brand-dashboard-content" hidden>
-        <!-- Hero Card Utama Brand -->
-        <section class="card-box brand-hero-card" id="brandHeroCard">
-          <div class="brand-hero-top">
-            <div class="brand-hero-info">
-              <h1 class="brand-hero-title" id="brandTitle">-</h1>
-            </div>
-            <div class="brand-hero-toggle-wrap">
-              <label class="switch-toggle" id="brandToggleLabel" title="Ubah status brand"
-                onclick="handleBrandToggleAttempt(event)">
-                <input type="checkbox" id="brandToggleInput" onchange="handleBrandToggle(this.checked)">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Meta Status & Jadwal (Identik gaya Mitra Agency) -->
-          <div class="mitra-outlet-meta" id="brandHeroMeta">
-            <!-- Rendered via JS -->
-          </div>
-
-          <div class="brand-hero-actions">
-            <button type="button" class="btn-brand-action btn-brand-schedule" onclick="openScheduleBottomSheet()">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <span>Lihat Jadwal</span>
-            </button>
-          </div>
-        </section>
-
-        <!-- Aktivitas Terbaru -->
-        <section class="card-box brand-activity-card">
+        <div id="brandCardsList" class="brand-cards-list"></div>
+        <section id="brandOwnerActivityCard" class="card-box brand-activity-card" hidden>
           <div class="card-heading">
             <h2>Aktivitas terbaru</h2>
           </div>
-          <div id="brandHistoryLogs" class="history-list">
-            <div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>
-          </div>
+          <div id="brandHistoryFilterChips" class="brand-history-filters" hidden></div>
+          <div id="brandHistoryLogs" class="history-list brand-owner-history-list"></div>
+          <button type="button" id="brandHistoryMoreButton" class="brand-history-more" onclick="toggleOwnerHistoryExpanded()" hidden></button>
         </section>
 
         <p class="mitra-dashboard-copyright">&copy; 2026 FoodMaster. All rights reserved.</p>
@@ -198,6 +164,11 @@
   <script>
     let currentBrandData = null;
     let isPendingToggle = false;
+    let activeBrandContextId = null;
+    let activeOwnerHistoryFilter = 'ALL';
+    let ownerHistoryExpanded = false;
+
+    const OWNER_HISTORY_INITIAL_LIMIT = 8;
 
     function getBrandSlugFromPath() {
       const path = window.location.pathname;
@@ -251,6 +222,26 @@
       document.getElementById('brandDashboardContent').hidden = true;
       document.getElementById('brandErrorState').hidden = false;
       document.getElementById('brandErrorMessage').textContent = message;
+    }
+
+    function getRenderableBrands() {
+      if (!currentBrandData) return [];
+      if (Array.isArray(currentBrandData.brands) && currentBrandData.brands.length) {
+        return currentBrandData.brands;
+      }
+      return [currentBrandData];
+    }
+
+    function getBrandById(brandId) {
+      return getRenderableBrands().find(brand => String(brand.id) === String(brandId) || String(brand.slug || '') === String(brandId)) || null;
+    }
+
+    function getPrimaryBrand() {
+      return getRenderableBrands()[0] || currentBrandData;
+    }
+
+    function getActiveBrandContext() {
+      return getBrandById(activeBrandContextId) || getPrimaryBrand();
     }
 
     const clockIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 15"></polyline></svg>`;
@@ -388,57 +379,25 @@
       return 'Tutup';
     }
 
-    function renderBrandDashboard(brand) {
+    function renderBrandDashboard(dashboardData) {
       document.getElementById('brandLoadingState').hidden = true;
       document.getElementById('brandErrorState').hidden = true;
       document.getElementById('brandDashboardContent').hidden = false;
 
-      document.getElementById('brandTitle').textContent = brand.name || 'Virtual Brand';
-      document.title = `${brand.name || 'Brand'} | FoodMaster`;
+      const brands = getRenderableBrands();
+      const primaryBrand = brands[0] || dashboardData;
+      const ownerName = dashboardData?.owner_name || primaryBrand?.name || 'Virtual Brand';
+      const cardsList = document.getElementById('brandCardsList');
 
-      // Toggle state
-      const toggleLabel = document.getElementById('brandToggleLabel');
-      const toggleInput = document.getElementById('brandToggleInput');
-      const isOn = (brand.requested_status || brand.applied_status) === 'ON';
-      const isScheduleLocked = Boolean(brand.is_schedule_locked);
+      document.title = `${ownerName || 'Brand'} | FoodMaster`;
 
-      let toggleState = 'paused';
-      if (isScheduleLocked) {
-        toggleState = 'closed';
-      } else if (isOn) {
-        toggleState = 'open';
+      if (cardsList) {
+        cardsList.innerHTML = brands.length
+          ? brands.map((brand, index) => renderBrandCardMarkup(brand, index, brands.length)).join('')
+          : '<div class="history-item is-empty"><span>Belum ada brand aktif.</span></div>';
       }
 
-      toggleLabel.className = `switch-toggle state-${toggleState} ${isScheduleLocked ? 'is-schedule-disabled' : ''} ${isPendingToggle ? 'is-toggle-pending' : ''}`;
-      toggleInput.checked = toggleState === 'open';
-      toggleInput.disabled = isScheduleLocked || isPendingToggle;
-
-      if (isScheduleLocked) {
-        toggleLabel.title = 'Seluruh outlet sedang di luar jadwal operasional Shopee sehingga toggle tidak dapat diaktifkan.';
-      } else if (isOn) {
-        toggleLabel.title = 'Brand Aktif (ON). Klik untuk tutup sementara.';
-      } else {
-        toggleLabel.title = 'Brand Tutup Sementara. Klik untuk buka sekarang.';
-      }
-
-      // Render Meta (Status label & Jam hari ini - gaya mitra agency)
-      const statusLabel = getBrandStatusLabel(brand);
-      const todayHours = getTodayOperatingHoursSummary(brand);
-      const heroMetaEl = document.getElementById('brandHeroMeta');
-      if (heroMetaEl) {
-        let metaHtml = '';
-        if (statusLabel) {
-          metaHtml += `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(statusLabel)}</span></div>`;
-        }
-        if (todayHours) {
-          metaHtml += `<div class="mitra-outlet-meta-row">${clockIcon}<span><strong>Jadwal hari ini:</strong> ${escapeHtml(todayHours)}</span></div>`;
-        }
-        heroMetaEl.innerHTML = metaHtml;
-        heroMetaEl.hidden = !metaHtml;
-      }
-
-      // Render History Logs
-      renderHistoryLogs(brand.history_logs || []);
+      renderOwnerHistorySection(brands);
     }
 
     function getHistoryActorPresentation(action) {
@@ -512,24 +471,63 @@
       return `${parts.day} ${monthStr} ${parts.year}, ${parts.hour}:${parts.minute} WIB`;
     }
 
-    function renderHistoryLogs(logs) {
-      const container = document.getElementById('brandHistoryLogs');
-      if (!container) return;
+    function getHistoryTimestampValue(value) {
+      if (!value) return 0;
+      const raw = String(value || '').trim();
+      let normalized = raw.replace(/([+-]\d{2})$/, '$1:00');
+      if (!normalized.includes('T') && normalized.includes(' ')) normalized = normalized.replace(' ', 'T');
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) normalized += '+07:00';
+      const parsed = new Date(normalized);
+      return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+    }
+
+    function collectOwnerHistoryLogs(brands) {
+      let sequence = 0;
+      const entries = [];
+
+      brands.forEach((brand, brandIndex) => {
+        const logs = Array.isArray(brand.history_logs) ? brand.history_logs : [];
+        const brandKey = String(brand.id || brand.slug || brand.name || brandIndex);
+        const brandName = brand.name || 'Virtual Brand';
+
+        logs.forEach(log => {
+          entries.push({
+            ...log,
+            __brand_key: brandKey,
+            __brand_name: brandName,
+            __history_sequence: sequence,
+            __history_timestamp: getHistoryTimestampValue(log?.timestamp)
+          });
+          sequence += 1;
+        });
+      });
+
+      return entries.sort((left, right) => {
+        const timeDelta = right.__history_timestamp - left.__history_timestamp;
+        if (timeDelta !== 0) return timeDelta;
+        return right.__history_sequence - left.__history_sequence;
+      });
+    }
+
+    function renderHistoryLogsMarkup(logs, options = {}) {
       if (!logs || !logs.length) {
-        container.innerHTML = '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
-        return;
+        return '<div class="history-item is-empty"><span>Belum ada aktivitas.</span></div>';
       }
 
-      container.innerHTML = logs.map(log => {
+      return logs.map(log => {
         const timeText = formatHistoryLogTimestamp(log.timestamp);
         const actor = getHistoryActorPresentation(log.action);
         const summary = getHistorySummary(log);
+        const brandBadge = options.showBrandName && log.__brand_name
+          ? `<span class="history-brand-chip">${escapeHtml(log.__brand_name)}</span>`
+          : '';
 
         return `
           <div class="history-item">
             <span class="history-role-pill ${actor.className}">${actor.label}</span>
             <span class="history-time">${escapeHtml(timeText)}</span>
             <span class="mitra-history-body">
+              ${brandBadge}
               <strong>${escapeHtml(summary.title)}</strong>
               <span>${escapeHtml(summary.subtitle || '-')}</span>
               ${log.store_id ? `<span class="history-store-id">Store ID ${escapeHtml(log.store_id)}</span>` : ''}
@@ -539,31 +537,160 @@
       }).join('');
     }
 
-    function handleBrandToggleAttempt(event) {
+    function renderOwnerHistorySection(brands) {
+      const activityCard = document.getElementById('brandOwnerActivityCard');
+      const filterChips = document.getElementById('brandHistoryFilterChips');
+      const logsContainer = document.getElementById('brandHistoryLogs');
+      const moreButton = document.getElementById('brandHistoryMoreButton');
+
+      if (!activityCard || !filterChips || !logsContainer || !moreButton) return;
+      if (!brands.length) {
+        activityCard.hidden = true;
+        return;
+      }
+
+      const filterOptions = brands.map((brand, index) => ({
+        key: String(brand.id || brand.slug || brand.name || index),
+        label: brand.name || `Brand ${index + 1}`
+      }));
+
+      if (activeOwnerHistoryFilter !== 'ALL' && !filterOptions.some(option => option.key === activeOwnerHistoryFilter)) {
+        activeOwnerHistoryFilter = 'ALL';
+      }
+
+      const ownerLogs = collectOwnerHistoryLogs(brands);
+      const filteredLogs = activeOwnerHistoryFilter === 'ALL'
+        ? ownerLogs
+        : ownerLogs.filter(log => log.__brand_key === activeOwnerHistoryFilter);
+      const visibleLogs = ownerHistoryExpanded
+        ? filteredLogs
+        : filteredLogs.slice(0, OWNER_HISTORY_INITIAL_LIMIT);
+      const hasMoreLogs = filteredLogs.length > OWNER_HISTORY_INITIAL_LIMIT;
+
+      activityCard.hidden = false;
+
+      if (filterOptions.length > 1) {
+        filterChips.hidden = false;
+        filterChips.innerHTML = [
+          { key: 'ALL', label: 'Semua' },
+          ...filterOptions
+        ].map(option => `
+          <button
+            type="button"
+            class="brand-history-filter-chip ${option.key === activeOwnerHistoryFilter ? 'is-active' : ''}"
+            onclick='setOwnerHistoryFilter(${JSON.stringify(option.key)})'
+          >${escapeHtml(option.label)}</button>
+        `).join('');
+      } else {
+        filterChips.hidden = true;
+        filterChips.innerHTML = '';
+      }
+
+      logsContainer.innerHTML = renderHistoryLogsMarkup(visibleLogs, { showBrandName: true });
+      moreButton.hidden = !hasMoreLogs;
+      moreButton.textContent = ownerHistoryExpanded
+        ? 'Tampilkan ringkas'
+        : `Lihat semua aktivitas (${filteredLogs.length})`;
+    }
+
+    function setOwnerHistoryFilter(filterKey) {
+      activeOwnerHistoryFilter = filterKey || 'ALL';
+      ownerHistoryExpanded = false;
+      renderOwnerHistorySection(getRenderableBrands());
+    }
+
+    function toggleOwnerHistoryExpanded() {
+      ownerHistoryExpanded = !ownerHistoryExpanded;
+      renderOwnerHistorySection(getRenderableBrands());
+    }
+
+    function renderBrandCardMarkup(brand, index, totalBrands) {
+      const isOn = (brand.requested_status || brand.applied_status) === 'ON';
+      const isScheduleLocked = Boolean(brand.is_schedule_locked);
+      const statusLabel = getBrandStatusLabel(brand);
+      const todayHours = getTodayOperatingHoursSummary(brand);
+
+      let toggleState = 'paused';
+      if (isScheduleLocked) {
+        toggleState = 'closed';
+      } else if (isOn) {
+        toggleState = 'open';
+      }
+
+      let toggleTitle = 'Brand Tutup Sementara. Klik untuk buka sekarang.';
+      if (isScheduleLocked) {
+        toggleTitle = 'Seluruh outlet sedang di luar jadwal operasional Shopee sehingga toggle tidak dapat diaktifkan.';
+      } else if (isOn) {
+        toggleTitle = 'Brand Aktif (ON). Klik untuk tutup sementara.';
+      }
+
+      let metaHtml = '';
+      if (statusLabel) {
+        metaHtml += `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(statusLabel)}</span></div>`;
+      }
+      if (todayHours) {
+        metaHtml += `<div class="mitra-outlet-meta-row">${clockIcon}<span><strong>Jadwal hari ini:</strong> ${escapeHtml(todayHours)}</span></div>`;
+      }
+
+      return `
+        <section class="card-box brand-hero-card brand-brand-card" data-brand-card="${escapeHtml(brand.id)}">
+          <div class="brand-hero-top">
+            <div class="brand-hero-info">
+              <h2 class="brand-hero-title">${escapeHtml(brand.name || 'Virtual Brand')}</h2>
+            </div>
+            <div class="brand-hero-toggle-wrap">
+              <label class="switch-toggle state-${toggleState} ${isScheduleLocked ? 'is-schedule-disabled' : ''} ${isPendingToggle ? 'is-toggle-pending' : ''}" title="${escapeHtml(toggleTitle)}" onclick="handleBrandToggleAttempt(event, '${brand.id}')">
+                <input type="checkbox" ${toggleState === 'open' ? 'checked' : ''} ${isScheduleLocked || isPendingToggle ? 'disabled' : ''} onchange="handleBrandToggle('${brand.id}', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="mitra-outlet-meta"${metaHtml ? '' : ' hidden'}>
+            ${metaHtml}
+          </div>
+
+          <div class="brand-hero-actions">
+            <button type="button" class="btn-brand-action btn-brand-schedule" onclick="openScheduleBottomSheet('${brand.id}')">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span>Lihat Jadwal</span>
+            </button>
+          </div>
+        </section>
+      `;
+    }
+
+    function handleBrandToggleAttempt(event, brandId) {
       if (isPendingToggle) {
         event.preventDefault();
         return;
       }
-      if (currentBrandData && currentBrandData.is_schedule_locked) {
+      const brand = getBrandById(brandId);
+      if (brand && brand.is_schedule_locked) {
         event.preventDefault();
         showToast('Seluruh outlet sedang di luar jadwal operasional Shopee.', 'warning');
       }
     }
 
-    function handleBrandToggle(checked) {
-      if (!currentBrandData) return;
-      if (currentBrandData.is_schedule_locked) {
+    function handleBrandToggle(brandId, checked) {
+      const brand = getBrandById(brandId);
+      if (!brand) return;
+      if (brand.is_schedule_locked) {
         showToast('Seluruh outlet sedang di luar jadwal operasional Shopee.', 'warning');
         renderBrandDashboard(currentBrandData);
         return;
       }
 
       if (!checked) {
-        // Show pause duration modal
-        openBrandPauseModal();
+        openBrandPauseModal(brandId);
       } else {
-        // Execute Resume / Open
-        executeBrandToggle('ON');
+        executeBrandToggle(brandId, 'ON');
       }
     }
 
@@ -679,7 +806,8 @@
     }
 
     function getBrandNextOperationalSessionDate() {
-      const schedule = currentBrandData?.schedule?.regular_hours || {};
+      const activeBrand = getActiveBrandContext();
+      const schedule = activeBrand?.schedule?.regular_hours || {};
       const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       const now = new Date();
@@ -756,10 +884,12 @@
       preview.textContent = `Berakhir pada ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`;
     }
 
-    function openBrandPauseModal() {
+    function openBrandPauseModal(brandId) {
+      activeBrandContextId = brandId;
+      const activeBrand = getActiveBrandContext();
       const modal = document.getElementById('brandPauseModal');
       if (!modal) return;
-      document.getElementById('brandPauseModalTitle').textContent = `Tutup ${currentBrandData?.name || 'Brand'}`;
+      document.getElementById('brandPauseModalTitle').textContent = `Tutup ${activeBrand?.name || 'Brand'}`;
       setBrandCustomDateTimeDefaults();
       document.querySelectorAll('input[name="brandPauseDuration"]').forEach(radio => {
         radio.checked = radio.value === '30_min';
@@ -791,14 +921,16 @@
       if (type !== 'rest_of_day' && invalidEnd) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
       const customUntil = document.getElementById('brandCustomUntilInput').value;
       closeBrandPauseModal();
-      await executeBrandToggle('PAUSED', type, type === 'custom' ? customUntil : null);
+      await executeBrandToggle(activeBrandContextId, 'PAUSED', type, type === 'custom' ? customUntil : null);
     }
 
-    async function executeBrandToggle(status, durationType = '30_min', customUntil = null) {
-      const slug = getBrandSlugFromPath();
+    async function executeBrandToggle(brandId, status, durationType = '30_min', customUntil = null) {
+      const brand = getBrandById(brandId);
+      const slug = brand?.slug || brand?.id || getBrandSlugFromPath();
       if (!slug || isPendingToggle) return;
 
       isPendingToggle = true;
+      activeBrandContextId = brandId;
       renderBrandDashboard(currentBrandData);
 
       try {
@@ -822,7 +954,9 @@
           throw new Error((json && json.detail) || 'Gagal mengubah status brand.');
         }
         currentBrandData = json.brand;
-        showToast(status === 'ON' ? 'Permintaan buka brand berhasil dikirim ke bot.' : 'Brand berhasil ditutup sementara.', 'success');
+        const updatedBrand = getBrandById(brandId) || getPrimaryBrand();
+        const brandName = updatedBrand?.name || brand?.name || 'Brand';
+        showToast(status === 'ON' ? `Permintaan buka ${brandName} berhasil dikirim ke bot.` : `${brandName} berhasil ditutup sementara.`, 'success');
       } catch (err) {
         showToast(err.message || 'Gagal mengirim perintah.', 'error');
       } finally {
@@ -892,14 +1026,18 @@
       return formatted.length ? formatted.join(', ') + ' WIB' : 'Tutup';
     }
 
-    function openScheduleBottomSheet() {
+    function openScheduleBottomSheet(brandId) {
+      activeBrandContextId = brandId;
+      const activeBrand = getActiveBrandContext();
       const sheet = document.getElementById('scheduleBottomSheet');
       const backdrop = document.getElementById('scheduleBackdrop');
       const body = document.getElementById('scheduleSheetBody');
+      const title = document.getElementById('sheetTitle');
 
-      const schedule = currentBrandData?.schedule || {};
+      const schedule = activeBrand?.schedule || {};
       const regHours = schedule.regular_hours || {};
       const specHours = schedule.special_hours || [];
+      if (title) title.textContent = `Jadwal Operasional ${activeBrand?.name ? `• ${activeBrand.name}` : ''}`;
 
       const dayNames = [
         { key: 'monday', label: 'Senin' },
