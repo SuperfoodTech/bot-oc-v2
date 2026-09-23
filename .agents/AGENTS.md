@@ -24,7 +24,15 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.19`.
+Latest documented release: `1.23.20`.
+
+Virtual Brand Admin Dashboard & Mitra Quick Copy UI Refinement:
+- Memperbarui tombol Link Dashboard Virtual Brand pada Admin Dashboard dengan background merah (`#be1a1a`), hover state dinamis, dan dark mode contrast yang optimal.
+- Menambahkan tombol instan `[Copy]` link dashboard brand di sisi kiri tombol Link Dashboard Virtual Brand lengkap dengan visual feedback animasi checkmark.
+- Menambahkan tombol copy link mitra instan pada tabel agency (`.admin-table-mitra-cell` dan `.admin-mobile-mitra-group`).
+- Memperbaiki layout responsif mobile Virtual Brand dengan menempatkan tombol panah expand/collapse chevron di sisi paling kanan.
+- Menyelaraskan teks dan perataan UX loading state brand (`"Memuat data brand..."`) menjadi full-width horizontal center di `#vbStatsGrid`.
+- Menyelaraskan field filter card Virtual Brand (Desktop & Mobile Sheet) kembali ke layout resmi standar tim (Grup, Status Grup, Portal, Status Outlet, Store ID) dengan integrasi custom searchable dropdown styling.
 
 Native WhatsApp Gateway Integration, Two-Tier Anti-Spam / Anti-Ban Deduplication & Unified Dashboard UI:
 - Mengintegrasikan tab WhatsApp Gateway (`admin_tab_wa.html`) secara langsung ke dalam Single Page Application (SPA) dashboard admin port utama tanpa pembungkus `<iframe>` eksternal.

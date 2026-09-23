@@ -658,6 +658,53 @@
       }
     }
 
+    async function copyVbOwnerDashboardLink(encodedSlug, button, event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const slug = decodeURIComponent(encodedSlug || '');
+      const fullUrl = `${window.location.origin}/brand/${encodeURIComponent(slug)}`;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(fullUrl);
+        } else {
+          const input = document.createElement('textarea');
+          input.value = fullUrl;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          input.remove();
+        }
+        if (button) {
+          button.classList.add('is-copied');
+          button.setAttribute('aria-label', 'Link dashboard tersalin');
+          button.setAttribute('title', 'Link dashboard tersalin');
+          const copyIcon = button.querySelector('.vb-copy-icon');
+          const checkIcon = button.querySelector('.vb-check-icon');
+          if (copyIcon && checkIcon) {
+            copyIcon.style.display = 'none';
+            checkIcon.style.display = 'block';
+          }
+          setTimeout(() => {
+            button.classList.remove('is-copied');
+            button.setAttribute('aria-label', 'Salin Link Dashboard');
+            button.setAttribute('title', 'Salin Link Dashboard');
+            if (copyIcon && checkIcon) {
+              copyIcon.style.display = 'block';
+              checkIcon.style.display = 'none';
+            }
+          }, 1600);
+        }
+        showToast('Link dashboard VB berhasil disalin.', 'success');
+      } catch (error) {
+        showToast('Gagal menyalin link dashboard VB.', 'error');
+      }
+    }
+
     async function copyStoreId(event, storeId) {
       if (event) {
         event.stopPropagation();
@@ -682,6 +729,33 @@
         showToast(`Store ID ${textToCopy} berhasil disalin!`, 'dark');
       } catch (error) {
         showToast(`Gagal menyalin Store ID: ${textToCopy}`, 'error');
+      }
+    }
+
+    async function copyMitraLink(event, linkUrl) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const textToCopy = String(linkUrl || '').trim();
+      if (!textToCopy) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(textToCopy);
+        } else {
+          const input = document.createElement('input');
+          input.value = textToCopy;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          input.remove();
+        }
+        showToast('Link Mitra berhasil disalin!', 'dark');
+      } catch (error) {
+        showToast('Gagal menyalin Link Mitra', 'error');
       }
     }
 
@@ -1483,7 +1557,7 @@
       if (!body) return;
       if (!isSilent) {
         body.innerHTML = '<div class="table-loading-state">Memuat data brand...</div>';
-        if (stats) stats.innerHTML = '<div class="table-loading-state">Memuat ringkasan brand...</div>';
+        if (stats) stats.innerHTML = '<div class="table-loading-state">Memuat data brand...</div>';
         if (summary) summary.textContent = '';
       }
       try {
@@ -2264,6 +2338,15 @@
                 </div>
               </div>
               <div class="vb-owner-right">
+                <button type="button" class="vb-owner-copy-link" onclick="copyVbOwnerDashboardLink('${encodeURIComponent(group.ownerSlug)}', this, event)" aria-label="Salin Link Dashboard ${escapeVBHtml(group.ownerName)}" title="Salin Link Dashboard">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="vb-copy-icon">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="vb-check-icon" style="display:none;">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
                 <a href="/brand/${encodeURIComponent(group.ownerSlug)}" target="_blank" rel="noopener noreferrer" class="vb-owner-link" onclick="event.stopPropagation()" aria-label="Buka Dashboard Owner ${escapeVBHtml(group.ownerName)}" title="Buka Dashboard Owner">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -3123,18 +3206,27 @@
     }
 
     function setupCustomFilterDropdowns() {
-      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter', 'vbOwnerFilter', 'vbGroupFilter', 'vbPortalFilter', 'vbStoreIdFilter']);
+      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter',
+        'vbGroupFilter', 'vbPortalFilter', 'vbStoreIdFilter',
+        'mobileOwnerFilter', 'mobileOutletFilter', 'mobileStoreIdFilter',
+        'mobileVbGroupFilter', 'mobileVbPortalFilter', 'mobileVbStoreIdFilter'
+      ]);
       const PLACEHOLDERS = {
         ownerFilter: 'Cari nama pemilik...',
         outletFilter: 'Cari nama outlet...',
         storeIdFilter: 'Cari Store ID...',
-        vbOwnerFilter: 'Cari nama pemilik...',
         vbGroupFilter: 'Cari nama grup...',
         vbPortalFilter: 'Cari portal...',
-        vbStoreIdFilter: 'Cari Store ID...'
+        vbStoreIdFilter: 'Cari Store ID...',
+        mobileOwnerFilter: 'Cari nama pemilik...',
+        mobileOutletFilter: 'Cari nama outlet...',
+        mobileStoreIdFilter: 'Cari Store ID...',
+        mobileVbGroupFilter: 'Cari nama grup...',
+        mobileVbPortalFilter: 'Cari portal...',
+        mobileVbStoreIdFilter: 'Cari Store ID...'
       };
 
-      document.querySelectorAll('.outlet-filter-card .filter-select, .vb-filter-card .filter-select').forEach(select => {
+      document.querySelectorAll('.outlet-filter-card .filter-select, .vb-filter-card .filter-select, .mobile-filter-sheet .mobile-sheet-select').forEach(select => {
         let wrapper = select.previousElementSibling;
         const isSearchable = SEARCHABLE_IDS.has(select.id);
 
@@ -3777,10 +3869,15 @@
         ` : '<span class="compact-meta">-</span>';
 
         const botLinkCellMarkup = mitraUrl ? `
-          <a href="${mitraUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-mitra-link" onclick="event.stopPropagation()" aria-label="Buka Link Mitra untuk store ${storeId}" title="Link Mitra">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-            <span>Link Mitra</span>
-          </a>
+          <div class="admin-table-mitra-cell">
+            <a href="${mitraUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-mitra-link" onclick="event.stopPropagation()" aria-label="Buka Link Mitra untuk store ${storeId}" title="Link Mitra">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              <span>Link Mitra</span>
+            </a>
+            <button type="button" class="btn-copy-icon" onclick="copyMitraLink(event, '${escapeHtml(mitraUrl)}')" title="Salin Link Mitra" aria-label="Salin Link Mitra">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
         ` : '<span class="compact-meta">-</span>';
 
         tr.innerHTML = `
@@ -3872,10 +3969,15 @@
             </a>
             ` : ''}
             ${mitraUrl ? `
-            <a href="${mitraUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-mitra-link" onclick="event.stopPropagation()" aria-label="Buka Link Mitra untuk store ${storeId}" title="Link Mitra">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              <span>Link Mitra</span>
-            </a>
+            <div class="admin-mobile-mitra-group">
+              <a href="${mitraUrl}" target="_blank" rel="noopener noreferrer" class="admin-table-mitra-link" onclick="event.stopPropagation()" aria-label="Buka Link Mitra untuk store ${storeId}" title="Link Mitra">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                <span>Link Mitra</span>
+              </a>
+              <button type="button" class="btn-copy-icon is-chip" onclick="copyMitraLink(event, '${escapeHtml(mitraUrl)}')" title="Salin Link Mitra" aria-label="Salin Link Mitra">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
             ` : ''}
           </div>
 
