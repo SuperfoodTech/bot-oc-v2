@@ -228,13 +228,17 @@
 
         <div id="customDurationBox" style="display: none; margin-top: 6px;">
           <div class="custom-datetime-fields">
-            <label>Mulai<input type="text" id="customStartInput" class="form-input" readonly disabled
-                aria-disabled="true"></label>
+            <div class="custom-datetime-field">
+              <span class="custom-field-label">Mulai</span>
+              <input type="text" id="customStartInput" class="form-input" readonly disabled
+                aria-disabled="true">
+            </div>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
-            <label>Target berakhir
+            <div class="custom-datetime-field">
+              <span class="custom-field-label">Target berakhir</span>
               <div class="custom-picker-anchor">
                 <button type="button" id="customUntilTrigger" class="custom-picker-trigger"
-                  onclick="openCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                  onclick="openCustomDateTimePicker(event)" aria-haspopup="dialog" aria-expanded="false">
                   <span id="customUntilDisplay">Pilih tanggal &amp; waktu</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="17" rx="2"></rect>
@@ -245,10 +249,10 @@
                 <div id="customDateTimePicker" class="custom-picker-popover" role="dialog"
                   aria-label="Pilih tanggal dan waktu" hidden>
                   <div class="custom-picker-header">
-                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(-1)"
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(-1, event)"
                       aria-label="Bulan sebelumnya">‹</button>
                     <strong id="customPickerMonthLabel"></strong>
-                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(1)"
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(1, event)"
                       aria-label="Bulan berikutnya">›</button>
                   </div>
                   <div class="custom-picker-weekdays" aria-hidden="true">
@@ -266,12 +270,12 @@
                     </div>
                   </div>
                   <div class="custom-picker-actions">
-                    <button type="button" class="btn-outline" onclick="closeCustomDateTimePicker()">Batal</button>
-                    <button type="button" class="btn-primary" onclick="applyCustomDateTimePicker()">Terapkan</button>
+                    <button type="button" class="btn-outline" onclick="closeCustomDateTimePicker(event)">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyCustomDateTimePicker(event)">Terapkan</button>
                   </div>
                 </div>
               </div>
-            </label>
+            </div>
           </div>
         </div>
       </div>
@@ -1385,9 +1389,10 @@
     function parseCustomUntil() {
       const value = document.getElementById('customUntilInput')?.value || '';
       if (!value) return null;
-      const timezone = getSelectedOutletTimezone();
-      const offset = timezone === 'Asia/Makassar' || timezone === 'Asia/Ujung_Pandang' ? '+08:00' : timezone === 'Asia/Jayapura' ? '+09:00' : '+07:00';
-      const date = new Date(`${value}:00${offset}`);
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [, y, m, d, h, min] = match;
+      const date = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min));
       return Number.isNaN(date.getTime()) ? null : date;
     }
 
@@ -1444,27 +1449,41 @@
         button.disabled = dateKey < todayKey || dateKey > maxDateKey;
         if (pickerDateKey(date) === pickerDateKey(pickerDate)) button.classList.add('is-selected');
         if (pickerDateKey(date) === todayKey) button.classList.add('is-today');
-        button.onclick = () => selectPickerDay(date);
+        button.onclick = (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          selectPickerDay(date);
+        };
         calendar.appendChild(button);
       }
     }
 
     function selectPickerDay(date) {
-      pickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), pickerDate.getHours(), pickerDate.getMinutes());
+      pickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), pickerDate ? pickerDate.getHours() : 12, pickerDate ? pickerDate.getMinutes() : 0);
       renderPickerCalendar();
     }
 
-    function shiftPickerMonth(offset) {
+    function shiftPickerMonth(offset, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + offset, 1);
       renderPickerCalendar();
     }
 
-    function openCustomDateTimePicker() {
+    function openCustomDateTimePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       const outletTimezone = getSelectedOutletTimezone();
       document.getElementById('customPickerTimezoneLabel').textContent = timezoneShortLabel(outletTimezone);
       const existing = parseCustomUntil();
       const selected = existing || new Date(Date.now() + (2 * 60 * 60 * 1000));
-      pickerDate = new Date(selected);
+      pickerDate = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), selected.getHours(), selected.getMinutes());
       pickerMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
       populatePickerTimeOptions();
       document.getElementById('customPickerHour').value = formatWibTime(selected).slice(0, 2);
@@ -1478,7 +1497,11 @@
       document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'true');
     }
 
-    function closeCustomDateTimePicker() {
+    function closeCustomDateTimePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       const picker = document.getElementById('customDateTimePicker');
       if (picker) {
         picker.hidden = true;
@@ -1487,7 +1510,11 @@
       document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'false');
     }
 
-    function applyCustomDateTimePicker() {
+    function applyCustomDateTimePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       if (!pickerDate) return;
       const hours = Number(document.getElementById('customPickerHour').value);
       const minutes = Number(document.getElementById('customPickerMinute').value);

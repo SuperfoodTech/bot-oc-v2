@@ -24,7 +24,13 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.20`.
+Latest documented release: `1.23.21`.
+
+iOS Safari & Mobile WebKit Custom Date & Time Picker Interaction Fix:
+- Memperbaiki arsitektur DOM modal custom duration ("Durasi lain") pada seluruh dashboard (Mitra Agency `user_dashboard.html`, Admin Agency & VB `admin_dashboard.html`, dan Mitra Virtual Brand `brand_dashboard.html`) dengan melepaskan pembungkus `<label>` di sekeliling `.custom-picker-anchor`, mencegah synthetic click activation pada Safari iOS yang memicu reset otomatis ke tanggal awal saat user menekan angka kalender.
+- Mencegah event bubbling dan default behavior (`e.preventDefault()`, `e.stopPropagation()`) pada pemilihan tanggal hari (`selectPickerDay`), tombol navigasi bulan (`shiftPickerMonth`), dan tombol aksi modal (`apply` / `close`).
+- Memperbaiki parsing datetime ISO (`parseCustomUntil`, `parseAdminCustomUntil`, `parseVbCustomUntil`, `parseBrandCustomUntil`) menggunakan regex parsing komponen tanggal lokal aman untuk mencegah bug *invalid date* / *UTC timezone drift* pada WebKit / iOS Safari.
+- Memperbaiki fungsi seleksi tanggal VB (`selectVbPickerDay` dan `selectBrandPickerDay`) agar membuat objek `Date` baru lengkap (tahun, bulan, tanggal) tanpa tertahan pada bulan sebelumnya saat berpindah bulan.
 
 Virtual Brand Admin Dashboard & Mitra Quick Copy UI Refinement:
 - Memperbarui tombol Link Dashboard Virtual Brand pada Admin Dashboard dengan background merah (`#be1a1a`), hover state dinamis, dan dark mode contrast yang optimal.

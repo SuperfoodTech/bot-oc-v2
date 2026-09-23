@@ -113,13 +113,17 @@
         </label>
         <div id="brandCustomDurationBox" style="display:none; margin-top:6px">
           <div class="custom-datetime-fields">
-            <label>Mulai<input type="text" id="brandCustomStartInput" class="form-input" readonly disabled
-                aria-disabled="true"></label>
+            <div class="custom-datetime-field">
+              <span class="custom-field-label">Mulai</span>
+              <input type="text" id="brandCustomStartInput" class="form-input" readonly disabled
+                aria-disabled="true">
+            </div>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
-            <label>Target berakhir
+            <div class="custom-datetime-field">
+              <span class="custom-field-label">Target berakhir</span>
               <div class="custom-picker-anchor">
                 <button type="button" id="brandCustomUntilTrigger" class="custom-picker-trigger"
-                  onclick="openBrandCustomDateTimePicker()" aria-haspopup="dialog" aria-expanded="false">
+                  onclick="openBrandCustomDateTimePicker(event)" aria-haspopup="dialog" aria-expanded="false">
                   <span id="brandCustomUntilDisplay">Pilih tanggal &amp; waktu</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="17" rx="2"></rect>
@@ -130,9 +134,9 @@
                 <div id="brandCustomDateTimePicker" class="custom-picker-popover" role="dialog"
                   aria-label="Pilih tanggal dan waktu" hidden>
                   <div class="custom-picker-header"><button type="button" class="custom-picker-nav"
-                      onclick="shiftBrandPickerMonth(-1)" aria-label="Bulan sebelumnya">‹</button><strong
+                      onclick="shiftBrandPickerMonth(-1, event)" aria-label="Bulan sebelumnya">‹</button><strong
                       id="brandCustomPickerMonthLabel"></strong><button type="button" class="custom-picker-nav"
-                      onclick="shiftBrandPickerMonth(1)" aria-label="Bulan berikutnya">›</button></div>
+                      onclick="shiftBrandPickerMonth(1, event)" aria-label="Bulan berikutnya">›</button></div>
                   <div class="custom-picker-weekdays" aria-hidden="true">
                     <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>
                       Sb</span>
@@ -144,11 +148,11 @@
                         aria-label="Menit Brand"></select><b>WIB</b></div>
                   </div>
                   <div class="custom-picker-actions"><button type="button" class="btn-outline"
-                      onclick="closeBrandCustomDateTimePicker()">Batal</button><button type="button" class="btn-primary"
-                      onclick="applyBrandCustomDateTimePicker()">Pilih</button></div>
+                      onclick="closeBrandCustomDateTimePicker(event)">Batal</button><button type="button" class="btn-primary"
+                      onclick="applyBrandCustomDateTimePicker(event)">Pilih</button></div>
                 </div>
               </div>
-            </label>
+            </div>
           </div>
         </div>
       </div>
@@ -733,6 +737,16 @@
       }
     }
 
+    function parseBrandCustomUntil() {
+      const value = document.getElementById('brandCustomUntilInput')?.value || '';
+      if (!value) return null;
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [, y, m, d, h, min] = match;
+      const date = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min));
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
     function renderBrandPickerCalendar() {
       const calendar = document.getElementById('brandCustomPickerCalendar');
       const label = document.getElementById('brandCustomPickerMonthLabel');
@@ -751,22 +765,41 @@
         button.textContent = day;
         const dateKey = getBrandDateKey(date);
         button.disabled = dateKey < todayKey || dateKey > maxDateKey;
-        if (date.toDateString() === brandPickerDate.toDateString()) button.classList.add('is-selected');
+        if (brandPickerDate && getBrandDateKey(date) === getBrandDateKey(brandPickerDate)) button.classList.add('is-selected');
         if (dateKey === todayKey) button.classList.add('is-today');
-        button.onclick = () => { brandPickerDate.setDate(day); renderBrandPickerCalendar(); };
+        button.onclick = (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          selectBrandPickerDay(date);
+        };
         calendar.appendChild(button);
       }
     }
 
-    function shiftBrandPickerMonth(offset) {
+    function selectBrandPickerDay(date) {
+      brandPickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), brandPickerDate ? brandPickerDate.getHours() : 12, brandPickerDate ? brandPickerDate.getMinutes() : 0);
+      renderBrandPickerCalendar();
+    }
+
+    function shiftBrandPickerMonth(offset, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       brandPickerMonth = new Date(brandPickerMonth.getFullYear(), brandPickerMonth.getMonth() + offset, 1);
       renderBrandPickerCalendar();
     }
 
-    function openBrandCustomDateTimePicker() {
-      const existing = document.getElementById('brandCustomUntilInput').value;
-      const selected = existing ? new Date(existing) : new Date(Date.now() + 2 * 60 * 60000);
-      brandPickerDate = Number.isNaN(selected.getTime()) ? new Date(Date.now() + 2 * 60 * 60000) : selected;
+    function openBrandCustomDateTimePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const existing = parseBrandCustomUntil();
+      const selected = existing || new Date(Date.now() + 2 * 60 * 60000);
+      brandPickerDate = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), selected.getHours(), selected.getMinutes());
       brandPickerMonth = new Date(brandPickerDate.getFullYear(), brandPickerDate.getMonth(), 1);
       populateBrandPickerTimeOptions();
       document.getElementById('brandCustomPickerHour').value = formatBrandTime(brandPickerDate).slice(0, 2);
@@ -776,14 +809,22 @@
       document.getElementById('brandCustomUntilTrigger').setAttribute('aria-expanded', 'true');
     }
 
-    function closeBrandCustomDateTimePicker() {
+    function closeBrandCustomDateTimePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       const picker = document.getElementById('brandCustomDateTimePicker');
       const trigger = document.getElementById('brandCustomUntilTrigger');
       if (picker) picker.hidden = true;
       if (trigger) trigger.setAttribute('aria-expanded', 'false');
     }
 
-    function applyBrandCustomDateTimePicker() {
+    function applyBrandCustomDateTimePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       if (!brandPickerDate) return;
       const selected = new Date(brandPickerDate.getFullYear(), brandPickerDate.getMonth(), brandPickerDate.getDate(), Number(document.getElementById('brandCustomPickerHour').value), Number(document.getElementById('brandCustomPickerMinute').value));
       if (selected <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
