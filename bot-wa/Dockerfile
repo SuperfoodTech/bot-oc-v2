@@ -2,11 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache git
+
 # Copy dependency files
 COPY package*.json ./
 
 # Install dependencies in container build
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy source code
 COPY . .

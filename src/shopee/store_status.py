@@ -4,7 +4,9 @@ import logging
 from typing import Dict, Any, Optional
 from selenium.webdriver.common.by import By
 
-log = logging.getLogger(__name__)
+from core.logger import get_logger
+log = get_logger("shopee.store_status")
+
 
 
 class StoreIdentityMismatch(Exception):

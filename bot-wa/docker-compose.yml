@@ -11,7 +11,7 @@ services:
       - "3002:3002"
     environment:
       - PORT=3002
-      - WA_API_KEY=${WA_API_KEY:-change-this-wa-secret-key-12345}
+      - WA_API_KEY=${WA_API_KEY:-foodmaster-wa-secret-2026-key}
       - WA_AUTH_DIR=/app/auth_info_baileys
       - LOG_LEVEL=info
       - TZ=Asia/Jakarta

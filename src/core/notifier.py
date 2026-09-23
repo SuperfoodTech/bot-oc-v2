@@ -202,8 +202,8 @@ def send_discord_agency_action_notification(
         f"Store ID: {clean_store_id}\n"
         f"Lihat di ShopeeFood:\n"
         f"{shopee_link_md}\n\n"
-        f"FoodMaster Bot Team\n"
-        f"WA CS: wa.me/6285183151531"
+        f"_FoodMaster Bot Team_\n"
+        f"_WA CS: wa.me/6285183151531_"
     )
 
     sig_raw = f"AGENCY:{header}:{clean_store_id}"
@@ -329,6 +329,37 @@ def send_discord_skipped(
 
 
 
+def _get_wa_gateway_config() -> tuple:
+    """
+    Mengambil URL dan API Key WA Gateway dengan fallback dinamis dari .env.
+    """
+    url = os.getenv("WA_GATEWAY_URL", "").strip()
+    key = os.getenv("WA_GATEWAY_KEY", "").strip()
+    if not url or not key:
+        try:
+            from pathlib import Path
+            import dotenv
+            base_dir = Path(__file__).resolve().parent
+            for _ in range(5):
+                env_candidate = base_dir / ".env"
+                if env_candidate.exists():
+                    vals = dotenv.dotenv_values(str(env_candidate))
+                    if not url:
+                        url = (vals.get("WA_GATEWAY_URL") or "").strip()
+                    if not key:
+                        key = (vals.get("WA_GATEWAY_KEY") or "").strip()
+                    if url and key:
+                        break
+                base_dir = base_dir.parent
+        except Exception:
+            pass
+    if not url:
+        url = "http://localhost:3002"
+    if not key:
+        key = "foodmaster-wa-secret-2026-key"
+    return url, key
+
+
 def send_wa_webhook_async(
     event_type: str,
     phone: str,
@@ -350,8 +381,7 @@ def send_wa_webhook_async(
     if _is_vb_environment(is_vb):
         return
 
-    wa_gateway_url = os.getenv("WA_GATEWAY_URL", "").strip()
-    wa_api_key = os.getenv("WA_GATEWAY_KEY", "").strip()
+    wa_gateway_url, wa_api_key = _get_wa_gateway_config()
 
     if not wa_gateway_url or not phone:
         return

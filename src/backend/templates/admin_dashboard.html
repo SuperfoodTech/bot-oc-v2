@@ -543,8 +543,8 @@
       statusFilter: 'mobileStatusFilter'
     };
     const VB_FILTER_FIELD_MAP = {
+      vbOwnerFilter: 'mobileVbOwnerFilter',
       vbGroupFilter: 'mobileVbGroupFilter',
-      vbMasterFilter: 'mobileVbMasterFilter',
       vbStatusFilter: 'mobileVbStatusFilter',
       vbPortalFilter: 'mobileVbPortalFilter',
       vbStoreIdFilter: 'mobileVbStoreIdFilter'
@@ -1207,7 +1207,7 @@
     }
 
     function getActiveVbAdvancedFilterCount(filters = getActiveVbFilters()) {
-      return [filters.group, filters.outletStatus, filters.groupStatus, filters.portal, filters.storeId].filter(Boolean).length;
+      return [filters.owner, filters.group, filters.groupStatus, filters.portal, filters.storeId].filter(Boolean).length;
     }
 
     function updateVbMobileFilterBadge(filters = getActiveVbFilters()) {
@@ -1856,6 +1856,8 @@
     function buildVbBrandViews(brands = allVBBrands) {
       const storeMap = getAllStoreMap();
       return (brands || []).map(brand => {
+        const ownerName = normalizeVbOwnerName(brand.owner_name || brand.ownerName || brand.owner);
+        const ownerSlug = String(brand.owner_slug || brand.ownerSlug || '').trim() || slugifyVbOwnerName(ownerName);
         const effectiveStatus = getVbBrandEffectiveStatus(brand);
         const outlets = (brand.outlets || [])
           .map((outlet, sourceIndex) => ({ outlet: getVbStoreView(outlet, storeMap, brand), sourceIndex }))
@@ -1863,6 +1865,8 @@
           .map(item => item.outlet);
         return {
           ...brand,
+          ownerName,
+          ownerSlug,
           groupCode: getVbGroupCode(brand),
           masterStatus: getVbBrandMasterStatus(brand),
           effectiveStatus,
@@ -1884,8 +1888,8 @@
       const queryFromHeader = adminHeaderSearchValues.vb || '';
       return {
         query: queryFromHeader.toLowerCase().trim(),
+        owner: document.getElementById('vbOwnerFilter')?.value || '',
         group: document.getElementById('vbGroupFilter')?.value || '',
-        outletStatus: (document.getElementById('vbMasterFilter')?.value || '').toUpperCase(),
         groupStatus: (document.getElementById('vbStatusFilter')?.value || '').toUpperCase(),
         portal: document.getElementById('vbPortalFilter')?.value || '',
         storeId: (document.getElementById('vbStoreIdFilter')?.value || '').toLowerCase().trim()
@@ -1906,6 +1910,12 @@
     }
 
     function syncVbFilterOptions(brandViews) {
+      const owners = [...new Set(brandViews.map(brand => brand.ownerName || normalizeVbOwnerName(brand.owner_name)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+      const ownerOptions = owners.map(name => ({ value: name, label: name }));
+      setVbSelectOptions('vbOwnerFilter', 'Semua pemilik', ownerOptions);
+      setVbSelectOptions('mobileVbOwnerFilter', 'Semua pemilik', ownerOptions);
+
       const groupOptions = brandViews.map(brand => ({
         value: String(brand.id),
         label: brand.name || brand.groupCode
@@ -1937,24 +1947,26 @@
 
     function getFilteredVbBrandViews(brandViews, filters) {
       return brandViews.reduce((acc, brand) => {
+        const brandOwner = normalizeVbOwnerName(brand.ownerName || brand.owner_name || brand.owner);
+        const matchesOwner = !filters.owner || brandOwner === filters.owner;
         const matchesGroup = !filters.group || String(brand.id) === String(filters.group);
         const matchesStatus = !filters.groupStatus || brand.effectiveStatus === filters.groupStatus;
-        if (!matchesGroup || !matchesStatus) return acc;
+        if (!matchesOwner || !matchesGroup || !matchesStatus) return acc;
 
         const outletScoped = brand.outlets.filter(outlet => (
           (!filters.portal || outlet.portalName === filters.portal) &&
-          (!filters.storeId || outlet.storeId.toLowerCase().includes(filters.storeId)) &&
-          matchesVbOutletStatus(outlet, filters.outletStatus)
+          (!filters.storeId || outlet.storeId.toLowerCase().includes(filters.storeId))
         ));
         const brandMatchesQuery = !filters.query
           || (brand.name || '').toLowerCase().includes(filters.query)
-          || brand.groupCode.toLowerCase().includes(filters.query);
+          || brand.groupCode.toLowerCase().includes(filters.query)
+          || brandOwner.toLowerCase().includes(filters.query);
         const queryMatchedOutlets = !filters.query
           ? outletScoped
           : outletScoped.filter(outlet => [outlet.portalName, outlet.storeName, outlet.storeId]
             .some(value => String(value || '').toLowerCase().includes(filters.query)));
         const visibleOutlets = brandMatchesQuery ? outletScoped : queryMatchedOutlets;
-        const hasOutletFilters = Boolean(filters.portal || filters.storeId || filters.outletStatus);
+        const hasOutletFilters = Boolean(filters.portal || filters.storeId);
         if (hasOutletFilters && !visibleOutlets.length) return acc;
         const shouldIncludeBrand = brandMatchesQuery || visibleOutlets.length > 0 || (!brand.outlets.length && !hasOutletFilters && !filters.query);
         if (!shouldIncludeBrand) return acc;
@@ -2069,8 +2081,8 @@
       // Group brands by owner
       const ownerGroupsMap = new Map();
       brands.forEach(brand => {
-        const ownerName = normalizeVbOwnerName(brand.owner_name);
-        const ownerSlug = String(brand.owner_slug || '').trim() || slugifyVbOwnerName(ownerName);
+        const ownerName = normalizeVbOwnerName(brand.ownerName || brand.owner_name || brand.owner);
+        const ownerSlug = String(brand.ownerSlug || brand.owner_slug || '').trim() || slugifyVbOwnerName(ownerName);
         if (!ownerGroupsMap.has(ownerSlug)) {
           ownerGroupsMap.set(ownerSlug, {
             ownerKey: ownerSlug,
@@ -2305,7 +2317,7 @@
       const summary = document.getElementById('vbResultsSummary');
       if (!summary) return;
       const totalStores = brands.reduce((sum, brand) => sum + (brand.visibleStoreCount || 0), 0);
-      const hasFilters = Boolean(filters.query || filters.group || filters.outletStatus || filters.groupStatus || filters.portal || filters.storeId);
+      const hasFilters = Boolean(filters.query || filters.owner || filters.group || filters.groupStatus || filters.portal || filters.storeId);
       summary.textContent = brands.length
         ? (hasFilters
           ? `Menampilkan ${brands.length} dari ${totalBrands} grup · ${totalStores} Store ID`
@@ -2330,7 +2342,7 @@
     }
 
     function resetVbFilters() {
-      ['vbGroupFilter', 'vbMasterFilter', 'vbStatusFilter', 'vbPortalFilter', 'vbStoreIdFilter', 'vbInlineSearchInput'].forEach(id => {
+      ['vbOwnerFilter', 'vbGroupFilter', 'vbStatusFilter', 'vbPortalFilter', 'vbStoreIdFilter', 'vbInlineSearchInput'].forEach(id => {
         setControlValue(id, '');
       });
       syncVbSearchInputs('', 'inline');
@@ -3111,11 +3123,12 @@
     }
 
     function setupCustomFilterDropdowns() {
-      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter', 'vbGroupFilter', 'vbPortalFilter', 'vbStoreIdFilter']);
+      const SEARCHABLE_IDS = new Set(['ownerFilter', 'outletFilter', 'storeIdFilter', 'vbOwnerFilter', 'vbGroupFilter', 'vbPortalFilter', 'vbStoreIdFilter']);
       const PLACEHOLDERS = {
         ownerFilter: 'Cari nama pemilik...',
         outletFilter: 'Cari nama outlet...',
         storeIdFilter: 'Cari Store ID...',
+        vbOwnerFilter: 'Cari nama pemilik...',
         vbGroupFilter: 'Cari nama grup...',
         vbPortalFilter: 'Cari portal...',
         vbStoreIdFilter: 'Cari Store ID...'

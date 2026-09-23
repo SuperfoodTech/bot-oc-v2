@@ -21,9 +21,15 @@
       </div>
 
       <details class="vb-filter-disclosure" id="vbFilterDisclosure">
-        <summary><span>Filter lanjutan</span><small>Grup, status, portal, dan Store ID</small></summary>
+        <summary><span>Filter lanjutan</span><small>Pemilik, grup, status, portal, dan Store ID</small></summary>
         <section class="vb-filter-card">
           <div class="vb-filter-grid">
+          <label class="filter-field">
+            <span>Nama Pemilik</span>
+            <select id="vbOwnerFilter" class="form-input filter-select" onchange="filterVBTable()">
+              <option value="">Semua pemilik</option>
+            </select>
+          </label>
           <label class="filter-field">
             <span>Nama Grup</span>
             <select id="vbGroupFilter" class="form-input filter-select" onchange="filterVBTable()">
@@ -42,16 +48,6 @@
             <span>Portal</span>
             <select id="vbPortalFilter" class="form-input filter-select" onchange="filterVBTable()">
               <option value="">Semua portal</option>
-            </select>
-          </label>
-          <label class="filter-field">
-            <span>Status Outlet</span>
-            <select id="vbMasterFilter" class="form-input filter-select" onchange="filterVBTable()">
-              <option value="">Semua status</option>
-              <option value="PERLU_CEK">Perlu cek</option>
-              <option value="OPEN">Live Buka</option>
-              <option value="CLOSED">Live Tutup</option>
-              <option value="PAUSE">Tutup Sementara</option>
             </select>
           </label>
           <label class="filter-field">
@@ -85,6 +81,12 @@
       </div>
       <div class="mobile-filter-sheet-body">
         <label class="filter-field">
+          <span>Nama Pemilik</span>
+          <select id="mobileVbOwnerFilter" class="form-input mobile-sheet-select" aria-label="Filter nama pemilik VB">
+            <option value="">Semua pemilik</option>
+          </select>
+        </label>
+        <label class="filter-field">
           <span>Nama Grup</span>
           <select id="mobileVbGroupFilter" class="form-input mobile-sheet-select" aria-label="Filter nama grup VB">
             <option value="">Semua grup</option>
@@ -102,16 +104,6 @@
           <span>Portal</span>
           <select id="mobileVbPortalFilter" class="form-input mobile-sheet-select" aria-label="Filter portal VB">
             <option value="">Semua portal</option>
-          </select>
-        </label>
-        <label class="filter-field">
-          <span>Status Outlet</span>
-          <select id="mobileVbMasterFilter" class="form-input mobile-sheet-select" aria-label="Filter status outlet VB">
-            <option value="">Semua status</option>
-            <option value="PERLU_CEK">Perlu cek</option>
-            <option value="OPEN">Live Buka</option>
-            <option value="CLOSED">Live Tutup</option>
-            <option value="PAUSE">Tutup Sementara</option>
           </select>
         </label>
         <label class="filter-field">

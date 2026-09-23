@@ -40,6 +40,7 @@ def run_import_sheet() -> dict[str, int]:
             merchant_name=row.nama_portal,
             account_username=row.username,
             account_password=row.password,
+            account_phone=row.hp,
             nama_pemilik=row.nama_pemilik,
             paket=row.paket,
             tanggal_mulai_layanan=row.tanggal_mulai_layanan,

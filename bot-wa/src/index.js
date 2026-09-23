@@ -30,7 +30,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 const PORT = process.env.PORT || 3002;
-const WA_API_KEY = process.env.WA_API_KEY || 'change-this-wa-secret-key';
+const WA_API_KEY = process.env.WA_API_KEY || 'foodmaster-wa-secret-2026-key';
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.join(__dirname, '../auth_info_baileys');
 
 if (!fs.existsSync(AUTH_DIR)) {
@@ -88,6 +88,28 @@ function extractUserInfo() {
 }
 
 /**
+ * Membersihkan seluruh isi folder autentikasi (tanpa menghapus folder mount point)
+ */
+function clearAuthDir() {
+  if (fs.existsSync(AUTH_DIR)) {
+    try {
+      const files = fs.readdirSync(AUTH_DIR);
+      for (const file of files) {
+        const filePath = path.join(AUTH_DIR, file);
+        try {
+          fs.rmSync(filePath, { recursive: true, force: true });
+        } catch (e) {
+          logger.warn({ file: filePath, err: e.message }, 'Gagal menghapus file auth');
+        }
+      }
+      logger.info('Folder autentikasi berhasil dibersihkan.');
+    } catch (e) {
+      logger.error({ err: e.message }, 'Gagal membaca folder auth untuk pembersihan');
+    }
+  }
+}
+
+/**
  * Inisialisasi Koneksi Baileys WhatsApp
  */
 async function connectToWhatsApp() {
@@ -140,7 +162,9 @@ async function connectToWhatsApp() {
           logger.info('Mencoba menyambungkan kembali dalam 5 detik...');
           setTimeout(connectToWhatsApp, 5000);
         } else {
-          logger.error('Session di-logout dari HP. Hapus folder auth dan restart service untuk scan ulang.');
+          logger.warn('Session di-logout / expired. Membersihkan sesi auth dan menyiapkan QR code baru...');
+          clearAuthDir();
+          setTimeout(connectToWhatsApp, 2000);
         }
       } else if (connection === 'open') {
         waStatus = 'CONNECTED';
@@ -287,10 +311,10 @@ function buildNotificationText(body) {
     return (
       `🟢 *OUTLET BERHASIL DIBUKA BOT*\n\n` +
       `Nama Outlet: *${outlet_name}*\n` +
-      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Store ID: ${cleanStoreId || '-'}\n` +
       `Lihat di ShopeeFood:\n${shopeeLink}\n\n` +
-      `FoodMaster Bot Team\n` +
-      `WA CS: wa.me/6285183151531`
+      `_FoodMaster Bot Team_\n` +
+      `_WA CS: wa.me/6285183151531_`
     );
   }
 
@@ -298,10 +322,10 @@ function buildNotificationText(body) {
     return (
       `🔴 *OUTLET BERHASIL DITUTUP BOT*\n\n` +
       `Nama Outlet: *${outlet_name}*\n` +
-      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Store ID: ${cleanStoreId || '-'}\n` +
       `Lihat di ShopeeFood:\n${shopeeLink}\n\n` +
-      `FoodMaster Bot Team\n` +
-      `WA CS: wa.me/6285183151531`
+      `_FoodMaster Bot Team_\n` +
+      `_WA CS: wa.me/6285183151531_`
     );
   }
 
@@ -309,11 +333,11 @@ function buildNotificationText(body) {
     return (
       `⚠️ *OUTLET DI-SKIP (JADWAL KHUSUS)*\n\n` +
       `Nama Outlet: *${outlet_name}*\n` +
-      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Store ID: ${cleanStoreId || '-'}\n` +
       `Status Shopee: *${live_status || 'UNKNOWN'}*\n` +
       `Catatan: Toko memiliki Jadwal Khusus / Libur.\n\n` +
-      `FoodMaster Bot Team\n` +
-      `WA CS: wa.me/6285183151531`
+      `_FoodMaster Bot Team_\n` +
+      `_WA CS: wa.me/6285183151531_`
     );
   }
 
@@ -321,11 +345,11 @@ function buildNotificationText(body) {
     return (
       `❌ *PERINGATAN EROR BOT PATROLI*\n\n` +
       `Nama Outlet: *${outlet_name}*\n` +
-      `Store ID: *${cleanStoreId || '-'}*\n` +
+      `Store ID: ${cleanStoreId || '-'}\n` +
       `Tipe Error: ${error_type || 'Unknown Exception'}\n` +
       `Detail: ${detail || 'Gagal memverifikasi status'}\n\n` +
-      `FoodMaster Bot Team\n` +
-      `WA CS: wa.me/6285183151531`
+      `_FoodMaster Bot Team_\n` +
+      `_WA CS: wa.me/6285183151531_`
     );
   }
 
@@ -333,10 +357,10 @@ function buildNotificationText(body) {
   return (
     `ℹ️ *NOTIFIKASI FOODMASTER*\n\n` +
     `Nama Outlet: *${outlet_name}*\n` +
-    `Store ID: *${cleanStoreId || '-'}*\n` +
+    `Store ID: ${cleanStoreId || '-'}\n` +
     `Informasi: ${detail || action || 'Pesan dari sistem'}\n\n` +
-    `FoodMaster Bot Team\n` +
-    `WA CS: wa.me/6285183151531`
+    `_FoodMaster Bot Team_\n` +
+    `_WA CS: wa.me/6285183151531_`
   );
 }
 
@@ -569,15 +593,17 @@ app.post('/api/v1/logout', authenticateApiKey, async (req, res) => {
     lastQr = null;
     lastQrImage = null;
     connectedUser = null;
-    if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-    }
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
+
+    clearAuthDir();
+
     res.json({
       success: true,
-      message: 'Sesi WhatsApp berhasil di-logout dan folder autentikasi dibersihkan.'
+      message: 'Sesi WhatsApp berhasil di-logout dan siap scan QR baru.'
     });
-    setTimeout(connectToWhatsApp, 2000);
+
+    setTimeout(() => {
+      connectToWhatsApp();
+    }, 1500);
   } catch (err) {
     logger.error({ err }, 'Gagal melakukan logout WA');
     res.status(500).json({

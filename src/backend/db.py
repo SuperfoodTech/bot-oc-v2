@@ -243,9 +243,6 @@ def _derive_schedule_fetch_status(
     *,
     schedule_available: bool,
 ) -> str:
-    if schedule_available:
-        return SCHEDULE_FETCH_READY
-
     normalized = str(store.get("schedule_fetch_status") or "").strip().upper()
     attempted_at = store.get("schedule_fetch_attempted_at")
     succeeded_at = store.get("schedule_fetch_succeeded_at")
@@ -257,11 +254,16 @@ def _derive_schedule_fetch_status(
         SCHEDULE_FETCH_EMPTY,
     }:
         return normalized
+
+    if schedule_available:
+        return SCHEDULE_FETCH_READY
+
     if succeeded_at and not error_message:
         return SCHEDULE_FETCH_EMPTY
     if attempted_at or error_message:
         return SCHEDULE_FETCH_RETRYING
     return SCHEDULE_FETCH_NOT_FETCHED_YET
+
 
 
 def _parse_schedule_range(range_text: str) -> Optional[Tuple[int, int]]:
@@ -686,16 +688,26 @@ def _context(conn, owner: str, merchant_name: str, dashboard_password: str = "",
     return merchant_id, portal["id"], account
 
 
-def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", account_password: str = "", nama_pemilik: str = "", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, is_active: bool = True, **_ignored) -> Dict:
+def save_or_update_store(store_id: str, store_name: str, merchant_name: str, account_username: str = "", account_password: str = "", account_phone: str = "", nama_pemilik: str = "", paket: str = "3 Bulan", tanggal_mulai_layanan: str = "", tanggal_berakhir_layanan: str = "", vercel_link: str = "", vercel_password: str = "", vercel_status: str = "ON", shopee_status: str = "UNKNOWN", subscription_status: str = "Aktif", is_suspended: bool = False, alasan_penangguhan: str = "", pause_until: Optional[str] = None, regular_hours: Optional[Dict] = None, special_hours: str = "", base_url: str = "", google_email: Optional[str] = None, is_active: bool = True, **_ignored) -> Dict:
     with get_db_connection() as conn:
         merchant_id, portal_id, account = _context(conn, nama_pemilik, merchant_name, vercel_password, base_url=base_url, google_email=google_email)
         existing_account = conn.execute("SELECT id FROM shopee_accounts WHERE portal_id=%s AND username=%s", (portal_id, account_username or BOT_USERNAME)).fetchone()
         if existing_account:
             shopee_account_id = existing_account["id"]
+            update_clauses = []
+            update_params = []
             if account_password:
-                conn.execute("UPDATE shopee_accounts SET password_plain=%s,updated_at=now() WHERE id=%s", (account_password, shopee_account_id))
+                update_clauses.append("password_plain=%s")
+                update_params.append(account_password)
+            if account_phone:
+                update_clauses.append("phone=%s")
+                update_params.append(account_phone)
+            if update_clauses:
+                update_clauses.append("updated_at=now()")
+                update_params.append(shopee_account_id)
+                conn.execute(f"UPDATE shopee_accounts SET {', '.join(update_clauses)} WHERE id=%s", tuple(update_params))
         else:
-            shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain) VALUES (%s,'',%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, account_password or BOT_PASSWORD)).fetchone()["id"]
+            shopee_account_id = conn.execute("INSERT INTO shopee_accounts (portal_id,merchant_id_external,username,password_plain,phone) VALUES (%s,'',%s,%s,%s) RETURNING id", (portal_id, account_username or BOT_USERNAME, account_password or BOT_PASSWORD, account_phone or "")).fetchone()["id"]
         outlet = conn.execute("INSERT INTO outlets (merchant_id,portal_id,shopee_account_id,store_id,long_name,special_hours,is_active) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (store_id) DO UPDATE SET merchant_id=EXCLUDED.merchant_id,portal_id=EXCLUDED.portal_id,shopee_account_id=EXCLUDED.shopee_account_id,long_name=EXCLUDED.long_name,special_hours=EXCLUDED.special_hours,is_active=EXCLUDED.is_active,updated_at=now() RETURNING id", (merchant_id, portal_id, shopee_account_id, store_id, store_name or store_id, special_hours, is_active)).fetchone()
         outlet_id = outlet["id"]
         conn.execute("INSERT INTO outlet_states (outlet_id,vercel_status,shopee_actual_status,suspension_status,suspension_reason,pause_until) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (outlet_id) DO UPDATE SET updated_at=now()", (outlet_id, (vercel_status or "OFF").upper(), _normalize_persisted_shopee_status(shopee_status), "SUSPENDED" if is_suspended else "ACTIVE", alasan_penangguhan, pause_until))
@@ -1166,14 +1178,22 @@ def update_outlet_name(store_id: str, store_name: str) -> None:
 
 def record_log(store_id, store_name, action, target_state, reason, success=True, error_message=None, mode="REGULAR"):
     with get_db_connection() as conn:
-        outlet = conn.execute("SELECT id, long_name FROM outlets WHERE store_id=%s", (store_id,)).fetchone()
+        outlet = conn.execute("""
+            SELECT o.id, o.long_name, p.name AS merchant_name, COALESCE(sa.phone, '') AS phone
+            FROM outlets o
+            JOIN portals p ON p.id = o.portal_id
+            LEFT JOIN shopee_accounts sa ON sa.id = o.shopee_account_id
+            WHERE o.store_id = %s
+        """, (store_id,)).fetchone()
         if not outlet: return
         outlet_full_name = store_name or (outlet["long_name"] if outlet else None) or "Outlet"
+        merchant_full_name = outlet.get("merchant_name") or "Shopee Merchant"
+        target_phone = outlet.get("phone") or ""
         row = conn.execute("SELECT vercel_status,shopee_actual_status,suspension_status FROM outlet_states WHERE outlet_id=%s", (outlet["id"],)).fetchone() or {}
         conn.execute("INSERT INTO automation_logs (outlet_id,mode,suspension_status,subscription_status,vercel_status_before,shopee_status_before,target_status,action,success,error_message,reason) VALUES (%s,%s,%s,'ACTIVE',%s,%s,%s,%s,%s,%s,%s)", (outlet["id"], mode, row.get("suspension_status", "ACTIVE"), row.get("vercel_status", "OFF"), row.get("shopee_actual_status", "UNKNOWN"), target_state, action, success, error_message, reason))
         
-        # Trigger notifikasi Discord khusus Agency jika aksi buka/tutup berhasil
-        if mode == "REGULAR" and success and action in ("ACTION_OPEN", "ACTION_CLOSE", "USER_RESUME_STORE", "USER_PAUSE_STORE", "OPEN", "PAUSE"):
+        # Trigger notifikasi Discord & WhatsApp khusus Agency jika aksi buka/tutup berhasil
+        if mode == "REGULAR" and success and action in ("ACTION_OPEN", "ACTION_CLOSE", "USER_RESUME_STORE", "USER_PAUSE_STORE", "ADMIN_PAUSE_STORE", "ADMIN_RESUME_STORE", "OPEN_STORE", "CLOSE_STORE", "OPEN", "PAUSE"):
             try:
                 import importlib
                 import core.notifier
@@ -1185,8 +1205,22 @@ def record_log(store_id, store_name, action, target_state, reason, success=True,
                     action=action,
                     success=success
                 )
+                if target_phone:
+                    act = str(action).upper()
+                    event = "ACTION_OPEN" if act in ("OPEN", "BUKA", "ACTION_OPEN", "USER_RESUME_STORE", "ADMIN_RESUME_STORE", "OPEN_STORE") else "ACTION_CLOSE"
+                    core.notifier.send_wa_webhook_async(
+                        event_type=event,
+                        phone=target_phone,
+                        merchant=merchant_full_name,
+                        outlet=outlet_full_name,
+                        platform="Shopee",
+                        store_id=store_id,
+                        action=action,
+                        is_vb=False
+                    )
             except Exception as _e:
-                print(f"[DISCORD AGENCY NOTIF ERROR] {_e}")
+                print(f"[AGENCY NOTIF ERROR] {_e}")
+
 
 
         if not success:
