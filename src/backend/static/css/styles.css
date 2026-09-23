@@ -10862,6 +10862,12 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   margin: 0;
 }
 
+.brand-dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 /* Hero Card */
 .brand-hero-card {
   background: var(--card-bg, #ffffff);
@@ -11183,7 +11189,7 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 16px;
   padding: 16px 20px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 

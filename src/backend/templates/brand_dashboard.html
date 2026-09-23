@@ -10,7 +10,7 @@
   <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <script src="/static/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260923-v12321-ios-latest">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20260923-v12322-card-gap">
 </head>
 
 <body class="brand-dashboard-body">
@@ -533,8 +533,6 @@
             <span class="mitra-history-body">
               ${brandBadge}
               <strong>${escapeHtml(summary.title)}</strong>
-              <span>${escapeHtml(summary.subtitle || '-')}</span>
-              ${log.store_id ? `<span class="history-store-id">Store ID ${escapeHtml(log.store_id)}</span>` : ''}
             </span>
           </div>
         `;

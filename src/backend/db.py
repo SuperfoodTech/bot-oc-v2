@@ -838,6 +838,23 @@ def sync_expired_user_pauses():
                )
         """)
 
+
+def has_pending_brand_actions() -> bool:
+    """Fast check for pending requested_status or expired timed pauses."""
+    try:
+        with get_db_connection() as conn:
+            row = conn.execute("""
+                SELECT 1 FROM vb_brands
+                WHERE is_active=true AND (
+                    requested_status IS NOT NULL
+                    OR (applied_status='PAUSED' AND pause_until IS NOT NULL AND pause_until <= now())
+                )
+                LIMIT 1
+            """).fetchone()
+            return bool(row)
+    except Exception:
+        return False
+
 def admin_generate_user_link(nama_pemilik, passcode=None, base_url=None):
     with get_db_connection() as conn:
         merchant = conn.execute("SELECT id FROM merchants WHERE name=%s", (nama_pemilik,)).fetchone()

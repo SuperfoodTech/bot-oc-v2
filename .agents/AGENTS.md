@@ -24,7 +24,21 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.23.21`.
+Latest documented release: `1.24.0`.
+
+Preemptive Cooperative On-Demand Execution Engine & Instant Sleep Interruption:
+- Mengintegrasikan pemeriksaan `has_pending_brand_actions()` di setiap iterasi awal pemeriksaan outlet pada `sync_all_stores()` di `main-vb/src/worker.py` dan `main-bot/src/worker.py`.
+- Ketika user mengubah status brand di dashboard saat bot sedang menjalankan patroli rutin (*PATROL LANE*) pada portal besar (30–50 outlet), loop patroli rutin **langsung berhenti (*break / yield*) dalam waktu $< 1$ detik**.
+- Mengembalikan kontrol ke `daemon.py` seketika untuk mempromosikan aksi toggle tersebut ke **Priority 100 (P0 Express Lane)**, memangkas latensi eksekusi dari 3–5 menit menjadi **$< 3\text{--}5$ detik**.
+- Menambahkan deteksi `has_pending_brand_actions()` di dalam perulangan 1-detik *idle sleep* pada `main-vb/src/daemon.py` dan `main-bot/src/daemon.py`, menjamin bot langsung bangun seketika saat ada aksi on-demand tanpa menunggu timer tidur berakhir.
+- Menjaga modul `main-vb/src/worker.py` dan `main-bot/src/worker.py` 100% identik *byte-for-byte*.
+
+Virtual Brand Activity Card Streamlining:
+- Menghapus tampilan nama outlet dan Store ID pada baris riwayat kartu aktivitas (*activity card / log card*) di Dashboard Mitra Virtual Brand (`/brand/{slug}`), sehingga log aktivitas tampil lebih bersih, ringkas, dan fokus pada aksi/status brand.
+
+Virtual Brand Dashboard Card Spacing & Activity Log Card Alignment:
+- Menambahkan layout container flex column (`gap: 14px`) pada `.brand-dashboard-content` serta menormalkan margin pada `.brand-activity-card` di Dashboard Mitra Virtual Brand (`/brand/{slug}`).
+- Memastikan jarak vertikal antara kartu brand (hero card) dan kartu riwayat aktivitas (activity / log card) konsisten dan presisi sebesar 14px, seragam dengan jarak antar-kartu brand saat seorang owner memiliki lebih dari satu brand.
 
 iOS Safari & Mobile WebKit Custom Date & Time Picker Interaction Fix:
 - Memperbaiki arsitektur DOM modal custom duration ("Durasi lain") pada seluruh dashboard (Mitra Agency `user_dashboard.html`, Admin Agency & VB `admin_dashboard.html`, dan Mitra Virtual Brand `brand_dashboard.html`) dengan melepaskan pembungkus `<label>` di sekeliling `.custom-picker-anchor`, mencegah synthetic click activation pada Safari iOS yang memicu reset otomatis ke tanggal awal saat user menekan angka kalender.

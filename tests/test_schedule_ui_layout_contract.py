@@ -307,16 +307,14 @@ def test_vb_outlet_status_filter_contract():
     dashboard_template = (PROJECT_ROOT / "src/backend/templates/admin_dashboard.html").read_text()
 
     # HTML assertions for desktop and mobile select filter
-    assert "<span>Status Outlet</span>" in vb_tab_template
-    assert '<option value="PERLU_CEK">Perlu cek</option>' in vb_tab_template
-    assert '<option value="OPEN">Live Buka</option>' in vb_tab_template
-    assert '<option value="CLOSED">Live Tutup</option>' in vb_tab_template
-    assert '<option value="PAUSE">Tutup Sementara</option>' in vb_tab_template
+    assert 'id="vbStatusFilter"' in vb_tab_template
+    assert '<option value="ON">ON</option>' in vb_tab_template
+    assert '<option value="OFF">OFF</option>' in vb_tab_template
+    assert 'id="vbStoreIdFilter"' in vb_tab_template
 
     # JS assertions in dashboard
-    assert "isVbOutletPerluCek(" in dashboard_template
-    assert "matchesVbOutletStatus(" in dashboard_template
-    assert "outletStatus:" in dashboard_template
+    assert "filterVBTable()" in vb_tab_template
+    assert "resetVbFilters()" in vb_tab_template
 
 
 

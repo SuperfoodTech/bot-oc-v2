@@ -396,8 +396,12 @@ def sync_all_stores(
                 if merchant_outlets
             }
 
+        yielded_for_preemption = False
+
         # Process each merchant portal group
         for (username, portal_name), merchant_outlets in grouped_outlets.items():
+            if yielded_for_preemption:
+                break
 
             log.info(f"🏬 [MERCHANT GROUP] Processing {len(merchant_outlets)} outlets for Merchant Portal: '{portal_name}' (Account: {username})...")
 
@@ -516,7 +520,22 @@ def sync_all_stores(
 
             _ensure_group_session_ready(f"group bootstrap for merchant '{portal_name}'")
 
-            for outlet in merchant_outlets:
+            for idx, outlet in enumerate(merchant_outlets):
+                # ── PREEMPTIVE ON-DEMAND CHECK ─────────────────────────────────────
+                # If currently running in routine PATROL LANE (not targeted express lane),
+                # check if a user just requested an on-demand brand toggle in DB.
+                if normalized_target_store_ids is None and hasattr(db, "has_pending_brand_actions"):
+                    try:
+                        if db.has_pending_brand_actions():
+                            log.info(
+                                f"⚡ [ON-DEMAND PREEMPTION] Urgent user brand toggle detected in DB! "
+                                f"Yielding routine patrol lane for '{portal_name}' (after outlet #{idx}/{len(merchant_outlets)}) to execute Express Lane immediately..."
+                            )
+                            yielded_for_preemption = True
+                            break
+                    except Exception as pre_err:
+                        log.debug(f"Preemption check error: {pre_err}")
+
                 outlet_username = _normalized_username(outlet.username)
                 if outlet_username:
                     browser.set_session_file(
@@ -872,6 +891,7 @@ def sync_all_stores(
             "message": f"Successfully processed stores for allowed usernames {ALLOWED_USERNAMES}.",
             "next_wake_hint_seconds": next_wake_hint_seconds,
             "next_wake_hint_reason": next_wake_hint_reason,
+            "yielded_for_preemption": yielded_for_preemption,
         }
     finally:
         SYNC_LOCK.release()

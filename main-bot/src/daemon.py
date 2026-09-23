@@ -334,7 +334,7 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
                     target_groups={selected.merchant_key},
                     target_store_ids=target_store_ids,
                 )
-                if not is_actionable:
+                if not is_actionable and not last_result.get("yielded_for_preemption"):
                     processed_keys.add(selected.merchant_key)
                 
                 # Update FAILED_RETRY_TRACKER based on action results
@@ -491,6 +491,9 @@ def run_daemon(interval_seconds: int = 60, once: bool = False, dry_run: bool = F
         # Sleep in 1-second chunks for responsive SIGINT handling + countdown tracking
         for remaining in range(next_sleep_seconds, 0, -1):
             if not RUNNING:
+                break
+            if hasattr(db, "has_pending_brand_actions") and db.has_pending_brand_actions():
+                log.info("⚡ [ON-DEMAND WAKEUP] Pending action detected during sleep! Waking up immediately...")
                 break
             try:
                 import bot_api

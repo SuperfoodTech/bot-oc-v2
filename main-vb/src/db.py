@@ -86,6 +86,23 @@ def sync_expired_user_pauses():
         apply_all_pending_statuses(conn)
 
 
+def has_pending_brand_actions() -> bool:
+    """Fast check for pending requested_status or expired timed pauses."""
+    try:
+        with connection() as conn:
+            row = conn.execute("""
+                SELECT 1 FROM vb_brands
+                WHERE is_active=true AND (
+                    requested_status IS NOT NULL
+                    OR (applied_status='PAUSED' AND pause_until IS NOT NULL AND pause_until <= now())
+                )
+                LIMIT 1
+            """).fetchone()
+            return bool(row)
+    except Exception:
+        return False
+
+
 def normalize_brand(name: str) -> str:
     return re.sub(r"\s+", " ", (name or "").strip()).casefold()
 
