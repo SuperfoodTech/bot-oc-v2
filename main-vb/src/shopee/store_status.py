@@ -109,23 +109,36 @@ def switch_store_context(driver, store_id: str, merchant_id: Optional[str] = Non
         return ensure_business_hours_page(driver, sid)
 
     try:
+        try:
+            driver.delete_cookie("shopee_tob_entity_id")
+        except Exception:
+            pass
+
         driver.execute_script("""
             var sid = String(arguments[0] || '').trim();
             var targetMid = String(arguments[1] || '').trim();
             var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
             var mid = (targetMid || existingMid || sid).trim();
             if (sid) {
-                // Clear any conflicting host-only cookies to prevent multi-domain collisions
-                document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
-                document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
+                // Clear any conflicting host-only and subdomain cookies
+                var domainsToDelete = ["", window.location.hostname, "." + window.location.hostname, ".shopee.co.id"];
+                for (var i = 0; i < domainsToDelete.length; i++) {
+                    var dom = domainsToDelete[i];
+                    var domAttr = dom ? ("; domain=" + dom) : "";
+                    document.cookie = "shopee_tob_entity_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                    document.cookie = "shopee_tob_entity_id=; path=/; max-age=0" + domAttr;
+                    document.cookie = "shopee_foody_mid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                    document.cookie = "shopee_foody_mid=; path=/; max-age=0" + domAttr;
+                }
                 // Inject MID exclusively on .shopee.co.id domain scope
                 if (mid) {
                     document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
                 }
-                // Neutralize entity ID: must be empty string on .shopee.co.id domain
-                document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+                // Inject target store ID into entity ID on .shopee.co.id domain scope
+                document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=.shopee.co.id;";
                 try {
                     if (mid) localStorage.setItem("shopee_foody_mid", mid);
+                    localStorage.setItem("shopee_tob_entity_id", sid);
                     localStorage.setItem("current_store_id", sid);
                 } catch(e) {}
             }
@@ -179,14 +192,22 @@ def get_actual_store_status(
                     var mid = (targetMid || existingMid || targetSid).trim();
                     var sid = targetSid;
                     if (sid) {{
-                        document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
-                        document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
+                        var domainsToDelete = ["", window.location.hostname, "." + window.location.hostname, ".shopee.co.id"];
+                        for (var i = 0; i < domainsToDelete.length; i++) {{
+                            var dom = domainsToDelete[i];
+                            var domAttr = dom ? ("; domain=" + dom) : "";
+                            document.cookie = "shopee_tob_entity_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_tob_entity_id=; path=/; max-age=0" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; max-age=0" + domAttr;
+                        }}
                         if (mid) {{
                             document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
                         }}
-                        document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=.shopee.co.id;";
                         try {{
                             if (mid) localStorage.setItem("shopee_foody_mid", mid);
+                            localStorage.setItem("shopee_tob_entity_id", sid);
                             localStorage.setItem("current_store_id", sid);
                         }} catch(e) {{}}
                     }}
@@ -353,14 +374,22 @@ def get_regular_hours(
                     var mid = (targetMid || existingMid || targetSid).trim();
                     var sid = targetSid;
                     if (sid) {{
-                        document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
-                        document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
+                        var domainsToDelete = ["", window.location.hostname, "." + window.location.hostname, ".shopee.co.id"];
+                        for (var i = 0; i < domainsToDelete.length; i++) {{
+                            var dom = domainsToDelete[i];
+                            var domAttr = dom ? ("; domain=" + dom) : "";
+                            document.cookie = "shopee_tob_entity_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_tob_entity_id=; path=/; max-age=0" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; max-age=0" + domAttr;
+                        }}
                         if (mid) {{
                             document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
                         }}
-                        document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=.shopee.co.id;";
                         try {{
                             if (mid) localStorage.setItem("shopee_foody_mid", mid);
+                            localStorage.setItem("shopee_tob_entity_id", sid);
                             localStorage.setItem("current_store_id", sid);
                         }} catch(e) {{}}
                     }}
@@ -460,14 +489,22 @@ def get_special_hours(
                     var mid = (targetMid || existingMid || targetSid).trim();
                     var sid = targetSid;
                     if (sid) {{
-                        document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
-                        document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
+                        var domainsToDelete = ["", window.location.hostname, "." + window.location.hostname, ".shopee.co.id"];
+                        for (var i = 0; i < domainsToDelete.length; i++) {{
+                            var dom = domainsToDelete[i];
+                            var domAttr = dom ? ("; domain=" + dom) : "";
+                            document.cookie = "shopee_tob_entity_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_tob_entity_id=; path=/; max-age=0" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; max-age=0" + domAttr;
+                        }}
                         if (mid) {{
                             document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
                         }}
-                        document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=.shopee.co.id;";
                         try {{
                             if (mid) localStorage.setItem("shopee_foody_mid", mid);
+                            localStorage.setItem("shopee_tob_entity_id", sid);
                             localStorage.setItem("current_store_id", sid);
                         }} catch(e) {{}}
                     }}
@@ -571,14 +608,22 @@ def pause_store_action(
                     var mid = (targetMid || existingMid || targetSid).trim();
                     var sid = targetSid;
                     if (sid) {{
-                        document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
-                        document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
+                        var domainsToDelete = ["", window.location.hostname, "." + window.location.hostname, ".shopee.co.id"];
+                        for (var i = 0; i < domainsToDelete.length; i++) {{
+                            var dom = domainsToDelete[i];
+                            var domAttr = dom ? ("; domain=" + dom) : "";
+                            document.cookie = "shopee_tob_entity_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_tob_entity_id=; path=/; max-age=0" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; max-age=0" + domAttr;
+                        }}
                         if (mid) {{
                             document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
                         }}
-                        document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=.shopee.co.id;";
                         try {{
                             if (mid) localStorage.setItem("shopee_foody_mid", mid);
+                            localStorage.setItem("shopee_tob_entity_id", sid);
                             localStorage.setItem("current_store_id", sid);
                         }} catch(e) {{}}
                     }}
@@ -667,14 +712,22 @@ def open_store_action(
                     var mid = (targetMid || existingMid || targetSid).trim();
                     var sid = targetSid;
                     if (sid) {{
-                        document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
-                        document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
+                        var domainsToDelete = ["", window.location.hostname, "." + window.location.hostname, ".shopee.co.id"];
+                        for (var i = 0; i < domainsToDelete.length; i++) {{
+                            var dom = domainsToDelete[i];
+                            var domAttr = dom ? ("; domain=" + dom) : "";
+                            document.cookie = "shopee_tob_entity_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_tob_entity_id=; path=/; max-age=0" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT" + domAttr;
+                            document.cookie = "shopee_foody_mid=; path=/; max-age=0" + domAttr;
+                        }}
                         if (mid) {{
                             document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
                         }}
-                        document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=.shopee.co.id;";
                         try {{
                             if (mid) localStorage.setItem("shopee_foody_mid", mid);
+                            localStorage.setItem("shopee_tob_entity_id", sid);
                             localStorage.setItem("current_store_id", sid);
                         }} catch(e) {{}}
                     }}

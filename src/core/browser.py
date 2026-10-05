@@ -1505,9 +1505,13 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                 if saved:
                     log.debug("🔍 Attempting to restore session from saved tokens...")
                     driver.add_cookie({"name": "shopee_tob_token", "value": saved["shopee_tob_token"]})
-                    if saved.get("shopee_tob_entity_id"):
-                        driver.add_cookie({"name": "shopee_tob_entity_id", "value": saved["shopee_tob_entity_id"]})
+                    try:
+                        driver.add_cookie({"name": "shopee_tob_entity_id", "value": "", "domain": ".shopee.co.id"})
+                    except Exception:
+                        pass
                     for n, v in saved.get("extra_cookies", {}).items():
+                        if n in ("shopee_tob_entity_id", "shopee_foody_mid"):
+                            continue
                         try: driver.add_cookie({"name": n, "value": v})
                         except: pass
                     
@@ -1529,9 +1533,13 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
                 if saved and saved.get("shopee_tob_token"):
                     try:
                         driver.add_cookie({"name": "shopee_tob_token", "value": saved["shopee_tob_token"]})
-                        if saved.get("shopee_tob_entity_id"):
-                            driver.add_cookie({"name": "shopee_tob_entity_id", "value": saved["shopee_tob_entity_id"]})
+                        try:
+                            driver.add_cookie({"name": "shopee_tob_entity_id", "value": "", "domain": ".shopee.co.id"})
+                        except Exception:
+                            pass
                         for n, v in saved.get("extra_cookies", {}).items():
+                            if n in ("shopee_tob_entity_id", "shopee_foody_mid"):
+                                continue
                             try: driver.add_cookie({"name": n, "value": v})
                             except: pass
                         driver.refresh()

@@ -66,9 +66,8 @@ def test_switch_store_context_injects_cookie():
     assert "shopee_foody_mid" in script_code
     assert "shopee_tob_entity_id" in script_code
 
-    # Entity Neutralizer: shopee_tob_entity_id must NEVER be set to sid
-    assert 'shopee_tob_entity_id=" + sid' not in script_code
-    assert 'document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;"' in script_code
+    # Store Entity ID Injection: shopee_tob_entity_id must be injected with sid on .shopee.co.id domain scope
+    assert 'shopee_tob_entity_id=" + sid' in script_code
     assert 'domain=.shopee.co.id' in script_code
     assert 'max-age=0' in script_code  # Clean host-only cookies
 
