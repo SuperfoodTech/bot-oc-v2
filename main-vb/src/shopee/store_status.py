@@ -41,7 +41,11 @@ def ensure_business_hours_page(driver, store_id: str) -> bool:
             check_res = driver.execute_script("""
                 var targetStoreId = String(arguments[0] || '').trim().toLowerCase();
                 var bodyText = (document.body ? document.body.innerText : '').toLowerCase();
-                var hasKeywords = bodyText.includes('jam operasional') || bodyText.includes('tutup outlet') || bodyText.includes('buka outlet');
+                var validKeywords = [
+                    'jam operasional', 'tutup outlet', 'buka outlet', 'jadwal operasional', 'jadwal khusus', 'jadwal reguler',
+                    'business hours', 'regular hours', 'special hours', 'pause store', 'close store', 'open store', 'order settings'
+                ];
+                var hasKeywords = validKeywords.some(function(k) { return bodyText.includes(k); });
                 var currUrl = window.location.href.toLowerCase();
                 var storeParam = '';
                 try {

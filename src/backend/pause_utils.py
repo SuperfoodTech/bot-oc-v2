@@ -60,61 +60,102 @@ def parse_pause_until(value: str, tz: ZoneInfo = WIB) -> datetime:
     return pause_until_dt.replace(tzinfo=tz)
 
 
-def resolve_pause_window(
+def resolve_pause_range(
     now_dt: datetime,
     duration_type: str,
     *,
     schedule: Optional[dict] = None,
     timezone: str = DEFAULT_TIMEZONE,
+    custom_from: Optional[str] = None,
     custom_until: Optional[str] = None,
     custom_minutes: Optional[int] = None,
     allow_default: bool = True,
-) -> tuple[datetime, int, str]:
+) -> tuple[datetime, Optional[datetime], int, str]:
+    """Return (pause_until_dt, pause_from_dt, duration_mins, label) for a pause request."""
     now_dt = _as_local_datetime(now_dt, timezone)
     dtype = (duration_type or "").strip().lower()
 
     if dtype in ("30", "30_min", "30min"):
         duration_mins = 30
         pause_until_dt = now_dt + timedelta(minutes=duration_mins)
-        return pause_until_dt, duration_mins, "30 Menit"
+        return pause_until_dt, None, duration_mins, "30 Menit"
 
     if dtype in ("60", "60_min", "60min"):
         duration_mins = 60
         pause_until_dt = now_dt + timedelta(minutes=duration_mins)
-        return pause_until_dt, duration_mins, "60 Menit"
+        return pause_until_dt, None, duration_mins, "60 Menit"
 
     if dtype in ("rest_of_day", "sepanjang_hari", "today"):
         pause_until_dt = next_operational_start(schedule, now_dt, timezone)
         if pause_until_dt is None:
             raise ValueError("Jadwal operasional hari berikutnya belum tersedia.")
         duration_mins = max(1, int((pause_until_dt - now_dt).total_seconds() // 60))
-        return pause_until_dt, duration_mins, "Sepanjang Hari"
+        return pause_until_dt, None, duration_mins, "Sepanjang Hari"
 
     if dtype in ("custom", "waktu_lain"):
+        local_tz = ZoneInfo(normalize_timezone(timezone))
+        pause_from_dt = None
+        if custom_from:
+            try:
+                pause_from_dt = parse_pause_until(custom_from, tz=local_tz)
+            except ValueError as exc:
+                raise ValueError("Waktu mulai penutupan tidak valid.") from exc
+            if pause_from_dt < now_dt - timedelta(minutes=2):
+                raise ValueError("Waktu mulai tidak boleh waktu lampau.")
+
         if custom_until:
             try:
-                pause_until_dt = parse_pause_until(
-                    custom_until,
-                    tz=ZoneInfo(normalize_timezone(timezone)),
-                )
+                pause_until_dt = parse_pause_until(custom_until, tz=local_tz)
             except ValueError as exc:
                 raise ValueError("Target waktu penutupan tidak valid.") from exc
-            duration_mins = int((pause_until_dt - now_dt).total_seconds() // 60)
-            if duration_mins <= 0:
-                raise ValueError("Target waktu harus lebih besar dari waktu sekarang.")
-            return pause_until_dt, duration_mins, f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
+
+            effective_start = pause_from_dt or now_dt
+            if pause_until_dt <= effective_start:
+                raise ValueError("Target waktu berakhir harus lebih besar dari waktu mulai.")
+
+            duration_mins = int((pause_until_dt - effective_start).total_seconds() // 60)
+            if pause_from_dt and pause_from_dt > now_dt + timedelta(minutes=1):
+                label = f"Terjadwal {pause_from_dt.strftime('%d/%m/%Y %H:%M')} s.d. {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
+            else:
+                label = f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
+            return pause_until_dt, pause_from_dt, duration_mins, label
 
         duration_mins = custom_minutes or 0
         if duration_mins <= 0:
             raise ValueError("Target waktu penutupan wajib diisi.")
-        pause_until_dt = now_dt + timedelta(minutes=duration_mins)
-        return pause_until_dt, duration_mins, f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
+        effective_start = pause_from_dt or now_dt
+        pause_until_dt = effective_start + timedelta(minutes=duration_mins)
+        return pause_until_dt, pause_from_dt, duration_mins, f"Sampai {pause_until_dt.strftime('%d/%m/%Y %H:%M')}"
 
     if allow_default:
         pause_until_dt = next_operational_start(schedule, now_dt, timezone)
         if pause_until_dt is None:
             raise ValueError("Jadwal operasional hari berikutnya belum tersedia.")
         duration_mins = max(1, int((pause_until_dt - now_dt).total_seconds() // 60))
-        return pause_until_dt, duration_mins, "Sepanjang Hari"
+        return pause_until_dt, None, duration_mins, "Sepanjang Hari"
 
     raise ValueError("Durasi pause wajib dipilih.")
+
+
+def resolve_pause_window(
+    now_dt: datetime,
+    duration_type: str,
+    *,
+    schedule: Optional[dict] = None,
+    timezone: str = DEFAULT_TIMEZONE,
+    custom_from: Optional[str] = None,
+    custom_until: Optional[str] = None,
+    custom_minutes: Optional[int] = None,
+    allow_default: bool = True,
+) -> tuple[datetime, int, str]:
+    until_dt, _from_dt, duration_mins, label = resolve_pause_range(
+        now_dt,
+        duration_type,
+        schedule=schedule,
+        timezone=timezone,
+        custom_from=custom_from,
+        custom_until=custom_until,
+        custom_minutes=custom_minutes,
+        allow_default=allow_default,
+    )
+    return until_dt, duration_mins, label

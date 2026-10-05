@@ -68,17 +68,19 @@ def test_vb_rest_of_day_uses_reference_outlet_schedule(monkeypatch):
             ],
         }
 
-    def fake_request_status(requested_brand_id: str, status: str, admin_id: str, pause_until=None):
+    def fake_request_status(requested_brand_id: str, status: str, admin_id: str, pause_until=None, pause_from=None):
         captured["brand_id"] = requested_brand_id
         captured["status"] = status
         captured["admin_id"] = admin_id
         captured["pause_until"] = pause_until
+        captured["pause_from"] = pause_from
         return {
             "id": requested_brand_id,
             "name": "VB Test",
             "applied_status": "ON",
             "requested_status": status,
             "requested_at": None,
+            "requested_pause_from": pause_from,
             "requested_pause_until": pause_until,
         }
 
@@ -111,16 +113,18 @@ def test_public_brand_toggle_contract(monkeypatch):
             "outlets": [],
         }
 
-    def fake_request_brand_status_public(slug_or_id: str, status: str, pause_until=None):
+    def fake_request_brand_status_public(slug_or_id: str, status: str, pause_until=None, pause_from=None):
         captured["slug_or_id"] = slug_or_id
         captured["status"] = status
         captured["pause_until"] = pause_until
+        captured["pause_from"] = pause_from
         return {
             "id": "11111111-1111-1111-1111-111111111111",
             "name": "Ayam Bakar Ori",
             "applied_status": "PAUSED",
             "requested_status": status,
             "requested_at": None,
+            "requested_pause_from": pause_from,
             "requested_pause_until": pause_until,
         }
 

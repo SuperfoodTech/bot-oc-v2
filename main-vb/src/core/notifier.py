@@ -215,7 +215,7 @@ def send_discord_vb_group_summary(
         formatted = f"{name} — {info}".strip(" —") if (name or info) else "Listing"
         if store_id:
             safe_id = urllib.parse.quote(store_id)
-            link_md = f" • [Link](https://shopee.co.id/universal-link/now-food/shop/{safe_id})"
+            link_md = f" • [Link](https://shopee.co.id/now-food/shop/{safe_id})"
             return f"{formatted}{link_md}"
         return formatted if formatted else "Listing"
 

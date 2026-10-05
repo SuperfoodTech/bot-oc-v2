@@ -475,9 +475,9 @@ def derive_outlet_runtime_state(
     elif desired_state == "OPEN" and not schedule_available:
         if schedule_fetch_status == SCHEDULE_FETCH_EMPTY:
             bot_phase = SCHEDULE_FETCH_EMPTY
-            status_label = "Jadwal Shopee belum diatur"
+            status_label = "Tidak memiliki jadwal operasional"
             status_tone = "closed"
-            display_note = "Toggle aktif, tetapi jadwal operasional Shopee belum diatur di Shopee sehingga bot belum bisa memproses outlet."
+            display_note = "Tidak memiliki jadwal operasional"
         elif schedule_fetch_status == SCHEDULE_FETCH_RETRYING:
             bot_phase = SCHEDULE_FETCH_RETRYING
             status_label = "Gagal fetch jadwal, bot akan coba lagi"
@@ -514,10 +514,7 @@ def derive_outlet_runtime_state(
         bot_phase = "WAITING_SCHEDULE"
         if active_special_hours:
             status_label = "Sedang Tutup • Jadwal Khusus"
-            display_note = (
-                f"Di luar jam operasional (Jadwal Khusus Shopee: {special_hours_desc}). "
-                "Toggle aktif kembali saat jadwal operasional dimulai."
-            )
+            display_note = "Bot tidak berfungsi karena terdapat Jadwal Khusus!"
         else:
             status_label = "Sedang Tutup • Di luar jadwal"
             display_note = (
@@ -541,9 +538,14 @@ def derive_outlet_runtime_state(
         display_note = ""
     elif desired_state == "OPEN" and live_state == "OPEN":
         bot_phase = "IN_SYNC"
-        status_label = "Sedang Buka"
-        status_tone = "open"
-        display_note = "Outlet mengikuti jam operasional Shopee."
+        if active_special_hours:
+            status_label = "Sedang Buka • Jadwal Khusus"
+            status_tone = "open"
+            display_note = "Bot tidak berfungsi karena terdapat Jadwal Khusus!"
+        else:
+            status_label = "Sedang Buka"
+            status_tone = "open"
+            display_note = "Outlet mengikuti jam operasional Shopee."
     else:
         bot_phase = "STATUS_UNKNOWN"
         status_label = "Status sedang dicek bot"
@@ -552,7 +554,7 @@ def derive_outlet_runtime_state(
 
     if is_suspended:
         display_toggle_reason = "SUSPENDED"
-    elif active_special_hours and not within_schedule:
+    elif active_special_hours:
         display_toggle_reason = "SPECIAL_HOURS"
     elif not schedule_available:
         display_toggle_reason = schedule_fetch_status
@@ -564,9 +566,15 @@ def derive_outlet_runtime_state(
     display_toggle_on = bool(
         desired_state == "OPEN"
         and not is_suspended
+        and not active_special_hours
         and (not schedule_available or within_schedule)
     )
-    display_toggle_disabled = bool(is_suspended or not schedule_available or not within_schedule)
+    display_toggle_disabled = bool(
+        is_suspended
+        or bool(active_special_hours)
+        or not schedule_available
+        or not within_schedule
+    )
     display_status_bucket = (
         "closed"
         if desired_state == "OPEN" and schedule_available and not within_schedule
@@ -796,6 +804,23 @@ def deactivate_store(store_id: str) -> bool:
     with get_db_connection() as conn:
         result = conn.execute("UPDATE outlets SET is_active=false,updated_at=now() WHERE store_id=%s", (store_id,))
         return result.rowcount > 0
+
+
+def deactivate_missing_agency_stores(active_sheet_store_ids: set[str] | list[str]) -> list[str]:
+    """Deactivate agency outlets that are active in DB but no longer present in Google Sheet."""
+    if not active_sheet_store_ids:
+        return []
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            """UPDATE outlets o
+                  SET is_active=false, updated_at=now()
+                WHERE o.is_active=true
+                  AND NOT EXISTS (SELECT 1 FROM vb_brand_outlets vb WHERE vb.outlet_id=o.id)
+                  AND o.store_id <> ALL(%s)
+               RETURNING o.store_id""",
+            (list(active_sheet_store_ids),),
+        ).fetchall()
+        return [r["store_id"] for r in rows]
 
 def _public_store(store):
     item = dict(store); item.update({"account_username": BOT_USERNAME, "merchant_name": store.get("merchant_name", ""), "is_suspended": store.get("suspension_status") == "SUSPENDED"}); return item

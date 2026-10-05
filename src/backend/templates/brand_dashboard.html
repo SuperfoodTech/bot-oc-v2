@@ -115,15 +115,51 @@
           <div class="custom-datetime-fields">
             <div class="custom-datetime-field">
               <span class="custom-field-label">Mulai</span>
-              <input type="text" id="brandCustomStartInput" class="form-input" readonly disabled
-                aria-disabled="true">
+              <div class="custom-picker-anchor">
+                <button type="button" id="brandCustomStartTrigger" class="custom-picker-trigger"
+                  onclick="openBrandCustomDateTimePicker('start', event)" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="brandCustomStartDisplay">Pilih tanggal &amp; waktu</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                    <path d="M8 2v4M16 2v4M3 9h18"></path>
+                  </svg>
+                </button>
+                <input type="hidden" id="brandCustomStartInput" aria-hidden="true">
+                <div id="brandCustomStartDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu mulai" hidden>
+                  <div class="custom-picker-header">
+                    <button type="button" class="custom-picker-nav" onclick="shiftBrandPickerMonth('start', -1, event)"
+                      aria-label="Bulan sebelumnya">‹</button>
+                    <strong id="brandCustomStartPickerMonthLabel"></strong>
+                    <button type="button" class="custom-picker-nav" onclick="shiftBrandPickerMonth('start', 1, event)"
+                      aria-label="Bulan berikutnya">›</button>
+                  </div>
+                  <div class="custom-picker-weekdays" aria-hidden="true">
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>Sb</span>
+                  </div>
+                  <div id="brandCustomStartPickerCalendar" class="custom-picker-calendar"></div>
+                  <div class="custom-picker-time">
+                    <span>Waktu</span>
+                    <div class="custom-picker-time-fields">
+                      <select id="brandCustomStartPickerHour" aria-label="Jam mulai Brand"></select>
+                      <span>:</span>
+                      <select id="brandCustomStartPickerMinute" aria-label="Menit mulai Brand"></select>
+                      <b>WIB</b>
+                    </div>
+                  </div>
+                  <div class="custom-picker-actions">
+                    <button type="button" class="btn-outline" onclick="closeBrandCustomDateTimePicker('start', event)">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyBrandCustomDateTimePicker('start', event)">Pilih</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
             <div class="custom-datetime-field">
               <span class="custom-field-label">Target berakhir</span>
               <div class="custom-picker-anchor">
                 <button type="button" id="brandCustomUntilTrigger" class="custom-picker-trigger"
-                  onclick="openBrandCustomDateTimePicker(event)" aria-haspopup="dialog" aria-expanded="false">
+                  onclick="openBrandCustomDateTimePicker('until', event)" aria-haspopup="dialog" aria-expanded="false">
                   <span id="brandCustomUntilDisplay">Pilih tanggal &amp; waktu</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="17" rx="2"></rect>
@@ -131,25 +167,32 @@
                   </svg>
                 </button>
                 <input type="hidden" id="brandCustomUntilInput" aria-hidden="true">
-                <div id="brandCustomDateTimePicker" class="custom-picker-popover" role="dialog"
-                  aria-label="Pilih tanggal dan waktu" hidden>
-                  <div class="custom-picker-header"><button type="button" class="custom-picker-nav"
-                      onclick="shiftBrandPickerMonth(-1, event)" aria-label="Bulan sebelumnya">‹</button><strong
-                      id="brandCustomPickerMonthLabel"></strong><button type="button" class="custom-picker-nav"
-                      onclick="shiftBrandPickerMonth(1, event)" aria-label="Bulan berikutnya">›</button></div>
+                <div id="brandCustomUntilDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu berakhir" hidden>
+                  <div class="custom-picker-header">
+                    <button type="button" class="custom-picker-nav" onclick="shiftBrandPickerMonth('until', -1, event)"
+                      aria-label="Bulan sebelumnya">‹</button>
+                    <strong id="brandCustomUntilPickerMonthLabel"></strong>
+                    <button type="button" class="custom-picker-nav" onclick="shiftBrandPickerMonth('until', 1, event)"
+                      aria-label="Bulan berikutnya">›</button>
+                  </div>
                   <div class="custom-picker-weekdays" aria-hidden="true">
-                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>
-                      Sb</span>
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>Sb</span>
                   </div>
-                  <div id="brandCustomPickerCalendar" class="custom-picker-calendar"></div>
-                  <div class="custom-picker-time"><span>Waktu</span>
-                    <div class="custom-picker-time-fields"><select id="brandCustomPickerHour"
-                        aria-label="Jam Brand"></select><span>:</span><select id="brandCustomPickerMinute"
-                        aria-label="Menit Brand"></select><b>WIB</b></div>
+                  <div id="brandCustomUntilPickerCalendar" class="custom-picker-calendar"></div>
+                  <div class="custom-picker-time">
+                    <span>Waktu</span>
+                    <div class="custom-picker-time-fields">
+                      <select id="brandCustomUntilPickerHour" aria-label="Jam berakhir Brand"></select>
+                      <span>:</span>
+                      <select id="brandCustomUntilPickerMinute" aria-label="Menit berakhir Brand"></select>
+                      <b>WIB</b>
+                    </div>
                   </div>
-                  <div class="custom-picker-actions"><button type="button" class="btn-outline"
-                      onclick="closeBrandCustomDateTimePicker(event)">Batal</button><button type="button" class="btn-primary"
-                      onclick="applyBrandCustomDateTimePicker(event)">Pilih</button></div>
+                  <div class="custom-picker-actions">
+                    <button type="button" class="btn-outline" onclick="closeBrandCustomDateTimePicker('until', event)">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyBrandCustomDateTimePicker('until', event)">Pilih</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -305,6 +348,20 @@
         : reopenText;
     }
 
+    function formatPauseScheduleRange(fromVal, untilVal) {
+      const fromDt = getPauseEndDate(fromVal);
+      const untilDt = getPauseEndDate(untilVal);
+      if (!fromDt || !untilDt) return '';
+      const fDate = formatBrandDate(fromDt);
+      const fTime = formatBrandTime(fromDt);
+      const uDate = formatBrandDate(untilDt);
+      const uTime = formatBrandTime(untilDt);
+      if (fDate === uDate) {
+        return `${fDate} ${fTime} - ${uTime} WIB`;
+      }
+      return `${fDate} ${fTime} - ${uDate} ${uTime} WIB`;
+    }
+
     function getBrandStatusLabel(brand) {
       const outlets = brand.outlets || [];
       const totalCount = outlets.length;
@@ -319,10 +376,17 @@
       const anyPendingPause = outlets.some(o => o.bot_phase === 'PENDING_PAUSE');
       const isScheduleLocked = Boolean(brand.is_schedule_locked);
       const isOn = (brand.requested_status || brand.applied_status) === 'ON';
+      const now = new Date();
+      const pauseFrom = brand.requested_pause_from || brand.pause_from;
       const pauseUntil = brand.requested_pause_until || brand.pause_until;
+      const isUpcomingPause = pauseFrom && new Date(pauseFrom) > now && pauseUntil;
 
       if (isScheduleLocked) {
         return 'Di luar jam operasional';
+      }
+
+      if (isUpcomingPause) {
+        return `Terjadwal tutup: ${formatPauseScheduleRange(pauseFrom, pauseUntil)}`;
       }
 
       // Jika Brand status ON (mode buka)
@@ -696,6 +760,7 @@
       }
     }
 
+    let brandPickerTarget = 'until';
     let brandPickerDate = null;
     let brandPickerMonth = null;
 
@@ -723,16 +788,14 @@
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 
-    function populateBrandPickerTimeOptions() {
-      const hour = document.getElementById('brandCustomPickerHour');
-      const minute = document.getElementById('brandCustomPickerMinute');
-      if (!hour || !minute || hour.options.length) return;
-      for (let value = 0; value < 24; value += 1) {
-        hour.insertAdjacentHTML('beforeend', `<option value="${String(value).padStart(2, '0')}">${String(value).padStart(2, '0')}</option>`);
-      }
-      for (let value = 0; value < 60; value += 1) {
-        minute.insertAdjacentHTML('beforeend', `<option value="${String(value).padStart(2, '0')}">${String(value).padStart(2, '0')}</option>`);
-      }
+    function parseBrandCustomStart() {
+      const value = document.getElementById('brandCustomStartInput')?.value || '';
+      if (!value) return null;
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [, y, m, d, h, min] = match;
+      const date = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min));
+      return Number.isNaN(date.getTime()) ? null : date;
     }
 
     function parseBrandCustomUntil() {
@@ -745,101 +808,246 @@
       return Number.isNaN(date.getTime()) ? null : date;
     }
 
-    function renderBrandPickerCalendar() {
-      const calendar = document.getElementById('brandCustomPickerCalendar');
-      const label = document.getElementById('brandCustomPickerMonthLabel');
+    function getBrandCustomStartValue() {
+      const value = parseBrandCustomStart();
+      if (!value) return null;
+      return document.getElementById('brandCustomStartInput').value;
+    }
+
+    function getBrandCustomUntilValue() {
+      const value = parseBrandCustomUntil();
+      if (!value) return null;
+      return document.getElementById('brandCustomUntilInput').value;
+    }
+
+    function populateBrandPickerTimeOptions(target = 'until') {
+      const prefix = target === 'start' ? 'brandCustomStartPicker' : 'brandCustomUntilPicker';
+      const hour = document.getElementById(`${prefix}Hour`);
+      const minute = document.getElementById(`${prefix}Minute`);
+      if (!hour || !minute || hour.options.length) return;
+      for (let value = 0; value < 24; value += 1) {
+        hour.insertAdjacentHTML('beforeend', `<option value="${String(value).padStart(2, '0')}">${String(value).padStart(2, '0')}</option>`);
+      }
+      for (let value = 0; value < 60; value += 1) {
+        minute.insertAdjacentHTML('beforeend', `<option value="${String(value).padStart(2, '0')}">${String(value).padStart(2, '0')}</option>`);
+      }
+      hour.addEventListener('change', () => syncBrandPickerTimeOptions(target));
+    }
+
+    function syncBrandPickerTimeOptions(target = 'until') {
+      const prefix = target === 'start' ? 'brandCustomStartPicker' : 'brandCustomUntilPicker';
+      const hourSelect = document.getElementById(`${prefix}Hour`);
+      const minuteSelect = document.getElementById(`${prefix}Minute`);
+      if (!hourSelect || !minuteSelect || !brandPickerDate) return;
+
+      const now = new Date();
+      let minDate = now;
+      if (target === 'until') {
+        const startVal = parseBrandCustomStart();
+        if (startVal && startVal > now) {
+          minDate = startVal;
+        }
+      }
+
+      const isMinDay = getBrandDateKey(brandPickerDate) === getBrandDateKey(minDate);
+      const minHour = minDate.getHours();
+      const minMinute = minDate.getMinutes();
+
+      let selectedHour = Number(hourSelect.value || 0);
+
+      let firstValidHour = null;
+      Array.from(hourSelect.options).forEach(opt => {
+        const val = Number(opt.value);
+        const isPast = isMinDay && val < minHour;
+        opt.disabled = isPast;
+        if (!isPast && firstValidHour === null) {
+          firstValidHour = val;
+        }
+      });
+
+      if (isMinDay && selectedHour < minHour) {
+        if (firstValidHour !== null) {
+          selectedHour = firstValidHour;
+          hourSelect.value = String(firstValidHour).padStart(2, '0');
+        }
+      }
+
+      const isMinHourOnDay = isMinDay && selectedHour === minHour;
+      let selectedMinute = Number(minuteSelect.value || 0);
+      let firstValidMinute = null;
+
+      Array.from(minuteSelect.options).forEach(opt => {
+        const val = Number(opt.value);
+        const isPast = isMinHourOnDay && (target === 'until' ? val <= minMinute : val < minMinute);
+        opt.disabled = isPast;
+        if (!isPast && firstValidMinute === null) {
+          firstValidMinute = val;
+        }
+      });
+
+      if (isMinHourOnDay && (target === 'until' ? selectedMinute <= minMinute : selectedMinute < minMinute)) {
+        if (firstValidMinute !== null) {
+          minuteSelect.value = String(firstValidMinute).padStart(2, '0');
+        } else {
+          const nextHour = selectedHour + 1;
+          if (nextHour < 24) {
+            hourSelect.value = String(nextHour).padStart(2, '0');
+            syncBrandPickerTimeOptions(target);
+          }
+        }
+      }
+    }
+
+    function renderBrandPickerCalendar(target = 'until') {
+      const prefix = target === 'start' ? 'brandCustomStartPicker' : 'brandCustomUntilPicker';
+      const calendar = document.getElementById(`${prefix}Calendar`);
+      const label = document.getElementById(`${prefix}MonthLabel`);
       if (!calendar || !label || !brandPickerDate || !brandPickerMonth) return;
       const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
       label.textContent = `${months[brandPickerMonth.getMonth()]} ${brandPickerMonth.getFullYear()}`;
       calendar.innerHTML = '';
       for (let index = 0; index < new Date(brandPickerMonth.getFullYear(), brandPickerMonth.getMonth(), 1).getDay(); index += 1) calendar.appendChild(document.createElement('span'));
       const daysInMonth = new Date(brandPickerMonth.getFullYear(), brandPickerMonth.getMonth() + 1, 0).getDate();
-      const todayKey = getBrandDateKey(new Date());
+      
+      const now = new Date();
+      let minDateKey = getBrandDateKey(now);
+      if (target === 'until') {
+        const startVal = parseBrandCustomStart();
+        if (startVal && getBrandDateKey(startVal) > minDateKey) {
+          minDateKey = getBrandDateKey(startVal);
+        }
+      }
       const maxDateKey = getBrandDateKey(getBrandPauseMaxDate());
+
       for (let day = 1; day <= daysInMonth; day += 1) {
         const date = new Date(brandPickerMonth.getFullYear(), brandPickerMonth.getMonth(), day);
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = day;
         const dateKey = getBrandDateKey(date);
-        button.disabled = dateKey < todayKey || dateKey > maxDateKey;
+        button.disabled = dateKey < minDateKey || dateKey > maxDateKey;
         if (brandPickerDate && getBrandDateKey(date) === getBrandDateKey(brandPickerDate)) button.classList.add('is-selected');
-        if (dateKey === todayKey) button.classList.add('is-today');
+        if (dateKey === getBrandDateKey(now)) button.classList.add('is-today');
         button.onclick = (e) => {
           if (e) {
             e.preventDefault();
             e.stopPropagation();
           }
-          selectBrandPickerDay(date);
+          selectBrandPickerDay(target, date);
         };
         calendar.appendChild(button);
       }
     }
 
-    function selectBrandPickerDay(date) {
+    function selectBrandPickerDay(target, date) {
       brandPickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), brandPickerDate ? brandPickerDate.getHours() : 12, brandPickerDate ? brandPickerDate.getMinutes() : 0);
-      renderBrandPickerCalendar();
+      syncBrandPickerTimeOptions(target);
+      renderBrandPickerCalendar(target);
     }
 
-    function shiftBrandPickerMonth(offset, event) {
+    function shiftBrandPickerMonth(target, offset, event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
       brandPickerMonth = new Date(brandPickerMonth.getFullYear(), brandPickerMonth.getMonth() + offset, 1);
-      renderBrandPickerCalendar();
+      renderBrandPickerCalendar(target);
     }
 
-    function openBrandCustomDateTimePicker(event) {
+    function openBrandCustomDateTimePicker(target = 'until', event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
-      const existing = parseBrandCustomUntil();
-      const selected = existing || new Date(Date.now() + 2 * 60 * 60000);
+      const otherTarget = target === 'start' ? 'until' : 'start';
+      closeBrandCustomDateTimePicker(otherTarget);
+
+      brandPickerTarget = target;
+      const prefix = target === 'start' ? 'brandCustomStart' : 'brandCustomUntil';
+
+      let selected;
+      if (target === 'start') {
+        selected = parseBrandCustomStart() || new Date();
+      } else {
+        const start = parseBrandCustomStart() || new Date();
+        selected = parseBrandCustomUntil() || new Date(start.getTime() + (2 * 60 * 60 * 1000));
+      }
+
       brandPickerDate = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), selected.getHours(), selected.getMinutes());
       brandPickerMonth = new Date(brandPickerDate.getFullYear(), brandPickerDate.getMonth(), 1);
-      populateBrandPickerTimeOptions();
-      document.getElementById('brandCustomPickerHour').value = formatBrandTime(brandPickerDate).slice(0, 2);
-      document.getElementById('brandCustomPickerMinute').value = formatBrandTime(brandPickerDate).slice(3, 5);
-      renderBrandPickerCalendar();
-      document.getElementById('brandCustomDateTimePicker').hidden = false;
-      document.getElementById('brandCustomUntilTrigger').setAttribute('aria-expanded', 'true');
+      populateBrandPickerTimeOptions(target);
+      document.getElementById(`${prefix}PickerHour`).value = formatBrandTime(brandPickerDate).slice(0, 2);
+      document.getElementById(`${prefix}PickerMinute`).value = formatBrandTime(brandPickerDate).slice(3, 5);
+      syncBrandPickerTimeOptions(target);
+      renderBrandPickerCalendar(target);
+      document.getElementById(`${prefix}DateTimePicker`).hidden = false;
+      document.getElementById(`${prefix}Trigger`).setAttribute('aria-expanded', 'true');
     }
 
-    function closeBrandCustomDateTimePicker(event) {
+    function closeBrandCustomDateTimePicker(target = null, event = null) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
-      const picker = document.getElementById('brandCustomDateTimePicker');
-      const trigger = document.getElementById('brandCustomUntilTrigger');
-      if (picker) picker.hidden = true;
-      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      const targets = target ? [target] : ['start', 'until'];
+      targets.forEach(t => {
+        const prefix = t === 'start' ? 'brandCustomStart' : 'brandCustomUntil';
+        const picker = document.getElementById(`${prefix}DateTimePicker`);
+        const trigger = document.getElementById(`${prefix}Trigger`);
+        if (picker) picker.hidden = true;
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
     }
 
-    function applyBrandCustomDateTimePicker(event) {
+    function applyBrandCustomDateTimePicker(target = 'until', event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
       if (!brandPickerDate) return;
-      const selected = new Date(brandPickerDate.getFullYear(), brandPickerDate.getMonth(), brandPickerDate.getDate(), Number(document.getElementById('brandCustomPickerHour').value), Number(document.getElementById('brandCustomPickerMinute').value));
-      if (selected <= new Date()) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
-      if (getBrandDateKey(selected) > getBrandDateKey(getBrandPauseMaxDate())) {
-        showToast(`Target maksimal ${formatBrandDate(getBrandPauseMaxDate())}.`, 'error');
-        return;
+      const prefix = target === 'start' ? 'brandCustomStart' : 'brandCustomUntil';
+      const hours = Number(document.getElementById(`${prefix}PickerHour`).value);
+      const minutes = Number(document.getElementById(`${prefix}PickerMinute`).value);
+      const selected = new Date(brandPickerDate.getFullYear(), brandPickerDate.getMonth(), brandPickerDate.getDate(), hours, minutes);
+      const now = new Date();
+
+      if (target === 'start') {
+        if (selected < new Date(now.getTime() - 60000)) {
+          showToast('Waktu mulai tidak boleh waktu yang lampau.', 'error');
+          return;
+        }
+        document.getElementById('brandCustomStartInput').value = toBrandDateTimeLocal(selected);
+        document.getElementById('brandCustomStartDisplay').textContent = `${formatBrandDate(selected)} ${formatBrandTime(selected)}`;
+
+        const currentUntil = parseBrandCustomUntil();
+        if (!currentUntil || currentUntil <= selected) {
+          const newUntil = new Date(selected.getTime() + (2 * 60 * 60 * 1000));
+          document.getElementById('brandCustomUntilInput').value = toBrandDateTimeLocal(newUntil);
+          document.getElementById('brandCustomUntilDisplay').textContent = `${formatBrandDate(newUntil)} ${formatBrandTime(newUntil)}`;
+        }
+      } else {
+        const startDate = parseBrandCustomStart() || now;
+        if (selected <= startDate) {
+          showToast('Target berakhir harus lebih besar dari waktu mulai.', 'error');
+          return;
+        }
+        if (getBrandDateKey(selected) > getBrandDateKey(getBrandPauseMaxDate())) {
+          showToast(`Target maksimal ${formatBrandDate(getBrandPauseMaxDate())}.`, 'error');
+          return;
+        }
+        document.getElementById('brandCustomUntilInput').value = toBrandDateTimeLocal(selected);
+        document.getElementById('brandCustomUntilDisplay').textContent = `${formatBrandDate(selected)} ${formatBrandTime(selected)}`;
       }
-      document.getElementById('brandCustomUntilInput').value = toBrandDateTimeLocal(selected);
-      document.getElementById('brandCustomUntilDisplay').textContent = `${formatBrandDate(selected)} ${formatBrandTime(selected)}`;
-      closeBrandCustomDateTimePicker();
+
+      closeBrandCustomDateTimePicker(target);
       updateBrandPausePreview();
     }
 
     function setBrandCustomDateTimeDefaults() {
       const start = new Date();
       const until = new Date(start.getTime() + 2 * 60 * 60000);
-      document.getElementById('brandCustomStartInput').value = `${formatBrandDate(start)} ${formatBrandTime(start)}`;
+      document.getElementById('brandCustomStartInput').value = toBrandDateTimeLocal(start);
+      document.getElementById('brandCustomStartDisplay').textContent = `${formatBrandDate(start)} ${formatBrandTime(start)}`;
       document.getElementById('brandCustomUntilInput').value = toBrandDateTimeLocal(until);
       document.getElementById('brandCustomUntilDisplay').textContent = `${formatBrandDate(until)} ${formatBrandTime(until)}`;
     }
@@ -918,6 +1126,18 @@
         preview.textContent = `Buka kembali ${formatBrandPauseTargetDate(nextSession)}`;
         return;
       }
+      if (durationType === 'custom') {
+        const start = parseBrandCustomStart() || new Date();
+        const end = parseBrandCustomUntil();
+        if (!end || Number.isNaN(end.getTime())) {
+          preview.textContent = 'Pilih tanggal & waktu WIB';
+          return;
+        }
+        const isFutureStart = start > new Date();
+        const startText = isFutureStart ? `Mulai ${formatBrandDate(start)} pk ${formatBrandTime(start)} WIB, ` : '';
+        preview.textContent = `${startText}Berakhir pada ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`;
+        return;
+      }
       const end = getBrandPauseEnd();
       if (!end || Number.isNaN(end.getTime())) { preview.textContent = 'Pilih tanggal & waktu WIB'; return; }
       preview.textContent = `Berakhir pada ${end.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`;
@@ -955,15 +1175,30 @@
 
     async function confirmBrandPause() {
       const type = document.querySelector('input[name="brandPauseDuration"]:checked')?.value;
-      const end = getBrandPauseEnd();
-      const invalidEnd = !end || Number.isNaN(end.getTime()) || end <= new Date();
-      if (type !== 'rest_of_day' && invalidEnd) { showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error'); return; }
-      const customUntil = document.getElementById('brandCustomUntilInput').value;
+      let customFrom = null;
+      let customUntil = null;
+      if (type === 'custom') {
+        const start = parseBrandCustomStart() || new Date();
+        const end = parseBrandCustomUntil();
+        if (!end || Number.isNaN(end.getTime()) || end <= start) {
+          showToast('Target berakhir harus lebih besar dari waktu mulai.', 'error');
+          return;
+        }
+        customFrom = getBrandCustomStartValue();
+        customUntil = getBrandCustomUntilValue();
+      } else {
+        const end = getBrandPauseEnd();
+        const invalidEnd = !end || Number.isNaN(end.getTime()) || end <= new Date();
+        if (type !== 'rest_of_day' && invalidEnd) {
+          showToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
+          return;
+        }
+      }
       closeBrandPauseModal();
-      await executeBrandToggle(activeBrandContextId, 'PAUSED', type, type === 'custom' ? customUntil : null);
+      await executeBrandToggle(activeBrandContextId, 'PAUSED', type, customUntil, customFrom);
     }
 
-    async function executeBrandToggle(brandId, status, durationType = '30_min', customUntil = null) {
+    async function executeBrandToggle(brandId, status, durationType = '30_min', customUntil = null, customFrom = null) {
       const brand = getBrandById(brandId);
       const slug = brand?.slug || brand?.id || getBrandSlugFromPath();
       if (!slug || isPendingToggle) return;
@@ -976,6 +1211,7 @@
         const payload = {
           status: status,
           duration_type: status === 'PAUSED' ? durationType : undefined,
+          custom_from: (status === 'PAUSED' && durationType === 'custom') ? customFrom : undefined,
           custom_until: (status === 'PAUSED' && durationType === 'custom') ? customUntil : undefined
         };
         const res = await fetch(`/api/v1/brand/${encodeURIComponent(slug)}/toggle`, {
@@ -1184,7 +1420,11 @@
           updateBrandPausePreview();
         });
       });
-      document.addEventListener('input', event => { if (event.target.id === 'brandCustomUntilInput') updateBrandPausePreview(); });
+      document.addEventListener('input', event => {
+        if (event.target.id === 'brandCustomUntilInput' || event.target.id === 'brandCustomStartInput') {
+          updateBrandPausePreview();
+        }
+      });
 
       // Modal backdrop click
       document.getElementById('brandPauseModal')?.addEventListener('click', (e) => {

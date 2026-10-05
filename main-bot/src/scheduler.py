@@ -14,6 +14,7 @@ from decision import (
     ACTION_OPEN,
     evaluate_outlet_status,
     get_active_pause_until,
+    get_upcoming_pause_from,
     get_next_schedule_start,
     is_within_operating_hours,
     outlet_timezone,
@@ -120,6 +121,14 @@ def derive_outlet_due(outlet: MerchantOutlet, now: Optional[datetime] = None) ->
             outlet.store_id, key, pause_until, P1_PAUSE_EXPIRY,
             "menunggu pause berakhir", "PAUSE", live, is_auto_open_eligible,
         )
+
+    upcoming_pause_from = get_upcoming_pause_from(outlet, current_time=now)
+    if upcoming_pause_from:
+        if upcoming_pause_from <= now + timedelta(seconds=120):
+            return OutletDueState(
+                outlet.store_id, key, upcoming_pause_from, P1_BOUNDARY,
+                "menunggu boundary scheduled pause mulai", "PAUSE", live, True,
+            )
 
     if not has_schedule:
         return OutletDueState(

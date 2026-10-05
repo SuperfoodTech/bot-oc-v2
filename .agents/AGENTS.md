@@ -24,7 +24,103 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.24.0`.
+Latest documented release: `1.33.1`.
+
+Virtual Brand Toggle SQL Type Casting & Import Integrity:
+- Memperbaiki `psycopg.errors.DatatypeMismatch` pada query `request_status` dan `request_brand_status_public` di `src/backend/vb.py` dengan menambahkan cast eksplisit `::timestamptz` pada ekspresi `CASE WHEN %s='PAUSED' THEN %s::timestamptz ELSE NULL END` untuk kolom `pause_from` dan `pause_until`.
+- Memperbaiki `NameError` pada `src/backend/vb.py` dengan mengimpor `datetime` dan `ZoneInfo` secara eksplisit.
+- Menambahkan import `logging` pada `src/backend/main.py` untuk penanganan exception sinkronisasi daftar owner WhatsApp.
+
+Unified Scheduled Future Pause Engine & 1:1 Dual Interactive Start-Until Pickers:
+- Menghadirkan fitur Penjadwalan Tutup Masa Depan (*Scheduled Future Pause*) yang memungkinkan Merchant maupun Admin untuk mengatur waktu mulai tutup (*Start Date-Time*) dan target buka kembali (*Until Date-Time*) ke masa depan secara fleksibel tanpa mengunci waktu mulai hanya pada saat ini.
+- Menerapkan arsitektur 1:1 identik dan konsisten di seluruh 4 antarmuka picker:
+  1. Dashboard Mitra Agency (`src/backend/templates/user_dashboard.html`)
+  2. Admin Console Agency Modal (`src/backend/templates/admin_dashboard.html`)
+  3. Admin Console Virtual Brand Modal (`src/backend/templates/admin_dashboard.html`)
+  4. Dashboard Mitra Virtual Brand (`src/backend/templates/brand_dashboard.html`)
+- Menerapkan Dynamic Past Time Restriction & Auto-Adjustment:
+  - Tanggal/Waktu Mulai: Opsi jam/menit lampau otomatis di-disable saat memilih hari ini (`Start >= Now - 1min`), dan seluruh 24 jam / 60 menit aktif bebas saat memilih tanggal masa depan.
+  - Tanggal/Waktu Berakhir: Opsi jam/menit sebelum atau sama dengan waktu mulai otomatis di-disable (`Until > Start`). Jika pengguna menggeser waktu mulai melewati waktu berakhir, waktu berakhir secara reaktif otomatis bergeser maju (`Start + 2 jam`).
+- Engine Eksekusi Otonom & Boundary Express Lane:
+  - Penambahan kolom `pause_from` pada tabel `outlet_states` dan `pause_from`, `requested_pause_from` pada tabel `vb_brands` via migrasi `016_scheduled_pause_from.sql`.
+  - Outlet/Brand dengan jadwal tutup masa depan (`pause_from > now`) tetap beroperasi dan buka secara normal (`effective_status = 'ON'`) dengan status banner transparan: `'Terjadwal tutup: [Tgl/Bln] [Jam] - [Jam] WIB'`.
+  - Ketika waktu mencapai `now >= pause_from`, bot secara otomatis mengeksekusi penutupan outlet (`TARGET_CLOSE`), dan membuka kembali secara otomatis saat `now >= pause_until`.
+  - Scheduler (`main-bot/src/scheduler.py` dan `main-vb/src/scheduler.py`) mengenali boundary `pause_from` sebagai `P1_BOUNDARY` actionable yang langsung dialihkan ke Express Lane demi presisi waktu penutupan instan.
+
+Unified 1:1 Dynamic Past Time Restriction & Strict Duration Picker Guard:
+- Menerapkan pembatasan pemilihan waktu lampau (*Past Time Restriction*) secara dinamis dan 1:1 konsisten di seluruh 4 antarmuka modal/custom date-time picker:
+  1. Dashboard Mitra Agency (`src/backend/templates/user_dashboard.html`)
+  2. Admin Console Agency Modal (`src/backend/templates/admin_dashboard.html`)
+  3. Admin Console Virtual Brand Modal (`src/backend/templates/admin_dashboard.html`)
+  4. Dashboard Mitra Virtual Brand (`src/backend/templates/brand_dashboard.html`)
+- Saat user memilih tanggal hari ini (*Today*):
+  - Seluruh opsi jam sebelum jam saat ini (`hour < currentHour`) secara otomatis di-disable (`option.disabled = true`).
+  - Ketika jam saat ini dipilih (`hour === currentHour`), seluruh opsi menit yang sudah lewat atau sama dengan menit saat ini (`minute <= currentMinute`) secara otomatis di-disable (`option.disabled = true`), dan nilai menit otomatis bergeser ke menit valid pertama (atau naik ke jam berikutnya jika menit adalah 59).
+  - Saat jam diubah oleh pengguna, listener `change` pada jam secara reaktif memperbarui opsi menit (`disabled` untuk menit lampau hanya pada jam saat ini).
+- Saat user memilih tanggal masa depan (*Future Date*), seluruh opsi 24 jam (00..23) dan 60 menit (00..59) otomatis aktif (*enabled*) secara deterministik.
+- Menjaga fungsi validasi guard `target > now` saat tombol *Terapkan* / *Pilih* ditekan, mencegah payload durasi lampau terkirim ke backend.
+
+Shopee Special Hours Open Recognition, Contract Compliant Toggle Lockdown & Empty Schedule UX Writing Normalization:
+- Mengintegrasikan penanganan evaluasi Jadwal Khusus Buka (*Special Hours Open*) pada `evaluate_outlet_status` di `src/core/decision.py` & `main-vb/src/core/decision.py`, menghasilkan keputusan deterministik `NO_CHANGE` (`Mengikuti Jadwal Khusus Shopee`) tanpa melempar error ketiadaan jadwal reguler saat toko beroperasi berdasarkan jadwal khusus.
+- Menerapkan penguncian switch toggle (*Strict Toggle Lockdown / disabled off* di sisi kiri `state-closed`) pada Dashboard Mitra (`user_dashboard.html`) dan Admin Console (`admin_dashboard.html` & `db.py`) saat terdapat Jadwal Khusus aktif (baik Buka maupun Tutup), memastikan bot 100% menghormati jadwal khusus Shopee tanpa intervensi.
+- Menstandarkan pesan tunggal Hero Card & Tooltip toggle menjadi `'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`.
+- Menampilkan rincian jam operasional Jadwal Khusus Buka (`HH:mm - HH:mm WIB`) pada drawer jadwal ("Tampilkan jadwal") dan ringkasan jadwal hari ini di antarmuka mitra.
+- Mengeliminasi seluruh cabang teks keliru `'Ada kesalahan data, harap hubungi Admin'` dan `'Jadwal operasional belum tersedia'`, menggantikannya secara faktual menjadi `'Tidak memiliki jadwal operasional'` untuk outlet yang memang tidak mengatur jadwal di Shopee (`FETCHED_EMPTY`), serta `'Sedang sinkronisasi jadwal'` saat jadwal dalam antrean penarikan.
+
+Mitra Dashboard Special Hours Closed UX Writing Normalization:
+- Mengganti teks meta status dan jadwal operasional pada outlet yang tutup akibat jadwal khusus (*Special Hours*) di Dashboard Mitra (`/mitra/{slug}` di `src/backend/templates/user_dashboard.html`).
+- Pada kondisi tutup karena jadwal khusus (*Full Day Close* / di luar rentang jam khusus hari ini), teks kombinasi jadwal biasa (`Akan buka kembali [Hari], [Jam] WIB` dan `Jadwal hari ini: [Hari] [Jam]`) digantikan secara bersih dengan satu baris pesan tegas: `'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`.
+- Menyelaraskan tooltip dan notifikasi toast saat toggle switch diklik saat periode jadwal khusus menjadi `'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`.
+- Mengintegrasikan pengecekan `getActiveSpecialHoursEntry` dan `isWithinSpecialHoursIntervals` pada kalkulasi `getOutletStateContext` frontend serta `is_within_special_hours_intervals` pada `_is_within_shopee_schedule` & `_get_schedule_gate_detail` di `src/backend/main.py` dan `src/backend/db.py`.
+- Menampilkan rincian Jadwal Khusus Shopee pada panel drawer jadwal saat mitra menekan tombol "Tampilkan jadwal".
+
+Virtual Brand 3-State Group Status Filter (ON, PAUSE, CLOSED):
+- Menambahkan opsi filter Status Grup Virtual Brand (VB) menjadi 3 state operasional lengkap: `ON`, `PAUSE`, dan `CLOSED` (baru) pada Desktop dropdown (`#vbStatusFilter`) dan Mobile Filter Sheet (`#mobileVbStatusFilter`) di `src/backend/templates/admin_tab_vb.html`.
+- Mengintegrasikan kalkulasi state toggle deterministik (`brand.vbToggleState` & `brand.isScheduleLocked`) langsung pada `buildVbBrandViews()` di `src/backend/templates/admin_dashboard.html`:
+  - `ON`: Brand aktif buka dan mengikuti jam operasional normal (toggle hijau di kanan / `state-open`).
+  - `PAUSE`: Brand dalam kondisi tutup sementara / pause manual pada jam operasional (toggle kuning di tengah / `state-paused`).
+  - `CLOSED`: Brand yang tutup karena di luar jam operasional (seluruh outlet berada di luar jadwal Shopee / `WAITING_SCHEDULE` / `within_operating_schedule === false` dengan visual switch toggle terkunci abu-abu disable di sebelah kiri / `state-closed` / `is-schedule-disabled`).
+- Memperbarui fungsi `getFilteredVbBrandViews()` untuk menyaring grup brand sesuai state toggle operasional, serta menyinkronkan pembaruan ringkasan data (`#vbResultsSummary`) dan kalkulasi kartu statistik ringkasan VB (`#vbStatsGrid`).
+- Menjaga kompatibilitas mundur (*backward compatibility*) untuk nilai legacy `OFF` yang dipetakan aman ke status `PAUSE`.
+
+Mitra Dashboard Action Role Attribution Consistency:
+- Menghapus pembacaan cookie sesi Admin pada endpoint `POST /api/v1/user/pause` di `src/backend/main.py`.
+- Memastikan seluruh tindakan penutupan sementara (pause) maupun pembukaan kembali yang dieksekusi melalui antarmuka Dashboard Mitra Agency (`/mitra/{slug}`) secara konsisten dan deterministik dicatat sebagai aksi **Merchant / Mitra** (`USER_PAUSE_STORE` / `USER_RESUME_STORE`).
+- Mencegah kontaminasi label `Admin` pada riwayat aktivitas mitra saat admin membuka atau menguji link dashboard mitra menggunakan browser yang sama dengan sesi admin yang sedang aktif.
+- Tindakan toggle yang dilakukan langsung melalui Admin Console (`/api/v1/admin/outlets/toggle`) tetap dipertahankan tercatat sebagai `ADMIN_PAUSE_STORE` / `ADMIN_RESUME_STORE`.
+
+Agency Google Sheet Sync Automatic Deletion Reconciliation:
+- Mengintegrasikan mekanisme rekonsiliasi otomatis pada fungsi "Fetch dari Sheet" (`run_import_sheet` di `src/core/import_sheet.py` dan `deactivate_missing_agency_stores` di `src/backend/db.py`).
+- Saat baris outlet dihapus secara permanen dari Google Sheet sumber, outlet Agency aktif terkait di PostgreSQL yang tidak lagi ditemukan di dalam sheet secara otomatis dinonaktifkan (`is_active = false`).
+- Outlet yang dihapus dari sheet seketika hilang dari Dashboard Admin & Mitra Agency serta langsung dilepaskan dari antrean patroli bot tanpa merusak integritas relasional data histori (`automation_logs`, analitik guarding, dan audit trail).
+- Menambahkan counter `removed_from_sheet` pada respons REST API `/api/v1/admin/sync-source` serta notifikasi Toast interaktif di Admin Dashboard (`Fetch selesai: X aktif, Y nonaktif, Z dihapus dari sheet, W dilewati`).
+
+Mobile Bottom Navbar 5-Button Alignment & Bot WA Streamlining:
+- Menyembunyikan menu **Bot WA** (`#tabBtnWA`) dan **Logs** (`#tabBtnLogs`) pada mode mobile (`@media (max-width: 767.98px)`) di `styles.css`.
+- Menempatkan menu **Analisis** (`#tabBtnAnalytics`) di bottom navbar mobile, sehingga tersusun tepat **5 tombol** dalam 1 baris yang rapi dan simetris tanpa wrapping/overflow:
+  1. `Agency` (kiri)
+  2. `Virtual Brand` (tengah-kiri)
+  3. `Fetch` (tombol floating bulat di tengah)
+  4. `Analisis` (tengah-kanan)
+  5. `Settings` (kanan)
+- Pada mode desktop, urutan menu di sidebar tetap lengkap 6 menu: `Agency`, `Virtual Brand`, `Analisis`, `Logs`, `Bot WA`, dan `Settings`.
+
+Interactive Entity Guarding Deep-Dive Detail Drawer & Operational Diagnostics:
+- Mengintegrasikan interaktivitas Slide-over Sheet / Drawer pada tabel **"Peringkat Brand / Outlet Terintervensi"** di Tab Analisis (`admin_tab_analytics.html`).
+- Saat baris brand (misal *Katsunami*) atau outlet agency diklik, panel drawer kanan terbuka secara mulus (*slide-over*) menampilkan data mendalam:
+  1. Ringkasan Guarding (Total Intervensi, Guarding Auto-Open, Proteksi Pause, Tingkat Keberhasilan, dan Waktu Intervensi Terakhir).
+  2. Distribusi Waktu Kritis & Jam Paling Sering Diintervensi (Puncak Auto-Open `HH:mm WIB`, Puncak Proteksi Pause `HH:mm WIB`, dan 3 jam tersibuk).
+  3. Komposisi Guarding Otonom (Progress visual bar perbandingan Auto-Open vs Proteksi Pause).
+  4. Breakdown Cabang Terintervensi (Tabel mini cabang/outlet di bawah brand dengan rincian total, buka, tutup, dan success rate).
+  5. Riwayat Intervensi Terakhir (Log stream 6 intervensi terbaru lengkap dengan badge aksi, timestamp WIB, nama cabang, dan alasan/keterangan).
+- Endpoint REST API baru `@app.get("/api/v1/analytics/entity-detail")` di `src/backend/main.py` dan fungsi analitik mendalam `get_entity_analytics_detail` di `src/backend/db.py`.
+- Dilengkapi interaksi modern: backdrop blur, tombol close, pintasan keyboard `ESC`, transition animation responsif, dan full dark mode support.
+
+Dedicated Autonomous Guarding Analytics Engine & Operational Analysis Tab:
+- Mengintegrasikan tab baru **"Analisis"** sebagai menu ke-3 persis di bawah Virtual Brand pada Admin Console (`admin_dashboard.html`), lengkap dengan sinkronisasi URL state (`?tab=analytics`), responsive layout, dan perbaikan scroll container (`overflow-y: auto`).
+- Mengimplementasikan filter query PostgreSQL murni aksi Guarding otonom di `src/backend/db.py` (`get_analytics_data`), mengecualikan seluruh intervensi manual/user trigger (`USER_PAUSE`, `ADMIN_PAUSE`, toggle OFF).
+- Menyajikan metrik operasional terperinci: Total Intervensi Guarding, Guarding Auto-Open, Proteksi Masa Pause, Tingkat Keberhasilan, Distribusi Waktu 24 Jam WIB (Open vs Close), Panel Mekanisme Kerja Guarding (Auto-Open & Proteksi Pause), Tren Volume Harian, Pola Sesi Operasional (Pagi, Siang Peak, Sore, Malam, Dini Hari), dan Peringkat Brand/Outlet Terintervensi (dengan filter terfokus pada rentang data rilis valid: Hari Ini & 7 Hari).
+- Memastikan UI bebas dari emoji (hanya SVG/CSS badge murni) dan teks analisis faktual tanpa hiperbola.
 
 Preemptive Cooperative On-Demand Execution Engine & Instant Sleep Interruption:
 - Mengintegrasikan pemeriksaan `has_pending_brand_actions()` di setiap iterasi awal pemeriksaan outlet pada `sync_all_stores()` di `main-vb/src/worker.py` dan `main-bot/src/worker.py`.

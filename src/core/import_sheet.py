@@ -23,10 +23,14 @@ def run_import_sheet() -> dict[str, int]:
     imported = 0
     deactivated = 0
     skipped = 0
+    sheet_store_ids: set[str] = set()
     for row in rows:
         if not row.store_id:
             skipped += 1
             continue
+
+        sheet_store_ids.add(row.store_id)
+
         if row.import_status.strip().casefold() != "aktif":
             if db.deactivate_store(row.store_id):
                 deactivated += 1
@@ -53,4 +57,12 @@ def run_import_sheet() -> dict[str, int]:
         )
         imported += 1
 
-    return {"imported": imported, "deactivated": deactivated, "skipped": skipped}
+    removed_stores = db.deactivate_missing_agency_stores(sheet_store_ids)
+    removed_count = len(removed_stores)
+
+    return {
+        "imported": imported,
+        "deactivated": deactivated,
+        "removed_from_sheet": removed_count,
+        "skipped": skipped,
+    }

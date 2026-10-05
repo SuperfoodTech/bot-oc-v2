@@ -42,10 +42,25 @@ def apply_all_pending_statuses(conn) -> list[dict[str, Any]]:
     """Apply any pending requested_status to applied_status for all active brands,
     and automatically revert expired timed pauses back to ON.
     """
+    # 0. Activate scheduled pauses whose pause_from has arrived
+    conn.execute("""
+        UPDATE vb_brands
+        SET applied_status='PAUSED',
+            requested_status=NULL,
+            requested_pause_from=NULL,
+            requested_pause_until=NULL,
+            last_applied_at=now(),
+            updated_at=now()
+        WHERE is_active=true
+          AND applied_status='ON'
+          AND pause_from IS NOT NULL AND pause_from <= now()
+          AND pause_until IS NOT NULL AND pause_until > now()
+    """)
     # 1. Expire timed pauses that have passed their deadline
     conn.execute("""
         UPDATE vb_brands
-        SET requested_status='ON', requested_pause_until=NULL,
+        SET requested_status='ON', requested_pause_from=NULL, requested_pause_until=NULL,
+            pause_from=NULL, pause_until=NULL,
             requested_at=now(), updated_at=now()
         WHERE is_active=true
           AND applied_status='PAUSED'
@@ -56,14 +71,16 @@ def apply_all_pending_statuses(conn) -> list[dict[str, Any]]:
     rows = conn.execute("""
         UPDATE vb_brands
         SET applied_status=requested_status,
+            pause_from=CASE WHEN requested_status='PAUSED' THEN requested_pause_from ELSE NULL END,
             pause_until=CASE WHEN requested_status='PAUSED' THEN requested_pause_until ELSE NULL END,
             requested_status=NULL,
+            requested_pause_from=NULL,
             requested_pause_until=NULL,
             requested_at=NULL,
             last_applied_at=now(),
             updated_at=now()
         WHERE is_active=true AND requested_status IS NOT NULL
-        RETURNING id, name, applied_status, pause_until, requested_by
+        RETURNING id, name, applied_status, pause_from, pause_until, requested_by
     """).fetchall()
     for row in rows:
         with _PENDING_LOCK:
@@ -95,6 +112,7 @@ def has_pending_brand_actions() -> bool:
                 WHERE is_active=true AND (
                     requested_status IS NOT NULL
                     OR (applied_status='PAUSED' AND pause_until IS NOT NULL AND pause_until <= now())
+                    OR (applied_status='ON' AND pause_from IS NOT NULL AND pause_from <= now() AND pause_until IS NOT NULL AND pause_until > now())
                 )
                 LIMIT 1
             """).fetchone()
@@ -135,7 +153,8 @@ def apply_pending_status(conn, brand_id):
     # state into the same pending ON transition used by the admin control.
     conn.execute(
         """UPDATE vb_brands
-           SET requested_status='ON', requested_pause_until=NULL,
+           SET requested_status='ON', requested_pause_from=NULL, requested_pause_until=NULL,
+               pause_from=NULL, pause_until=NULL,
                requested_at=now(), updated_at=now()
            WHERE id=%s AND is_active=true AND applied_status='PAUSED'
              AND pause_until IS NOT NULL AND pause_until <= now()
@@ -145,11 +164,12 @@ def apply_pending_status(conn, brand_id):
     row = conn.execute(
         """UPDATE vb_brands
            SET applied_status=requested_status,
+               pause_from=CASE WHEN requested_status='PAUSED' THEN requested_pause_from ELSE NULL END,
                pause_until=CASE WHEN requested_status='PAUSED' THEN requested_pause_until ELSE NULL END,
-               requested_status=NULL, requested_pause_until=NULL,
+               requested_status=NULL, requested_pause_from=NULL, requested_pause_until=NULL,
                requested_at=NULL, last_applied_at=now(), updated_at=now()
            WHERE id=%s AND is_active=true AND requested_status IS NOT NULL
-           RETURNING id, name, applied_status, pause_until, requested_by""", (brand_id,)
+           RETURNING id, name, applied_status, pause_from, pause_until, requested_by""", (brand_id,)
     ).fetchone()
     if row:
         with _PENDING_LOCK:
@@ -185,6 +205,7 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
     query = """
         SELECT b.name AS brand_name,
                COALESCE(b.requested_status, b.applied_status) AS effective_status,
+               COALESCE(b.requested_pause_from, b.pause_from)::text AS brand_pause_from,
                COALESCE(b.requested_pause_until, b.pause_until)::text AS brand_pause_until,
                o.store_id, o.long_name, p.name AS portal_name,
                sa.username, sa.password_plain, sa.phone, sa.merchant_id_external,
@@ -218,6 +239,7 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             continue
         if str(row.get("effective_status") or "ON").upper() != "ON":
             existing["effective_status"] = row.get("effective_status")
+            existing["brand_pause_from"] = row.get("brand_pause_from")
             existing["brand_pause_until"] = row.get("brand_pause_until")
     rows = list(unique_rows.values())
 
@@ -255,6 +277,7 @@ def fetch_merchant_outlets_from_db() -> list[Any]:
             status_langganan="Aktif",
             penangguhan="Tidak",
             alasan_penangguhan="",
+            pause_from=row.get("brand_pause_from") or "",
             pause_until=row.get("brand_pause_until") or "",
             schedule_fetch_status=row.get("schedule_fetch_status") or SCHEDULE_FETCH_NOT_FETCHED_YET,
             schedule_fetch_attempted_at=row.get("schedule_fetch_attempted_at") or "",

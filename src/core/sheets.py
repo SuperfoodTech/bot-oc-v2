@@ -58,7 +58,8 @@ class MerchantOutlet:
     alasan_penangguhan: str = ""
     tgl_mulai_penangguhan: str = ""
     tgl_berakhir_penangguhan: str = ""
-    # Stored local end time for a user-requested temporary pause.
+    # Stored local start/end time for a user-requested temporary pause.
+    pause_from: str = ""
     pause_until: str = ""
     shopee_regular_hours: dict = field(default_factory=dict)
     shopee_special_hours: list = field(default_factory=list)

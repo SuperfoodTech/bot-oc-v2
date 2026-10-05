@@ -15,6 +15,7 @@ class ToggleRequest(BaseModel):
     status: str = Field(..., description="'ON' or 'OFF'")
     pause_duration_minutes: Optional[int] = Field(default=None, description="Legacy explicit pause duration in minutes")
     duration_type: Optional[str] = Field(default=None, description="'rest_of_day', '30_min', '60_min', or 'custom'")
+    custom_from: Optional[str] = Field(default=None, description="Custom pause start time in local ISO format")
     custom_until: Optional[str] = Field(default=None, description="Custom pause end time in local ISO format")
 
 
@@ -39,6 +40,7 @@ class StoreStatusResponse(BaseModel):
     subscription_status: str
     is_suspended: bool
     alasan_penangguhan: Optional[str] = ""
+    pause_from: Optional[str] = None
     pause_until: Optional[str] = None
     pause_mode: Optional[str] = None
     timezone: Optional[str] = "Asia/Jakarta"
@@ -158,5 +160,6 @@ class UserLoginRequest(BaseModel):
 class UserPauseRequest(BaseModel):
     store_id: str = Field(..., description="Target Store ID")
     duration_type: str = Field(..., description="'30_min', '60_min', 'rest_of_day' (sesi operasional outlet berikutnya), or 'custom'")
+    custom_from: Optional[str] = Field(default=None, description="Target pause start time in local ISO format when duration_type is custom")
     custom_until: Optional[str] = Field(default=None, description="Target pause end time in local ISO format when duration_type is custom")
     custom_minutes: Optional[int] = Field(default=None, description="Legacy custom pause duration in minutes")

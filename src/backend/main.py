@@ -10,6 +10,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import subprocess
 import urllib.request
@@ -33,7 +34,7 @@ from fastapi.templating import Jinja2Templates
 from backend import db, realtime, state, worker
 from backend import apps_script
 from backend import vb
-from backend.pause_utils import resolve_pause_window
+from backend.pause_utils import resolve_pause_range, resolve_pause_window
 from core.timezones import normalize_timezone, timezone_for
 from backend.models import (
     ToggleRequest,
@@ -57,12 +58,18 @@ class VBStatusRequest(BaseModel):
     status: str
     duration_type: Optional[str] = None
     custom_minutes: Optional[int] = None
+    custom_from: Optional[str] = None
     custom_until: Optional[str] = None
 
 
 def _is_within_shopee_schedule(store: dict, now_dt: datetime) -> bool:
     """Return whether a store may be manually changed in its local timezone."""
-    local_now = now_dt.astimezone(timezone_for(store.get("timezone")))
+    local_tz = timezone_for(store.get("timezone"))
+    local_now = now_dt.astimezone(local_tz)
+    special_hours_data = store.get("shopee_special_hours") or store.get("special_hours")
+    active_special_hours = db.get_active_special_hours(special_hours_data, local_now, local_tz)
+    if active_special_hours:
+        return db.is_within_special_hours_intervals(active_special_hours, local_now)
     return db.is_within_shopee_schedule(store.get("shopee_regular_hours"), local_now)
 
 
@@ -70,6 +77,8 @@ def _get_schedule_gate_detail(store: dict, now_dt: datetime) -> Optional[str]:
     """Return a user-facing block reason when manual actions are gated by schedule state."""
     toggle_reason = str(store.get("display_toggle_reason") or "").strip().upper()
     fetch_status = str(store.get("schedule_fetch_status") or "").strip().upper()
+    if toggle_reason == "SPECIAL_HOURS" or store.get("is_special_hours_closed"):
+        return "Bot tidak berfungsi karena terdapat Jadwal Khusus!"
     if toggle_reason == "FETCHED_EMPTY" or fetch_status == "FETCHED_EMPTY":
         return "Toggle dikunci karena jadwal operasional Shopee belum diatur di Shopee."
     if toggle_reason == "FETCH_RETRYING" or fetch_status == "FETCH_RETRYING":
@@ -266,7 +275,12 @@ def admin_redirect():
 def admin_dashboard_page(request: Request, admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE)):
     if not _read_admin_session(admin_session):
         return RedirectResponse(url="/admin/login", status_code=303)
-    return templates.TemplateResponse(request=request, name="admin_dashboard.html", context={"active_page": "dashboard"})
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_dashboard.html",
+        context={"active_page": "dashboard"},
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"},
+    )
 
 
 @app.get("/admin/mitra/tambah", response_class=HTMLResponse, summary="Admin: Add Merchant and Outlet")
@@ -291,7 +305,7 @@ def admin_login_page():
     login_html = TEMPLATES_DIR / "admin_login.html"
     if not login_html.exists():
         raise HTTPException(status_code=404, detail="Admin login template not found.")
-    return HTMLResponse(content=login_html.read_text(encoding="utf-8"))
+    return HTMLResponse(content=login_html.read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"})
 
 
 @app.post("/api/v1/admin/login", summary="Authenticate Admin")
@@ -462,7 +476,7 @@ def user_page(slug: Optional[str] = None):
     user_html = TEMPLATES_DIR / "user_dashboard.html"
     if not user_html.exists():
         raise HTTPException(status_code=404, detail="User template not found.")
-    return HTMLResponse(content=user_html.read_text(encoding="utf-8"))
+    return HTMLResponse(content=user_html.read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"})
 
 
 @app.get("/brand/{slug}", response_class=HTMLResponse, summary="Public Virtual Brand Dashboard Web Page")
@@ -470,7 +484,7 @@ def brand_page(slug: str):
     brand_html = TEMPLATES_DIR / "brand_dashboard.html"
     if not brand_html.exists():
         raise HTTPException(status_code=404, detail="Brand dashboard template not found.")
-    return HTMLResponse(content=brand_html.read_text(encoding="utf-8"))
+    return HTMLResponse(content=brand_html.read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"})
 
 
 # ── SERVICE HEALTHCHECK ────────────────────────────────────────────────────────
@@ -522,6 +536,7 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
     requested = req.status.strip().upper()
     if requested not in {"ON", "PAUSED"}:
         raise HTTPException(status_code=422, detail="Status VB harus ON atau PAUSED.")
+    pause_from = None
     pause_until = None
     duration_type = (req.duration_type or "").strip().lower()
     if requested == "PAUSED":
@@ -537,7 +552,7 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
                         status_code=422,
                         detail="Jadwal operasional outlet referensi brand ini belum tersedia.",
                     )
-                pause_until, _duration_mins, _label = resolve_pause_window(
+                pause_until, pause_from, _duration_mins, _label = resolve_pause_range(
                     now_dt,
                     duration_type,
                     schedule=reference_outlet.get("shopee_regular_hours") or {},
@@ -545,9 +560,10 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
                     allow_default=False,
                 )
             else:
-                pause_until, _duration_mins, _label = resolve_pause_window(
+                pause_until, pause_from, _duration_mins, _label = resolve_pause_range(
                     now_dt,
                     duration_type,
+                    custom_from=req.custom_from,
                     custom_until=req.custom_until,
                     custom_minutes=req.custom_minutes,
                     allow_default=False,
@@ -557,7 +573,7 @@ def admin_vb_request_status(brand_id: UUID, req: VBStatusRequest, admin: dict = 
             if message == "Durasi pause wajib dipilih.":
                 message = "Durasi pause VB wajib dipilih."
             raise HTTPException(status_code=422, detail=message) from exc
-    result = vb.request_status(str(brand_id), requested, admin["sub"], pause_until=pause_until)
+    result = vb.request_status(str(brand_id), requested, admin["sub"], pause_until=pause_until, pause_from=pause_from)
     if not result:
         raise HTTPException(status_code=404, detail="Brand VB tidak ditemukan.")
     return {"success": True, "brand": result, "message": "Perubahan disimpan dan menunggu giliran brand berikutnya."}
@@ -594,6 +610,7 @@ def public_brand_toggle(slug: str, req: VBStatusRequest):
     if requested == "ON" and brand.get("is_schedule_locked"):
         raise HTTPException(status_code=400, detail="Seluruh outlet brand sedang di luar jadwal operasional.")
 
+    pause_from = None
     pause_until = None
     duration_type = (req.duration_type or "").strip().lower()
     if requested == "PAUSED":
@@ -606,7 +623,7 @@ def public_brand_toggle(slug: str, req: VBStatusRequest):
                         status_code=422,
                         detail="Jadwal operasional outlet referensi brand ini belum tersedia.",
                     )
-                pause_until, _duration_mins, _label = resolve_pause_window(
+                pause_until, pause_from, _duration_mins, _label = resolve_pause_range(
                     now_dt,
                     duration_type,
                     schedule=reference_outlet.get("shopee_regular_hours") or {},
@@ -614,9 +631,10 @@ def public_brand_toggle(slug: str, req: VBStatusRequest):
                     allow_default=False,
                 )
             else:
-                pause_until, _duration_mins, _label = resolve_pause_window(
+                pause_until, pause_from, _duration_mins, _label = resolve_pause_range(
                     now_dt,
                     duration_type,
+                    custom_from=req.custom_from,
                     custom_until=req.custom_until,
                     custom_minutes=req.custom_minutes,
                     allow_default=False,
@@ -627,7 +645,7 @@ def public_brand_toggle(slug: str, req: VBStatusRequest):
                 message = "Durasi pause VB wajib dipilih."
             raise HTTPException(status_code=422, detail=message) from exc
 
-    result = vb.request_brand_status_public(slug, requested, pause_until=pause_until)
+    result = vb.request_brand_status_public(slug, requested, pause_until=pause_until, pause_from=pause_from)
     if not result:
         raise HTTPException(status_code=400, detail="Gagal mengubah status brand.")
 
@@ -864,32 +882,28 @@ def user_get_outlets(nama_pemilik: str = Query(..., description="Nama Pemilik / 
 
 
 @app.post("/api/v1/user/pause", summary="User Link: Pause Store with Selected Duration")
-def user_pause_store(
-    req: UserPauseRequest,
-    admin_session: Optional[str] = Cookie(default=None, alias=ADMIN_SESSION_COOKIE),
-):
-    admin_account = _read_admin_session(admin_session)
+def user_pause_store(req: UserPauseRequest):
     store = state.get_store_by_id(req.store_id)
     if not store:
         raise HTTPException(status_code=404, detail=f"Store ID '{req.store_id}' not found.")
 
-    if not admin_account and (store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED"):
+    if store.get("is_suspended") or store.get("suspension_status") == "SUSPENDED":
         reason = store.get("alasan_penangguhan") or "Tindakan admin"
         raise HTTPException(status_code=403, detail=f"Outlet ditangguhkan oleh Admin (Alasan: {reason}). Silakan hubungi CS.")
 
     now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
-    if not admin_account:
-        schedule_gate_detail = _get_schedule_gate_detail(store, now_dt)
-        if schedule_gate_detail:
-            raise HTTPException(status_code=403, detail=schedule_gate_detail)
+    schedule_gate_detail = _get_schedule_gate_detail(store, now_dt)
+    if schedule_gate_detail:
+        raise HTTPException(status_code=403, detail=schedule_gate_detail)
 
     try:
         pause_mode = "REST_OF_DAY" if req.duration_type.strip().lower() in {"rest_of_day", "sepanjang_hari", "today"} else ("CUSTOM" if req.duration_type.strip().lower() in {"custom", "waktu_lain"} else "FIXED_DURATION")
-        pause_until_dt, duration_mins, label = resolve_pause_window(
+        pause_until_dt, pause_from_dt, duration_mins, label = resolve_pause_range(
             now_dt,
             req.duration_type,
             schedule=store.get("shopee_regular_hours") or {},
             timezone=normalize_timezone(store.get("timezone")),
+            custom_from=req.custom_from,
             custom_until=req.custom_until,
             custom_minutes=req.custom_minutes,
         )
@@ -897,18 +911,12 @@ def user_pause_store(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     pause_until_str = pause_until_dt.strftime("%Y-%m-%d %H:%M:%S")
-    pause_start_time_ms = int(now_dt.timestamp() * 1000)
+    pause_start_time_ms = int((pause_from_dt or now_dt).timestamp() * 1000)
     pause_end_time_ms = int(pause_until_dt.timestamp() * 1000)
 
-    # Admin uses the same request contract as Mitra, but keeps Admin ownership in the audit log.
-    action = "ADMIN_PAUSE_STORE" if admin_account else "USER_PAUSE_STORE"
-    reason = (
-        f"Admin {admin_account.get('username')} set store OFF via Mitra pause modal until {pause_until_str} WIB"
-        if admin_account
-        else f"User set store OFF with duration: {label} (Until {pause_until_str} WIB); pause_start_time_ms={pause_start_time_ms}; pause_end_time_ms={pause_end_time_ms}"
-    )
-    apply_toggle = state.apply_admin_toggle if admin_account else state.apply_user_toggle
-    transition = apply_toggle(
+    action = "USER_PAUSE_STORE"
+    reason = f"User set store OFF with duration: {label} (Until {pause_until_str} WIB); pause_start_time_ms={pause_start_time_ms}; pause_end_time_ms={pause_end_time_ms}"
+    transition = state.apply_user_toggle(
         store_id=req.store_id,
         status="OFF",
         pause_until=pause_until_dt,
@@ -916,20 +924,22 @@ def user_pause_store(
         target_state="CLOSED",
         reason=reason,
         pause_mode=pause_mode,
+        pause_from=pause_from_dt,
     )
     if not transition["success"]:
         raise HTTPException(status_code=403 if transition["code"] in {"suspended", "subscription_expired"} else 404, detail=transition["detail"])
     realtime.publish_outlet_state_changed(
         _hydrate_outlet_transition(transition),
         action,
-        "ADMIN" if admin_account else "MITRA",
+        "MITRA",
     )
 
     return {
         "success": True,
         "store_id": req.store_id,
-        "vercel_status": "OFF",
+        "vercel_status": transition.get("vercel_status", "OFF"),
         "duration_label": label,
+        "pause_from": transition.get("pause_from"),
         "pause_until": pause_until_str,
         "pause_start_time": pause_start_time_ms,
         "pause_end_time": pause_end_time_ms,
@@ -1026,11 +1036,12 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
         try:
             if req.duration_type:
                 pause_mode = "REST_OF_DAY" if req.duration_type.strip().lower() in {"rest_of_day", "sepanjang_hari", "today"} else "CUSTOM"
-                pause_until, _duration_mins, pause_label = resolve_pause_window(
+                pause_until, pause_from, _duration_mins, pause_label = resolve_pause_range(
                     now_dt,
                     req.duration_type,
                     schedule=store.get("shopee_regular_hours") or {},
                     timezone=normalize_timezone(store.get("timezone")),
+                    custom_from=req.custom_from,
                     custom_until=req.custom_until,
                     custom_minutes=req.pause_duration_minutes,
                 )
@@ -1039,10 +1050,11 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
                 if req.pause_duration_minutes <= 0:
                     raise ValueError("Durasi pause harus lebih besar dari 0 menit.")
                 pause_until = now_dt + timedelta(minutes=req.pause_duration_minutes)
+                pause_from = None
                 pause_label = f"{req.pause_duration_minutes} Menit"
             else:
                 pause_mode = "REST_OF_DAY"
-                pause_until, _duration_mins, pause_label = resolve_pause_window(
+                pause_until, pause_from, _duration_mins, pause_label = resolve_pause_range(
                     now_dt,
                     "rest_of_day",
                     schedule=store.get("shopee_regular_hours") or {},
@@ -1050,6 +1062,8 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
                 )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+    else:
+        pause_from = None
     pause_until_str = pause_until.astimezone(ZoneInfo(normalize_timezone(store.get("timezone")))).strftime("%Y-%m-%d %H:%M:%S") if pause_until else ""
     transition = state.apply_admin_toggle(
         store_id=req.store_id,
@@ -1058,6 +1072,7 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
         action="ADMIN_PAUSE_STORE" if next_status == "OFF" else "ADMIN_RESUME_STORE",
         target_state="CLOSED" if next_status == "OFF" else "OPEN",
         pause_mode=pause_mode,
+        pause_from=pause_from,
         reason=(f"Admin {admin.get('username')} set store OFF via Dashboard ({pause_label}) until {pause_until_str} WIB" if next_status == "OFF" and pause_until_str
                 else f"Admin {admin.get('username')} set store OFF via Dashboard" if next_status == "OFF"
                 else f"Admin {admin.get('username')} set store ON via Dashboard"),
@@ -1073,6 +1088,7 @@ def toggle_store(req: ToggleRequest, admin: dict = Depends(require_admin)):
         "success": True,
         "store_id": req.store_id,
         "new_vercel_status": transition["vercel_status"],
+        "pause_from": transition.get("pause_from"),
         "pause_until": transition["pause_until"]
     }
 
@@ -1124,6 +1140,39 @@ def get_logs(
 @app.get("/api/v1/admin/logs/overview", summary="Admin: Compact logs for regular bot and VB")
 def get_logs_overview(limit: int = Query(default=40, ge=1, le=100), admin: dict = Depends(require_admin)):
     return state.get_log_overview(limit=limit)
+
+
+@app.get("/api/v1/analytics", summary="Admin: Patrol, Guarding, and Operational Analytics")
+def get_analytics(
+    mode: Optional[str] = Query(default=None, description="Filter by mode: 'VB', 'REGULAR', or None for all"),
+    time_range: str = Query(default="7d", description="Time range: 'today', '7d', '30d', or 'all'"),
+    admin: dict = Depends(require_admin)
+):
+    try:
+        return db.get_analytics_data(mode=mode, time_range=time_range)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat data analisis: {str(e)}")
+
+
+@app.get("/api/v1/analytics/entity-detail", summary="Admin: Deep-dive guarding detail for a brand or outlet")
+def get_entity_analytics_detail(
+    entity_name: str = Query(..., description="Brand name or Outlet long name / store_id"),
+    mode: Optional[str] = Query(default=None, description="Mode: 'VB' or 'REGULAR'"),
+    brand_id: Optional[str] = Query(default=None, description="Virtual Brand UUID"),
+    outlet_id: Optional[str] = Query(default=None, description="Outlet UUID"),
+    time_range: str = Query(default="7d", description="Time range: 'today' or '7d'"),
+    admin: dict = Depends(require_admin)
+):
+    try:
+        return db.get_entity_analytics_detail(
+            entity_name=entity_name,
+            mode=mode,
+            brand_id=brand_id,
+            outlet_id=outlet_id,
+            time_range=time_range
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat detail analisis entitas: {str(e)}")
 
 
 import urllib.request

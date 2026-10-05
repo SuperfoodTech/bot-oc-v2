@@ -90,28 +90,24 @@ Template pesan WhatsApp diselaraskan **1:1** dengan format resmi Discord Webhook
 
 ### Contoh Pesan: Outlet Berhasil Dibuka (`ACTION_OPEN`)
 ```text
-🟢 *OUTLET BERHASIL DIBUKA BOT*
+🟢 OUTLET BERHASIL DIBUKA BOT
+Nama Outlet: [Nama Outlet]
+Store ID: [Store ID]
+Lihat di ShopeeFood: [Link ShopeeFood]
 
-Nama Outlet: *NAMA OUTLET MERCHANT*
-Store ID: *12345678*
-Lihat di ShopeeFood:
-https://shopee.co.id/universal-link/now-food/shop/12345678
-
-FoodMaster Bot Team
-WA CS: wa.me/6285183151531
+_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_
+_WA CS: wa.me/6285183151531_
 ```
 
 ### Contoh Pesan: Outlet Berhasil Ditutup (`ACTION_CLOSE` / `ACTION_PAUSE`)
 ```text
-🔴 *OUTLET BERHASIL DITUTUP BOT*
+🔴 OUTLET BERHASIL DITUTUP BOT
+Nama Outlet: [Nama Outlet]
+Store ID: [Store ID]
+Lihat di ShopeeFood: [Link ShopeeFood]
 
-Nama Outlet: *NAMA OUTLET MERCHANT*
-Store ID: *12345678*
-Lihat di ShopeeFood:
-https://shopee.co.id/universal-link/now-food/shop/12345678
-
-FoodMaster Bot Team
-WA CS: wa.me/6285183151531
+_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_
+_WA CS: wa.me/6285183151531_
 ```
 
 ---

@@ -102,9 +102,24 @@ def get_active_pause_until(outlet: Any, current_time: Optional[datetime] = None)
     local_tz = outlet_timezone(outlet)
     now_local = _coerce_local_datetime(current_time, local_tz) or datetime.now(local_tz)
     pause_until = _coerce_local_datetime(_get_outlet_value(outlet, "pause_until"), local_tz)
+    pause_from = _coerce_local_datetime(_get_outlet_value(outlet, "pause_from"), local_tz)
     if not pause_until or pause_until <= now_local:
         return None
+    if pause_from and pause_from > now_local:
+        return None
     return pause_until
+
+
+def get_upcoming_pause_from(outlet: Any, current_time: Optional[datetime] = None) -> Optional[datetime]:
+    local_tz = outlet_timezone(outlet)
+    now_local = _coerce_local_datetime(current_time, local_tz) or datetime.now(local_tz)
+    pause_from = _coerce_local_datetime(_get_outlet_value(outlet, "pause_from"), local_tz)
+    pause_until = _coerce_local_datetime(_get_outlet_value(outlet, "pause_until"), local_tz)
+    if not pause_from or pause_from <= now_local:
+        return None
+    if pause_until and pause_until <= pause_from:
+        return None
+    return pause_from
 
 
 def get_next_schedule_start(schedule: dict, now_dt: Optional[datetime] = None, not_after: Optional[datetime] = None, timezone: ZoneInfo = LOCAL_TZ, grace_seconds: int = 120) -> Optional[datetime]:
@@ -148,11 +163,20 @@ def get_pause_recheck_delay_seconds(
     for outlet in outlets or []:
         local_tz = outlet_timezone(outlet)
         outlet_now = reference_now.astimezone(local_tz)
+        store_id = _get_outlet_value(outlet, "store_id", "-")
+
+        upcoming_pause_from = get_upcoming_pause_from(outlet, current_time=outlet_now)
+        if upcoming_pause_from and (nearest_dt is None or upcoming_pause_from < nearest_dt):
+            nearest_dt = upcoming_pause_from
+            nearest_reason = (
+                f"fast recheck Store {store_id}: scheduled pause mulai "
+                f"{upcoming_pause_from.astimezone(local_tz).strftime('%H:%M:%S %Z')}"
+            )
+
         pause_until = get_active_pause_until(outlet, current_time=outlet_now)
         if not pause_until:
             continue
 
-        store_id = _get_outlet_value(outlet, "store_id", "-")
         schedule = _get_outlet_schedule(outlet)
         next_start = get_next_schedule_start(schedule, outlet_now, not_after=pause_until, timezone=local_tz)
 
@@ -351,6 +375,11 @@ def evaluate_outlet_status(
             target = TARGET_CLOSE
             reason = f"Tutup berdasarkan Jadwal Khusus Shopee ({special_desc})"
             action = ACTION_CLOSE if is_currently_open else ACTION_NO_CHANGE
+            return DecisionResult(target_state=target, action=action, reason=reason)
+        else:
+            target = TARGET_OPEN
+            reason = f"Mengikuti Jadwal Khusus Shopee ({special_desc})"
+            action = ACTION_NO_CHANGE
             return DecisionResult(target_state=target, action=action, reason=reason)
     else:
         weekday_name = WEEKDAY_MAP.get(current_time.weekday(), "Senin")

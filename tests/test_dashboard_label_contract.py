@@ -13,7 +13,7 @@ def test_admin_and_mitra_expose_the_same_runtime_status_concepts():
         "Menunggu bot membuka",
         "Menunggu fetch jadwal",
         "Gagal fetch jadwal, bot akan coba lagi",
-        "Jadwal Shopee belum diatur",
+        "Tidak memiliki jadwal operasional",
         "Menunggu jadwal operasional",
         "Otomatisasi nonaktif",
         "Tutup sementara",
@@ -24,9 +24,6 @@ def test_admin_and_mitra_expose_the_same_runtime_status_concepts():
         "Sedang Tutup • Dinonaktifkan admin",
         "Sedang Buka • Menunggu bot menutup",
         "Sedang Tutup • Menunggu bot membuka",
-        "Menunggu fetch jadwal",
-        "Gagal fetch jadwal, bot akan coba lagi",
-        "Jadwal Shopee belum diatur",
         "Sedang Tutup • Di luar jadwal",
         "Sedang Tutup • Otomatisasi nonaktif",
         "Tutup Sementara",
@@ -56,7 +53,7 @@ def test_admin_fallback_handles_split_schedule_fetch_states():
     assert "Menunggu jadwal operasional" in admin_presentation
     assert "Menunggu fetch jadwal" in admin_presentation
     assert "Gagal fetch jadwal, bot akan coba lagi" in admin_presentation
-    assert "Jadwal Shopee belum diatur" in admin_presentation
+    assert "Tidak memiliki jadwal operasional" in admin_presentation
 
 
 def test_admin_toggle_uses_effective_display_state_outside_schedule():

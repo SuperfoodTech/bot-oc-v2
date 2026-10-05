@@ -304,62 +304,62 @@ function buildNotificationText(body) {
 
   const cleanStoreId = String(store_id || '').trim();
   const shopeeLink = cleanStoreId && cleanStoreId !== '-' && cleanStoreId !== 'SYSTEM'
-    ? `https://shopee.co.id/universal-link/now-food/shop/${cleanStoreId}`
+    ? `https://shopee.co.id/now-food/shop/${cleanStoreId}`
     : '-';
 
   if (event_type === 'ACTION_OPEN') {
     return (
-      `🟢 *OUTLET BERHASIL DIBUKA BOT*\n\n` +
-      `Nama Outlet: *${outlet_name}*\n` +
+      `🟢 OUTLET BERHASIL DIBUKA BOT\n` +
+      `Nama Outlet: ${outlet_name}\n` +
       `Store ID: ${cleanStoreId || '-'}\n` +
-      `Lihat di ShopeeFood:\n${shopeeLink}\n\n` +
-      `_FoodMaster Bot Team_\n` +
+      `Lihat di ShopeeFood: ${shopeeLink}\n\n` +
+      `_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_\n` +
       `_WA CS: wa.me/6285183151531_`
     );
   }
 
   if (event_type === 'ACTION_CLOSE' || event_type === 'ACTION_PAUSE') {
     return (
-      `🔴 *OUTLET BERHASIL DITUTUP BOT*\n\n` +
-      `Nama Outlet: *${outlet_name}*\n` +
+      `🔴 OUTLET BERHASIL DITUTUP BOT\n` +
+      `Nama Outlet: ${outlet_name}\n` +
       `Store ID: ${cleanStoreId || '-'}\n` +
-      `Lihat di ShopeeFood:\n${shopeeLink}\n\n` +
-      `_FoodMaster Bot Team_\n` +
+      `Lihat di ShopeeFood: ${shopeeLink}\n\n` +
+      `_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_\n` +
       `_WA CS: wa.me/6285183151531_`
     );
   }
 
   if (event_type === 'ACTION_SKIPPED') {
     return (
-      `⚠️ *OUTLET DI-SKIP (JADWAL KHUSUS)*\n\n` +
-      `Nama Outlet: *${outlet_name}*\n` +
+      `⚠️ OUTLET DI-SKIP (JADWAL KHUSUS)\n` +
+      `Nama Outlet: ${outlet_name}\n` +
       `Store ID: ${cleanStoreId || '-'}\n` +
-      `Status Shopee: *${live_status || 'UNKNOWN'}*\n` +
+      `Status Shopee: ${live_status || 'UNKNOWN'}\n` +
       `Catatan: Toko memiliki Jadwal Khusus / Libur.\n\n` +
-      `_FoodMaster Bot Team_\n` +
+      `_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_\n` +
       `_WA CS: wa.me/6285183151531_`
     );
   }
 
   if (event_type === 'BOT_ERROR') {
     return (
-      `❌ *PERINGATAN EROR BOT PATROLI*\n\n` +
-      `Nama Outlet: *${outlet_name}*\n` +
+      `❌ PERINGATAN EROR BOT PATROLI\n` +
+      `Nama Outlet: ${outlet_name}\n` +
       `Store ID: ${cleanStoreId || '-'}\n` +
       `Tipe Error: ${error_type || 'Unknown Exception'}\n` +
       `Detail: ${detail || 'Gagal memverifikasi status'}\n\n` +
-      `_FoodMaster Bot Team_\n` +
+      `_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_\n` +
       `_WA CS: wa.me/6285183151531_`
     );
   }
 
   // Fallback Pesan Generik
   return (
-    `ℹ️ *NOTIFIKASI FOODMASTER*\n\n` +
-    `Nama Outlet: *${outlet_name}*\n` +
+    `ℹ️ NOTIFIKASI FOODMASTER\n` +
+    `Nama Outlet: ${outlet_name}\n` +
     `Store ID: ${cleanStoreId || '-'}\n` +
     `Informasi: ${detail || action || 'Pesan dari sistem'}\n\n` +
-    `_FoodMaster Bot Team_\n` +
+    `_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_\n` +
     `_WA CS: wa.me/6285183151531_`
   );
 }

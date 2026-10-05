@@ -195,7 +195,7 @@ def test_closed_without_schedule_and_successful_empty_fetch_shows_empty_state():
 
     assert derived["bot_phase"] == "FETCHED_EMPTY"
     assert derived["display_status_bucket"] == "closed"
-    assert derived["display_status_label"] == "Jadwal Shopee belum diatur"
+    assert derived["display_status_label"] == "Tidak memiliki jadwal operasional"
     assert derived["display_status_tone"] == "closed"
     assert derived["display_toggle_on"] is True
     assert derived["display_toggle_disabled"] is True

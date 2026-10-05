@@ -1,0 +1,1758 @@
+{# ── TAB PANE: ANALISIS OPERASIONAL & GUARDING ── #}
+<div class="tab-pane" :class="{ 'active': currentTab === 'analytics' }" id="paneAnalytics">
+  <div class="analytics-page-shell">
+    
+    <!-- Toolbar Kontrol Filter -->
+    <div class="analytics-toolbar">
+      <div class="analytics-filter-group">
+        <span class="analytics-filter-label">Mode:</span>
+        <div class="analytics-pill-toggle" id="analyticsModeFilter">
+          <button type="button" class="analytics-pill-btn active" data-mode="all" onclick="changeAnalyticsMode('all')">Semua</button>
+          <button type="button" class="analytics-pill-btn" data-mode="VB" onclick="changeAnalyticsMode('VB')">Virtual Brand</button>
+          <button type="button" class="analytics-pill-btn" data-mode="REGULAR" onclick="changeAnalyticsMode('REGULAR')">Agency</button>
+        </div>
+      </div>
+
+      <div class="analytics-filter-group">
+        <span class="analytics-filter-label">Rentang:</span>
+        <div class="analytics-pill-toggle" id="analyticsRangeFilter">
+          <button type="button" class="analytics-pill-btn" data-range="today" onclick="changeAnalyticsRange('today')">Hari Ini</button>
+          <button type="button" class="analytics-pill-btn active" data-range="7d" onclick="changeAnalyticsRange('7d')">7 Hari</button>
+        </div>
+      </div>
+
+      <div class="analytics-toolbar-right">
+        <span class="analytics-last-update" id="analyticsLastUpdateText">Memuat data...</span>
+        <button type="button" class="btn-outline btn-compact analytics-refresh-btn" onclick="loadAnalyticsData()" title="Perbarui data analisis">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ringkasan Metrik Utama Guarding -->
+    <section class="analytics-stat-grid" id="analyticsStatGrid">
+      <div class="analytics-stat-card">
+        <div class="analytics-stat-head">
+          <span class="analytics-stat-title">Total Aksi Guarding</span>
+          <span class="analytics-stat-icon-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+        </div>
+        <div class="analytics-stat-value" id="statTotalActions">-</div>
+        <div class="analytics-stat-sub" id="statTotalSub">Buka: - | Tutup: -</div>
+      </div>
+
+      <div class="analytics-stat-card">
+        <div class="analytics-stat-head">
+          <span class="analytics-stat-title">Guarding Auto-Open</span>
+          <span class="analytics-stat-icon-wrap stat-icon-success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </span>
+        </div>
+        <div class="analytics-stat-value" id="statAutoOpen">-</div>
+        <div class="analytics-stat-sub" id="statAutoOpenSub">- dari total guarding</div>
+      </div>
+
+      <div class="analytics-stat-card">
+        <div class="analytics-stat-head">
+          <span class="analytics-stat-title">Proteksi Masa Pause</span>
+          <span class="analytics-stat-icon-wrap stat-icon-danger">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+          </span>
+        </div>
+        <div class="analytics-stat-value" id="statPauseEnforce">-</div>
+        <div class="analytics-stat-sub" id="statPauseEnforceSub">- dari total guarding</div>
+      </div>
+
+      <div class="analytics-stat-card">
+        <div class="analytics-stat-head">
+          <span class="analytics-stat-title">Tingkat Keberhasilan</span>
+          <span class="analytics-stat-icon-wrap stat-icon-info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </span>
+        </div>
+        <div class="analytics-stat-value" id="statSuccessRate">-%</div>
+        <div class="analytics-stat-sub" id="statSuccessSub">Sukses: - | Gagal: -</div>
+      </div>
+    </section>
+
+    <!-- Grid Visualisasi Chart Guarding -->
+    <div class="analytics-charts-grid">
+      
+      <!-- Chart 1: Distribusi Jam Guarding -->
+      <div class="analytics-card analytics-chart-main">
+        <div class="analytics-card-header">
+          <div class="analytics-card-title-group">
+            <h3 class="analytics-card-title">Distribusi Waktu Guarding per Jam</h3>
+            <p class="analytics-card-desc">Frekuensi aksi guarding buka dan tutup otonom bot dalam 24 jam (WIB)</p>
+          </div>
+          <div class="analytics-legend">
+            <span class="analytics-legend-item"><span class="legend-dot dot-open"></span>Guarding Buka</span>
+            <span class="analytics-legend-item"><span class="legend-dot dot-close"></span>Guarding Tutup</span>
+          </div>
+        </div>
+        <div class="analytics-chart-container">
+          <canvas id="analyticsHourlyChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Card 2: Penjelasan Mekanisme Kerja Guarding -->
+      <div class="analytics-card analytics-guide-card">
+        <div class="analytics-card-header">
+          <div class="analytics-card-title-group">
+            <h3 class="analytics-card-title">Mekanisme Kerja Guarding</h3>
+            <p class="analytics-card-desc">Prinsip dasar logika intervensi otonom bot</p>
+          </div>
+        </div>
+        <div class="analytics-guide-list">
+          <div class="analytics-guide-item">
+            <div class="analytics-guide-content">
+              <span class="analytics-guide-heading">Auto-Open (Pemulihan Buka Otonom)</span>
+              <p class="analytics-guide-text">Membuka kembali outlet yang tiba-tiba tertutup di Shopee padahal berada dalam jam operasional aktif dan otomasi berstatus ON.</p>
+            </div>
+          </div>
+
+          <div class="analytics-guide-item">
+            <div class="analytics-guide-content">
+              <span class="analytics-guide-heading">Proteksi Masa Pause</span>
+              <p class="analytics-guide-text">Menutup kembali outlet yang dibuka manual di kasir/resto sebelum durasi jeda (pause) yang diatur di dashboard selesai.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 3: Tren Harian Guarding -->
+      <div class="analytics-card analytics-chart-full">
+        <div class="analytics-card-header">
+          <div class="analytics-card-title-group">
+            <h3 class="analytics-card-title">Tren Volume Guarding Harian</h3>
+            <p class="analytics-card-desc">Volume intervensi otonom bot per hari sepanjang periode terpilih</p>
+          </div>
+        </div>
+        <div class="analytics-chart-container chart-daily-container">
+          <canvas id="analyticsDailyChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tabel Analisis 1: Pola Jam Operasional -->
+    <div class="analytics-card analytics-table-card">
+      <div class="analytics-card-header">
+        <div class="analytics-card-title-group">
+          <h3 class="analytics-card-title">Karakteristik & Pola Sesi Operasional</h3>
+          <p class="analytics-card-desc">Evaluasi aktivitas bot patroli berdasarkan blok waktu operasional harian</p>
+        </div>
+      </div>
+      <div class="analytics-table-responsive">
+        <table class="analytics-table">
+          <thead>
+            <tr>
+              <th>Rentang Waktu (WIB)</th>
+              <th>Sesi</th>
+              <th class="text-end">Total Aksi</th>
+              <th class="text-end">Aksi Buka</th>
+              <th class="text-end">Aksi Tutup</th>
+              <th class="text-end">Tingkat Keberhasilan</th>
+              <th>Karakteristik Operasional</th>
+            </tr>
+          </thead>
+          <tbody id="analyticsTimeBlocksBody">
+            <tr><td colspan="7" class="table-loading-state">Memuat data pola sesi...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tabel Analisis 2: Peringkat Brand / Outlet Terintervensi -->
+    <div class="analytics-card analytics-table-card">
+      <div class="analytics-card-header">
+        <div class="analytics-card-title-group">
+          <h3 class="analytics-card-title">Peringkat Brand / Outlet Terintervensi</h3>
+          <p class="analytics-card-desc">Daftar entitas dengan frekuensi intervensi guarding dan penegakan jadwal tertinggi</p>
+        </div>
+        <div class="analytics-table-search-wrap">
+          <input type="search" id="analyticsEntitySearch" class="form-input analytics-search-input" placeholder="Cari brand atau outlet..." oninput="filterAnalyticsEntities()">
+        </div>
+      </div>
+      <div class="analytics-table-responsive">
+        <table class="analytics-table">
+          <thead>
+            <tr>
+              <th>Nama Brand / Outlet</th>
+              <th>Mode</th>
+              <th class="text-end">Total Intervensi</th>
+              <th class="text-end">Aksi Buka</th>
+              <th class="text-end">Aksi Tutup</th>
+              <th class="text-end">Tingkat Keberhasilan</th>
+              <th>Intervensi Terakhir</th>
+              <th style="width: 32px;"></th>
+            </tr>
+          </thead>
+          <tbody id="analyticsEntitiesBody">
+            <tr><td colspan="8" class="table-loading-state">Memuat data entitas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Detail Entity Drawer & Backdrop -->
+  <div class="analytics-drawer-backdrop" id="analyticsDrawerBackdrop" onclick="closeEntityDrawer()"></div>
+  <aside class="analytics-drawer" id="analyticsEntityDrawer" aria-hidden="true">
+    <div class="analytics-drawer-header">
+      <div class="analytics-drawer-title-group">
+        <div class="analytics-drawer-badge-row">
+          <span class="analytics-badge-mode" id="drawerEntityMode">VB</span>
+          <span class="analytics-drawer-sub-badge" id="drawerTimeRangeBadge">7 Hari Terakhir</span>
+        </div>
+        <h3 class="analytics-drawer-title" id="drawerEntityName">-</h3>
+      </div>
+      <button type="button" class="analytics-drawer-close" onclick="closeEntityDrawer()" aria-label="Tutup Detail">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="analytics-drawer-body" id="drawerBodyContent">
+      <!-- Konten dimuat secara dinamis via renderEntityDrawerContent -->
+    </div>
+  </aside>
+</div>
+
+<style>
+/* ── ANALYTICS TAB STYLES & SCROLL ARCHITECTURE ── */
+#paneAnalytics {
+  height: 100%;
+  min-height: 0;
+  display: none;
+}
+
+#paneAnalytics.active {
+  display: block;
+}
+
+.analytics-page-shell {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  padding: 4px 8px 48px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  #paneAnalytics.active,
+  .analytics-page-shell {
+    height: auto;
+    overflow: visible;
+    padding-bottom: 72px;
+  }
+}
+
+/* Toolbar */
+.analytics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+
+.analytics-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--admin-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analytics-pill-toggle {
+  display: inline-flex;
+  background: var(--admin-bg, #f8fafc);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.analytics-pill-btn {
+  border: none;
+  background: transparent;
+  color: var(--admin-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analytics-pill-btn:hover {
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.analytics-pill-btn.active {
+  background: var(--admin-card-bg, #ffffff);
+  color: #be1a1a;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.analytics-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.analytics-last-update {
+  font-size: 11px;
+  color: var(--admin-text-muted, #64748b);
+}
+
+.analytics-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+}
+
+/* Stat Grid */
+.analytics-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.analytics-stat-card {
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.analytics-stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.analytics-stat-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--admin-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analytics-stat-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.stat-icon-success {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.stat-icon-danger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.stat-icon-info {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.analytics-stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--admin-text-primary, #0f172a);
+  line-height: 1.1;
+}
+
+.analytics-stat-sub {
+  font-size: 12px;
+  color: var(--admin-text-muted, #64748b);
+  font-weight: 500;
+}
+
+/* Charts Grid */
+.analytics-charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+.analytics-chart-main {
+  grid-column: span 1;
+}
+
+.analytics-chart-side {
+  grid-column: span 1;
+}
+
+.analytics-chart-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 991px) {
+  .analytics-charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .analytics-chart-main,
+  .analytics-chart-side,
+  .analytics-chart-full {
+    grid-column: 1 / -1;
+  }
+}
+
+.analytics-card {
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.analytics-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.analytics-card-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.analytics-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.analytics-card-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--admin-text-muted, #64748b);
+}
+
+.analytics-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.analytics-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-text-muted, #64748b);
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.dot-open { background: #10b981; }
+.dot-close { background: #ef4444; }
+
+.analytics-chart-container {
+  position: relative;
+  width: 100%;
+  height: 280px;
+}
+
+.chart-daily-container {
+  height: 220px;
+}
+
+/* Guide Card */
+.analytics-guide-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analytics-guide-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: var(--admin-bg, #f8fafc);
+  border: 1px solid var(--admin-border, #f1f5f9);
+  border-radius: 8px;
+}
+
+.analytics-guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analytics-guide-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.analytics-guide-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--admin-text-muted, #64748b);
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .analytics-guide-item {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Tables */
+.analytics-table-card {
+  padding: 18px 20px;
+}
+
+.analytics-table-search-wrap {
+  min-width: 220px;
+}
+
+.analytics-search-input {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  width: 100%;
+}
+
+.analytics-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.analytics-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--admin-text-muted, #64748b);
+  border-bottom: 1px solid var(--admin-border, #e2e8f0);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.analytics-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--admin-border, #f1f5f9);
+  color: var(--admin-text-primary, #0f172a);
+  vertical-align: middle;
+}
+
+.analytics-table tr:hover td {
+  background: var(--admin-table-hover, rgba(0,0,0,0.015));
+}
+
+.analytics-badge-mode {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-mode-vb {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-mode-regular {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* Success Rate Typography (Clean, Large, No Pill) */
+.rate-text {
+  font-size: 15px;
+  font-weight: 800;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.rate-high { color: #059669; }
+.rate-mid  { color: #d97706; }
+.rate-low  { color: #dc2626; }
+
+/* Dynamic Peak Row Highlight (No Left Accent) */
+.analytics-table tr.row-peak-highlight td {
+  background: rgba(255, 107, 0, 0.04);
+}
+
+.analytics-table tr.row-peak-highlight .peak-session-text {
+  color: #ea580c;
+  font-weight: 700;
+}
+
+.analytics-table tr.row-peak-highlight .peak-timerange-text {
+  color: #c2410c;
+}
+
+/* Clickable Entity Row & Drawer */
+.analytics-table tr.clickable-entity-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.analytics-table tr.clickable-entity-row:hover td {
+  background: var(--admin-table-hover, rgba(0, 0, 0, 0.025));
+}
+
+.analytics-table tr.clickable-entity-row:hover .entity-action-icon {
+  color: #be1a1a;
+  transform: translateX(2px);
+}
+
+.entity-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--admin-text-muted, #94a3b8);
+  transition: all 0.15s ease;
+}
+
+/* Drawer Backdrop & Slide-over */
+.analytics-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 1040;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.analytics-drawer-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.analytics-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 490px;
+  max-width: 92vw;
+  background: var(--admin-card-bg, #ffffff);
+  border-left: 1px solid var(--admin-border, #e2e8f0);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.analytics-drawer.active {
+  transform: translateX(0);
+}
+
+.analytics-drawer-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--admin-border, #e2e8f0);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--admin-card-bg, #ffffff);
+}
+
+.analytics-drawer-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analytics-drawer-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-drawer-sub-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--admin-text-muted, #64748b);
+  background: var(--admin-bg, #f1f5f9);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.analytics-drawer-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--admin-text-primary, #0f172a);
+  line-height: 1.25;
+}
+
+.analytics-drawer-close {
+  background: transparent;
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--admin-text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.analytics-drawer-close:hover {
+  background: var(--admin-bg, #f1f5f9);
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.analytics-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Stat Grid Inside Drawer */
+.drawer-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.drawer-stat-card {
+  background: var(--admin-bg, #f8fafc);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-stat-card.stat-full {
+  grid-column: span 2;
+}
+
+.drawer-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.drawer-stat-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--admin-text-primary, #0f172a);
+  line-height: 1.1;
+}
+
+.drawer-stat-sub {
+  font-size: 11px;
+  color: var(--admin-text-muted, #64748b);
+}
+
+/* Sections Inside Drawer */
+.drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawer-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--admin-text-primary, #0f172a);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.drawer-section-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--admin-text-muted, #64748b);
+}
+
+/* Peak Timing Cards */
+.drawer-peak-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.drawer-peak-box {
+  background: var(--admin-card-bg, #ffffff);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-peak-box-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-text-muted, #64748b);
+}
+
+.drawer-peak-box-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--admin-text-primary, #0f172a);
+}
+
+/* Peak List */
+.drawer-peak-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-peak-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--admin-bg, #f8fafc);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.drawer-peak-item-hour {
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.drawer-peak-item-count {
+  font-weight: 800;
+  color: #ea580c;
+}
+
+.drawer-peak-item-sub {
+  font-size: 11px;
+  color: var(--admin-text-muted, #64748b);
+  display: flex;
+  gap: 8px;
+}
+
+/* Ratio Bar */
+.drawer-ratio-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--admin-bg, #f8fafc);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.drawer-ratio-track {
+  height: 8px;
+  background: #ef4444;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+
+.drawer-ratio-fill-open {
+  height: 100%;
+  background: #10b981;
+}
+
+.drawer-ratio-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Mini Table inside Drawer */
+.drawer-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.drawer-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.drawer-mini-table th {
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--admin-text-muted, #64748b);
+  border-bottom: 1px solid var(--admin-border, #e2e8f0);
+  background: var(--admin-bg, #f8fafc);
+  white-space: nowrap;
+}
+
+.drawer-mini-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--admin-border, #f1f5f9);
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.drawer-mini-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Log Stream inside Drawer */
+.drawer-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-log-card {
+  background: var(--admin-bg, #f8fafc);
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drawer-log-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.drawer-log-badge.log-badge-open {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.drawer-log-badge.log-badge-close {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.drawer-log-badge.log-badge-fail {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.drawer-log-time {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--admin-text-muted, #64748b);
+}
+
+.drawer-log-outlet {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--admin-text-primary, #0f172a);
+}
+
+.drawer-log-reason {
+  font-size: 11px;
+  color: var(--admin-text-muted, #64748b);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Loading & Empty State */
+.analytics-drawer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+  color: var(--admin-text-muted, #64748b);
+  font-size: 13px;
+}
+
+.drawer-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--admin-border, #e2e8f0);
+  border-top-color: #be1a1a;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .analytics-pill-btn.active {
+  background: #1e293b;
+  color: #ef4444;
+}
+[data-theme="dark"] .stat-icon-success { background: rgba(5, 150, 105, 0.2); }
+[data-theme="dark"] .stat-icon-danger { background: rgba(220, 38, 38, 0.2); }
+[data-theme="dark"] .stat-icon-info { background: rgba(37, 99, 235, 0.2); }
+[data-theme="dark"] .badge-mode-vb { background: rgba(29, 78, 216, 0.2); color: #93c5fd; border-color: rgba(147, 197, 253, 0.3); }
+[data-theme="dark"] .badge-mode-regular { background: rgba(180, 83, 9, 0.2); color: #fde68a; border-color: rgba(253, 230, 138, 0.3); }
+[data-theme="dark"] .rate-high { color: #34d399; }
+[data-theme="dark"] .rate-mid { color: #facc15; }
+[data-theme="dark"] .rate-low { color: #f87171; }
+[data-theme="dark"] .analytics-table tr.row-peak-highlight td { background: rgba(255, 107, 0, 0.08); }
+[data-theme="dark"] .analytics-table tr.row-peak-highlight .peak-session-text { color: #fb923c; }
+[data-theme="dark"] .analytics-table tr.row-peak-highlight .peak-timerange-text { color: #fdba74; }
+
+[data-theme="dark"] .analytics-drawer {
+  background: #0f172a;
+  border-left-color: #334155;
+}
+[data-theme="dark"] .analytics-drawer-header {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+[data-theme="dark"] .analytics-drawer-sub-badge {
+  background: #1e293b;
+  color: #94a3b8;
+}
+[data-theme="dark"] .analytics-drawer-close {
+  border-color: #334155;
+}
+[data-theme="dark"] .analytics-drawer-close:hover {
+  background: #1e293b;
+}
+[data-theme="dark"] .drawer-stat-card,
+[data-theme="dark"] .drawer-peak-item,
+[data-theme="dark"] .drawer-ratio-container,
+[data-theme="dark"] .drawer-log-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+[data-theme="dark"] .drawer-peak-box {
+  background: #0f172a;
+  border-color: #334155;
+}
+[data-theme="dark"] .drawer-table-wrap {
+  border-color: #334155;
+}
+[data-theme="dark"] .drawer-mini-table th {
+  background: #1e293b;
+  border-bottom-color: #334155;
+}
+[data-theme="dark"] .drawer-mini-table td {
+  border-bottom-color: #334155;
+}
+[data-theme="dark"] .drawer-log-badge.log-badge-open {
+  background: rgba(5, 150, 105, 0.2);
+  color: #34d399;
+}
+[data-theme="dark"] .drawer-log-badge.log-badge-close {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
+[data-theme="dark"] .drawer-log-badge.log-badge-fail {
+  background: rgba(220, 38, 38, 0.3);
+  color: #fca5a5;
+}
+</style>
+
+<script>
+/* ── ANALYTICS JAVASCRIPT CONTROLLER ── */
+let currentAnalyticsMode = 'all';
+let currentAnalyticsRange = '7d';
+let analyticsHourlyChartInstance = null;
+let analyticsDailyChartInstance = null;
+let allAnalyticsEntities = [];
+let isAnalyticsFetching = false;
+
+function changeAnalyticsMode(mode) {
+  currentAnalyticsMode = mode;
+  document.querySelectorAll('#analyticsModeFilter .analytics-pill-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  loadAnalyticsData();
+}
+
+function changeAnalyticsRange(range) {
+  currentAnalyticsRange = range;
+  document.querySelectorAll('#analyticsRangeFilter .analytics-pill-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === range);
+  });
+  loadAnalyticsData();
+}
+
+function getAnalyticsThemeColors() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('dark');
+  return {
+    textColor: isDark ? '#94a3b8' : '#64748b',
+    gridColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+    openColor: '#10b981',
+    closeColor: '#ef4444',
+    openBg: isDark ? 'rgba(16, 185, 129, 0.85)' : '#10b981',
+    closeBg: isDark ? 'rgba(239, 68, 68, 0.85)' : '#ef4444',
+    lineColor: isDark ? '#38bdf8' : '#0284c7',
+    lineBg: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.08)'
+  };
+}
+
+async function loadAnalyticsData() {
+  if (isAnalyticsFetching) return;
+  isAnalyticsFetching = true;
+
+  const lastUpdateEl = document.getElementById('analyticsLastUpdateText');
+  if (lastUpdateEl) lastUpdateEl.textContent = 'Memuat data...';
+
+  try {
+    const params = new URLSearchParams();
+    if (currentAnalyticsMode && currentAnalyticsMode !== 'all') {
+      params.set('mode', currentAnalyticsMode);
+    }
+    params.set('time_range', currentAnalyticsRange);
+
+    const res = await fetch(`/api/v1/analytics?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: Gagal memuat analitik`);
+    }
+    const data = await res.json();
+
+    // 1. Render data tables and metrics first (always resilient)
+    renderAnalyticsSummary(data.summary || {});
+    renderAnalyticsTimeBlocks(data.time_blocks || []);
+    
+    allAnalyticsEntities = data.top_entities || [];
+    renderAnalyticsEntities(allAnalyticsEntities);
+
+    // 2. Render charts safely
+    try {
+      renderAnalyticsHourlyChart(data.hourly || []);
+    } catch (e) {
+      console.warn('Gagal merender hourly chart:', e);
+    }
+
+    try {
+      renderAnalyticsDailyChart(data.daily || []);
+    } catch (e) {
+      console.warn('Gagal merender daily chart:', e);
+    }
+
+    if (lastUpdateEl) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      lastUpdateEl.textContent = `Terakhir diperbarui: ${timeStr} WIB`;
+    }
+  } catch (err) {
+    console.error('Gagal memuat data analisis:', err);
+    if (lastUpdateEl) lastUpdateEl.textContent = 'Gagal memuat data';
+  } finally {
+    isAnalyticsFetching = false;
+  }
+}
+
+function renderAnalyticsSummary(sum) {
+  const total = sum.total_actions || 0;
+  const open = sum.total_open || 0;
+  const close = sum.total_close || 0;
+  const autoOpen = sum.auto_open_count || 0;
+  const pauseEnforce = sum.pause_enforce_count || 0;
+  const rate = sum.success_rate != null ? sum.success_rate : 100.0;
+  const success = sum.success_count || 0;
+  const fail = sum.fail_count || 0;
+
+  const totalEl = document.getElementById('statTotalActions');
+  const totalSubEl = document.getElementById('statTotalSub');
+  const autoOpenEl = document.getElementById('statAutoOpen');
+  const autoOpenSubEl = document.getElementById('statAutoOpenSub');
+  const pauseEnforceEl = document.getElementById('statPauseEnforce');
+  const pauseEnforceSubEl = document.getElementById('statPauseEnforceSub');
+  const rateEl = document.getElementById('statSuccessRate');
+  const rateSubEl = document.getElementById('statSuccessSub');
+
+  if (totalEl) totalEl.textContent = total.toLocaleString('id-ID');
+  if (totalSubEl) totalSubEl.textContent = `Buka: ${open.toLocaleString('id-ID')} | Tutup: ${close.toLocaleString('id-ID')}`;
+
+  if (autoOpenEl) autoOpenEl.textContent = autoOpen.toLocaleString('id-ID');
+  if (autoOpenSubEl) {
+    const pct = total > 0 ? ((autoOpen / total) * 100).toFixed(1) : '0';
+    autoOpenSubEl.textContent = `${pct}% dari total intervensi`;
+  }
+
+  if (pauseEnforceEl) pauseEnforceEl.textContent = pauseEnforce.toLocaleString('id-ID');
+  if (pauseEnforceSubEl) {
+    const pct = total > 0 ? ((pauseEnforce / total) * 100).toFixed(1) : '0';
+    pauseEnforceSubEl.textContent = `${pct}% dari total intervensi`;
+  }
+
+  if (rateEl) rateEl.textContent = `${rate}%`;
+  if (rateSubEl) rateSubEl.textContent = `Sukses: ${success.toLocaleString('id-ID')} | Gagal: ${fail.toLocaleString('id-ID')}`;
+}
+
+function renderAnalyticsHourlyChart(hourlyData) {
+  const ctx = document.getElementById('analyticsHourlyChart');
+  if (!ctx || typeof Chart === 'undefined') return;
+
+  const colors = getAnalyticsThemeColors();
+  const labels = hourlyData.map(d => d.hour);
+  const openValues = hourlyData.map(d => d.open);
+  const closeValues = hourlyData.map(d => d.close);
+
+  if (analyticsHourlyChartInstance) {
+    analyticsHourlyChartInstance.destroy();
+    analyticsHourlyChartInstance = null;
+  }
+
+  analyticsHourlyChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Aksi Buka',
+          data: openValues,
+          backgroundColor: colors.openBg,
+          borderRadius: 4,
+          borderSkipped: false
+        },
+        {
+          label: 'Aksi Tutup',
+          data: closeValues,
+          backgroundColor: colors.closeBg,
+          borderRadius: 4,
+          borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          padding: 10,
+          boxPadding: 4,
+          usePointStyle: true
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: colors.textColor, font: { size: 11 } }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: colors.gridColor },
+          ticks: { color: colors.textColor, font: { size: 11 }, precision: 0 }
+        }
+      }
+    }
+  });
+}
+
+function renderAnalyticsDailyChart(dailyData) {
+  const ctx = document.getElementById('analyticsDailyChart');
+  if (!ctx || typeof Chart === 'undefined') return;
+
+  const colors = getAnalyticsThemeColors();
+  const labels = dailyData.map(d => d.label || d.date);
+  const totals = dailyData.map(d => d.total);
+  const opens = dailyData.map(d => d.open);
+  const closes = dailyData.map(d => d.close);
+
+  if (analyticsDailyChartInstance) {
+    analyticsDailyChartInstance.destroy();
+    analyticsDailyChartInstance = null;
+  }
+
+  analyticsDailyChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Total Aksi',
+          data: totals,
+          borderColor: colors.lineColor,
+          backgroundColor: colors.lineBg,
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3
+        },
+        {
+          label: 'Guarding Buka',
+          data: opens,
+          borderColor: colors.openColor,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.3
+        },
+        {
+          label: 'Guarding Tutup',
+          data: closes,
+          borderColor: colors.closeColor,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: { boxWidth: 10, font: { size: 11 }, color: colors.textColor }
+        },
+        tooltip: {
+          padding: 10,
+          usePointStyle: true
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: colors.textColor, font: { size: 11 } }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: colors.gridColor },
+          ticks: { color: colors.textColor, font: { size: 11 }, precision: 0 }
+        }
+      }
+    }
+  });
+}
+
+function renderAnalyticsTimeBlocks(blocks) {
+  const tbody = document.getElementById('analyticsTimeBlocksBody');
+  if (!tbody) return;
+
+  if (!blocks || blocks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="table-loading-state">Tidak ada data untuk ditampilkan.</td></tr>';
+    return;
+  }
+
+  const maxTotal = Math.max(...blocks.map(b => b.total_count || 0));
+
+  tbody.innerHTML = blocks.map(b => {
+    const isPeak = maxTotal > 0 && b.total_count === maxTotal;
+    const rate = b.success_rate != null ? b.success_rate : 100.0;
+    const rateClass = rate >= 98 ? 'rate-high' : (rate >= 90 ? 'rate-mid' : 'rate-low');
+
+    return `
+      <tr class="${isPeak ? 'row-peak-highlight' : ''}">
+        <td class="${isPeak ? 'peak-timerange-text' : ''}" style="font-weight: 700; font-family: monospace;">${escapeAnalyticsHtml(b.time_range)}</td>
+        <td class="${isPeak ? 'peak-session-text' : ''}" style="font-weight: 600;">${escapeAnalyticsHtml(b.session_name)}</td>
+        <td class="text-end" style="font-weight: 800; ${isPeak ? 'color: #ea580c;' : ''}">${b.total_count.toLocaleString('id-ID')}</td>
+        <td class="text-end" style="color: #059669; font-weight: 600;">${b.open_count.toLocaleString('id-ID')}</td>
+        <td class="text-end" style="color: #dc2626; font-weight: 600;">${b.close_count.toLocaleString('id-ID')}</td>
+        <td class="text-end"><span class="rate-text ${rateClass}">${rate}%</span></td>
+        <td style="color: var(--admin-text-muted); font-size: 12px;">${escapeAnalyticsHtml(b.characteristic)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderAnalyticsEntities(entities) {
+  const tbody = document.getElementById('analyticsEntitiesBody');
+  if (!tbody) return;
+
+  if (!entities || entities.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="table-loading-state">Tidak ada data entitas yang cocok.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entities.map(e => {
+    const modeBadge = e.mode === 'Virtual Brand'
+      ? '<span class="analytics-badge-mode badge-mode-vb">VB</span>'
+      : '<span class="analytics-badge-mode badge-mode-regular">Agency</span>';
+
+    const rate = e.success_rate != null ? e.success_rate : 100.0;
+    const rateClass = rate >= 98 ? 'rate-high' : (rate >= 90 ? 'rate-mid' : 'rate-low');
+
+    const brandIdAttr = e.brand_id ? escapeAnalyticsHtml(e.brand_id) : '';
+    const outletIdAttr = e.outlet_id ? escapeAnalyticsHtml(e.outlet_id) : '';
+    const nameAttr = escapeAnalyticsHtml(e.name);
+    const modeAttr = escapeAnalyticsHtml(e.mode);
+
+    return `
+      <tr class="clickable-entity-row" onclick="openEntityDrawer('${nameAttr}', '${modeAttr}', '${brandIdAttr}', '${outletIdAttr}')" title="Klik untuk melihat detail intervensi ${nameAttr}">
+        <td style="font-weight: 700; color: var(--admin-text-primary);">${nameAttr}</td>
+        <td>${modeBadge}</td>
+        <td class="text-end" style="font-weight: 700;">${e.total_count.toLocaleString('id-ID')}</td>
+        <td class="text-end" style="color: #059669; font-weight: 600;">${e.open_count.toLocaleString('id-ID')}</td>
+        <td class="text-end" style="color: #dc2626; font-weight: 600;">${e.close_count.toLocaleString('id-ID')}</td>
+        <td class="text-end"><span class="rate-text ${rateClass}">${rate}%</span></td>
+        <td style="font-size: 12px; color: var(--admin-text-muted); font-family: monospace;">${escapeAnalyticsHtml(e.last_intervened_at)}</td>
+        <td class="text-end" style="padding-right: 8px;">
+          <span class="entity-action-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterAnalyticsEntities() {
+  const q = (document.getElementById('analyticsEntitySearch')?.value || '').toLowerCase().trim();
+  if (!q) {
+    renderAnalyticsEntities(allAnalyticsEntities);
+    return;
+  }
+  const filtered = allAnalyticsEntities.filter(e => 
+    (e.name || '').toLowerCase().includes(q) ||
+    (e.mode || '').toLowerCase().includes(q)
+  );
+  renderAnalyticsEntities(filtered);
+}
+
+/* ── DRAWER CONTROLLER & DEEP-DIVE RENDERER ── */
+async function openEntityDrawer(name, mode, brandId, outletId) {
+  const drawer = document.getElementById('analyticsEntityDrawer');
+  const backdrop = document.getElementById('analyticsDrawerBackdrop');
+  const titleEl = document.getElementById('drawerEntityName');
+  const modeEl = document.getElementById('drawerEntityMode');
+  const timeRangeBadgeEl = document.getElementById('drawerTimeRangeBadge');
+  const bodyEl = document.getElementById('drawerBodyContent');
+
+  if (!drawer || !backdrop || !bodyEl) return;
+
+  if (titleEl) titleEl.textContent = name;
+  if (modeEl) {
+    modeEl.textContent = mode === 'Virtual Brand' ? 'VB' : 'Agency';
+    modeEl.className = `analytics-badge-mode ${mode === 'Virtual Brand' ? 'badge-mode-vb' : 'badge-mode-regular'}`;
+  }
+  if (timeRangeBadgeEl) {
+    timeRangeBadgeEl.textContent = currentAnalyticsRange === 'today' ? 'Hari Ini' : '7 Hari Terakhir';
+  }
+
+  // Set loading state
+  bodyEl.innerHTML = `
+    <div class="analytics-drawer-loading">
+      <div class="drawer-spinner"></div>
+      <span>Memuat data mendalam...</span>
+    </div>
+  `;
+
+  // Open drawer
+  drawer.classList.add('active');
+  backdrop.classList.add('active');
+  drawer.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const params = new URLSearchParams();
+    params.set('entity_name', name);
+    if (mode) params.set('mode', mode === 'Virtual Brand' ? 'VB' : 'REGULAR');
+    if (brandId && brandId !== 'null' && brandId !== 'undefined' && brandId !== '') params.set('brand_id', brandId);
+    if (outletId && outletId !== 'null' && outletId !== 'undefined' && outletId !== '') params.set('outlet_id', outletId);
+    params.set('time_range', currentAnalyticsRange);
+
+    const res = await fetch(`/api/v1/analytics/entity-detail?${params.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    renderEntityDrawerContent(data);
+  } catch (err) {
+    console.error('Gagal memuat detail entitas:', err);
+    bodyEl.innerHTML = `
+      <div class="analytics-drawer-loading" style="color: #dc2626;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Gagal memuat detail analisis entitas. Silakan coba lagi.</span>
+      </div>
+    `;
+  }
+}
+
+function closeEntityDrawer() {
+  const drawer = document.getElementById('analyticsEntityDrawer');
+  const backdrop = document.getElementById('analyticsDrawerBackdrop');
+  if (drawer) {
+    drawer.classList.remove('active');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+  if (backdrop) {
+    backdrop.classList.remove('active');
+  }
+  document.body.style.overflow = '';
+}
+
+function renderEntityDrawerContent(data) {
+  const bodyEl = document.getElementById('drawerBodyContent');
+  if (!bodyEl) return;
+
+  const sum = data.summary || {};
+  const peaks = data.peak_hours || [];
+  const outlets = data.outlets || [];
+  const logs = data.recent_logs || [];
+
+  const total = sum.total_actions || 0;
+  const autoOpen = sum.auto_open_count || 0;
+  const pauseProtect = sum.pause_protect_count || 0;
+  const openPct = total > 0 ? ((autoOpen / total) * 100).toFixed(1) : '0';
+  const closePct = total > 0 ? ((pauseProtect / total) * 100).toFixed(1) : '0';
+  const rate = sum.success_rate != null ? sum.success_rate : 100.0;
+  const rateClass = rate >= 98 ? 'rate-high' : (rate >= 90 ? 'rate-mid' : 'rate-low');
+
+  // Peak Hours List HTML
+  const peakListHtml = peaks.length > 0 ? peaks.map(p => `
+    <div class="drawer-peak-item">
+      <div>
+        <div class="drawer-peak-item-hour">${escapeAnalyticsHtml(p.hour)}</div>
+        <div class="drawer-peak-item-sub">
+          <span style="color: #059669; font-weight: 600;">Buka: ${p.open_count}</span>
+          <span style="color: #dc2626; font-weight: 600;">Tutup: ${p.close_count}</span>
+        </div>
+      </div>
+      <div class="drawer-peak-item-count">${p.total_count}x</div>
+    </div>
+  `).join('') : '<div style="font-size: 12px; color: var(--admin-text-muted);">Tidak ada pola jam signifikan.</div>';
+
+  // Outlets breakdown HTML
+  const outletTableHtml = (outlets.length > 1) ? `
+    <div class="drawer-section">
+      <div class="drawer-section-head">
+        <h4 class="drawer-section-title">Breakdown Cabang Terintervensi (${outlets.length})</h4>
+        <p class="drawer-section-desc">Distribusi intervensi guarding di tiap cabang outlet</p>
+      </div>
+      <div class="drawer-table-wrap">
+        <table class="drawer-mini-table">
+          <thead>
+            <tr>
+              <th>Cabang / Store ID</th>
+              <th class="text-end">Total</th>
+              <th class="text-end">Buka</th>
+              <th class="text-end">Tutup</th>
+              <th class="text-end">Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${outlets.map(o => `
+              <tr>
+                <td>
+                  <div style="font-weight: 700;">${escapeAnalyticsHtml(o.long_name)}</div>
+                  <div style="font-size: 11px; color: var(--admin-text-muted); font-family: monospace;">${escapeAnalyticsHtml(o.store_id)}</div>
+                </td>
+                <td class="text-end" style="font-weight: 700;">${o.total_count}</td>
+                <td class="text-end" style="color: #059669; font-weight: 600;">${o.open_count}</td>
+                <td class="text-end" style="color: #dc2626; font-weight: 600;">${o.close_count}</td>
+                <td class="text-end"><span class="rate-text ${o.success_rate >= 98 ? 'rate-high' : 'rate-mid'}" style="font-size: 13px;">${o.success_rate}%</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ` : '';
+
+  // Recent logs HTML
+  const logsHtml = logs.length > 0 ? logs.map(l => {
+    const isAutoOpen = l.action === 'ACTION_OPEN';
+    const badgeClass = !l.success ? 'log-badge-fail' : (isAutoOpen ? 'log-badge-open' : 'log-badge-close');
+    const statusText = l.success ? (isAutoOpen ? 'Guarding Auto-Open' : 'Proteksi Pause') : 'Guarding Gagal';
+    return `
+      <div class="drawer-log-card">
+        <div class="drawer-log-head">
+          <span class="drawer-log-badge ${badgeClass}">
+            ${statusText}
+          </span>
+          <span class="drawer-log-time">${escapeAnalyticsHtml(l.timestamp)}</span>
+        </div>
+        <div class="drawer-log-outlet">${escapeAnalyticsHtml(l.outlet_name)} <span style="font-weight: 400; font-family: monospace; color: var(--admin-text-muted);">(${escapeAnalyticsHtml(l.store_id)})</span></div>
+        <div class="drawer-log-reason">${escapeAnalyticsHtml(l.reason)}</div>
+      </div>
+    `;
+  }).join('') : '<div style="font-size: 12px; color: var(--admin-text-muted);">Belum ada riwayat intervensi.</div>';
+
+  bodyEl.innerHTML = `
+    <!-- Metrik Utama Entitas -->
+    <div class="drawer-stat-grid">
+      <div class="drawer-stat-card">
+        <span class="drawer-stat-label">Total Guarding</span>
+        <span class="drawer-stat-val">${total.toLocaleString('id-ID')}</span>
+        <span class="drawer-stat-sub">Buka: ${autoOpen} | Tutup: ${pauseProtect}</span>
+      </div>
+
+      <div class="drawer-stat-card">
+        <span class="drawer-stat-label">Keberhasilan</span>
+        <span class="drawer-stat-val rate-text ${rateClass}" style="font-size: 26px;">${rate}%</span>
+        <span class="drawer-stat-sub">Sukses: ${sum.success_count} | Gagal: ${sum.fail_count}</span>
+      </div>
+
+      <div class="drawer-stat-card stat-full">
+        <span class="drawer-stat-label">Intervensi Terakhir</span>
+        <span style="font-size: 13px; font-weight: 700; color: var(--admin-text-primary); font-family: monospace;">${escapeAnalyticsHtml(sum.last_intervened_at)}</span>
+      </div>
+    </div>
+
+    <!-- Waktu Paling Sering Diintervensi -->
+    <div class="drawer-section">
+      <div class="drawer-section-head">
+        <h4 class="drawer-section-title">Waktu Sering Diintervensi</h4>
+        <p class="drawer-section-desc">Jam dengan frekuensi pemulihan dan penegakan tertinggi</p>
+      </div>
+
+      <div class="drawer-peak-grid">
+        <div class="drawer-peak-box box-open">
+          <span class="drawer-peak-box-label">Puncak Auto-Open</span>
+          <span class="drawer-peak-box-val" style="color: #059669;">${escapeAnalyticsHtml(sum.top_open_hour || '-')}</span>
+        </div>
+        <div class="drawer-peak-box box-close">
+          <span class="drawer-peak-box-label">Puncak Proteksi Pause</span>
+          <span class="drawer-peak-box-val" style="color: #dc2626;">${escapeAnalyticsHtml(sum.top_close_hour || '-')}</span>
+        </div>
+      </div>
+
+      <div class="drawer-peak-list">
+        ${peakListHtml}
+      </div>
+    </div>
+
+    <!-- Komposisi Intervensi Otonom -->
+    <div class="drawer-section">
+      <div class="drawer-section-head">
+        <h4 class="drawer-section-title">Komposisi Guarding</h4>
+        <p class="drawer-section-desc">Perbandingan pemulihan buka otonom vs proteksi pause</p>
+      </div>
+
+      <div class="drawer-ratio-container">
+        <div class="drawer-ratio-track">
+          <div class="drawer-ratio-fill-open" style="width: ${openPct}%;"></div>
+        </div>
+        <div class="drawer-ratio-legend">
+          <span style="color: #059669;">Auto-Open: ${autoOpen} (${openPct}%)</span>
+          <span style="color: #dc2626;">Proteksi Pause: ${pauseProtect} (${closePct}%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Breakdown Cabang jika > 1 cabang -->
+    ${outletTableHtml}
+
+    <!-- Riwayat Intervensi Terbaru -->
+    <div class="drawer-section">
+      <div class="drawer-section-head">
+        <h4 class="drawer-section-title">Riwayat Intervensi Terakhir</h4>
+        <p class="drawer-section-desc">6 log aktivitas penegakan otonom bot terbaru</p>
+      </div>
+
+      <div class="drawer-log-list">
+        ${logsHtml}
+      </div>
+    </div>
+  `;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeEntityDrawer();
+});
+
+function escapeAnalyticsHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+</script>

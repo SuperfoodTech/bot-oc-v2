@@ -192,7 +192,7 @@ def send_discord_agency_action_notification(
     clean_store_id = str(store_id or "").strip()
     if clean_store_id and clean_store_id != "SYSTEM":
         safe_id = urllib.parse.quote(clean_store_id)
-        shopee_link_md = f"[Link ShopeeFood](https://shopee.co.id/universal-link/now-food/shop/{safe_id})"
+        shopee_link_md = f"[Link ShopeeFood](https://shopee.co.id/now-food/shop/{safe_id})"
     else:
         shopee_link_md = "-"
 
@@ -200,9 +200,8 @@ def send_discord_agency_action_notification(
         f"{header}\n"
         f"Nama Outlet: {outlet_name}\n"
         f"Store ID: {clean_store_id}\n"
-        f"Lihat di ShopeeFood:\n"
-        f"{shopee_link_md}\n\n"
-        f"_FoodMaster Bot Team_\n"
+        f"Lihat di ShopeeFood: {shopee_link_md}\n\n"
+        f"_⚠️ WA ini khusus BOT, jika ada pertanyaan silakan hubungi WA FoodMaster 👇🏻_\n"
         f"_WA CS: wa.me/6285183151531_"
     )
 
@@ -499,7 +498,7 @@ def send_discord_vb_group_summary(
         formatted = f"{name} — {info}".strip(" —") if (name or info) else "Listing"
         if store_id:
             safe_id = urllib.parse.quote(store_id)
-            link_md = f" • [Link](https://shopee.co.id/universal-link/now-food/shop/{safe_id})"
+            link_md = f" • [Link](https://shopee.co.id/now-food/shop/{safe_id})"
             return f"{formatted}{link_md}"
         return formatted if formatted else "Listing"
 

@@ -1,54 +1,72 @@
-# Definition of Done (DoD) — Preemptive Cooperative On-Demand Execution & Instant Interrupt Engine
+# Implementation Plan & Definition of Done (DoD)
 
-**Fitur**: Preemptive Cooperative Yielding, Instant Express Lane Preemption, Zero Order Leak  
-**Modul**: `main-vb`, `main-bot`, `src/core`, `src/backend`  
-**Target Versi**: Release 1.24.0  
-
-Dokumen ini mendefinisikan kriteria kelayakan (*Acceptance Criteria*) dan standar kualitas (*Quality Gates*) yang wajib dipenuhi sebelum fitur ini dinyatakan selesai dan di-deploy ke produksi.
+## 📌 Judul Rencana
+**Deteksi Jadwal Khusus Buka (Special Hours Open), Penguncian Toggle Sesuai Kontrak, dan Normalisasi UX Writing Dashboard Mitra**
 
 ---
 
-## 1. Kriteria Fungsional (*Functional Acceptance Criteria*)
+## 🎯 1. Objektif & Latar Belakang
 
-### A. Preemptive Cooperative Yielding (< 1 Detik Interruption)
-- [ ] **Instant Routine Patrol Interruption**: Ketika user mengubah toggle status brand di Dashboard Mitra atau Admin VB saat bot sedang berada di tengah-tengah pemindaian portal besar (misal outlet ke-5 dari 40 di *WonderFood*), loop patroli rutin **wajib langsung berhenti (*break / yield*) dalam waktu $\le \mathbf{1\text{ detik}}$**.
-- [ ] **Preservation of Routine Queue**: Portal yang diinterupsi tidak boleh hilang atau ditandai selesai palsu (`not marked as completed in processed_keys`), dan wajib dapat dilanjutkan kembali setelah aksi express selesai.
-- [ ] **Lightweight DB Check Overhead**: Pemeriksaan `has_pending_brand_actions()` di setiap awal loop outlet wajib berkecepatan tinggi ($\le 2\text{ms}$) dan tidak menambah beban CPU / database.
+1. **Deteksi Jadwal Khusus Buka (*Special Hours Open*)**:
+   - Menjamin sistem bot dan backend mampu mengenali dan memproses Jadwal Khusus Shopee tipe **Buka** (`date_type != 1` atau memiliki `intervals` jam operasional tertentu), baik saat jadwal reguler mingguan terisi maupun saat jadwal reguler **kosong / dihapus merchant**.
+   - Mencegah bot menghasilkan *Decision Error* / *"Jadwal reguler Shopee Sabtu tidak tersedia"* ketika toko buka berdasarkan Jadwal Khusus.
 
-### B. On-Demand Express Lane Latency (< 3–5 Detik Total Execution)
-- [ ] **Prioritas Mutlak P0**: Begitu patroli rutin terinterupsi, daemon wajib langsung mempromosikan status brand baru ke **Priority 100 (P0)** dan mengeksekusi `⚡ [EXPRESS LANE]` sebelum portal patroli rutin lainnya.
-- [ ] **Targeted Store Execution**: Pemanggilan `worker.sync_all_stores(target_store_ids={...})` hanya memproses toko target dari brand yang di-toggle tanpa memindai toko lain.
-- [ ] **Total End-to-End Latency**: Waktu total dari saat user menekan switch toggle di browser hingga aksi berhasil terverifikasi di Shopee Partner Web wajib $\le \mathbf{3\text{--}5\text{ detik}}$ (jika di portal yang sama) atau $\le \mathbf{8\text{--}12\text{ detik}}$ (jika memerlukan pergantian portal akun via `auto_switch_merchant`).
+2. **Kepatuhan Kontrak Operasional Bot (*Contract Compliance*)**:
+   - **Prinsip:** Bot **100% menghormati Jadwal Khusus Shopee** dan tidak mengintervensi atau mengubah status toko saat toko berada dalam periode Jadwal Khusus (baik Jadwal Khusus Tutup maupun Jadwal Khusus Buka).
+   - **Perilaku Toggle:** Toggle pada antarmuka Dashboard Mitra (`/mitra/{slug}`) dan Admin Dashboard tetap **TERKUNCI / DISABLE OFF** (`state-closed` / switch abu-abu nonaktif di kiri).
 
-### C. Zero Order Leak & Compliance Guarding
-- [ ] **Zero False Open (Pagar Jadwal)**: Bot dilarang keras membuka toko jika outlet berada di luar jam operasional reguler atau sedang dalam periode *Special Hours Close*, meskipun status toggle diminta ON.
-- [ ] **Immediate Discord Notification**: Notifikasi Discord rekap aksi brand terkirim secara instan ($< 1\text{--}2$ detik) setelah target outlet selesai dieksekusi.
-
----
-
-## 2. Kriteria Kualitas Kode & Integritas Arsitektur (*Technical Quality Gates*)
-
-- [ ] **Byte-for-Byte Parity**: File `main-vb/src/worker.py` **WAJIB 100% identik *byte-for-byte*** dengan `main-bot/src/worker.py`. Perbedaan implementasi khusus VB hanya boleh diletakkan pada adapter `main-vb/src/db.py`.
-- [ ] **Zero Memory Leak & Resource Reclamation**: Setiap siklus evaluasi daemon dan preemption event tetap memanggil `gc.collect()` dan `malloc_trim(0)` secara aman.
-- [ ] **Safe Browser State**: Proses interupsi tidak boleh merusak context Selenium browser yang sedang aktif atau memicu invalid session id.
-- [ ] **Fallback Resiliency**: Jika database mengalami temporary network glitch saat pengecekan preemption, worker tidak boleh crash dan wajib melanjutkan loop secara aman (*fail-safe*).
+3. **Standarisasi & Normalisasi UX Writing**:
+   - **Saat Berada dalam Jadwal Khusus (Buka / Tutup):**
+     - Pesan tunggal pada Hero Card Dashboard Mitra: **`'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`**.
+     - Tooltip & alert klik toggle: **`'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`**.
+     - Menghapus total pesan keliru `'Ada kesalahan data, harap hubungi Admin'`.
+   - **Pada Drawer / Panel Jadwal ("Tampilkan jadwal"):**
+     - Menampilkan rincian Jadwal Khusus (termasuk Jadwal Khusus Buka lengkap dengan rentang jam operasional WIB).
+   - **Saat Toko Benar-benar Tidak Memiliki Jadwal (Reguler Kosong & Khusus Kosong / `FETCHED_EMPTY`):**
+     - Teks summary jadwal hari ini: **`'Tidak memiliki jadwal operasional'`** (menggantikan `'Jadwal operasional belum tersedia'`).
 
 ---
 
-## 3. Kriteria Pengujian & Verifikasi (*Testing & Validation*)
+## 🏗️ 2. Komponen yang Terdampak & Rencana Perubahan
 
-- [ ] **Simulasi Patrol Interruption Test**:
-  - Uji jalannya patroli portal 30+ outlet, kemudian masukkan request toggle brand di tengah jalan.
-  - Verifikasi log mencatat `⚡ [ON-DEMAND PREEMPTION]` dan beralih ke Express Lane dalam $< 1$ detik.
-- [ ] **End-to-End Verification Test**:
-  - Uji pengubahan status dari dashboard (misal: brand *Katsu Geprek* atau lainnya).
-  - Verifikasi perubahan langsung terefleksi di Shopee Partner Web dan status database dalam waktu $< 5$ detik.
-- [ ] **Regression Test Suite**:
-  - Seluruh unit test yang ada pada `tests/` lulus 100% (*ALL PASS*).
+### A. Engine Evaluasi Bot (`src/core/decision.py` & `main-vb/src/core/decision.py`)
+- Pada fungsi `evaluate_outlet_status`:
+  - Saat `active_special_hours` terdeteksi:
+    - Jika `not is_open_special` (Jadwal Khusus Tutup / di luar jam buka khusus): Menetapkan `target=TARGET_CLOSE` dan `reason="Tutup berdasarkan Jadwal Khusus Shopee ([Deskripsi])"`.
+    - Jika `is_open_special` (Jadwal Khusus Buka): Menetapkan `action=ACTION_NO_CHANGE` dan `reason="Mengikuti Jadwal Khusus Shopee ([Deskripsi])"`.
+  - Memastikan evaluasi langsung selesai (*return*) pada tahap Jadwal Khusus tanpa jatuh ke pengecekan `require_regular_schedule` yang memicu false log *"Jadwal reguler Shopee [Hari] tidak tersedia"*.
+
+### B. State Derivation & DB Runtime (`src/backend/db.py` & `main-vb/src/backend/db.py`)
+- Pada fungsi `derive_outlet_runtime_state`:
+  - Saat `active_special_hours` aktif:
+    - `display_toggle_disabled = True` (selalu terkunci nonaktif).
+    - `display_toggle_on = False` (toggle off di kiri).
+    - `display_toggle_reason = 'SPECIAL_HOURS'`.
+    - `bot_phase = 'WAITING_SCHEDULE'` / `'SPECIAL_HOURS'`.
+    - `display_note = 'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`.
+  - Saat `schedule_fetch_status == 'FETCHED_EMPTY'` dan tidak ada special hours:
+    - Menghapus label error, menstandarkan keterangan menjadi *"Tidak memiliki jadwal operasional"*.
+
+### C. Antarmuka Dashboard Mitra & Admin (`src/backend/templates/user_dashboard.html` & `admin_dashboard.html`)
+- **`getOutletStateContext(outlet)`**:
+  - Jika `hasSpecialHours == true` (baik buka maupun tutup), secara deterministik menyetel:
+    - `toggleDisabled = true`
+    - `toggleChecked = false`
+    - `toggleReason = 'SPECIAL_HOURS'`
+    - `isSpecialHoursClosed = true` (mengunci toggle agar tidak bisa diubah).
+- **`getMitraScheduleMetaText(outlet, stateContext)` & `formatTodayScheduleSummary`**:
+  - Jika `hasSpecialHours == true`: mengembalikan `'Bot tidak berfungsi karena terdapat Jadwal Khusus!'`.
+  - Jika `FETCHED_EMPTY`: mengembalikan `'Tidak memiliki jadwal operasional'`.
+  - Menghilangkan cabang teks `'Ada kesalahan data, harap hubungi Admin'`.
+- **`renderOutletSchedule(outlet)`**:
+  - Memastikan fungsi rendering *Special Hours* memformat dan menampilkan entri Jadwal Khusus Buka dengan interval jam (`HH:mm - HH:mm WIB`) secara jelas di panel drawer jadwal.
 
 ---
 
-## 4. Kriteria Rilis & Deployment (*Release Compliance*)
+## ⏰ 4. Dynamic Past Time Picker Restriction (1:1 Reproducibility Across All Portals)
 
-- [ ] **Release Documentation**: Dokumentasi rilis dicatat lengkap di `update/1.24.0.md`.
-- [ ] **Zero-Downtime Deployment**: Backend web dan bot di-deploy sesuai SOP tanpa mematikan sesi Selenium aktif.
+1. [x] **Mitra Agency Dashboard (`user_dashboard.html`)**: Opsi jam lampau dan menit lampau pada hari ini di-disable secara otomatis, opsi menit otomatis menyesuaikan saat jam dipilih, dan semua opsi aktif saat memilih tanggal masa depan.
+2. [x] **Admin Console Agency Modal (`admin_dashboard.html`)**: 1:1 perilaku identik untuk modal custom duration pause Agency.
+3. [x] **Admin Console Virtual Brand Modal (`admin_dashboard.html`)**: 1:1 perilaku identik untuk modal custom duration pause VB Brand.
+4. [x] **Mitra Virtual Brand Dashboard (`brand_dashboard.html`)**: 1:1 perilaku identik untuk modal custom duration pause Mitra Brand (`/brand/{slug}`).
+5. [x] **Zero-Downtime Deployment Verified**: Service web berhasil di-rebuild dan dijalankan tanpa interupsi pada bot daemon (`v1.32.0`).

@@ -308,8 +308,9 @@ def test_vb_outlet_status_filter_contract():
 
     # HTML assertions for desktop and mobile select filter
     assert 'id="vbStatusFilter"' in vb_tab_template
-    assert '<option value="ON">ON</option>' in vb_tab_template
-    assert '<option value="OFF">OFF</option>' in vb_tab_template
+    assert '<option value="OPEN">Open</option>' in vb_tab_template
+    assert '<option value="PAUSE">Pause</option>' in vb_tab_template
+    assert '<option value="CLOSED">Closed</option>' in vb_tab_template
     assert 'id="vbStoreIdFilter"' in vb_tab_template
 
     # JS assertions in dashboard

@@ -230,15 +230,51 @@
           <div class="custom-datetime-fields">
             <div class="custom-datetime-field">
               <span class="custom-field-label">Mulai</span>
-              <input type="text" id="customStartInput" class="form-input" readonly disabled
-                aria-disabled="true">
+              <div class="custom-picker-anchor">
+                <button type="button" id="customStartTrigger" class="custom-picker-trigger"
+                  onclick="openCustomDateTimePicker('start', event)" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="customStartDisplay">Pilih tanggal &amp; waktu</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                    <path d="M8 2v4M16 2v4M3 9h18"></path>
+                  </svg>
+                </button>
+                <input type="hidden" id="customStartInput" aria-hidden="true">
+                <div id="customStartDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu mulai" hidden>
+                  <div class="custom-picker-header">
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth('start', -1, event)"
+                      aria-label="Bulan sebelumnya">‹</button>
+                    <strong id="customStartPickerMonthLabel"></strong>
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth('start', 1, event)"
+                      aria-label="Bulan berikutnya">›</button>
+                  </div>
+                  <div class="custom-picker-weekdays" aria-hidden="true">
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>Sb</span>
+                  </div>
+                  <div id="customStartPickerCalendar" class="custom-picker-calendar"></div>
+                  <div class="custom-picker-time">
+                    <span>Waktu</span>
+                    <div class="custom-picker-time-fields">
+                      <select id="customStartPickerHour" aria-label="Jam mulai outlet"></select>
+                      <span>:</span>
+                      <select id="customStartPickerMinute" aria-label="Menit mulai WIB"></select>
+                      <b id="customStartPickerTimezoneLabel">WIB</b>
+                    </div>
+                  </div>
+                  <div class="custom-picker-actions">
+                    <button type="button" class="btn-outline" onclick="closeCustomDateTimePicker('start', event)">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyCustomDateTimePicker('start', event)">Terapkan</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <span class="custom-datetime-arrow" aria-hidden="true">→</span>
             <div class="custom-datetime-field">
               <span class="custom-field-label">Target berakhir</span>
               <div class="custom-picker-anchor">
                 <button type="button" id="customUntilTrigger" class="custom-picker-trigger"
-                  onclick="openCustomDateTimePicker(event)" aria-haspopup="dialog" aria-expanded="false">
+                  onclick="openCustomDateTimePicker('until', event)" aria-haspopup="dialog" aria-expanded="false">
                   <span id="customUntilDisplay">Pilih tanggal &amp; waktu</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="17" rx="2"></rect>
@@ -246,32 +282,31 @@
                   </svg>
                 </button>
                 <input type="hidden" id="customUntilInput" aria-hidden="true">
-                <div id="customDateTimePicker" class="custom-picker-popover" role="dialog"
-                  aria-label="Pilih tanggal dan waktu" hidden>
+                <div id="customUntilDateTimePicker" class="custom-picker-popover" role="dialog"
+                  aria-label="Pilih tanggal dan waktu berakhir" hidden>
                   <div class="custom-picker-header">
-                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(-1, event)"
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth('until', -1, event)"
                       aria-label="Bulan sebelumnya">‹</button>
-                    <strong id="customPickerMonthLabel"></strong>
-                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth(1, event)"
+                    <strong id="customUntilPickerMonthLabel"></strong>
+                    <button type="button" class="custom-picker-nav" onclick="shiftPickerMonth('until', 1, event)"
                       aria-label="Bulan berikutnya">›</button>
                   </div>
                   <div class="custom-picker-weekdays" aria-hidden="true">
-                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>
-                      Sb</span>
+                    <span>Mg</span><span>Sn</span><span>Sl</span><span>Rb</span><span>Km</span><span>Jm</span><span>Sb</span>
                   </div>
-                  <div id="customPickerCalendar" class="custom-picker-calendar"></div>
+                  <div id="customUntilPickerCalendar" class="custom-picker-calendar"></div>
                   <div class="custom-picker-time">
                     <span>Waktu</span>
                     <div class="custom-picker-time-fields">
-                      <select id="customPickerHour" aria-label="Jam outlet"></select>
+                      <select id="customUntilPickerHour" aria-label="Jam berakhir outlet"></select>
                       <span>:</span>
-                      <select id="customPickerMinute" aria-label="Menit WIB"></select>
-                      <b id="customPickerTimezoneLabel">WIB</b>
+                      <select id="customUntilPickerMinute" aria-label="Menit berakhir WIB"></select>
+                      <b id="customUntilPickerTimezoneLabel">WIB</b>
                     </div>
                   </div>
                   <div class="custom-picker-actions">
-                    <button type="button" class="btn-outline" onclick="closeCustomDateTimePicker(event)">Batal</button>
-                    <button type="button" class="btn-primary" onclick="applyCustomDateTimePicker(event)">Terapkan</button>
+                    <button type="button" class="btn-outline" onclick="closeCustomDateTimePicker('until', event)">Batal</button>
+                    <button type="button" class="btn-primary" onclick="applyCustomDateTimePicker('until', event)">Terapkan</button>
                   </div>
                 </div>
               </div>
@@ -403,7 +438,7 @@
     }
 
     function getShopeeFoodStoreUrl(storeId) {
-      return `https://shopee.co.id/universal-link/now-food/shop/${encodeURIComponent(String(storeId || '').trim())}`;
+      return `https://shopee.co.id/now-food/shop/${encodeURIComponent(String(storeId || '').trim())}`;
     }
 
     function openShopeeFoodOutlet(storeId) {
@@ -858,6 +893,138 @@
       return MITRA_STATUS_TONE_CLASS[normalized] || 'is-pending';
     }
 
+    function formatSpecialHoursDate(startStr, endStr) {
+      if (!startStr && startStr !== 0) return '-';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      function parsePart(str) {
+        if (!str && str !== 0) return null;
+        if (typeof str === 'number' || (/^\d{10,13}$/.test(String(str).trim()))) {
+          const ms = typeof str === 'number' ? str : parseInt(str, 10);
+          const dObj = new Date(ms > 1e11 ? ms : ms * 1000);
+          if (isNaN(dObj.getTime())) return null;
+          return { y: dObj.getFullYear(), m: dObj.getMonth(), d: dObj.getDate(), monthName: months[dObj.getMonth()] || '' };
+        }
+        const parts = String(str).trim().split('T')[0].split('-');
+        if (parts.length === 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const d = parseInt(parts[2], 10);
+          return { y, m, d, monthName: months[m] || '' };
+        }
+        return null;
+      }
+      const pStart = parsePart(startStr);
+      const pEnd = parsePart(endStr || startStr);
+      if (!pStart) return String(startStr);
+      if (!pEnd || (pStart.y === pEnd.y && pStart.m === pEnd.m && pStart.d === pEnd.d)) {
+        return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y}`;
+      }
+      if (pStart.y === pEnd.y && pStart.m === pEnd.m) {
+        return `${String(pStart.d).padStart(2, '0')} - ${String(pEnd.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y}`;
+      }
+      if (pStart.y === pEnd.y) {
+        return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} - ${String(pEnd.d).padStart(2, '0')} ${pEnd.monthName} ${pStart.y}`;
+      }
+      return `${String(pStart.d).padStart(2, '0')} ${pStart.monthName} ${pStart.y} - ${String(pEnd.d).padStart(2, '0')} ${pEnd.monthName} ${pEnd.y}`;
+    }
+
+    function formatSpecialHoursIntervals(intervals) {
+      if (!Array.isArray(intervals) || !intervals.length) {
+        return 'Tutup';
+      }
+      function formatSec(sec) {
+        const s = parseInt(sec, 10);
+        if (isNaN(s)) return '';
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+      const formatted = intervals.map(item => {
+        let from = String(item.time_from || '').replace(/\./g, ':');
+        let to = String(item.time_to || '').replace(/\./g, ':');
+        if (!from && !to && (item.start_relative_sec !== undefined || item.end_relative_sec !== undefined)) {
+          const startSec = Number(item.start_relative_sec || 0);
+          const endSec = Number(item.end_relative_sec || 0);
+          if (startSec === 0 && endSec === 0) return '';
+          from = formatSec(startSec);
+          to = formatSec(endSec);
+        }
+        return from && to ? `${from} - ${to}` : (from || to || '');
+      }).filter(Boolean);
+      return formatted.length ? formatted.join(', ') + ' WIB' : 'Tutup';
+    }
+
+    function parseSpecialHoursDatePart(val) {
+      if (val === null || val === undefined || val === '') return null;
+      if (typeof val === 'number' || (/^\d{10,13}$/.test(String(val).trim()))) {
+        const ms = typeof val === 'number' ? val : parseInt(val, 10);
+        const d = new Date(ms > 1e11 ? ms : ms * 1000);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const parts = String(val).trim().split('T')[0].split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return isNaN(d.getTime()) ? null : d;
+      }
+      return null;
+    }
+
+    function getActiveSpecialHoursEntry(outlet, now = new Date()) {
+      let rawList = outlet?.shopee_special_hours || outlet?.special_hours;
+      if (typeof rawList === 'string') {
+        try { rawList = JSON.parse(rawList); } catch (e) { rawList = null; }
+      }
+      if (rawList && typeof rawList === 'object' && !Array.isArray(rawList)) {
+        rawList = rawList.special_hours || [];
+      }
+      if (!Array.isArray(rawList) || !rawList.length) {
+        return null;
+      }
+      const nowMs = now.getTime();
+      for (const entry of rawList) {
+        if (!entry || typeof entry !== 'object') continue;
+        const startDt = parseSpecialHoursDatePart(entry.date_start ?? entry.start_date ?? entry.date);
+        const endDt = parseSpecialHoursDatePart(entry.date_end ?? entry.end_date ?? entry.date_start ?? entry.date);
+        if (!startDt || !endDt) continue;
+        const startMs = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate(), 0, 0, 0).getTime();
+        const endMs = new Date(endDt.getFullYear(), endDt.getMonth(), endDt.getDate(), 23, 59, 59, 999).getTime();
+        if (nowMs >= startMs && nowMs <= endMs) {
+          return entry;
+        }
+      }
+      return null;
+    }
+
+    function isWithinSpecialHoursIntervals(entry, now = new Date()) {
+      if (!entry) return false;
+      const dateType = Number(entry.date_type ?? 1);
+      if (dateType === 1) {
+        return false;
+      }
+      const intervals = Array.isArray(entry.intervals) ? entry.intervals : [];
+      if (!intervals.length) return false;
+
+      const wibParts = getWibParts(now);
+      const currentSec = Number(wibParts.hour) * 3600 + Number(wibParts.minute) * 60;
+
+      for (const inv of intervals) {
+        if (!inv || typeof inv !== 'object') continue;
+        let sSec = Number(inv.start_relative_sec || 0);
+        let eSec = Number(inv.end_relative_sec || 0);
+        if (!sSec && !eSec && inv.time_from && inv.time_to) {
+          const fromParts = String(inv.time_from).split(':').map(Number);
+          const toParts = String(inv.time_to).split(':').map(Number);
+          sSec = (fromParts[0] || 0) * 3600 + (fromParts[1] || 0) * 60;
+          eSec = (toParts[0] || 0) * 3600 + (toParts[1] || 0) * 60;
+        }
+        if (sSec === 0 && eSec === 0) continue;
+        if (currentSec >= sSec && currentSec <= eSec) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     function normalizeScheduleFetchStatus(outlet, scheduleAvailable) {
       if (scheduleAvailable) return 'READY';
       let status = String(outlet?.schedule_fetch_status || '').trim().toUpperCase();
@@ -871,23 +1038,39 @@
     function getOutletStateContext(outlet) {
       const desiredState = normalizeDesiredOutletState(outlet);
       const liveState = normalizeLiveOutletState(outlet?.live_state || outlet?.shopee_status);
+      const activeSpecialHours = getActiveSpecialHoursEntry(outlet);
+      const hasSpecialHours = Boolean(activeSpecialHours);
+      const isWithinSpecialHours = hasSpecialHours ? isWithinSpecialHoursIntervals(activeSpecialHours) : false;
+      const isSpecialHoursClosed = String(outlet?.display_toggle_reason || '').trim().toUpperCase() === 'SPECIAL_HOURS'
+        || Boolean(outlet?.is_special_hours_closed)
+        || hasSpecialHours;
+
       const scheduleAvailable = typeof outlet?.schedule_available === 'boolean'
         ? outlet.schedule_available
-        : hasUsableSchedule(getOutletSchedule(outlet));
+        : (hasSpecialHours ? true : hasUsableSchedule(getOutletSchedule(outlet)));
       const isWithinSchedule = typeof outlet?.within_operating_schedule === 'boolean'
         ? outlet.within_operating_schedule
-        : (scheduleAvailable && isOutletWithinSchedule(outlet));
+        : (hasSpecialHours ? isWithinSpecialHours : (scheduleAvailable && isOutletWithinSchedule(outlet)));
       const isSuspended = Boolean(outlet?.is_suspended || outlet?.suspension_status === 'SUSPENDED');
       const scheduleFetchStatus = normalizeScheduleFetchStatus(outlet, scheduleAvailable);
-      let toggleReason = String(outlet?.display_toggle_reason || '').trim().toUpperCase()
-        || (isSuspended ? 'SUSPENDED' : (!scheduleAvailable ? scheduleFetchStatus : (!isWithinSchedule ? 'OUTSIDE_SCHEDULE' : 'READY')));
+
+      let toggleReason = String(outlet?.display_toggle_reason || '').trim().toUpperCase();
+      if (!toggleReason) {
+        if (isSuspended) toggleReason = 'SUSPENDED';
+        else if (hasSpecialHours || isSpecialHoursClosed) toggleReason = 'SPECIAL_HOURS';
+        else if (!scheduleAvailable) toggleReason = scheduleFetchStatus;
+        else if (!isWithinSchedule) toggleReason = 'OUTSIDE_SCHEDULE';
+        else toggleReason = 'READY';
+      }
       if (toggleReason === 'SCHEDULE_UNAVAILABLE' || toggleReason === 'WAITING_SCHEDULE_FETCH') toggleReason = scheduleFetchStatus;
+
       const toggleChecked = typeof outlet?.display_toggle_on === 'boolean'
         ? outlet.display_toggle_on
-        : Boolean(!isSuspended && desiredState === 'OPEN' && (!scheduleAvailable || isWithinSchedule));
+        : Boolean(!isSuspended && !hasSpecialHours && !isSpecialHoursClosed && desiredState === 'OPEN' && (!scheduleAvailable || isWithinSchedule));
       const toggleDisabled = typeof outlet?.display_toggle_disabled === 'boolean'
         ? outlet.display_toggle_disabled
-        : Boolean(isSuspended || !scheduleAvailable || !isWithinSchedule);
+        : Boolean(isSuspended || hasSpecialHours || isSpecialHoursClosed || !scheduleAvailable || !isWithinSchedule);
+
       let botPhase = String(outlet?.bot_phase || '').trim().toUpperCase();
       if (botPhase === 'SCHEDULE_UNAVAILABLE' || botPhase === 'WAITING_SCHEDULE_FETCH') botPhase = scheduleFetchStatus;
       if (!botPhase) {
@@ -909,6 +1092,8 @@
         scheduleFetchStatus,
         isWithinSchedule,
         isSuspended,
+        isSpecialHoursClosed,
+        hasSpecialHours,
         toggleChecked,
         toggleDisabled,
         toggleReason,
@@ -926,6 +1111,9 @@
     }
 
     function getMitraToggleTooltip(outlet, stateContext = getOutletStateContext(outlet), toggleState = getMitraToggleState(outlet, stateContext)) {
+      if (stateContext.toggleReason === 'SPECIAL_HOURS' || stateContext.isSpecialHoursClosed || stateContext.hasSpecialHours) {
+        return 'Bot tidak berfungsi karena terdapat Jadwal Khusus!';
+      }
       if (toggleState === 'open') {
         return 'Buka otomatis aktif (Sedang Buka). Klik untuk tutup sementara.';
       }
@@ -966,6 +1154,12 @@
           value: stateContext.liveState || 'UNKNOWN'
         };
       }
+      if (stateContext.hasSpecialHours || stateContext.isSpecialHoursClosed || stateContext.toggleReason === 'SPECIAL_HOURS') {
+        if (stateContext.liveState === 'OPEN') {
+          return { label: 'Sedang Buka • Jadwal Khusus', className: 'mitra-status-pill is-open', value: stateContext.liveState };
+        }
+        return { label: 'Sedang Tutup • Jadwal Khusus', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
+      }
       if (stateContext.botPhase === 'SUSPENDED') {
         return { label: 'Sedang Tutup • Dinonaktifkan admin', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
       }
@@ -982,7 +1176,7 @@
         return { label: 'Gagal fetch jadwal, bot akan coba lagi', className: 'mitra-status-pill is-pending', value: stateContext.liveState };
       }
       if (stateContext.botPhase === 'FETCHED_EMPTY') {
-        return { label: 'Jadwal Shopee belum diatur', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
+        return { label: 'Tidak memiliki jadwal operasional', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') {
         return { label: 'Sedang Tutup • Di luar jadwal', className: 'mitra-status-pill is-closed', value: stateContext.liveState };
@@ -1070,11 +1264,20 @@
     }
 
     function getOutletScheduleSummary(outlet) {
+      const activeSpecial = getActiveSpecialHoursEntry(outlet);
+      if (activeSpecial) {
+        const dateType = Number(activeSpecial.date_type ?? 1);
+        if (dateType !== 1 && Array.isArray(activeSpecial.intervals) && activeSpecial.intervals.length) {
+          const intervalsText = formatSpecialHoursIntervals(activeSpecial.intervals);
+          const today = getWibParts(new Date(), outlet?.timezone || 'Asia/Jakarta').weekday;
+          return `${today} ${intervalsText} (Jadwal Khusus)`;
+        }
+      }
       const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
       const today = getWibParts(new Date(), outlet?.timezone || 'Asia/Jakarta').weekday;
       const todayIntervals = schedule[today] || [];
       const hasAnySchedule = Object.values(schedule).some(intervals => Array.isArray(intervals) && intervals.length);
-      if (!hasAnySchedule) return 'Jadwal operasional belum tersedia';
+      if (!hasAnySchedule) return 'Tidak memiliki jadwal operasional';
       return todayIntervals.length
         ? `${today} ${todayIntervals.map(formatScheduleRange).join(', ')}`
         : `${today} tutup`;
@@ -1110,14 +1313,36 @@
       return '';
     }
 
+    function formatPauseScheduleRange(fromVal, untilVal) {
+      const fromDt = getPauseEndDate(fromVal);
+      const untilDt = getPauseEndDate(untilVal);
+      if (!fromDt || !untilDt) return '';
+      const fDate = formatWibDate(fromDt);
+      const fTime = formatWibTime(fromDt);
+      const uDate = formatWibDate(untilDt);
+      const uTime = formatWibTime(untilDt);
+      if (fDate === uDate) {
+        return `${fDate} ${fTime} - ${uTime} WIB`;
+      }
+      return `${fDate} ${fTime} - ${uDate} ${uTime} WIB`;
+    }
+
     function getOutletPauseLine(outlet, stateContext = getOutletStateContext(outlet)) {
       if (stateContext.isSuspended) {
         return outlet.alasan_penangguhan
           ? `Dinonaktifkan admin: ${outlet.alasan_penangguhan}`
           : 'Dinonaktifkan admin.';
       }
+      if (stateContext.isSpecialHoursClosed || stateContext.toggleReason === 'SPECIAL_HOURS' || stateContext.hasSpecialHours) {
+        return 'Bot tidak berfungsi karena terdapat Jadwal Khusus!';
+      }
       if (stateContext.botPhase === 'PENDING_PAUSE') {
         return 'Bot sedang dalam proses penutupan outlet';
+      }
+      const now = new Date();
+      const isUpcomingPause = outlet.pause_from && new Date(outlet.pause_from) > now && outlet.pause_until;
+      if (isUpcomingPause) {
+        return `Terjadwal tutup: ${formatPauseScheduleRange(outlet.pause_from, outlet.pause_until)}`;
       }
       if (stateContext.desiredState === 'PAUSE' && outlet.pause_until) {
         return formatPauseResumeInline(outlet.pause_until);
@@ -1128,9 +1353,9 @@
           : (getNextScheduleOpenText(outlet) || 'Di luar jam operasional');
       }
       if (stateContext.botPhase === 'WAITING_SCHEDULE') return getNextScheduleOpenText(outlet) || 'Di luar jam operasional';
-      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Ada kesalahan data, harap hubungi Admin';
-      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Ada kesalahan data, harap hubungi Admin';
-      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Ada kesalahan data, harap hubungi Admin';
+      if (stateContext.botPhase === 'NOT_FETCHED_YET') return 'Sedang sinkronisasi jadwal';
+      if (stateContext.botPhase === 'FETCH_RETRYING') return 'Sedang sinkronisasi ulang jadwal';
+      if (stateContext.botPhase === 'FETCHED_EMPTY') return 'Tidak memiliki jadwal operasional';
       if (stateContext.botPhase === 'AUTOMATION_OFF' || (stateContext.desiredState === 'MANUAL_OFF' && stateContext.liveState !== 'OPEN')) {
         return 'Akan dibuka kembali saat otomatisasi diaktifkan.';
       }
@@ -1141,6 +1366,9 @@
       if (stateContext.isSuspended) {
         return `Outlet ini sedang ditangguhkan oleh Admin (Alasan: ${outlet.alasan_penangguhan || 'Tindakan admin'}). Silakan hubungi CS/Admin.`;
       }
+      if (stateContext.toggleReason === 'SPECIAL_HOURS' || stateContext.isSpecialHoursClosed || stateContext.hasSpecialHours) {
+        return 'Bot tidak berfungsi karena terdapat Jadwal Khusus!';
+      }
       if (stateContext.toggleReason === 'NOT_FETCHED_YET') {
         return 'Toggle dikunci sambil menunggu bot fetch jadwal operasional Shopee.';
       }
@@ -1148,7 +1376,7 @@
         return 'Toggle dikunci karena bot belum berhasil fetch jadwal operasional Shopee.';
       }
       if (stateContext.toggleReason === 'FETCHED_EMPTY') {
-        return 'Toggle dikunci karena jadwal operasional Shopee belum diatur di Shopee.';
+        return 'Toggle dikunci karena outlet tidak memiliki jadwal operasional di Shopee.';
       }
       if (stateContext.toggleReason === 'OUTSIDE_SCHEDULE') {
         return 'Di luar jadwal operasional';
@@ -1159,7 +1387,41 @@
     function renderOutletSchedule(outlet) {
       const schedule = normalizeOutletSchedule(getOutletSchedule(outlet));
       const names = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      return `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal Operasional <span>WIB</span></div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].map(formatScheduleRange).join(' · ') : 'Tutup'}</span></div>`).join('')}</div>`;
+      const regularHtml = `<div class="outlet-schedule-panel"><div class="outlet-schedule-title">Jadwal Operasional <span>WIB</span></div>${names.map(name => `<div class="outlet-schedule-row"><strong>${name}</strong><span>${schedule[name].length ? schedule[name].map(formatScheduleRange).join(' · ') : 'Tutup'}</span></div>`).join('')}</div>`;
+
+      let specHours = outlet?.shopee_special_hours || outlet?.special_hours || [];
+      if (typeof specHours === 'string') {
+        try { specHours = JSON.parse(specHours); } catch (e) { specHours = []; }
+      }
+      if (specHours && typeof specHours === 'object' && !Array.isArray(specHours)) {
+        specHours = specHours.special_hours || [];
+      }
+      if (!Array.isArray(specHours) || !specHours.length) {
+        return regularHtml;
+      }
+
+      const specialRows = specHours.map(item => {
+        const dateText = formatSpecialHoursDate(item.date_start ?? item.start_date ?? item.date, item.date_end ?? item.end_date ?? item.date_start ?? item.date);
+        const descText = item.date_desc ? escapeHtml(String(item.date_desc)) : '';
+        const intervalsText = formatSpecialHoursIntervals(item.intervals);
+        return `
+          <div class="outlet-schedule-row" style="align-items:flex-start;">
+            <div>
+              <strong>${escapeHtml(dateText)}</strong>
+              ${descText ? `<small style="display:block;font-size:11px;color:#6b7280;margin-top:2px;">${descText}</small>` : ''}
+            </div>
+            <span>${escapeHtml(intervalsText)}</span>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        ${regularHtml}
+        <div class="outlet-schedule-panel" style="margin-top:12px;">
+          <div class="outlet-schedule-title">Jadwal Khusus <span>Shopee</span></div>
+          ${specialRows}
+        </div>
+      `;
     }
 
     function isOutletWithinSchedule(outlet, now = new Date()) {
@@ -1207,6 +1469,7 @@
         const stateContext = getOutletStateContext(out);
         const toggleState = getMitraToggleState(out, stateContext);
         const isSuspended = stateContext.isSuspended;
+        const isSpecialClosed = stateContext.isSpecialHoursClosed || stateContext.toggleReason === 'SPECIAL_HOURS';
         const isScheduleBlocked = stateContext.toggleDisabled && !isSuspended;
         const isToggleChecked = toggleState === 'open';
         const isToggleDisabled = toggleState === 'closed' || isTogglePending;
@@ -1220,9 +1483,31 @@
         const storeName = escapeHtml(out.store_name || out.store_id || 'Outlet');
         const storeId = escapeHtml(out.store_id || '-');
         const clockIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3 2"></path></svg>';
-        const pauseRow = pauseLine
-          ? `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(pauseLine)}</span></div>`
-          : '';
+
+        let metaHtml = '';
+        if (isSpecialClosed) {
+          metaHtml = `
+            <div class="mitra-outlet-meta">
+              <div class="mitra-outlet-meta-row">
+                ${clockIcon}
+                <span>Bot tidak berfungsi karena terdapat Jadwal Khusus!</span>
+              </div>
+            </div>
+          `;
+        } else {
+          const pauseRow = pauseLine
+            ? `<div class="mitra-outlet-meta-row">${clockIcon}<span>${escapeHtml(pauseLine)}</span></div>`
+            : '';
+          metaHtml = `
+            <div class="mitra-outlet-meta">
+              ${pauseRow}
+              <div class="mitra-outlet-meta-row">
+                ${clockIcon}
+                <span><strong>Jadwal hari ini:</strong> ${escapeHtml(scheduleSummary)}</span>
+              </div>
+            </div>
+          `;
+        }
 
         const card = document.createElement('div');
         card.className = 'card-box mitra-outlet-card';
@@ -1241,13 +1526,7 @@
             </div>
           </div>
 
-          <div class="mitra-outlet-meta">
-            ${pauseRow}
-            <div class="mitra-outlet-meta-row">
-              ${clockIcon}
-              <span><strong>Jadwal hari ini:</strong> ${escapeHtml(scheduleSummary)}</span>
-            </div>
-          </div>
+          ${metaHtml}
 
           ${isSuspended ? `<div class="mitra-outlet-alert">${escapeHtml(`Outlet ini dinonaktifkan admin${out.alasan_penangguhan ? `: ${out.alasan_penangguhan}` : '.'}`)}</div>` : ''}
 
@@ -1386,6 +1665,16 @@
       return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     }
 
+    function parseCustomStart() {
+      const value = document.getElementById('customStartInput')?.value || '';
+      if (!value) return null;
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [, y, m, d, h, min] = match;
+      const date = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min));
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
     function parseCustomUntil() {
       const value = document.getElementById('customUntilInput')?.value || '';
       if (!value) return null;
@@ -1396,9 +1685,10 @@
       return Number.isNaN(date.getTime()) ? null : date;
     }
 
-    function populatePickerTimeOptions() {
-      const hourSelect = document.getElementById('customPickerHour');
-      const minuteSelect = document.getElementById('customPickerMinute');
+    function populatePickerTimeOptions(target = 'until') {
+      const prefix = target === 'start' ? 'customStartPicker' : 'customUntilPicker';
+      const hourSelect = document.getElementById(`${prefix}Hour`);
+      const minuteSelect = document.getElementById(`${prefix}Minute`);
       if (!hourSelect || !minuteSelect || hourSelect.options.length) return;
       for (let value = 0; value < 24; value += 1) {
         const option = document.createElement('option');
@@ -1411,6 +1701,73 @@
         option.value = String(value).padStart(2, '0');
         option.textContent = option.value;
         minuteSelect.appendChild(option);
+      }
+      hourSelect.addEventListener('change', () => {
+        syncPickerTimeOptions(target);
+      });
+    }
+
+    function syncPickerTimeOptions(target = 'until') {
+      const prefix = target === 'start' ? 'customStartPicker' : 'customUntilPicker';
+      const hourSelect = document.getElementById(`${prefix}Hour`);
+      const minuteSelect = document.getElementById(`${prefix}Minute`);
+      if (!hourSelect || !minuteSelect || !pickerDate) return;
+
+      const now = new Date();
+      let minDate = now;
+      if (target === 'until') {
+        const startVal = parseCustomStart();
+        if (startVal && startVal > now) {
+          minDate = startVal;
+        }
+      }
+
+      const isMinDay = pickerDateKey(pickerDate) === pickerDateKey(minDate);
+      const minHour = minDate.getHours();
+      const minMinute = minDate.getMinutes();
+
+      let selectedHour = Number(hourSelect.value || 0);
+
+      let firstValidHour = null;
+      Array.from(hourSelect.options).forEach(opt => {
+        const val = Number(opt.value);
+        const isPast = isMinDay && val < minHour;
+        opt.disabled = isPast;
+        if (!isPast && firstValidHour === null) {
+          firstValidHour = val;
+        }
+      });
+
+      if (isMinDay && selectedHour < minHour) {
+        if (firstValidHour !== null) {
+          selectedHour = firstValidHour;
+          hourSelect.value = String(firstValidHour).padStart(2, '0');
+        }
+      }
+
+      const isMinHourOnDay = isMinDay && selectedHour === minHour;
+      let selectedMinute = Number(minuteSelect.value || 0);
+      let firstValidMinute = null;
+
+      Array.from(minuteSelect.options).forEach(opt => {
+        const val = Number(opt.value);
+        const isPast = isMinHourOnDay && (target === 'until' ? val <= minMinute : val < minMinute);
+        opt.disabled = isPast;
+        if (!isPast && firstValidMinute === null) {
+          firstValidMinute = val;
+        }
+      });
+
+      if (isMinHourOnDay && (target === 'until' ? selectedMinute <= minMinute : selectedMinute < minMinute)) {
+        if (firstValidMinute !== null) {
+          minuteSelect.value = String(firstValidMinute).padStart(2, '0');
+        } else {
+          const nextHour = selectedHour + 1;
+          if (nextHour < 24) {
+            hourSelect.value = String(nextHour).padStart(2, '0');
+            syncPickerTimeOptions(target);
+          }
+        }
       }
     }
 
@@ -1425,17 +1782,27 @@
       return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), Math.min(now.getDate(), lastDay), 23, 59, 59, 999);
     }
 
-    function renderPickerCalendar() {
-      const calendar = document.getElementById('customPickerCalendar');
-      const monthLabel = document.getElementById('customPickerMonthLabel');
+    function renderPickerCalendar(target = 'until') {
+      const prefix = target === 'start' ? 'customStartPicker' : 'customUntilPicker';
+      const calendar = document.getElementById(`${prefix}Calendar`);
+      const monthLabel = document.getElementById(`${prefix}MonthLabel`);
       if (!calendar || !monthLabel || !pickerMonth || !pickerDate) return;
       const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
       monthLabel.textContent = `${monthNames[pickerMonth.getMonth()]} ${pickerMonth.getFullYear()}`;
       calendar.innerHTML = '';
       const firstDay = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), 1).getDay();
       const daysInMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 0).getDate();
-      const todayKey = pickerDateKey(new Date());
+
+      const now = new Date();
+      let minDateKey = pickerDateKey(now);
+      if (target === 'until') {
+        const startVal = parseCustomStart();
+        if (startVal && pickerDateKey(startVal) > minDateKey) {
+          minDateKey = pickerDateKey(startVal);
+        }
+      }
       const maxDateKey = pickerDateKey(getPauseMaxDate());
+
       for (let index = 0; index < firstDay; index += 1) {
         calendar.appendChild(document.createElement('span'));
       }
@@ -1446,99 +1813,142 @@
         button.textContent = day;
         button.setAttribute('aria-label', `${day} ${monthNames[pickerMonth.getMonth()]} ${pickerMonth.getFullYear()}`);
         const dateKey = pickerDateKey(date);
-        button.disabled = dateKey < todayKey || dateKey > maxDateKey;
+        button.disabled = dateKey < minDateKey || dateKey > maxDateKey;
         if (pickerDateKey(date) === pickerDateKey(pickerDate)) button.classList.add('is-selected');
-        if (pickerDateKey(date) === todayKey) button.classList.add('is-today');
+        if (pickerDateKey(date) === pickerDateKey(now)) button.classList.add('is-today');
         button.onclick = (e) => {
           if (e) {
             e.preventDefault();
             e.stopPropagation();
           }
-          selectPickerDay(date);
+          selectPickerDay(target, date);
         };
         calendar.appendChild(button);
       }
     }
 
-    function selectPickerDay(date) {
+    function selectPickerDay(target, date) {
       pickerDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), pickerDate ? pickerDate.getHours() : 12, pickerDate ? pickerDate.getMinutes() : 0);
-      renderPickerCalendar();
+      renderPickerCalendar(target);
+      syncPickerTimeOptions(target);
     }
 
-    function shiftPickerMonth(offset, event) {
+    function shiftPickerMonth(target, offset, event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
       pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + offset, 1);
-      renderPickerCalendar();
+      renderPickerCalendar(target);
     }
 
-    function openCustomDateTimePicker(event) {
+    function openCustomDateTimePicker(target = 'until', event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
+      const otherTarget = target === 'start' ? 'until' : 'start';
+      closeCustomDateTimePicker(otherTarget);
+
+      pickerTarget = target;
       const outletTimezone = getSelectedOutletTimezone();
-      document.getElementById('customPickerTimezoneLabel').textContent = timezoneShortLabel(outletTimezone);
-      const existing = parseCustomUntil();
-      const selected = existing || new Date(Date.now() + (2 * 60 * 60 * 1000));
+      const prefix = target === 'start' ? 'customStart' : 'customUntil';
+      const timezoneLabel = document.getElementById(`${prefix}PickerTimezoneLabel`);
+      if (timezoneLabel) timezoneLabel.textContent = timezoneShortLabel(outletTimezone);
+
+      let selected;
+      if (target === 'start') {
+        selected = parseCustomStart() || new Date();
+      } else {
+        const start = parseCustomStart() || new Date();
+        selected = parseCustomUntil() || new Date(start.getTime() + (2 * 60 * 60 * 1000));
+      }
+
       pickerDate = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), selected.getHours(), selected.getMinutes());
       pickerMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
-      populatePickerTimeOptions();
-      document.getElementById('customPickerHour').value = formatWibTime(selected).slice(0, 2);
-      document.getElementById('customPickerMinute').value = formatWibTime(selected).slice(3, 5);
-      renderPickerCalendar();
-      const picker = document.getElementById('customDateTimePicker');
-      if (picker) {
-        picker.hidden = false;
-        if ('inert' in picker) picker.inert = false;
+      populatePickerTimeOptions(target);
+      document.getElementById(`${prefix}PickerHour`).value = formatWibTime(selected).slice(0, 2);
+      document.getElementById(`${prefix}PickerMinute`).value = formatWibTime(selected).slice(3, 5);
+      renderPickerCalendar(target);
+      syncPickerTimeOptions(target);
+
+      const popover = document.getElementById(`${prefix}DateTimePicker`);
+      if (popover) {
+        popover.hidden = false;
+        if ('inert' in popover) popover.inert = false;
       }
-      document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'true');
+      document.getElementById(`${prefix}Trigger`)?.setAttribute('aria-expanded', 'true');
     }
 
-    function closeCustomDateTimePicker(event) {
+    function closeCustomDateTimePicker(target = null, event = null) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
-      const picker = document.getElementById('customDateTimePicker');
-      if (picker) {
-        picker.hidden = true;
-        if ('inert' in picker) picker.inert = true;
-      }
-      document.getElementById('customUntilTrigger').setAttribute('aria-expanded', 'false');
+      const targets = target ? [target] : ['start', 'until'];
+      targets.forEach(t => {
+        const prefix = t === 'start' ? 'customStart' : 'customUntil';
+        const popover = document.getElementById(`${prefix}DateTimePicker`);
+        if (popover) {
+          popover.hidden = true;
+          if ('inert' in popover) popover.inert = true;
+        }
+        document.getElementById(`${prefix}Trigger`)?.setAttribute('aria-expanded', 'false');
+      });
     }
 
-    function applyCustomDateTimePicker(event) {
+    function applyCustomDateTimePicker(target = 'until', event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
       if (!pickerDate) return;
-      const hours = Number(document.getElementById('customPickerHour').value);
-      const minutes = Number(document.getElementById('customPickerMinute').value);
+      const prefix = target === 'start' ? 'customStart' : 'customUntil';
+      const hours = Number(document.getElementById(`${prefix}PickerHour`).value);
+      const minutes = Number(document.getElementById(`${prefix}PickerMinute`).value);
       const selected = new Date(pickerDate.getFullYear(), pickerDate.getMonth(), pickerDate.getDate(), hours, minutes);
-      document.getElementById('customUntilInput').value = toDateTimeLocalValue(selected);
-      if (parseCustomUntil() <= new Date()) {
-        showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
-        return;
+      const now = new Date();
+
+      if (target === 'start') {
+        if (selected < new Date(now.getTime() - 60000)) {
+          showUserToast('Waktu mulai tidak boleh waktu yang lampau.', 'error');
+          return;
+        }
+        document.getElementById('customStartInput').value = toDateTimeLocalValue(selected);
+        document.getElementById('customStartDisplay').textContent = `${formatWibDate(selected)} ${formatWibTime(selected)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
+
+        const currentUntil = parseCustomUntil();
+        if (!currentUntil || currentUntil <= selected) {
+          const newUntil = new Date(selected.getTime() + (2 * 60 * 60 * 1000));
+          document.getElementById('customUntilInput').value = toDateTimeLocalValue(newUntil);
+          document.getElementById('customUntilDisplay').textContent = `${formatWibDate(newUntil)} ${formatWibTime(newUntil)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
+        }
+      } else {
+        const startDate = parseCustomStart() || now;
+        if (selected <= startDate) {
+          showUserToast('Target berakhir harus lebih besar dari waktu mulai.', 'error');
+          return;
+        }
+        if (pickerDateKey(selected) > pickerDateKey(getPauseMaxDate())) {
+          showUserToast(`Target maksimal ${formatPauseTargetDate(getPauseMaxDate())}.`, 'error');
+          return;
+        }
+        document.getElementById('customUntilInput').value = toDateTimeLocalValue(selected);
+        document.getElementById('customUntilDisplay').textContent = `${formatWibDate(selected)} ${formatWibTime(selected)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
       }
-      if (pickerDateKey(selected) > pickerDateKey(getPauseMaxDate())) {
-        showUserToast(`Target maksimal ${formatPauseTargetDate(getPauseMaxDate())}.`, 'error');
-        return;
-      }
-      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(selected)} ${formatWibTime(selected)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
-      closeCustomDateTimePicker();
+
+      closeCustomDateTimePicker(target);
       updatePauseEndPreview();
     }
 
     function setCustomDateTimeDefaults() {
       const start = new Date();
       const until = new Date(start.getTime() + (2 * 60 * 60 * 1000));
-      document.getElementById('customStartInput').value = `${formatWibDate(start)} ${formatWibTime(start)}`;
+      const tzLabel = timezoneShortLabel(getSelectedOutletTimezone());
+      document.getElementById('customStartInput').value = toDateTimeLocalValue(start);
+      document.getElementById('customStartDisplay').textContent = `${formatWibDate(start)} ${formatWibTime(start)} ${tzLabel}`;
       document.getElementById('customUntilInput').value = toDateTimeLocalValue(until);
-      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(until)} ${formatWibTime(until)} ${timezoneShortLabel(getSelectedOutletTimezone())}`;
+      document.getElementById('customUntilDisplay').textContent = `${formatWibDate(until)} ${formatWibTime(until)} ${tzLabel}`;
     }
 
     function getSelectedPauseMinutes() {
@@ -1546,11 +1956,18 @@
       if (durationType === '30_min') return 30;
       if (durationType === '60_min') return 60;
       if (durationType === 'custom') {
+        const start = parseCustomStart() || new Date();
         const until = parseCustomUntil();
         if (!until) return 0;
-        return Math.max(0, Math.floor((until.getTime() - Date.now()) / 60000));
+        return Math.max(0, Math.floor((until.getTime() - start.getTime()) / 60000));
       }
       return null;
+    }
+
+    function getCustomStartValue() {
+      const value = parseCustomStart();
+      if (!value) return null;
+      return document.getElementById('customStartInput').value;
     }
 
     function getCustomUntilValue() {
@@ -1575,7 +1992,11 @@
       const timezone = responseData?.timezone || outlet?.timezone || 'Asia/Jakarta';
       const pauseEndTime = Number(responseData?.pause_end_time);
       const endDate = Number.isFinite(pauseEndTime) && pauseEndTime > 0 ? new Date(pauseEndTime) : null;
+      const pauseFromTime = responseData?.pause_from ? new Date(responseData.pause_from) : null;
 
+      if (durationType === 'custom' && pauseFromTime && pauseFromTime > new Date() && endDate) {
+        return `Penutupan terjadwal berhasil disimpan (${formatWibDate(pauseFromTime)} ${formatWibTime(pauseFromTime)} - ${formatWibDate(endDate)} ${formatWibTime(endDate)} ${timezoneShortLabel(timezone)}).`;
+      }
       if (durationType === 'rest_of_day') {
         return endDate
           ? `Permintaan tutup sementara Sepanjang Hari tersimpan. Buka kembali pada ${formatPauseTargetDate(endDate, timezone)}.`
@@ -1637,20 +2058,29 @@
       if (!preview) return;
       updatePauseRestOfDayMeta();
       const durationType = document.querySelector('input[name="pauseDuration"]:checked')?.value;
+      const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
+      const timezone = outlet?.timezone || 'Asia/Jakarta';
+
       if (durationType === 'rest_of_day') {
-        const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
         const nextSession = outlet && getNextOperationalSessionDate(outlet);
         preview.textContent = nextSession
-          ? `Buka kembali ${formatPauseTargetDate(nextSession, outlet.timezone || 'Asia/Jakarta')}`
+          ? `Buka kembali ${formatPauseTargetDate(nextSession, timezone)}`
           : 'Buka kembali pada sesi operasional berikutnya';
         return;
       }
       if (durationType === 'custom') {
+        const start = parseCustomStart();
         const until = parseCustomUntil();
-        const outlet = currentUserOutlets.find(item => String(item.store_id) === String(selectedStoreId));
-        preview.textContent = until
-          ? `Berakhir pada ${formatPauseTargetDate(until, outlet?.timezone || 'Asia/Jakarta')}`
-          : 'Pilih tanggal dan waktu outlet';
+        if (start && until) {
+          const isFuture = start > new Date();
+          if (isFuture) {
+            preview.textContent = `Terjadwal tutup ${formatWibDate(start)} ${formatWibTime(start)} - buka kembali ${formatPauseTargetDate(until, timezone)}`;
+          } else {
+            preview.textContent = `Berakhir pada ${formatPauseTargetDate(until, timezone)}`;
+          }
+        } else {
+          preview.textContent = 'Pilih tanggal dan waktu outlet';
+        }
         return;
       }
       const minutes = getSelectedPauseMinutes();
@@ -1658,7 +2088,7 @@
         preview.textContent = 'Masukkan durasi lebih dari 0 menit';
         return;
       }
-      preview.textContent = `Berakhir pada ${formatPauseTargetDate(new Date(Date.now() + minutes * 60000))}`;
+      preview.textContent = `Berakhir pada ${formatPauseTargetDate(new Date(Date.now() + minutes * 60000), timezone)}`;
     }
 
     function closeModal(shouldRender = true) {
@@ -1675,9 +2105,15 @@
       const durationType = document.querySelector('input[name="pauseDuration"]:checked').value;
       const customMins = getSelectedPauseMinutes() || 0;
       const customUntil = getCustomUntilValue();
-      if (durationType === 'custom' && customMins <= 0) {
-        showUserToast('Target waktu harus lebih besar dari waktu sekarang.', 'error');
-        return;
+      const customFrom = durationType === 'custom' ? getCustomStartValue() : null;
+
+      if (durationType === 'custom') {
+        const start = parseCustomStart();
+        const until = parseCustomUntil();
+        if (!start || !until || until <= start) {
+          showUserToast('Target berakhir harus lebih besar dari waktu mulai.', 'error');
+          return;
+        }
       }
       if (!beginUserToggle(storeId)) return;
 
@@ -1689,7 +2125,8 @@
             store_id: storeId,
             duration_type: durationType,
             custom_minutes: customMins,
-            custom_until: durationType === 'custom' ? customUntil : null
+            custom_until: durationType === 'custom' ? customUntil : null,
+            custom_from: customFrom
           })
         });
         const data = await res.json();

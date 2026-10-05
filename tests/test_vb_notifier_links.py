@@ -51,9 +51,9 @@ class TestVbNotifierLinks(unittest.TestCase):
             embed = payload["embeds"][0]
             desc = embed["description"]
 
-            expected_link_1 = "✅ Katsunami Rawamangun — 1002345 • [Link](https://shopee.co.id/universal-link/now-food/shop/1002345)"
-            expected_link_2 = "✅ Katsunami Matraman — 1002346 • [Link](https://shopee.co.id/universal-link/now-food/shop/1002346)"
-            expected_link_3 = "❌ Katsunami Tebet — 1002347 • [Link](https://shopee.co.id/universal-link/now-food/shop/1002347)"
+            expected_link_1 = "✅ Katsunami Rawamangun — 1002345 • [Link](https://shopee.co.id/now-food/shop/1002345)"
+            expected_link_2 = "✅ Katsunami Matraman — 1002346 • [Link](https://shopee.co.id/now-food/shop/1002346)"
+            expected_link_3 = "❌ Katsunami Tebet — 1002347 • [Link](https://shopee.co.id/now-food/shop/1002347)"
 
             self.assertIn(expected_link_1, desc)
             self.assertIn(expected_link_2, desc)
@@ -94,7 +94,7 @@ class TestVbNotifierLinks(unittest.TestCase):
             payload = mock_send.call_args[0][1]
             embed = payload["embeds"][0]
             self.assertIn("VB OUTLET (GUARDING) BERHASIL DITUTUP BOT", embed["title"])
-            self.assertIn("✅ Ayam Geprek Solo — 999888 • [Link](https://shopee.co.id/universal-link/now-food/shop/999888)", embed["description"])
+            self.assertIn("✅ Ayam Geprek Solo — 999888 • [Link](https://shopee.co.id/now-food/shop/999888)", embed["description"])
 
 
 if __name__ == "__main__":

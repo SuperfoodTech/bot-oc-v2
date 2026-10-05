@@ -109,10 +109,10 @@ class TestSpecialHoursScheduleGate(unittest.TestCase):
             shopee_special_hours=special_custom,
             timezone="Asia/Jakarta",
         )
-        # At 13:00 WIB (within 10:00 - 14:00) -> Open
+        # At 13:00 WIB (within 10:00 - 14:00) -> Open (Shopee managed / NO_CHANGE)
         decision = evaluate_outlet_status(outlet, current_time=self.now)
         self.assertEqual(decision.target_state, TARGET_OPEN)
-        self.assertEqual(decision.action, ACTION_OPEN)
+        self.assertEqual(decision.action, ACTION_NO_CHANGE)
 
         # At 15:00 WIB (outside 10:00 - 14:00) -> Closed
         time_15 = datetime(2026, 9, 17, 15, 0, 0, tzinfo=WIB)

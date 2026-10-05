@@ -102,6 +102,9 @@ def init_db() -> None:
         migration15_path = base_dir / "015_vb_brand_owner.sql"
         if migration15_path.exists():
             conn.execute(migration15_path.read_text(encoding="utf-8"))
+        migration16_path = base_dir / "016_scheduled_pause_from.sql"
+        if migration16_path.exists():
+            conn.execute(migration16_path.read_text(encoding="utf-8"))
         # Upgrade databases created by the earlier draft without deleting data.
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS password_plain text")
         conn.execute("ALTER TABLE dashboard_accounts ADD COLUMN IF NOT EXISTS link_slug varchar(255)")
@@ -141,6 +144,9 @@ def _coerce_pause_until(value) -> Optional[datetime]:
     if pause_until_dt.tzinfo is None:
         return pause_until_dt.replace(tzinfo=WIB)
     return pause_until_dt.astimezone(WIB)
+
+
+_coerce_pause_from = _coerce_pause_until
 
 
 def _empty_schedule_map() -> Dict[str, List[str]]:
@@ -477,9 +483,9 @@ def derive_outlet_runtime_state(
     elif desired_state == "OPEN" and not schedule_available:
         if schedule_fetch_status == SCHEDULE_FETCH_EMPTY:
             bot_phase = SCHEDULE_FETCH_EMPTY
-            status_label = "Jadwal Shopee belum diatur"
+            status_label = "Tidak memiliki jadwal operasional"
             status_tone = "closed"
-            display_note = "Toggle aktif, tetapi jadwal operasional Shopee belum diatur di Shopee sehingga bot belum bisa memproses outlet."
+            display_note = "Tidak memiliki jadwal operasional"
         elif schedule_fetch_status == SCHEDULE_FETCH_RETRYING:
             bot_phase = SCHEDULE_FETCH_RETRYING
             status_label = "Gagal fetch jadwal, bot akan coba lagi"
@@ -516,10 +522,7 @@ def derive_outlet_runtime_state(
         bot_phase = "WAITING_SCHEDULE"
         if active_special_hours:
             status_label = "Sedang Tutup • Jadwal Khusus"
-            display_note = (
-                f"Di luar jam operasional (Jadwal Khusus Shopee: {special_hours_desc}). "
-                "Toggle aktif kembali saat jadwal operasional dimulai."
-            )
+            display_note = "Bot tidak berfungsi karena terdapat Jadwal Khusus!"
         else:
             status_label = "Sedang Tutup • Di luar jadwal"
             display_note = (
@@ -543,9 +546,14 @@ def derive_outlet_runtime_state(
         display_note = ""
     elif desired_state == "OPEN" and live_state == "OPEN":
         bot_phase = "IN_SYNC"
-        status_label = "Sedang Buka"
-        status_tone = "open"
-        display_note = "Outlet mengikuti jam operasional Shopee."
+        if active_special_hours:
+            status_label = "Sedang Buka • Jadwal Khusus"
+            status_tone = "open"
+            display_note = "Bot tidak berfungsi karena terdapat Jadwal Khusus!"
+        else:
+            status_label = "Sedang Buka"
+            status_tone = "open"
+            display_note = "Outlet mengikuti jam operasional Shopee."
     else:
         bot_phase = "STATUS_UNKNOWN"
         status_label = "Status sedang dicek bot"
@@ -554,7 +562,7 @@ def derive_outlet_runtime_state(
 
     if is_suspended:
         display_toggle_reason = "SUSPENDED"
-    elif active_special_hours and not within_schedule:
+    elif active_special_hours:
         display_toggle_reason = "SPECIAL_HOURS"
     elif not schedule_available:
         display_toggle_reason = schedule_fetch_status
@@ -566,9 +574,15 @@ def derive_outlet_runtime_state(
     display_toggle_on = bool(
         desired_state == "OPEN"
         and not is_suspended
+        and not active_special_hours
         and (not schedule_available or within_schedule)
     )
-    display_toggle_disabled = bool(is_suspended or not schedule_available or not within_schedule)
+    display_toggle_disabled = bool(
+        is_suspended
+        or bool(active_special_hours)
+        or not schedule_available
+        or not within_schedule
+    )
     display_status_bucket = (
         "closed"
         if desired_state == "OPEN" and schedule_available and not within_schedule
@@ -594,6 +608,8 @@ def derive_outlet_runtime_state(
         "display_status_label": status_label,
         "display_status_tone": status_tone,
         "display_note": display_note,
+        "has_active_special_hours": bool(active_special_hours),
+        "is_special_hours_closed": bool(active_special_hours and not within_schedule),
     }
 
 
@@ -748,7 +764,7 @@ def format_last_action(raw_action: Optional[str]) -> str:
 
 
 def _store_query(where: str = "", params=()) -> List[Dict]:
-    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.shopee_special_hours,os.schedule_fetch_status,to_char(os.schedule_fetch_attempted_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_attempted_at,to_char(os.schedule_fetch_succeeded_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_succeeded_at,COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
+    query = """SELECT o.id AS outlet_uuid,o.store_id,o.long_name AS store_name,o.long_name,'' AS kepemilikan,o.special_hours,p.name AS merchant_name,p.name AS nama_portal,m.name AS nama_pemilik,m.id AS merchant_id,COALESCE(sa.username,%s) AS account_username,COALESCE(sa.phone,'') AS shopee_phone,COALESCE(sa.password_plain,'') AS shopee_password,da.password_plain AS vercel_password,da.dashboard_url AS vercel_link,da.google_email,os.vercel_status,os.shopee_actual_status AS shopee_status,os.shopee_regular_hours,os.shopee_special_hours,os.schedule_fetch_status,to_char(os.schedule_fetch_attempted_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_attempted_at,to_char(os.schedule_fetch_succeeded_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS schedule_fetch_succeeded_at,COALESCE(os.schedule_fetch_error, '') AS schedule_fetch_error,os.suspension_status,(os.suspension_status='SUSPENDED') AS is_suspended,os.suspension_reason AS alasan_penangguhan,os.pause_from::text AS pause_from,os.pause_until::text AS pause_until,to_char(os.last_checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS last_synced_at,al.action AS last_action_raw,tl.action AS last_toggle_action_raw,COALESCE(tl.reason, '') AS last_toggle_reason,tl.checked_at AS last_toggle_at,COALESCE(CASE WHEN s.status='ACTIVE' THEN 'Aktif' WHEN s.status='EXPIRED' THEN 'Kedaluwarsa' ELSE s.status END,CASE WHEN s.end_date>=CURRENT_DATE THEN 'Aktif' ELSE 'Kedaluwarsa' END,'Aktif') AS subscription_status,s.start_date::text AS tanggal_mulai_layanan,s.end_date::text AS tanggal_berakhir_layanan,sp.name AS paket FROM outlets o JOIN merchants m ON m.id=o.merchant_id JOIN portals p ON p.id=o.portal_id LEFT JOIN shopee_accounts sa ON sa.id=o.shopee_account_id LEFT JOIN dashboard_accounts da ON da.merchant_id=m.id AND da.role='MERCHANT' LEFT JOIN outlet_states os ON os.outlet_id=o.id LEFT JOIN LATERAL (SELECT action FROM automation_logs WHERE outlet_id=o.id ORDER BY id DESC LIMIT 1) al ON true LEFT JOIN LATERAL (SELECT action, COALESCE(reason, '') AS reason, to_char(checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') AS checked_at FROM automation_logs WHERE outlet_id=o.id AND action IN ('ACTION_OPEN','ACTION_CLOSE','USER_PAUSE_STORE','USER_RESUME_STORE','ADMIN_PAUSE_STORE','ADMIN_RESUME_STORE','OPEN_STORE','CLOSE_STORE','OPEN','CLOSE','PAUSE') ORDER BY id DESC LIMIT 1) tl ON true LEFT JOIN LATERAL (SELECT * FROM subscriptions sx WHERE sx.outlet_id=o.id ORDER BY sx.end_date DESC LIMIT 1) s ON true LEFT JOIN subscription_plans sp ON sp.id=s.plan_id"""
     if where: query += " WHERE " + where
     # Virtual Brand outlets are controlled exclusively through vb_brands and
     # must not appear in the regular outlet dashboard or bot-oc worker scope.
@@ -809,6 +825,23 @@ def deactivate_store(store_id: str) -> bool:
         result = conn.execute("UPDATE outlets SET is_active=false,updated_at=now() WHERE store_id=%s", (store_id,))
         return result.rowcount > 0
 
+
+def deactivate_missing_agency_stores(active_sheet_store_ids: set[str] | list[str]) -> list[str]:
+    """Deactivate agency outlets that are active in DB but no longer present in Google Sheet."""
+    if not active_sheet_store_ids:
+        return []
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            """UPDATE outlets o
+                  SET is_active=false, updated_at=now()
+                WHERE o.is_active=true
+                  AND NOT EXISTS (SELECT 1 FROM vb_brand_outlets vb WHERE vb.outlet_id=o.id)
+                  AND o.store_id <> ALL(%s)
+               RETURNING o.store_id""",
+            (list(active_sheet_store_ids),),
+        ).fetchall()
+        return [r["store_id"] for r in rows]
+
 def _public_store(store):
     item = dict(store); item.update({"account_username": BOT_USERNAME, "merchant_name": store.get("merchant_name", ""), "is_suspended": store.get("suspension_status") == "SUSPENDED"}); return item
 def admin_get_all_users_with_stores():
@@ -825,7 +858,7 @@ def sync_expired_user_pauses():
     with get_db_connection() as conn:
         conn.execute("""
             UPDATE outlet_states os
-               SET vercel_status='ON', pause_until=NULL, updated_at=now()
+               SET vercel_status='ON', pause_from=NULL, pause_until=NULL, updated_at=now()
              WHERE os.vercel_status='OFF'
                AND os.pause_until IS NOT NULL
                AND os.pause_until <= now()
@@ -946,9 +979,10 @@ def admin_create_account(username, password, google_email=None):
                 raise ValueError("Email Google sudah digunakan akun lain.")
         row = conn.execute("INSERT INTO dashboard_accounts (username,password_plain,role,is_active,google_email) VALUES (%s,%s,'ADMIN',true,%s) RETURNING id,username,role,is_active,google_email", (username, password, email_clean)).fetchone()
     return dict(row)
-def update_vercel_toggle(store_id, status, pause_until=None):
+def update_vercel_toggle(store_id, status, pause_until=None, pause_from=None):
     pause_until = _coerce_pause_until(pause_until)
-    with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_until, store_id))
+    pause_from = _coerce_pause_from(pause_from)
+    with get_db_connection() as conn: conn.execute("""UPDATE outlet_states os SET vercel_status=CASE WHEN os.suspension_status='SUSPENDED' OR EXISTS (SELECT 1 FROM subscriptions sx WHERE sx.outlet_id=os.outlet_id AND sx.end_date<CURRENT_DATE AND sx.status<>'CANCELLED') THEN 'OFF' ELSE %s END,pause_from=%s,pause_until=%s,updated_at=now() FROM outlets o WHERE o.id=os.outlet_id AND o.store_id=%s""", (status.upper(), pause_from, pause_until, store_id))
 
 
 def _apply_toggle_transaction(
@@ -961,13 +995,15 @@ def _apply_toggle_transaction(
     pause_mode: Optional[str],
     reject_suspended: bool,
     reject_expired_on: bool,
+    pause_from=None,
 ) -> Dict[str, Any]:
     """Serialize one outlet toggle and its audit log in a single transaction."""
     normalized_status = str(status or "").upper()
     if normalized_status not in {"ON", "OFF"}:
         return {"success": False, "code": "invalid_status", "detail": "Status toggle tidak valid."}
 
-    pause_until = _coerce_pause_until(pause_until)
+    pause_from_dt = _coerce_pause_from(pause_from)
+    pause_until_dt = _coerce_pause_until(pause_until)
 
     with get_db_connection() as conn:
         row = conn.execute(
@@ -1003,22 +1039,38 @@ def _apply_toggle_transaction(
         if reject_expired_on and normalized_status == "ON" and row["subscription_expired"]:
             return {"success": False, "code": "subscription_expired", "detail": "Subscription outlet sudah berakhir."}
 
-        next_pause_until = pause_until if normalized_status == "OFF" else None
-        effective_status = "OFF" if row["suspension_status"] == "SUSPENDED" or row["subscription_expired"] else normalized_status
+        now_wib = datetime.now(WIB)
+        is_future_scheduled = bool(pause_from_dt and pause_from_dt > now_wib)
+
+        if normalized_status == "OFF":
+            next_pause_from = pause_from_dt
+            next_pause_until = pause_until_dt
+            if is_future_scheduled:
+                effective_status = "OFF" if row["suspension_status"] == "SUSPENDED" or row["subscription_expired"] else "ON"
+            else:
+                effective_status = "OFF"
+                if not next_pause_from:
+                    next_pause_from = now_wib
+        else:
+            next_pause_from = None
+            next_pause_until = None
+            effective_status = "OFF" if row["suspension_status"] == "SUSPENDED" or row["subscription_expired"] else normalized_status
+
         updated = conn.execute(
             """
             UPDATE outlet_states
                SET vercel_status=%s,
+                   pause_from=%s,
                    pause_until=%s,
                    pause_mode=%s,
                    last_action_at=now(),
                    last_checked_at=now(),
                    updated_at=now()
              WHERE outlet_id=%s
-         RETURNING vercel_status, pause_until::text AS pause_until,
+         RETURNING vercel_status, pause_from::text AS pause_from, pause_until::text AS pause_until,
                    last_action_at::text AS changed_at
             """,
-            (effective_status, next_pause_until, pause_mode if normalized_status == "OFF" else None, row["outlet_id"]),
+            (effective_status, next_pause_from, next_pause_until, pause_mode if normalized_status == "OFF" else None, row["outlet_id"]),
         ).fetchone()
         conn.execute(
             """
@@ -1044,6 +1096,7 @@ def _apply_toggle_transaction(
             "store_name": row["store_name"],
             "owner_name": row["owner_name"],
             "vercel_status": updated["vercel_status"],
+            "pause_from": updated["pause_from"],
             "pause_until": updated["pause_until"],
             "pause_mode": pause_mode if normalized_status == "OFF" else None,
             "changed_at": updated["changed_at"],
@@ -1051,19 +1104,21 @@ def _apply_toggle_transaction(
         }
 
 
-def apply_user_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str, pause_mode: Optional[str] = None) -> Dict[str, Any]:
+def apply_user_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str, pause_mode: Optional[str] = None, pause_from=None) -> Dict[str, Any]:
     return _apply_toggle_transaction(
         store_id, status, pause_until, action, target_state, reason, pause_mode,
         reject_suspended=True,
         reject_expired_on=True,
+        pause_from=pause_from,
     )
 
 
-def apply_admin_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str, pause_mode: Optional[str] = None) -> Dict[str, Any]:
+def apply_admin_toggle(store_id: str, status: str, pause_until, action: str, target_state: str, reason: str, pause_mode: Optional[str] = None, pause_from=None) -> Dict[str, Any]:
     return _apply_toggle_transaction(
         store_id, status, pause_until, action, target_state, reason, pause_mode,
         reject_suspended=False,
         reject_expired_on=False,
+        pause_from=pause_from,
     )
 
 
@@ -1367,6 +1422,7 @@ def fetch_merchant_outlets_from_db() -> List[Any]:
             timezone=normalize_timezone(s.get("timezone")),
             status_langganan=s.get("subscription_status", "Aktif"),
             penangguhan="Ya" if s.get("is_suspended") else "Tidak",
+            pause_from=s.get("pause_from") or "",
             pause_until=s.get("pause_until") or "",
             shopee_regular_hours=s.get("shopee_regular_hours") or {},
             shopee_special_hours=s.get("shopee_special_hours") or [],
@@ -1428,6 +1484,430 @@ def delete_merchant(nama_pemilik: str) -> bool:
         conn.execute("DELETE FROM dashboard_accounts WHERE merchant_id=%s", (mid,))
         conn.execute("DELETE FROM merchants WHERE id=%s", (mid,))
         return True
+
+
+def get_analytics_data(mode: Optional[str] = None, time_range: str = "7d") -> dict:
+    """Aggregate pure bot guarding metrics (excluding manual dashboard triggers)."""
+    where_clauses = [
+        "al.action IN ('ACTION_OPEN', 'ACTION_CLOSE')",
+        "al.action NOT IN ('ADMIN_PAUSE_STORE', 'ADMIN_RESUME_STORE', 'USER_PAUSE_STORE', 'USER_RESUME_STORE')",
+        "al.reason NOT LIKE '%%Toggle = OFF%%'",
+        "al.reason NOT LIKE '%%Toggle = OFF (Auto Close)%%'",
+        # Pengecualian anomali infinite loop historis akibat bug sistem sebelum perbaikan Special Hours & Retry Queue (v1.24):
+        "al.outlet_id NOT IN (SELECT id FROM outlets WHERE store_id = '21830870')",
+        "NOT (al.outlet_id IN (SELECT id FROM outlets WHERE store_id = '1176062') AND al.checked_at BETWEEN '2026-09-22 14:00:00+07' AND '2026-09-22 15:40:00+07' AND al.success = false)",
+        "NOT (al.outlet_id IN (SELECT id FROM outlets WHERE store_id = '21846522') AND al.checked_at BETWEEN '2026-09-20 09:35:00+07' AND '2026-09-20 10:00:00+07' AND al.success = false)",
+    ]
+    params = []
+
+    if mode and mode.upper() in ("VB", "REGULAR"):
+        where_clauses.append("al.mode = %s")
+        params.append(mode.upper())
+
+    if time_range == "today":
+        where_clauses.append("al.checked_at >= (CURRENT_DATE AT TIME ZONE 'Asia/Jakarta')")
+    else:
+        # Standar rentang data valid (7 hari terakhir, mengisolasi data masa testing lama)
+        where_clauses.append("al.checked_at >= (NOW() - INTERVAL '7 days')")
+
+    where_sql = " WHERE " + " AND ".join(where_clauses)
+
+    with get_db_connection() as conn:
+        # 1. Summary Metrics
+        raw_sum = conn.execute(f"""
+            SELECT 
+                COUNT(*) AS total_actions,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS total_open,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS total_close,
+                SUM(CASE WHEN al.success = true THEN 1 ELSE 0 END) AS success_count,
+                SUM(CASE WHEN al.success = false THEN 1 ELSE 0 END) AS fail_count,
+                COUNT(DISTINCT al.outlet_id) AS distinct_outlets,
+                COUNT(DISTINCT al.vb_brand_id) AS distinct_brands,
+                SUM(CASE WHEN al.reason LIKE '%%VERIFICATION_MISMATCH%%' OR al.reason LIKE '%%MISMATCH%%' THEN 1 ELSE 0 END) AS mismatch_recovery_count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' AND al.reason NOT LIKE '%%VERIFICATION_MISMATCH%%' AND al.reason NOT LIKE '%%MISMATCH%%' THEN 1 ELSE 0 END) AS auto_open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' AND al.reason LIKE '%%Pause aktif%%' THEN 1 ELSE 0 END) AS pause_enforce_count
+            FROM automation_logs al
+            {where_sql}
+        """, params).fetchone() or {}
+
+        total = int(raw_sum.get("total_actions") or 0)
+        success = int(raw_sum.get("success_count") or 0)
+        rate = round((success / total * 100), 1) if total > 0 else 100.0
+
+        summary = {
+            "total_actions": total,
+            "total_open": int(raw_sum.get("total_open") or 0),
+            "total_close": int(raw_sum.get("total_close") or 0),
+            "success_count": success,
+            "fail_count": int(raw_sum.get("fail_count") or 0),
+            "success_rate": rate,
+            "distinct_outlets": int(raw_sum.get("distinct_outlets") or 0),
+            "distinct_brands": int(raw_sum.get("distinct_brands") or 0),
+            "auto_open_count": int(raw_sum.get("auto_open_count") or 0),
+            "pause_enforce_count": int(raw_sum.get("pause_enforce_count") or 0),
+            "mismatch_recovery_count": int(raw_sum.get("mismatch_recovery_count") or 0),
+        }
+
+        # 2. Hourly Distribution (24 Hours in Asia/Jakarta)
+        hourly_rows = conn.execute(f"""
+            SELECT 
+                EXTRACT(HOUR FROM al.checked_at AT TIME ZONE 'Asia/Jakarta')::int AS hour_wib,
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count
+            FROM automation_logs al
+            {where_sql}
+            GROUP BY hour_wib
+            ORDER BY hour_wib;
+        """, params).fetchall()
+        hourly_dict = {r["hour_wib"]: r for r in hourly_rows}
+        hourly_chart = []
+        for h in range(24):
+            r = hourly_dict.get(h, {})
+            hourly_chart.append({
+                "hour": f"{h:02d}:00",
+                "hour_int": h,
+                "total": int(r.get("total_count") or 0),
+                "open": int(r.get("open_count") or 0),
+                "close": int(r.get("close_count") or 0),
+            })
+
+        # 3. Daily Trend
+        daily_rows = conn.execute(f"""
+            SELECT 
+                TO_CHAR(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS date_str,
+                TO_CHAR(al.checked_at AT TIME ZONE 'Asia/Jakarta', 'Dy, DD/MM') AS label_str,
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count
+            FROM automation_logs al
+            {where_sql}
+            GROUP BY date_str, label_str
+            ORDER BY date_str ASC;
+        """, params).fetchall()
+        daily_chart = [
+            {
+                "date": r["date_str"],
+                "label": r["label_str"],
+                "total": int(r["total_count"] or 0),
+                "open": int(r["open_count"] or 0),
+                "close": int(r["close_count"] or 0),
+            }
+            for r in daily_rows
+        ]
+
+        # 4. Reason Categories (Pure Guarding)
+        reason_rows = conn.execute(f"""
+            SELECT 
+                CASE 
+                    WHEN al.reason LIKE '%%VERIFICATION_MISMATCH%%' OR al.reason LIKE '%%MISMATCH%%' THEN 'Pemulihan Mismatch Tutup'
+                    WHEN al.action = 'ACTION_OPEN' THEN 'Guarding Auto-Open Jadwal'
+                    WHEN al.action = 'ACTION_CLOSE' AND al.reason LIKE '%%Pause aktif%%' THEN 'Penegakan Durasi Pause'
+                    ELSE 'Guarding Rutin Lainnya'
+                END AS category_name,
+                COUNT(*) AS count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count
+            FROM automation_logs al
+            {where_sql}
+            GROUP BY 1
+            ORDER BY count DESC;
+        """, params).fetchall()
+        reasons = [
+            {
+                "category": r["category_name"],
+                "count": int(r["count"] or 0),
+                "open_count": int(r["open_count"] or 0),
+                "close_count": int(r["close_count"] or 0),
+                "percentage": round((int(r["count"] or 0) / total * 100), 1) if total > 0 else 0.0,
+            }
+            for r in reason_rows
+        ]
+
+        # 5. Operational Time Blocks
+        time_block_rows = conn.execute(f"""
+            WITH hourly_data AS (
+                SELECT 
+                    EXTRACT(HOUR FROM al.checked_at AT TIME ZONE 'Asia/Jakarta')::int AS h,
+                    al.action,
+                    al.success
+                FROM automation_logs al
+                {where_sql}
+            )
+            SELECT 
+                CASE 
+                    WHEN h BETWEEN 0 AND 5 THEN '00:00 - 05:59'
+                    WHEN h BETWEEN 6 AND 10 THEN '06:00 - 10:59'
+                    WHEN h BETWEEN 11 AND 14 THEN '11:00 - 14:59'
+                    WHEN h BETWEEN 15 AND 17 THEN '15:00 - 17:59'
+                    ELSE '18:00 - 23:59'
+                END AS time_range,
+                CASE 
+                    WHEN h BETWEEN 0 AND 5 THEN 'Dini Hari'
+                    WHEN h BETWEEN 6 AND 10 THEN 'Pagi'
+                    WHEN h BETWEEN 11 AND 14 THEN 'Siang'
+                    WHEN h BETWEEN 15 AND 17 THEN 'Sore'
+                    ELSE 'Malam'
+                END AS session_name,
+                CASE 
+                    WHEN h BETWEEN 0 AND 5 THEN 'Volume rendah; bot dalam siklus pemantauan berkala (P5 Inactive Heartbeat).'
+                    WHEN h BETWEEN 6 AND 10 THEN 'Pembukaan sesi operasional pagi dan pemulihan batas jeda pause semalam.'
+                    WHEN h BETWEEN 11 AND 14 THEN 'Peak hour makan siang; guarding aktif menjaga outlet tetap buka sesuai jadwal.'
+                    WHEN h BETWEEN 15 AND 17 THEN 'Jeda sesi siang-sore dan penegakan pause operasional.'
+                    ELSE 'Sesi makan malam dan penegakan penutupan outlet di akhir jam operasional.'
+                END AS characteristic,
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count,
+                SUM(CASE WHEN success = true THEN 1 ELSE 0 END) AS success_count
+            FROM hourly_data
+            GROUP BY 1, 2, 3
+            ORDER BY MIN(h);
+        """, params).fetchall()
+        time_blocks = [
+            {
+                "time_range": r["time_range"],
+                "session_name": r["session_name"],
+                "characteristic": r["characteristic"],
+                "total_count": int(r["total_count"] or 0),
+                "open_count": int(r["open_count"] or 0),
+                "close_count": int(r["close_count"] or 0),
+                "success_rate": round((int(r["success_count"] or 0) / int(r["total_count"] or 1) * 100), 1) if int(r["total_count"] or 0) > 0 else 100.0,
+            }
+            for r in time_block_rows
+        ]
+
+        # 6. Top Intervened Entities (Brands / Outlets)
+        top_rows = conn.execute(f"""
+            SELECT 
+                COALESCE(b.name, o.long_name, o.store_id, 'Tidak Diketahui') AS name,
+                al.vb_brand_id,
+                al.outlet_id,
+                al.mode,
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count,
+                SUM(CASE WHEN al.success = true THEN 1 ELSE 0 END) AS success_count,
+                MAX(al.checked_at AT TIME ZONE 'Asia/Jakarta') AS last_intervened_at
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql}
+            GROUP BY 1, 2, 3, 4
+            ORDER BY total_count DESC
+            LIMIT 15;
+        """, params).fetchall()
+        top_entities = [
+            {
+                "name": r["name"],
+                "brand_id": str(r["vb_brand_id"]) if r["vb_brand_id"] else None,
+                "outlet_id": str(r["outlet_id"]) if r["outlet_id"] else None,
+                "mode": "Virtual Brand" if r["mode"] == "VB" else "Agency",
+                "total_count": int(r["total_count"] or 0),
+                "open_count": int(r["open_count"] or 0),
+                "close_count": int(r["close_count"] or 0),
+                "success_rate": round((int(r["success_count"] or 0) / int(r["total_count"] or 1) * 100), 1) if int(r["total_count"] or 0) > 0 else 100.0,
+                "last_intervened_at": r["last_intervened_at"].strftime("%d/%m/%Y %H:%M WIB") if r["last_intervened_at"] else "-",
+            }
+            for r in top_rows
+        ]
+
+    return {
+        "summary": summary,
+        "hourly": hourly_chart,
+        "daily": daily_chart,
+        "reasons": reasons,
+        "time_blocks": time_blocks,
+        "top_entities": top_entities,
+    }
+
+
+def get_entity_analytics_detail(
+    entity_name: str,
+    mode: Optional[str] = None,
+    brand_id: Optional[str] = None,
+    outlet_id: Optional[str] = None,
+    time_range: str = "7d"
+) -> dict:
+    """Detailed operational deep-dive for a specific brand or outlet."""
+    where_clauses = [
+        "al.action IN ('ACTION_OPEN', 'ACTION_CLOSE')",
+        "al.action NOT IN ('ADMIN_PAUSE_STORE', 'ADMIN_RESUME_STORE', 'USER_PAUSE_STORE', 'USER_RESUME_STORE')",
+        "al.reason NOT LIKE '%%Toggle = OFF%%'",
+        "al.reason NOT LIKE '%%Toggle = OFF (Auto Close)%%'",
+        # Pengecualian anomali infinite loop historis pra-v1.24:
+        "al.outlet_id NOT IN (SELECT id FROM outlets WHERE store_id = '21830870')",
+        "NOT (al.outlet_id IN (SELECT id FROM outlets WHERE store_id = '1176062') AND al.checked_at BETWEEN '2026-09-22 14:00:00+07' AND '2026-09-22 15:40:00+07' AND al.success = false)",
+        "NOT (al.outlet_id IN (SELECT id FROM outlets WHERE store_id = '21846522') AND al.checked_at BETWEEN '2026-09-20 09:35:00+07' AND '2026-09-20 10:00:00+07' AND al.success = false)",
+    ]
+    params = []
+
+    if time_range == "today":
+        where_clauses.append("al.checked_at >= (CURRENT_DATE AT TIME ZONE 'Asia/Jakarta')")
+    else:
+        where_clauses.append("al.checked_at >= (NOW() - INTERVAL '7 days')")
+
+    if brand_id and str(brand_id).strip() and str(brand_id) != "None":
+        where_clauses.append("al.vb_brand_id = %s")
+        params.append(str(brand_id).strip())
+    elif outlet_id and str(outlet_id).strip() and str(outlet_id) != "None":
+        where_clauses.append("al.outlet_id = %s")
+        params.append(str(outlet_id).strip())
+    else:
+        where_clauses.append("(b.name = %s OR o.long_name = %s OR o.store_id = %s)")
+        params.extend([entity_name.strip(), entity_name.strip(), entity_name.strip()])
+
+    where_sql = " WHERE " + " AND ".join(where_clauses)
+
+    with get_db_connection() as conn:
+        # 1. Summary
+        raw_sum = conn.execute(f"""
+            SELECT 
+                COUNT(*) AS total_actions,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS auto_open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS pause_protect_count,
+                SUM(CASE WHEN al.success = true THEN 1 ELSE 0 END) AS success_count,
+                SUM(CASE WHEN al.success = false THEN 1 ELSE 0 END) AS fail_count,
+                MAX(al.checked_at AT TIME ZONE 'Asia/Jakarta') AS last_intervened_at
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql}
+        """, params).fetchone() or {}
+
+        tot = int(raw_sum.get("total_actions") or 0)
+        succ = int(raw_sum.get("success_count") or 0)
+        summary = {
+            "entity_name": entity_name,
+            "mode": mode or ("Virtual Brand" if brand_id else "Agency"),
+            "total_actions": tot,
+            "auto_open_count": int(raw_sum.get("auto_open_count") or 0),
+            "pause_protect_count": int(raw_sum.get("pause_protect_count") or 0),
+            "success_count": succ,
+            "fail_count": int(raw_sum.get("fail_count") or 0),
+            "success_rate": round((succ / tot * 100), 1) if tot > 0 else 100.0,
+            "last_intervened_at": raw_sum["last_intervened_at"].strftime("%d/%m/%Y %H:%M WIB") if raw_sum.get("last_intervened_at") else "-",
+        }
+
+        # 2. Hourly breakdown & Peak Hours
+        hourly_rows = conn.execute(f"""
+            SELECT 
+                EXTRACT(HOUR FROM al.checked_at AT TIME ZONE 'Asia/Jakarta')::int AS h,
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql}
+            GROUP BY h
+            ORDER BY total_count DESC;
+        """, params).fetchall()
+
+        peak_hours = [
+            {
+                "hour": f"{r['h']:02d}:00 - {r['h']:02d}:59 WIB",
+                "total_count": int(r["total_count"] or 0),
+                "open_count": int(r["open_count"] or 0),
+                "close_count": int(r["close_count"] or 0),
+            }
+            for r in hourly_rows[:3]
+        ]
+
+        # 3. Peak Auto-Open & Peak Pause Protect Timings
+        top_open_hour = conn.execute(f"""
+            SELECT 
+                EXTRACT(HOUR FROM al.checked_at AT TIME ZONE 'Asia/Jakarta')::int AS h,
+                COUNT(*) AS count
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql} AND al.action = 'ACTION_OPEN'
+            GROUP BY h
+            ORDER BY count DESC
+            LIMIT 1;
+        """, params).fetchone()
+
+        top_close_hour = conn.execute(f"""
+            SELECT 
+                EXTRACT(HOUR FROM al.checked_at AT TIME ZONE 'Asia/Jakarta')::int AS h,
+                COUNT(*) AS count
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql} AND al.action = 'ACTION_CLOSE'
+            GROUP BY h
+            ORDER BY count DESC
+            LIMIT 1;
+        """, params).fetchone()
+
+        summary["top_open_hour"] = f"{top_open_hour['h']:02d}:00 WIB ({top_open_hour['count']}x)" if top_open_hour else "-"
+        summary["top_close_hour"] = f"{top_close_hour['h']:02d}:00 WIB ({top_close_hour['count']}x)" if top_close_hour else "-"
+
+        # 4. Outlets breakdown (for multi-outlet brands)
+        outlet_rows = conn.execute(f"""
+            SELECT 
+                o.long_name, o.store_id,
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN al.action = 'ACTION_OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN al.action = 'ACTION_CLOSE' THEN 1 ELSE 0 END) AS close_count,
+                SUM(CASE WHEN al.success = true THEN 1 ELSE 0 END) AS success_count
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql}
+            GROUP BY o.long_name, o.store_id
+            ORDER BY total_count DESC;
+        """, params).fetchall()
+
+        outlets_breakdown = [
+            {
+                "long_name": r["long_name"] or "-",
+                "store_id": r["store_id"] or "-",
+                "total_count": int(r["total_count"] or 0),
+                "open_count": int(r["open_count"] or 0),
+                "close_count": int(r["close_count"] or 0),
+                "success_rate": round((int(r["success_count"] or 0) / int(r["total_count"] or 1) * 100), 1) if int(r["total_count"] or 0) > 0 else 100.0,
+            }
+            for r in outlet_rows
+        ]
+
+        # 5. Recent Logs (Top 6 latest logs)
+        recent_rows = conn.execute(f"""
+            SELECT 
+                al.checked_at AT TIME ZONE 'Asia/Jakarta' AS checked_at_wib,
+                al.action,
+                al.success,
+                al.reason,
+                o.long_name,
+                o.store_id
+            FROM automation_logs al
+            LEFT JOIN vb_brands b ON b.id = al.vb_brand_id
+            LEFT JOIN outlets o ON o.id = al.outlet_id
+            {where_sql}
+            ORDER BY al.checked_at DESC
+            LIMIT 6;
+        """, params).fetchall()
+
+        recent_logs = [
+            {
+                "timestamp": r["checked_at_wib"].strftime("%d/%m %H:%M:%S WIB") if r["checked_at_wib"] else "-",
+                "action": r["action"],
+                "action_type": "Auto-Open" if r["action"] == "ACTION_OPEN" else "Proteksi Pause",
+                "success": bool(r["success"]),
+                "outlet_name": r["long_name"] or "-",
+                "store_id": r["store_id"] or "-",
+                "reason": r["reason"] or "",
+            }
+            for r in recent_rows
+        ]
+
+        return {
+            "summary": summary,
+            "peak_hours": peak_hours,
+            "outlets": outlets_breakdown,
+            "recent_logs": recent_logs,
+        }
 
 
 init_state = init_db
