@@ -28,12 +28,14 @@ Latest documented release: `1.34.0`.
 
 Shopee In-Browser Virtual Switch Engine & Zero-DOM Probing Architecture:
 - Mengintegrasikan mekanisme In-Browser Instant Virtual Switch pada `src/shopee/store_status.py` dan `main-vb/src/shopee/store_status.py` yang mengeliminasi kebutuhan navigasi DOM halaman penuh (`driver.get()`) dan jeda hidrasi React SPA (2-4 detik per toko).
-- Menyuntikkan cookie context `shopee_foody_mid = target_store_id` dan menetralisir `shopee_tob_entity_id = ""` secara atomik (<1ms) pada browser session aktif sebelum mengeksekusi request `fetch()` API Shopee (`/api/seller/store`, `/regular-hours`, `/special-hours`, `/action/open`, `/action/pause`).
+- Menyuntikkan cookie context `shopee_foody_mid = target_merchant_id` dan menetralisir `shopee_tob_entity_id = ""` secara atomik (<1ms) pada domain tunggal `.shopee.co.id; path=/` pada browser session aktif sebelum mengeksekusi request `fetch()` API Shopee (`/api/seller/store`, `/regular-hours`, `/special-hours`, `/action/open`, `/action/pause`), mengeliminasi error `1130001: token invalid` dan tabrakan cookie multi-domain.
+- Mengeliminasi hardcode fallback `"14367488"` pada `worker.py` dan argumen default `store_status.py`, menggantikannya dengan Dynamic MID Resolution `(targetMid || existingMid || targetSid)` sesuai kontrak `/trx` (mengeliminasi error `1130014: merchant authority invalid`).
+- Menghapus pemanggilan destruktif `_deliberate_logout_and_relogin` pada kegagalan pencocokan nama merchant di dropdown profil Shopee, menandai outlet dilewati (*skip with warning*), dan menjaga proses Chromium tetap aktif 24/7.
 - Memangkas latensi pemeriksaan status toko (probing) dari 3-5 detik menjadi <150ms per outlet, dan mempercepat siklus patroli portal 30-50 toko dari 2-4 menit menjadi hanya 4-8 detik.
 - Mengakselerasi eksekusi aksi on-demand (Express Lane) dari dashboard mitra/admin menjadi instan (<500ms).
 - Menerapkan Automated Self-Healing Fallback: Jika terjadi mismatch identitas toko atau anomali jaringan, bot secara otomatis beralih ke full navigation `ensure_business_hours_page` untuk memulihkan sesi, dengan tetap menjaga validasi pengaman ketat `StoreIdentityMismatch`.
 - Mengoptimalkan patrol loop pada `main-bot/src/worker.py` dan `main-vb/src/worker.py` (tetap dijaga 100% byte-for-byte identical) dengan `switch_store_context`.
-- Menambahkan comprehensive test suite `tests/test_virtual_switch_contract.py` untuk memvalidasi injeksi cookie, pencegahan context bleeding, dan mekanisme fallback.
+- Menambahkan comprehensive test suite `tests/test_virtual_switch_contract.py` (11 test case) untuk memvalidasi injeksi cookie, netralisasi entity ID, dynamic MID, pencegahan context bleeding, dan mekanisme fallback.
 
 Virtual Brand Toggle SQL Type Casting & Import Integrity:
 - Memperbaiki `psycopg.errors.DatatypeMismatch` pada query `request_status` dan `request_brand_status_public` di `src/backend/vb.py` dengan menambahkan cast eksplisit `::timestamptz` pada ekspresi `CASE WHEN %s='PAUSED' THEN %s::timestamptz ELSE NULL END` untuk kolom `pause_from` dan `pause_until`.

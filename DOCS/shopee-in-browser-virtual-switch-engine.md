@@ -41,12 +41,12 @@ Berdasarkan analisis reverse-engineering network traffic Shopee Seller Web (`foo
 | Parameter Cookie | Asal / Sumber | Peran Teknis & Karakteristik |
 | :--- | :--- | :--- |
 | `shopee_tob_token` | Sesi Login Browser | **Master Auth Token (To-Business)**. Kunci enkripsi autentikasi akun portal. Berlaku untuk seluruh toko yang berada di bawah akun tersebut. |
-| `shopee_foody_mid` | Disuntik Dinamis | **Merchant ID Switcher (MID)**. Menentukan identitas entitas merchant induk target (contoh: `"14367488"` untuk WonderFood). |
-| `shopee_tob_entity_id` | Disuntik Dinamis | **Store ID Switcher (SID)**. Menentukan cabang outlet spesifik yang sedang diakses (contoh: `"21897166"`). |
+| `shopee_foody_mid` | Disuntik Dinamis | **Merchant Context Switcher (MID)**. Menentukan identitas entitas merchant induk target (contoh: `"14367488"` untuk WonderFood, atau MID Lokarasa). Diinjeksi eksklusif ke domain `.shopee.co.id`. |
+| `shopee_tob_entity_id` | Dinetralkan (`""`) | **Entity Neutralizer**. Wajib disetel string kosong (`""`) pada domain `.shopee.co.id`. Jika diisi Store ID atau ID yang tidak cocok dengan master token, server Shopee menolak request dengan `code: 1130001, msg: 'token invalid'`. |
 | `__shopee_partner_website_x_token_live` | Sesi Login Browser | **JWT Live Session**. Token pendukung regional claim (`region: ID`). |
 
 > **Kunci Penemuan:**
-> Backend Shopee Food API (`foody.shopee.co.id`) **TIDAK** membutuhkan navigasi visual halaman web untuk mengganti toko. Server Shopee sepenuhnya menentukan target toko yang dievaluasi berdasarkan kombinasi cookie `shopee_foody_mid` dan `shopee_tob_entity_id` yang menyertai request HTTP.
+> Backend Shopee Food API (`foody.shopee.co.id`) **TIDAK** membutuhkan navigasi visual halaman web untuk mengganti toko. Server Shopee sepenuhnya menentukan target toko yang dievaluasi berdasarkan cookie `shopee_foody_mid` yang valid dan netralisasi `shopee_tob_entity_id = ""` pada domain `.shopee.co.id`.
 
 ---
 
@@ -63,19 +63,21 @@ Setiap kali fungsi probe atau action dipanggil, script menyuntikkan pasangan coo
     var existingMid = (document.cookie.match(/(?:^|;\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
     var mid = (targetMid || existingMid || sid).trim();
 
-    // 2. Suntikkan cookie secara serentak ke domain .shopee.co.id dan hostname aktif
-    var domains = ['.shopee.co.id', window.location.hostname];
-    for (var i = 0; i < domains.length; i++) {
-        var d = domains[i];
-        document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
-        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
-    }
-    document.cookie = "shopee_foody_mid=" + mid + "; path=/";
-    document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+    // 2. Bersihkan cookie level-host untuk mencegah tabrakan multi-domain (Cookie Scope Collision)
+    document.cookie = "shopee_foody_mid=; path=/; max-age=0;";
+    document.cookie = "shopee_tob_entity_id=; path=/; max-age=0;";
 
-    // 3. Simpan state context ke localStorage
+    // 3. Suntikkan cookie MID eksklusif ke domain .shopee.co.id
+    if (mid) {
+        document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=.shopee.co.id;";
+    }
+
+    // 4. Netralkan shopee_tob_entity_id (wajib string kosong pada domain .shopee.co.id)
+    document.cookie = "shopee_tob_entity_id=; path=/; domain=.shopee.co.id;";
+
+    // 5. Simpan state context ke localStorage
     try {
-        localStorage.setItem("shopee_foody_mid", mid);
+        if (mid) localStorage.setItem("shopee_foody_mid", mid);
         localStorage.setItem("current_store_id", sid);
     } catch(e) {}
     return true;
@@ -232,4 +234,30 @@ Sesuai aturan operasional repository pada [.agents/AGENTS.md](file:///home/akbar
 2. **Byte-for-Byte Store Status Parity**:
    File [src/shopee/store_status.py](file:///home/akbarhann/project/bot-oc/src/shopee/store_status.py) dan [main-vb/src/shopee/store_status.py](file:///home/akbarhann/project/bot-oc/main-vb/src/shopee/store_status.py) dijaga **100% identik**.
 3. **Test Suite Verification**:
-   Seluruh 18 pengujian contract pada [tests/test_virtual_switch_contract.py](file:///home/akbarhann/project/bot-oc/tests/test_virtual_switch_contract.py), [tests/test_regular_hours_store_identity.py](file:///home/akbarhann/project/bot-oc/tests/test_regular_hours_store_identity.py), dan [tests/test_special_hours_store_identity.py](file:///home/akbarhann/project/bot-oc/tests/test_special_hours_store_identity.py) harus lulus 100% sebelum rilis dideploy ke production.
+   Seluruh 20 pengujian contract pada [tests/test_virtual_switch_contract.py](file:///home/akbarhann/project/bot-oc/tests/test_virtual_switch_contract.py), [tests/test_regular_hours_store_identity.py](file:///home/akbarhann/project/bot-oc/tests/test_regular_hours_store_identity.py), dan [tests/test_special_hours_store_identity.py](file:///home/akbarhann/project/bot-oc/tests/test_special_hours_store_identity.py) harus lulus 100% sebelum rilis dideploy ke production.
+
+---
+
+## 8. Hardening & Blueprint Resolusi Gap Production (Multi-Merchant & Multi-Domain)
+
+Berdasarkan investigasi menyeluruh pada insiden production (analisis dev vs prod), telah diterapkan 5 lapis penguatan arsitektur:
+
+### A. Netralisasi Otorisasi `shopee_tob_entity_id` (Solusi Error 1130001)
+* **Akar Masalah**: Menyuntikkan Store ID (`sid`) ke dalam cookie `shopee_tob_entity_id` memicu inkonsistensi otorisasi dengan master token `shopee_tob_token`, karena entity ID Shopee adalah representasi akun entitas induk bukan ID toko. Hal ini menyebabkan Shopee gateway melempar `{"code": 1130001, "msg": "token invalid"}`.
+* **Perbaikan**: `shopee_tob_entity_id` bertindak murni sebagai **Entity Neutralizer** dan **wajib** selalu disetel ke string kosong `""` pada domain `.shopee.co.id`.
+
+### B. Eliminasi Polusi Cookie Multi-Domain (Cookie Scope Collision)
+* **Akar Masalah**: Menulis cookie ke domain `.shopee.co.id`, `window.location.hostname`, dan host tanpa domain menciptakan 3 salinan cookie bernama sama di Chromium cookie jar. Header HTTP `Cookie:` mengirimkan duplikat yang bertabrakan saat fetch API dijalankan.
+* **Perbaikan**: Sebelum injeksi, cookie level-host dibersihkan via `max-age=0`. Penulisan `shopee_foody_mid` dan `shopee_tob_entity_id` dibatasi secara tunggal dan eksklusif ke domain `.shopee.co.id; path=/`.
+
+### C. Eliminasi Fallback Hardcode WonderFood ("14367488") (Solusi Error 1130014)
+* **Akar Masalah**: Hardcode `"14367488"` di `worker.py` dan default argumen `store_status.py` memaksa toko dari portal merchant lain (seperti *Lokarasa*, *SuperFood*, dll) menggunakan MID WonderFood, sehingga server Shopee menolak eksekusi dengan `{"code": 1130014, "msg": "merchant authority invalid"}`.
+* **Perbaikan**: Menghapus default argumen `"14367488"` menjadi `merchant_id: Optional[str] = None`. Mengintegrasikan dynamic MID resolution: `m_id = raw_mid if raw_mid.isdigit() else None`. Jika `targetMid` kosong, JS runtime otomatis mengambil `existingMid` dari portal aktif atau fallback ke `targetSid` per kontrak `/trx`.
+
+### D. Eliminasi Cascade Logout Destruktif (`_deliberate_logout_and_relogin`)
+* **Akar Masalah**: Saat bot gagal mencocokkan nama portal di dropdown profil, logika recovery memanggil `_deliberate_logout_and_relogin` yang menghancurkan sesi Chromium 24/7 dan mematikan proses browser.
+* **Perbaikan**: Kegagalan switch merchant tidak boleh merusak sesi browser aktif. Bot menandai kelompok outlet tersebut dilewati (*skip with warning*), mempertahankan browser tetap hidup, dan melanjutkan patroli untuk puluhan merchant lainnya secara kontinu.
+
+### E. Normalisasi Whitespace & Case-Insensitive Dropdown Matching
+* **Akar Masalah**: Ketidakcocokan penulisan kapitalisasi di DB (`LOKARASA`) versus UI (`Lokarasa`).
+* **Perbaikan**: Mengintegrasikan normalisasi teks `.toLowerCase().replace(/\s+/g, ' ').trim()`, mendukung selektor virtual scroll `rc-virtual-list-holder`, dan mengganti error throw fatal menjadi boolean `False` yang graceful.

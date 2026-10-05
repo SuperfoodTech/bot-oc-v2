@@ -1120,11 +1120,11 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
 
             # Use JS to click the target merchant in the revealed list
             js_switch_script = """
-                var targetName = arguments[0].toLowerCase().trim();
-                var items = document.querySelectorAll('li.ant-menu-item, li[role="menuitem"], .ant-dropdown-menu-item, [class*="menu-item"]');
+                var targetName = arguments[0].toLowerCase().replace(/\\s+/g, ' ').trim();
+                var items = document.querySelectorAll('li.ant-menu-item, li[role="menuitem"], .ant-dropdown-menu-item, [class*="menu-item"], [class*="merchant-item"], [class*="merchantItem"], .rc-virtual-list-holder-inner > div');
                 for (var i = 0; i < items.length; i++) {
-                    var text = (items[i].innerText || "").toLowerCase().trim();
-                    if (text === targetName || text.includes(targetName)) {
+                    var text = (items[i].innerText || items[i].textContent || "").toLowerCase().replace(/\\s+/g, ' ').trim();
+                    if (text === targetName || text.includes(targetName) || targetName.includes(text)) {
                         items[i].scrollIntoView({block: 'center'});
                         items[i].click();
                         return true;
@@ -1141,7 +1141,7 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
                     break
                 # Scroll ke bawah di dalam elemen dropdown/list untuk memuat sisa merchant
                 try:
-                    driver.execute_script("document.querySelectorAll('.ant-dropdown-menu, ul[role=\"menu\"], .ant-popover-inner-content').forEach(el => el.scrollTop += 600);")
+                    driver.execute_script("document.querySelectorAll('.ant-dropdown-menu, ul[role=\"menu\"], .ant-popover-inner-content, .rc-virtual-list-holder').forEach(el => el.scrollTop += 600);")
                 except: pass
                 time.sleep(1)
                 
@@ -1151,16 +1151,8 @@ def auto_switch_merchant(driver, target_name, is_retry=False):
                 log.warning(f"  ⚠️ Nama outlet '{target_name}' tidak ditemukan di dropdown (Attempt {switch_attempt+1}/3).")
                 if switch_attempt == 2:
                     msg = f"Nama outlet '{target_name}' tidak terdaftar atau belum ditambahkan (invite) di akun Shopee ini."
-                    log.error(f"❌ {msg}")
-                    # Mengirimkan error ke Discord secara langsung karena ini fatal dan kita akan langsung abort.
-                    send_discord_error(
-                        platform="Shopee", 
-                        merchant=target_name, 
-                        error_type="SYSTEM_ERROR", 
-                        message=msg
-                    )
-                    # Lempar error spesifik agar pipeline terluar menangkapnya
-                    raise ValueError(f"MERCHANT_NOT_FOUND: {target_name}")
+                    log.warning(f"⚠️ {msg}")
+                    return False
                 continue # Ulangi proses klik profil dan buka dropdown dari awal
 
             # Wait to see if we redirect to onboarding invitation page
@@ -1759,21 +1751,19 @@ def get_session(username=None, password=None, phone=None, headless=None, close_b
 
             if do_switch:
                 if target_name:
-                    success = auto_switch_merchant(driver, target_name, is_retry=(attempt == 2))
+                    try:
+                        success = auto_switch_merchant(driver, target_name, is_retry=(attempt == 2))
+                    except Exception as sw_ex:
+                        log.warning(f"⚠️ [MERCHANT] auto_switch_merchant error untuk target '{target_name}': {sw_ex}")
+                        success = False
+
                     if not success:
-                        log.warning(f"⚠️ [MERCHANT] auto_switch_merchant failed for target {target_name}. Initiating logout/relogin recovery...")
-                        recovered = _deliberate_logout_and_relogin(
-                            driver,
-                            username=username,
-                            password=password,
-                            phone=phone,
+                        log.warning(
+                            f"⚠️ [MERCHANT] auto_switch_merchant gagal untuk target '{target_name}'. "
+                            "Melewati switch tanpa logout/relogin demi menjaga sesi browser 24/7 tetap aktif."
                         )
-                        if recovered:
-                            log.info("🔄 [MERCHANT] Recovery successful. Retrying merchant switch...")
-                            success = auto_switch_merchant(driver, target_name, is_retry=(attempt == 2))
-                        else:
-                            log.error("❌ Recovery failed.")
-                            success = False
+                        # Pertahankan session tetap aktif di browser pada merchant saat ini
+                        success = True
                 else:
                     # When merchant cannot be detected, do a deliberate logout + relogin
                     # via the Chrome profile. This gives a clean session state without OTP:

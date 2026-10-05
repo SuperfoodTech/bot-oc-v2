@@ -290,7 +290,9 @@ def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
 
         # Primary Action: In-Browser XHR via store_status module (Instant execution)
         if driver and outlet.store_id:
-            m_id = str(getattr(outlet, "merchant_id", "") or "14367488")
+            raw_mid = str(getattr(outlet, "merchant_id", "") or "").strip()
+            # Hanya gunakan raw_mid jika numerik valid (Shopee Merchant ID), hindari UUID DB internal / fallback kaku
+            m_id = raw_mid if raw_mid.isdigit() else None
             if action == ACTION_OPEN:
                 success = store_status.open_store_action(driver, outlet.store_id, merchant_id=m_id)
             else:
@@ -484,7 +486,12 @@ def sync_all_stores(
                             log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}' (Current UI: '{current_merchant}'). Skip switch.")
                         else:
                             log.info(f"  🔄 [MERCHANT] Current merchant di browser: '{current_merchant or 'Unknown'}' | Target group: '{portal_name}'. Executing auto_switch_merchant...")
-                            sw_ok = browser.auto_switch_merchant(driver, portal_name)
+                            try:
+                                sw_ok = browser.auto_switch_merchant(driver, portal_name)
+                            except Exception as sw_ex:
+                                log.warning(f"  ⚠️ [MERCHANT] auto_switch_merchant ke '{portal_name}' melempar error: {sw_ex}")
+                                sw_ok = False
+
                             if sw_ok:
                                 log.info(f"  ✅ [MERCHANT] Switched successfully to portal merchant '{portal_name}'.")
                                 tok, eid = browser.extract_tokens_from_driver(driver)
@@ -494,8 +501,11 @@ def sync_all_stores(
                                     if eid:
                                         cached["shopee_tob_entity_id"] = eid
                             else:
-                                log.warning(f"  ⚠️ [MERCHANT] auto_switch_merchant ke '{portal_name}' gagal. Initiating session recovery...")
-                                _recover_session(f"switch merchant to {portal_name} failed")
+                                log.warning(
+                                    f"  ⚠️ [MERCHANT] auto_switch_merchant ke '{portal_name}' gagal. "
+                                    f"Melewati {len(merchant_outlets)} outlet pada portal '{portal_name}' tanpa merusak sesi browser aktif."
+                                )
+                                continue
                     except Exception as sw_err:
                         log.warning(f"  ⚠️ Merchant context switch warning: {sw_err}")
                         if _is_session_dead(driver):
