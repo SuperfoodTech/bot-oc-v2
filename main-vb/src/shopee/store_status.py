@@ -4,33 +4,51 @@ import logging
 from typing import Dict, Any, Optional
 from selenium.webdriver.common.by import By
 
-log = logging.getLogger(__name__)
+try:
+    from core.logger import get_logger
+    log = get_logger("shopee.store_status")
+except ImportError:
+    log = logging.getLogger("shopee.store_status")
 
 
 class StoreIdentityMismatch(Exception):
     """Raised when Shopee returns data for a different store than requested."""
 
+
+def is_on_shopee_partner(driver) -> bool:
+    """Checks if the browser driver is currently on the Shopee Partner portal domain."""
+    if not driver:
+        return False
+    try:
+        url = str(getattr(driver, "current_url", "") or "").lower()
+        return "partner.shopee.co.id" in url or "foody.shopee.co.id" in url
+    except Exception:
+        return False
+
+
 def ensure_business_hours_page(driver, store_id: str) -> bool:
     """
     Navigates Chrome browser to the exact Business Hours URL for store_id and verifies if the Business Hours menu is fully loaded.
     URL: https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}
+    Acts as the reliable fallback mechanism when virtual switch requires full page hydration.
     """
     if not driver or not store_id:
         return False
 
-    target_url = f"https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={store_id}"
+    sid = str(store_id).strip()
+    target_url = f"https://partner.shopee.co.id/settings/shopee-food/business-hours-settings/business-hours?storeId={sid}"
     try:
-        current_url = str(driver.current_url or "").lower()
+        current_url = str(getattr(driver, "current_url", "") or "").lower()
     except Exception as exc:
-        log.warning(f"  ⚠️ [NAVIGATE BUSINESS HOURS] Tidak bisa membaca current_url untuk Store {store_id}: {exc}")
+        log.warning(f"  ⚠️ [NAVIGATE BUSINESS HOURS] Tidak bisa membaca current_url untuk Store {sid}: {exc}")
         return False
     
-    if f"storeid={store_id}".lower() not in current_url:
-        log.info(f"🌐 [NAVIGATE BUSINESS HOURS] Navigasi browser ke menu business hours untuk store {store_id}: {target_url}")
+    if f"storeid={sid}".lower() not in current_url:
+        log.info(f"🌐 [NAVIGATE BUSINESS HOURS] Navigasi browser ke menu business hours untuk store {sid}: {target_url}")
         try:
             driver.get(target_url)
         except Exception as exc:
-            log.warning(f"  ⚠️ [NAVIGATE BUSINESS HOURS] Navigasi gagal untuk Store {store_id}: {exc}")
+            log.warning(f"  ⚠️ [NAVIGATE BUSINESS HOURS] Navigasi gagal untuk Store {sid}: {exc}")
             return False
         time.sleep(2.0)
 
@@ -56,14 +74,14 @@ def ensure_business_hours_page(driver, store_id: str) -> bool:
                     store_match: !!targetStoreId && storeParam === targetStoreId,
                     has_keywords: hasKeywords
                 };
-            """, str(store_id))
+            """, sid)
             
             if check_res and check_res.get("url_match") and check_res.get("store_match") and check_res.get("has_keywords"):
                 is_loaded = True
-                log.info(f"  ✅ [VERIFY BUSINESS HOURS] Outlet Store {store_id} BERHASIL TERDETEKSI & TER-LOAD di menu Business Hours! (URL: {driver.current_url})")
+                log.info(f"  ✅ [VERIFY BUSINESS HOURS] Outlet Store {sid} BERHASIL TERDETEKSI & TER-LOAD di menu Business Hours! (URL: {getattr(driver, 'current_url', '')})")
                 break
             else:
-                log.warning(f"  ⚠️ [VERIFY BUSINESS HOURS] Percobaan {attempt}/3: Halaman Business Hours Store {store_id} belum ter-load sempurna. Menunggu hidrasi React SPA...")
+                log.warning(f"  ⚠️ [VERIFY BUSINESS HOURS] Percobaan {attempt}/3: Halaman Business Hours Store {sid} belum ter-load sempurna. Menunggu hidrasi React SPA...")
                 time.sleep(2.0)
         except Exception as e:
             log.warning(f"  ⚠️ [VERIFY BUSINESS HOURS] Error saat verifikasi hidrasi halaman: {e}")
@@ -72,44 +90,118 @@ def ensure_business_hours_page(driver, store_id: str) -> bool:
     return is_loaded
 
 
-def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
+def switch_store_context(driver, store_id: str, merchant_id: Optional[str] = None) -> bool:
+    """
+    Switches active store context instantly in-browser (<1ms) via context cookie injection.
+    Sets 'shopee_foody_mid' to target merchant_id and 'shopee_tob_entity_id' to store_id.
+    Ensures browser is on Shopee Partner portal before injecting.
+    """
+    if not driver or not store_id:
+        return False
+
+    sid = str(store_id).strip()
+    mid = str(merchant_id).strip() if merchant_id else ""
+    if not sid:
+        return False
+
+    if not is_on_shopee_partner(driver):
+        log.info(f"🌐 [INITIAL CONTEXT LOAD] Navigasi awal browser ke partner portal untuk Store {sid}...")
+        return ensure_business_hours_page(driver, sid)
+
+    try:
+        driver.execute_script("""
+            var sid = String(arguments[0] || '').trim();
+            var targetMid = String(arguments[1] || '').trim();
+            var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
+            var mid = (targetMid || existingMid || sid).trim();
+            if (sid) {
+                var domains = ['.shopee.co.id', window.location.hostname];
+                for (var i = 0; i < domains.length; i++) {
+                    var d = domains[i];
+                    document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
+                    document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
+                }
+                document.cookie = "shopee_foody_mid=" + mid + "; path=/";
+                document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+                try {
+                    localStorage.setItem("shopee_foody_mid", mid);
+                    localStorage.setItem("current_store_id", sid);
+                } catch(e) {}
+            }
+            return true;
+        """, sid, mid)
+        return True
+    except Exception as exc:
+        log.warning(f"  ⚠️ [VIRTUAL SWITCH] Injeksi cookie konteks gagal untuk Store {sid}: {exc}")
+        return ensure_business_hours_page(driver, sid)
+
+
+def get_actual_store_status(
+    driver,
+    store_id: str,
+    merchant_id: Optional[str] = None,
+    use_virtual_switch: bool = True,
+) -> Optional[Dict[str, Any]]:
     """
     Fetches exact real-time opening status directly from Shopee Partner Dashboard API (`/api/seller/store`).
     Exact real-time condition matching DOCS/store-response.json & UI Screenshot:
     - display_opening_status: 2 (OPEN / BUKA) vs 3 (PAUSE / TUTUP SEMENTARA)
     - order_enabled: 1 (CAN RECEIVE ORDERS) vs 0 (PAUSED / CANNOT RECEIVE ORDERS)
     - pause_time: pause_start_time > 0 indicates active pause
-    Includes 5s AbortController timeout, 3x retries, and DOM badge fallback.
+    Includes instant virtual switch with automated fallback to full page navigation on mismatch.
     """
     if not driver or not store_id:
         return None
 
+    sid = str(store_id).strip()
+    mid = str(merchant_id).strip() if merchant_id else ""
     try:
-        if not ensure_business_hours_page(driver, store_id):
-            log.warning(f"  ⚠️ [LIVE STORE API] Business Hours page untuk Store {store_id} belum tervalidasi. Skip fetch live state.")
-            return None
+        if use_virtual_switch:
+            if not switch_store_context(driver, sid, merchant_id=mid):
+                log.warning(f"  ⚠️ [LIVE STORE API] Context switch gagal untuk Store {sid}. Skip fetch live state.")
+                return None
+        else:
+            if not ensure_business_hours_page(driver, sid):
+                log.warning(f"  ⚠️ [LIVE STORE API] Business Hours page untuk Store {sid} belum tervalidasi. Skip fetch live state.")
+                return None
 
-        log.info(f"📊 [LIVE STORE API] Fetching real-time store state via /api/seller/store for Store {store_id}...")
+        log.info(f"📊 [LIVE STORE API] Fetching real-time store state via /api/seller/store for Store {sid} (virtual_switch={use_virtual_switch})...")
 
         res = None
         for attempt in range(1, 3):
             try:
-                res = driver.execute_async_script("""
+                res = driver.execute_async_script(f"""
                     var done = arguments[arguments.length - 1];
+                    var targetSid = "{sid}";
+                    var targetMid = "{mid}";
+                    var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
+                    var mid = (targetMid || existingMid || targetSid).trim();
+                    var sid = targetSid;
+                    if (sid) {{
+                        var domains = ['.shopee.co.id', window.location.hostname];
+                        for (var i = 0; i < domains.length; i++) {{
+                            var d = domains[i];
+                            document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
+                            document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
+                        }}
+                        document.cookie = "shopee_foody_mid=" + mid + "; path=/";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+                    }}
                     var controller = new AbortController();
-                    var timer = setTimeout(function() {
+                    var timer = setTimeout(function() {{
                         controller.abort();
-                        done({code: -1, msg: 'Client timeout (5s)'});
-                    }, 5000);
-                    fetch('https://foody.shopee.co.id/api/seller/store', {
+                        done({{code: -1, msg: 'Client timeout (5s)'}});
+                    }}, 5000);
+                    var url = 'https://foody.shopee.co.id/api/seller/store' + (targetSid ? ('?store_id=' + targetSid) : '');
+                    fetch(url, {{
                         method: 'GET',
                         credentials: 'include',
-                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        headers: {{ 'Accept': 'application/json, text/plain, */*' }},
                         signal: controller.signal
-                    })
-                    .then(function(r) { return r.json(); })
-                    .then(function(d) { clearTimeout(timer); done(d); })
-                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                    }})
+                    .then(function(r) {{ return r.json(); }})
+                    .then(function(d) {{ clearTimeout(timer); done(d); }})
+                    .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
                 """)
                 if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
                     break
@@ -119,18 +211,25 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 log.warning(f"  ⚠️ [LIVE STORE API] Percobaan {attempt}/2 error: {async_err}")
             time.sleep(1.0)
 
-        log.info(f"  🔍 [LIVE STORE API RAW RESPONSE] Store {store_id} | Raw Res: {res}")
+        log.info(f"  🔍 [LIVE STORE API RAW RESPONSE] Store {sid} | Raw Res: {res}")
 
         if isinstance(res, dict) and res.get("code") == 0 and res.get("data"):
             data = res["data"]
             store_data = data.get("store", {})
-            requested_store_id = str(store_id).strip()
+            requested_store_id = sid
             response_store_id = str(store_data.get("id") or "").strip() if isinstance(store_data, dict) else ""
             log.info(
                 f"  🔍 [LIVE STORE IDENTITY] requested_store_id={requested_store_id} "
                 f"response_store_id={response_store_id or 'missing'}"
             )
             if response_store_id != requested_store_id:
+                if use_virtual_switch:
+                    log.warning(
+                        f"  ⚠️ [VIRTUAL SWITCH MISMATCH] Store {requested_store_id} returned {response_store_id or 'missing'}. "
+                        "Mencoba fallback via full navigation..."
+                    )
+                    return get_actual_store_status(driver, sid, merchant_id=mid, use_virtual_switch=False)
+
                 log.error(
                     f"  ❌ [LIVE STORE REJECTED] Store ID mismatch: "
                     f"requested={requested_store_id}, response={response_store_id or 'missing'}. "
@@ -153,7 +252,7 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 status_str = "CLOSED"
 
             log.info(
-                f"  ✅ [REALTIME LIVE STATE] Store {store_id} | "
+                f"  ✅ [REALTIME LIVE STATE] Store {sid} | "
                 f"Status: {status_str} | display_opening_status: {display_status} | "
                 f"order_enabled: {order_enabled} | "
                 f"pause_start_time: {pause_start}"
@@ -209,44 +308,72 @@ def get_actual_store_status(driver, store_id: str) -> Optional[Dict[str, Any]]:
     except StoreIdentityMismatch:
         raise
     except Exception as e:
-        log.warning(f"⚠️ Pengecekan status toko gagal untuk store {store_id}: {e}")
+        log.warning(f"⚠️ Pengecekan status toko gagal untuk store {sid}: {e}")
 
     return None
 
 
-def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
+def get_regular_hours(
+    driver,
+    store_id: str,
+    merchant_id: Optional[str] = None,
+    use_virtual_switch: bool = True,
+) -> Optional[Dict[str, Any]]:
     """
-    Pulls regular business hours for a specific storeId after navigating browser to Business Hours page.
+    Pulls regular business hours for a specific storeId using instant in-browser virtual switch.
     Endpoint: GET https://foody.shopee.co.id/api/seller/store/regular-hours
     """
     if not driver or not store_id:
         return None
 
+    sid = str(store_id).strip()
+    mid = str(merchant_id).strip() if merchant_id else ""
     try:
-        if not ensure_business_hours_page(driver, store_id):
-            log.warning(f"  ⚠️ [REGULAR HOURS API] Business Hours page untuk Store {store_id} belum tervalidasi. Skip fetch schedule.")
-            return None
+        if use_virtual_switch:
+            if not switch_store_context(driver, sid, merchant_id=mid):
+                log.warning(f"  ⚠️ [REGULAR HOURS API] Context switch gagal untuk Store {sid}. Skip fetch schedule.")
+                return None
+        else:
+            if not ensure_business_hours_page(driver, sid):
+                log.warning(f"  ⚠️ [REGULAR HOURS API] Business Hours page untuk Store {sid} belum tervalidasi. Skip fetch schedule.")
+                return None
 
-        log.info(f"🕒 [PULL REGULAR HOURS] Menarik data jadwal reguler Store {store_id}...")
+        log.info(f"🕒 [PULL REGULAR HOURS] Menarik data jadwal reguler Store {sid} (virtual_switch={use_virtual_switch})...")
         res = None
         for attempt in range(1, 3):
             try:
-                res = driver.execute_async_script("""
+                res = driver.execute_async_script(f"""
                     var done = arguments[arguments.length - 1];
+                    var targetSid = "{sid}";
+                    var targetMid = "{mid}";
+                    var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
+                    var mid = (targetMid || existingMid || targetSid).trim();
+                    var sid = targetSid;
+                    if (sid) {{
+                        var domains = ['.shopee.co.id', window.location.hostname];
+                        for (var i = 0; i < domains.length; i++) {{
+                            var d = domains[i];
+                            document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
+                            document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
+                        }}
+                        document.cookie = "shopee_foody_mid=" + mid + "; path=/";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+                    }}
                     var controller = new AbortController();
-                    var timer = setTimeout(function() {
+                    var timer = setTimeout(function() {{
                         controller.abort();
-                        done({code: -1, msg: 'Client timeout (5s)'});
-                    }, 5000);
-                    fetch('https://foody.shopee.co.id/api/seller/store/regular-hours', {
+                        done({{code: -1, msg: 'Client timeout (5s)'}});
+                    }}, 5000);
+                    var url = 'https://foody.shopee.co.id/api/seller/store/regular-hours' + (targetSid ? ('?store_id=' + targetSid) : '');
+                    fetch(url, {{
                         method: 'GET',
                         credentials: 'include',
-                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        headers: {{ 'Accept': 'application/json, text/plain, */*' }},
                         signal: controller.signal
-                    })
-                    .then(function(r) { return r.json(); })
-                    .then(function(d) { clearTimeout(timer); done(d); })
-                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                    }})
+                    .then(function(r) {{ return r.json(); }})
+                    .then(function(d) {{ clearTimeout(timer); done(d); }})
+                    .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
                 """)
                 if isinstance(res, dict) and res.get("code") == 0:
                     break
@@ -254,16 +381,23 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 log.warning(f"  ⚠️ [REGULAR HOURS API] Percobaan {attempt}/2 error: {async_err}")
             time.sleep(1.0)
 
-        log.info(f"  🔍 [REGULAR HOURS API RESPONSE] Store {store_id} | Response: {res.get('code') if isinstance(res, dict) else None}")
+        log.info(f"  🔍 [REGULAR HOURS API RESPONSE] Store {sid} | Response: {res.get('code') if isinstance(res, dict) else None}")
         if isinstance(res, dict) and res.get("code") == 0:
             data = res.get("data")
             response_store_id = str(data.get("store_id") or "").strip() if isinstance(data, dict) else ""
-            requested_store_id = str(store_id).strip()
+            requested_store_id = sid
             log.info(
                 f"  🔍 [REGULAR HOURS IDENTITY] requested_store_id={requested_store_id} "
                 f"response_store_id={response_store_id or 'missing'}"
             )
             if response_store_id != requested_store_id:
+                if use_virtual_switch:
+                    log.warning(
+                        f"  ⚠️ [VIRTUAL SWITCH MISMATCH] Regular hours requested={requested_store_id}, response={response_store_id or 'missing'}. "
+                        "Mencoba fallback via full navigation..."
+                    )
+                    return get_regular_hours(driver, sid, merchant_id=mid, use_virtual_switch=False)
+
                 log.error(
                     f"  ❌ [REGULAR HOURS REJECTED] Store ID mismatch: "
                     f"requested={requested_store_id}, response={response_store_id or 'missing'}. "
@@ -279,44 +413,72 @@ def get_regular_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
     except StoreIdentityMismatch:
         raise
     except Exception as e:
-        log.warning(f"⚠️ Gagal menarik data jadwal reguler untuk store {store_id}: {e}")
+        log.warning(f"⚠️ Gagal menarik data jadwal reguler untuk store {sid}: {e}")
 
     return None
 
 
-def get_special_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
+def get_special_hours(
+    driver,
+    store_id: str,
+    merchant_id: Optional[str] = None,
+    use_virtual_switch: bool = True,
+) -> Optional[Dict[str, Any]]:
     """
-    Pulls special business hours for a specific storeId after navigating browser to Business Hours page.
+    Pulls special business hours for a specific storeId using instant in-browser virtual switch.
     Endpoint: GET https://foody.shopee.co.id/api/seller/store/special-hours
     """
     if not driver or not store_id:
         return None
 
+    sid = str(store_id).strip()
+    mid = str(merchant_id).strip() if merchant_id else ""
     try:
-        if not ensure_business_hours_page(driver, store_id):
-            log.warning(f"  ⚠️ [SPECIAL HOURS API] Business Hours page untuk Store {store_id} belum tervalidasi. Skip fetch special schedule.")
-            return None
+        if use_virtual_switch:
+            if not switch_store_context(driver, sid, merchant_id=mid):
+                log.warning(f"  ⚠️ [SPECIAL HOURS API] Context switch gagal untuk Store {sid}. Skip fetch special schedule.")
+                return None
+        else:
+            if not ensure_business_hours_page(driver, sid):
+                log.warning(f"  ⚠️ [SPECIAL HOURS API] Business Hours page untuk Store {sid} belum tervalidasi. Skip fetch special schedule.")
+                return None
 
-        log.info(f"🕒 [PULL SPECIAL HOURS] Menarik data jadwal khusus Store {store_id}...")
+        log.info(f"🕒 [PULL SPECIAL HOURS] Menarik data jadwal khusus Store {sid} (virtual_switch={use_virtual_switch})...")
         res = None
         for attempt in range(1, 3):
             try:
-                res = driver.execute_async_script("""
+                res = driver.execute_async_script(f"""
                     var done = arguments[arguments.length - 1];
+                    var targetSid = "{sid}";
+                    var targetMid = "{mid}";
+                    var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
+                    var mid = (targetMid || existingMid || targetSid).trim();
+                    var sid = targetSid;
+                    if (sid) {{
+                        var domains = ['.shopee.co.id', window.location.hostname];
+                        for (var i = 0; i < domains.length; i++) {{
+                            var d = domains[i];
+                            document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
+                            document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
+                        }}
+                        document.cookie = "shopee_foody_mid=" + mid + "; path=/";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+                    }}
                     var controller = new AbortController();
-                    var timer = setTimeout(function() {
+                    var timer = setTimeout(function() {{
                         controller.abort();
-                        done({code: -1, msg: 'Client timeout (5s)'});
-                    }, 5000);
-                    fetch('https://foody.shopee.co.id/api/seller/store/special-hours', {
+                        done({{code: -1, msg: 'Client timeout (5s)'}});
+                    }}, 5000);
+                    var url = 'https://foody.shopee.co.id/api/seller/store/special-hours' + (targetSid ? ('?store_id=' + targetSid) : '');
+                    fetch(url, {{
                         method: 'GET',
                         credentials: 'include',
-                        headers: { 'Accept': 'application/json, text/plain, */*' },
+                        headers: {{ 'Accept': 'application/json, text/plain, */*' }},
                         signal: controller.signal
-                    })
-                    .then(function(r) { return r.json(); })
-                    .then(function(d) { clearTimeout(timer); done(d); })
-                    .catch(function(e) { clearTimeout(timer); done({code: -1, msg: e.message || String(e)}); });
+                    }})
+                    .then(function(r) {{ return r.json(); }})
+                    .then(function(d) {{ clearTimeout(timer); done(d); }})
+                    .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
                 """)
                 if isinstance(res, dict) and res.get("code") == 0:
                     break
@@ -324,16 +486,23 @@ def get_special_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
                 log.warning(f"  ⚠️ [SPECIAL HOURS API] Percobaan {attempt}/2 error: {async_err}")
             time.sleep(1.0)
 
-        log.info(f"  🔍 [SPECIAL HOURS API RESPONSE] Store {store_id} | Response: {res.get('code') if isinstance(res, dict) else None}")
+        log.info(f"  🔍 [SPECIAL HOURS API RESPONSE] Store {sid} | Response: {res.get('code') if isinstance(res, dict) else None}")
         if isinstance(res, dict) and res.get("code") == 0:
             data = res.get("data")
             response_store_id = str(data.get("store_id") or "").strip() if isinstance(data, dict) else ""
-            requested_store_id = str(store_id).strip()
+            requested_store_id = sid
             log.info(
                 f"  🔍 [SPECIAL HOURS IDENTITY] requested_store_id={requested_store_id} "
                 f"response_store_id={response_store_id or 'missing'}"
             )
             if response_store_id != requested_store_id:
+                if use_virtual_switch:
+                    log.warning(
+                        f"  ⚠️ [VIRTUAL SWITCH MISMATCH] Special hours requested={requested_store_id}, response={response_store_id or 'missing'}. "
+                        "Mencoba fallback via full navigation..."
+                    )
+                    return get_special_hours(driver, sid, merchant_id=mid, use_virtual_switch=False)
+
                 log.error(
                     f"  ❌ [SPECIAL HOURS REJECTED] Store ID mismatch: "
                     f"requested={requested_store_id}, response={response_store_id or 'missing'}. "
@@ -349,7 +518,7 @@ def get_special_hours(driver, store_id: str) -> Optional[Dict[str, Any]]:
     except StoreIdentityMismatch:
         raise
     except Exception as e:
-        log.warning(f"⚠️ Gagal menarik data jadwal khusus untuk store {store_id}: {e}")
+        log.warning(f"⚠️ Gagal menarik data jadwal khusus untuk store {sid}: {e}")
 
     return None
 
@@ -360,28 +529,50 @@ def pause_store_action(
     merchant_id: str = "14367488",
     pause_duration_minutes: int = 1440,
     pause_end_time_ms: Optional[int] = None,
+    use_virtual_switch: bool = True,
 ) -> bool:
     """
-    Triggers store pause (Auto Close) for store_id.
-    Uses the in-browser XHR POST API directly. UI interaction is intentionally
-    disabled while this execution path is being evaluated.
+    Triggers store pause (Auto Close) for store_id using instant in-browser virtual switch.
+    Uses the in-browser XHR POST API directly with automatic fallback to full navigation.
     """
     if not driver or not store_id:
         return False
 
+    sid = str(store_id).strip()
+    mid = str(merchant_id).strip() if merchant_id else ""
     try:
-        if not ensure_business_hours_page(driver, store_id):
-            log.warning(f"  ⚠️ [ACTION PAUSE XHR] Business Hours page untuk Store {store_id} belum tervalidasi. Skip pause action.")
-            return False
+        if use_virtual_switch:
+            if not switch_store_context(driver, sid, merchant_id=mid):
+                log.warning(f"  ⚠️ [ACTION PAUSE XHR] Context switch gagal untuk Store {sid}. Skip pause action.")
+                return False
+        else:
+            if not ensure_business_hours_page(driver, sid):
+                log.warning(f"  ⚠️ [ACTION PAUSE XHR] Business Hours page untuk Store {sid} belum tervalidasi. Skip pause action.")
+                return False
 
-        log.info(f"🌐 [ACTION PAUSE XHR] Executing direct API action for Store {store_id} (UI disabled)...")
+        log.info(f"🌐 [ACTION PAUSE XHR] Executing direct API action for Store {sid} (virtual_switch={use_virtual_switch})...")
 
-        # Direct XHR POST with explicit store_id query parameter.
-        target_num = int(store_id) if str(store_id).isdigit() else store_id
+        target_num = int(sid) if sid.isdigit() else sid
+        success = False
         for attempt in range(1, 3):
             try:
                 res = driver.execute_async_script(f"""
                     var done = arguments[arguments.length - 1];
+                    var targetSid = "{sid}";
+                    var targetMid = "{mid}";
+                    var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
+                    var mid = (targetMid || existingMid || targetSid).trim();
+                    var sid = targetSid;
+                    if (sid) {{
+                        var domains = ['.shopee.co.id', window.location.hostname];
+                        for (var i = 0; i < domains.length; i++) {{
+                            var d = domains[i];
+                            document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
+                            document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
+                        }}
+                        document.cookie = "shopee_foody_mid=" + mid + "; path=/";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+                    }}
                     var controller = new AbortController();
                     var timer = setTimeout(function() {{
                         controller.abort();
@@ -389,7 +580,7 @@ def pause_store_action(
                     }}, 5000);
                     var now = Date.now();
                     var end = {pause_end_time_ms if pause_end_time_ms is not None else f"now + ({pause_duration_minutes} * 60 * 1000)"};
-                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id={store_id}', {{
+                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/pause?store_id=' + targetSid, {{
                         method: 'POST',
                         credentials: 'include',
                         headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
@@ -404,53 +595,89 @@ def pause_store_action(
                     .then(function(d) {{ clearTimeout(timer); done(d); }})
                     .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
                 """)
-                log.info(f"  🔍 [PAUSE API RESPONSE] Store {store_id} (Attempt {attempt}/2) | Response: {res}")
+                log.info(f"  🔍 [PAUSE API RESPONSE] Store {sid} (Attempt {attempt}/2) | Response: {res}")
                 if isinstance(res, dict) and res.get("code") == 0:
-                    log.info(f"  ✅ [ACTION PAUSE SUCCESS] Store {store_id} berhasil di-pause (Tutup Toko via API).")
+                    log.info(f"  ✅ [ACTION PAUSE SUCCESS] Store {sid} berhasil di-pause (Tutup Toko via API).")
                     return True
             except Exception as async_err:
                 log.warning(f"  ⚠️ [PAUSE API] Percobaan {attempt}/2 error: {async_err}")
             time.sleep(1.0)
 
+        if not success and use_virtual_switch:
+            log.warning(f"  ⚠️ [ACTION PAUSE] Virtual switch gagal untuk Store {sid}. Mencoba fallback via full navigation...")
+            return pause_store_action(
+                driver,
+                sid,
+                merchant_id=mid,
+                pause_duration_minutes=pause_duration_minutes,
+                pause_end_time_ms=pause_end_time_ms,
+                use_virtual_switch=False,
+            )
+
     except Exception as e:
-        log.error(f"  ❌ Failed to execute pause action for store {store_id}: {e}")
+        log.error(f"  ❌ Failed to execute pause action for store {sid}: {e}")
 
     return False
 
 
-def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> bool:
+def open_store_action(
+    driver,
+    store_id: str,
+    merchant_id: str = "14367488",
+    use_virtual_switch: bool = True,
+) -> bool:
     """
-    Triggers store reopen (Auto Open) for store_id.
-    Uses the in-browser XHR POST API directly. UI interaction is intentionally
-    disabled while this execution path is being evaluated.
+    Triggers store reopen (Auto Open) for store_id using instant in-browser virtual switch.
+    Uses the in-browser XHR POST API directly with automatic fallback to full navigation.
     """
     if not driver or not store_id:
         return False
 
+    sid = str(store_id).strip()
+    mid = str(merchant_id).strip() if merchant_id else ""
     try:
-        if not ensure_business_hours_page(driver, store_id):
-            log.warning(f"  ⚠️ [ACTION OPEN XHR] Business Hours page untuk Store {store_id} belum tervalidasi. Skip open action.")
-            return False
+        if use_virtual_switch:
+            if not switch_store_context(driver, sid, merchant_id=mid):
+                log.warning(f"  ⚠️ [ACTION OPEN XHR] Context switch gagal untuk Store {sid}. Skip open action.")
+                return False
+        else:
+            if not ensure_business_hours_page(driver, sid):
+                log.warning(f"  ⚠️ [ACTION OPEN XHR] Business Hours page untuk Store {sid} belum tervalidasi. Skip open action.")
+                return False
 
-        log.info(f"🌐 [ACTION OPEN XHR] Executing direct API action for Store {store_id} (UI disabled)...")
+        log.info(f"🌐 [ACTION OPEN XHR] Executing direct API action for Store {sid} (virtual_switch={use_virtual_switch})...")
 
-        # Direct XHR POST with explicit store_id query parameter.
-        target_num = int(store_id) if str(store_id).isdigit() else store_id
+        success = False
         for attempt in range(1, 3):
             try:
                 res = driver.execute_async_script(f"""
                     var done = arguments[arguments.length - 1];
+                    var targetSid = "{sid}";
+                    var targetMid = "{mid}";
+                    var existingMid = (document.cookie.match(/(?:^|;\\s*)shopee_foody_mid=([^;]+)/) || [])[1] || '';
+                    var mid = (targetMid || existingMid || targetSid).trim();
+                    var sid = targetSid;
+                    if (sid) {{
+                        var domains = ['.shopee.co.id', window.location.hostname];
+                        for (var i = 0; i < domains.length; i++) {{
+                            var d = domains[i];
+                            document.cookie = "shopee_foody_mid=" + mid + "; path=/; domain=" + d;
+                            document.cookie = "shopee_tob_entity_id=" + sid + "; path=/; domain=" + d;
+                        }}
+                        document.cookie = "shopee_foody_mid=" + mid + "; path=/";
+                        document.cookie = "shopee_tob_entity_id=" + sid + "; path=/";
+                    }}
                     var controller = new AbortController();
                     var timer = setTimeout(function() {{
                         controller.abort();
                         done({{code: -1, msg: 'Client timeout (5s)'}});
                     }}, 5000);
-                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id={store_id}', {{
+                    fetch('https://foody.shopee.co.id/api/seller/store/opening-status/action/open?store_id=' + targetSid, {{
                         method: 'POST',
                         credentials: 'include',
                         headers: {{ 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' }},
                         body: JSON.stringify({{
-                            "store_id": "{store_id}"
+                            "store_id": "{sid}"
                         }}),
                         signal: controller.signal
                     }})
@@ -458,15 +685,24 @@ def open_store_action(driver, store_id: str, merchant_id: str = "14367488") -> b
                     .then(function(d) {{ clearTimeout(timer); done(d); }})
                     .catch(function(e) {{ clearTimeout(timer); done({{code: -1, msg: e.message || String(e)}}); }});
                 """)
-                log.info(f"  🔍 [OPEN API RESPONSE] Store {store_id} (Attempt {attempt}/2) | Response: {res}")
+                log.info(f"  🔍 [OPEN API RESPONSE] Store {sid} (Attempt {attempt}/2) | Response: {res}")
                 if isinstance(res, dict) and res.get("code") == 0:
-                    log.info(f"  ✅ [ACTION OPEN SUCCESS] Store {store_id} berhasil dibuka (Buka Toko via API).")
+                    log.info(f"  ✅ [ACTION OPEN SUCCESS] Store {sid} berhasil dibuka (Buka Toko via API).")
                     return True
             except Exception as async_err:
                 log.warning(f"  ⚠️ [OPEN API] Percobaan {attempt}/2 error: {async_err}")
             time.sleep(1.0)
 
+        if not success and use_virtual_switch:
+            log.warning(f"  ⚠️ [ACTION OPEN] Virtual switch gagal untuk Store {sid}. Mencoba fallback via full navigation...")
+            return open_store_action(
+                driver,
+                sid,
+                merchant_id=mid,
+                use_virtual_switch=False,
+            )
+
     except Exception as e:
-        log.error(f"  ❌ Failed to execute open action for store {store_id}: {e}")
+        log.error(f"  ❌ Failed to execute open action for store {sid}: {e}")
 
     return False

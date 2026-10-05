@@ -549,21 +549,21 @@ def sync_all_stores(
                         f"({outlet.nama_panjang_outlet}). Bot akan memakai state DB sementara."
                     )
 
-                log.info(f"📌 Memasuki tab Business Hours untuk Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
+                log.info(f"📌 Menyiapkan konteks toko untuk Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
 
                 is_detected = False
                 if driver_ready and driver:
-                    is_detected = store_status.ensure_business_hours_page(driver, store_id=outlet.store_id)
+                    is_detected = store_status.switch_store_context(driver, store_id=outlet.store_id)
                     if not is_detected and _is_session_dead(driver):
-                        _recover_session(f"business hours page lost for Store {outlet.store_id}")
+                        _recover_session(f"store context lost for Store {outlet.store_id}")
                         driver_ready = _ensure_group_session_ready(f"retry patrol Store {outlet.store_id}")
                         if driver_ready and driver:
-                            is_detected = store_status.ensure_business_hours_page(driver, store_id=outlet.store_id)
+                            is_detected = store_status.switch_store_context(driver, store_id=outlet.store_id)
 
                 if is_detected:
-                    log.info(f"  ✅ [BUSINESS HOURS CONFIRMED] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) TERDETEKSI & TER-LOAD SEMPURNA di menu Business Hours!")
+                    log.info(f"  ✅ [STORE CONTEXT CONFIRMED] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) aktif via Virtual Switch!")
                 else:
-                    log.warning(f"  ⚠️ [BUSINESS HOURS WARNING] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) BELUM TERDETEKSI SEMPURNA di menu Business Hours!")
+                    log.warning(f"  ⚠️ [STORE CONTEXT WARNING] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) belum terkonfigurasi!")
 
                 # Keep the last known Shopee schedule in-memory unless this cycle
                 # successfully fetches a newer one. This prevents multi-schedule
