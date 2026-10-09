@@ -353,18 +353,7 @@ def evaluate_outlet_status(
         action = ACTION_CLOSE if is_currently_open else ACTION_NO_CHANGE
         return DecisionResult(target_state=target, action=action, reason=reason)
 
-    # 3. Active user/admin pause must survive Shopee's regular schedule breaks.
-    active_pause_until = get_active_pause_until(outlet, current_time=current_time)
-    if active_pause_until:
-        pause_label = _format_local_label(active_pause_until, local_tz)
-        if is_currently_open:
-            return DecisionResult(
-                target_state=TARGET_CLOSE,
-                action=ACTION_CLOSE,
-                reason=f"Pause aktif sampai {pause_label}; outlet harus tetap tutup",
-            )
-
-    # 4. Check Special Hours & Operating Hours for today
+    # 3. Check Special Hours & Operating Hours for today (Shopee Special Hours takes precedence)
     special_hours_data = _get_outlet_value(outlet, "shopee_special_hours") or _get_outlet_value(outlet, "special_hours")
     active_special_hours = get_active_special_hours(special_hours_data, current_time, local_tz)
 
@@ -381,45 +370,56 @@ def evaluate_outlet_status(
             reason = f"Mengikuti Jadwal Khusus Shopee ({special_desc})"
             action = ACTION_NO_CHANGE
             return DecisionResult(target_state=target, action=action, reason=reason)
-    else:
-        weekday_name = WEEKDAY_MAP.get(current_time.weekday(), "Senin")
-        regular_hours = _get_outlet_schedule(outlet)
-        today_hours = regular_hours.get(weekday_name, "")
 
-        if active_pause_until:
-            pause_label = _format_local_label(active_pause_until, local_tz)
-            if require_regular_schedule and not today_hours:
-                return DecisionResult(
-                    target_state=TARGET_CLOSE,
-                    action=ACTION_NO_CHANGE,
-                    reason=f"Pause aktif sampai {pause_label}; jadwal reguler Shopee {weekday_name} belum tersedia",
-                )
-            if not is_within_operating_hours(today_hours, current_time.time()):
-                return DecisionResult(
-                    target_state=TARGET_CLOSE,
-                    action=ACTION_NO_CHANGE,
-                    reason=f"Pause aktif sampai {pause_label}; menunggu sesi reguler berikutnya",
-                )
+    # 4. Active user/admin pause must survive Shopee's regular schedule breaks.
+    active_pause_until = get_active_pause_until(outlet, current_time=current_time)
+    if active_pause_until:
+        pause_label = _format_local_label(active_pause_until, local_tz)
+        if is_currently_open:
             return DecisionResult(
                 target_state=TARGET_CLOSE,
-                action=ACTION_NO_CHANGE,
-                reason=f"Pause aktif sampai {pause_label}; outlet sudah tertutup",
+                action=ACTION_CLOSE,
+                reason=f"Pause aktif sampai {pause_label}; outlet harus tetap tutup",
             )
 
+    weekday_name = WEEKDAY_MAP.get(current_time.weekday(), "Senin")
+    regular_hours = _get_outlet_schedule(outlet)
+    today_hours = regular_hours.get(weekday_name, "")
+
+    if active_pause_until:
+        pause_label = _format_local_label(active_pause_until, local_tz)
         if require_regular_schedule and not today_hours:
             return DecisionResult(
                 target_state=TARGET_CLOSE,
                 action=ACTION_NO_CHANGE,
-                reason=f"Jadwal reguler Shopee {weekday_name} tidak tersedia",
+                reason=f"Pause aktif sampai {pause_label}; jadwal reguler Shopee {weekday_name} belum tersedia",
             )
-        
         if not is_within_operating_hours(today_hours, current_time.time()):
-            # Shopee owns the CLOSED state outside the regular schedule. Do not
-            # translate it into a PAUSE/CLOSE action from the bot.
-            target = TARGET_CLOSE
-            reason = f"Di luar jam operasional ({weekday_name}: {today_hours or 'Tutup'})"
-            action = ACTION_NO_CHANGE
-            return DecisionResult(target_state=target, action=action, reason=reason)
+            return DecisionResult(
+                target_state=TARGET_CLOSE,
+                action=ACTION_NO_CHANGE,
+                reason=f"Pause aktif sampai {pause_label}; menunggu sesi reguler berikutnya",
+            )
+        return DecisionResult(
+            target_state=TARGET_CLOSE,
+            action=ACTION_NO_CHANGE,
+            reason=f"Pause aktif sampai {pause_label}; outlet sudah tertutup",
+        )
+
+    if require_regular_schedule and not today_hours:
+        return DecisionResult(
+            target_state=TARGET_CLOSE,
+            action=ACTION_NO_CHANGE,
+            reason=f"Jadwal reguler Shopee {weekday_name} tidak tersedia",
+        )
+
+    if not is_within_operating_hours(today_hours, current_time.time()):
+        # Shopee owns the CLOSED state outside the regular schedule. Do not
+        # translate it into a PAUSE/CLOSE action from the bot.
+        target = TARGET_CLOSE
+        reason = f"Di luar jam operasional ({weekday_name}: {today_hours or 'Tutup'})"
+        action = ACTION_NO_CHANGE
+        return DecisionResult(target_state=target, action=action, reason=reason)
 
     # 5. Vercel Toggle / Status Utama (Source of Truth)
     status_utama_raw = (outlet.status_utama or "").strip().lower()

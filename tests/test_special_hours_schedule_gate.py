@@ -142,7 +142,33 @@ class TestSpecialHoursScheduleGate(unittest.TestCase):
         # At 13:00 WIB on Thursday (within regular 08:00 - 17:00) -> Opens by regular schedule
         decision = evaluate_outlet_status(outlet, current_time=self.now)
         self.assertEqual(decision.target_state, TARGET_OPEN)
-        self.assertEqual(decision.action, ACTION_OPEN)
+    def test_special_hours_open_takes_precedence_over_stale_pause(self):
+        # Special hours 10:00 - 18:00
+        special_open = [
+            {
+                "date_start": 1789318800000,
+                "date_end": 2866467599999,
+                "date_desc": "Buka Khusus Hari Ini",
+                "date_type": 2,
+                "intervals": [{"start_relative_sec": 36000, "end_relative_sec": 64800}],
+            }
+        ]
+        # Outlet has a stale pause until tomorrow
+        stale_pause_until = datetime(2026, 9, 18, 15, 0, 0, tzinfo=WIB)
+        outlet = MerchantOutlet(
+            store_id="21304843",
+            status_utama="OFF",
+            status_aktual="OPEN",
+            pause_until=stale_pause_until.isoformat(),
+            shopee_regular_hours=self.regular_hours,
+            shopee_special_hours=special_open,
+            timezone="Asia/Jakarta",
+        )
+        # Decision must NOT be ACTION_CLOSE; it must respect Shopee Special Hours Open!
+        decision = evaluate_outlet_status(outlet, current_time=self.now)
+        self.assertEqual(decision.target_state, TARGET_OPEN)
+        self.assertEqual(decision.action, ACTION_NO_CHANGE)
+        self.assertIn("Mengikuti Jadwal Khusus Shopee", decision.reason)
 
 
 if __name__ == "__main__":

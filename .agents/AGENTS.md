@@ -24,7 +24,13 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.33.1`.
+Latest documented release: `1.34.0`.
+
+Mismatch-Driven Instant Schedule Verification & Special Hours Precedence:
+- Mengintegrasikan mekanisme On-Demand Schedule Verification pada `main-bot/src/worker.py` dan `main-vb/src/worker.py`: ketika status live outlet di Shopee terdeteksi `OPEN` namun evaluasi awal bot bernilai `ACTION_CLOSE` (akibat sisa jeda pause lama atau di luar jadwal reguler), bot secara instan melakukan verifikasi tarik ulang data `/special-hours` (serta regular hours jika kosong) dari Shopee ke database sebelum mengeksekusi penutupan paksa.
+- Memprioritaskan evaluasi Jadwal Khusus (*Active Special Hours*) di atas penanganan pause sementara (*Active Pause Until*) pada `src/core/decision.py` dan `main-vb/src/core/decision.py`, menjamin toko yang beroperasi di bawah Jadwal Khusus Buka Shopee 100% dihormati dengan keputusan `NO_CHANGE` tanpa intervensi penutupan paksa bot.
+- Menerapkan auto-cleanup pembersihan parameter `pause_until` lama secara atomik di database ketika jadwal aktif Shopee terkonfirmasi, mencegah sisa pause usang mengunci operasional toko pada putaran patroli berikutnya.
+- Menjaga modul `main-vb/src/worker.py` dan `main-bot/src/worker.py` serta `src/core/decision.py` dan `main-vb/src/core/decision.py` 100% identik byte-for-byte.
 
 Virtual Brand Toggle SQL Type Casting & Import Integrity:
 - Memperbaiki `psycopg.errors.DatatypeMismatch` pada query `request_status` dan `request_brand_status_public` di `src/backend/vb.py` dengan menambahkan cast eksplisit `::timestamptz` pada ekspresi `CASE WHEN %s='PAUSED' THEN %s::timestamptz ELSE NULL END` untuk kolom `pause_from` dan `pause_until`.

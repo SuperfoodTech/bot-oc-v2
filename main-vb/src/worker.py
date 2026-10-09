@@ -19,7 +19,7 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
 from logger import get_logger
-from sheets import MerchantOutlet
+from sheets import MerchantOutlet, WEEKDAY_MAP
 from decision import (
     evaluate_outlet_status,
     get_pause_recheck_delay_seconds,
@@ -40,6 +40,7 @@ ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.st
 # this browser; the bot does not close/reopen Chrome for every outlet action.
 ACTIVE_SESSIONS = {}
 SYNC_LOCK = threading.Lock()
+_LAST_ON_DEMAND_SCHEDULE_REFRESH: Dict[str, float] = {}
 
 
 def _normalized_username(value: str) -> str:
@@ -765,6 +766,88 @@ def sync_all_stores(
                     f"Shopee Status Sebelum: {shopee_before} | Vercel Toggle: {vercel_status} | "
                     f"Decision: {decision.action} ({decision.reason})"
                 )
+
+                if (
+                    decision.action == ACTION_CLOSE
+                    and shopee_before in ("ON", "OPEN", "2")
+                    and driver_ready
+                    and driver
+                ):
+                    now_ts = time.time()
+                    last_rf = _LAST_ON_DEMAND_SCHEDULE_REFRESH.get(str(outlet.store_id), 0.0)
+                    if (now_ts - last_rf) >= 180.0:
+                        _LAST_ON_DEMAND_SCHEDULE_REFRESH[str(outlet.store_id)] = now_ts
+                        log.info(
+                            f"  🔍 [ON-DEMAND SCHEDULE CHECK] Store {outlet.store_id} ({outlet.nama_panjang_outlet}) "
+                            f"live di Shopee berstatus OPEN ({shopee_before}), tetapi evaluasi bot bernilai ACTION_CLOSE "
+                            f"({decision.reason}). Menarik jadwal Shopee secara instan untuk verifikasi..."
+                        )
+                        schedule_changed = False
+                        try:
+                            special_res = store_status.get_special_hours(driver, store_id=outlet.store_id)
+                            if isinstance(special_res, dict):
+                                special_list = special_res.get("special_hours", [])
+                                outlet.shopee_special_hours = special_list
+                                try:
+                                    db.update_shopee_special_hours(outlet.store_id, special_list)
+                                    log.info(
+                                        f"  ✅ [ON-DEMAND SPECIAL SYNC] Store {outlet.store_id} jadwal khusus Shopee tersimpan "
+                                        f"({len(special_list)} entri)."
+                                    )
+                                except Exception as e:
+                                    log.warning(f"  ⚠️ Gagal simpan special_hours ke DB: {e}")
+                                schedule_changed = True
+                        except store_status.StoreIdentityMismatch as sp_err:
+                            log.error(f"  ❌ [SPECIAL HOURS QUARANTINE] Store {outlet.store_id} identity mismatch: {sp_err}")
+                        except Exception as sp_err:
+                            log.warning(f"  ⚠️ Gagal on-demand fetch special_hours untuk Store {outlet.store_id}: {sp_err}")
+
+                        weekday_name = WEEKDAY_MAP.get(datetime.now(local_tz).weekday(), "Senin")
+                        curr_sched = getattr(outlet, "regular_hours", None) or getattr(outlet, "shopee_regular_hours", None) or {}
+                        if not curr_sched.get(weekday_name):
+                            try:
+                                shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
+                                if isinstance(shopee_hours, dict) and "regular_hours" in shopee_hours:
+                                    normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
+                                    if any(normalized_hours.values()):
+                                        outlet.regular_hours = normalized_hours
+                                        outlet.shopee_regular_hours = normalized_hours
+                                        outlet.schedule_fetch_status = "READY"
+                                        try:
+                                            db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                                            log.info(
+                                                f"  ✅ [ON-DEMAND REGULAR SYNC] Store {outlet.store_id} jadwal Shopee tersimpan."
+                                            )
+                                        except Exception as e:
+                                            log.warning(f"  ⚠️ Gagal simpan regular_hours ke DB: {e}")
+                                        schedule_changed = True
+                            except store_status.StoreIdentityMismatch as reg_err:
+                                log.error(f"  ❌ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} identity mismatch: {reg_err}")
+                            except Exception as reg_err:
+                                log.warning(f"  ⚠️ Gagal on-demand fetch regular_hours untuk Store {outlet.store_id}: {reg_err}")
+
+                        if schedule_changed:
+                            decision = evaluate_outlet_status(
+                                outlet,
+                                current_time=datetime.now(local_tz),
+                                require_regular_schedule=True,
+                            )
+                            log.info(
+                                f"  🔄 [ON-DEMAND RE-EVALUATION] Store {outlet.store_id} setelah re-fetch jadwal -> "
+                                f"Decision: {decision.action} ({decision.reason})"
+                            )
+                            if decision.action != ACTION_CLOSE:
+                                log.info(
+                                    f"  ✅ [MISMATCH RESOLVED] Store {outlet.store_id} tidak jadi ditutup paksa! "
+                                    f"Shopee schedule aktif terkonfirmasi ({decision.reason})."
+                                )
+                                if getattr(outlet, "pause_until", None):
+                                    outlet.pause_until = None
+                                    try:
+                                        db.update_vercel_toggle(outlet.store_id, outlet.status_utama, pause_until=None)
+                                        log.info(f"  ✅ [DB CLEANUP] Stale pause_until untuk Store {outlet.store_id} berhasil di-clear.")
+                                    except Exception as clean_err:
+                                        log.warning(f"  ⚠️ Gagal clear stale pause_until di DB: {clean_err}")
 
                 if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
                     log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id} (Target: {decision.target_state})...")
