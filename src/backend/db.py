@@ -351,14 +351,14 @@ def _format_pause_until_local(pause_until, timezone: str) -> str:
     return pause_until_dt.astimezone(timezone_for(timezone)).strftime("%d/%m/%Y %H:%M %Z")
 
 
-def _derive_display_status_bucket(live_state: str, display_toggle_on: bool, desired_state: str) -> str:
-    if live_state == "OPEN":
-        return "open"
-    if live_state in {"PAUSE", "CLOSED"}:
+def _derive_display_status_bucket(live_state: str, display_toggle_on: bool, desired_state: str, display_toggle_disabled: bool = False) -> str:
+    if display_toggle_disabled:
         return "closed"
     if display_toggle_on:
         return "open"
-    return "open" if desired_state == "OPEN" else "closed"
+    if desired_state == "OPEN":
+        return "open"
+    return "paused"
 
 
 def parse_special_hours_entry(entry: Any, timezone: ZoneInfo) -> Optional[dict]:
@@ -583,13 +583,12 @@ def derive_outlet_runtime_state(
         or not schedule_available
         or not within_schedule
     )
-    display_status_bucket = (
-        "closed"
-        if desired_state == "OPEN" and schedule_available and not within_schedule
-        else "closed"
-        if desired_state == "OPEN" and not schedule_available and schedule_fetch_status == SCHEDULE_FETCH_EMPTY
-        else _derive_display_status_bucket(live_state, display_toggle_on, desired_state)
-    )
+    if display_toggle_disabled:
+        display_status_bucket = "closed"
+    elif display_toggle_on:
+        display_status_bucket = "open"
+    else:
+        display_status_bucket = "paused"
 
     return {
         "desired_state": desired_state,

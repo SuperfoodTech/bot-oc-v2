@@ -19,7 +19,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20260925-v1260-mobile-nav">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261010-v1350-tristate-cards">
 </head>
 
 <body x-data="adminApp()">
@@ -643,7 +643,7 @@
       vbPortalFilter: 'mobileVbPortalFilter',
       vbStoreIdFilter: 'mobileVbStoreIdFilter'
     };
-    const OUTLET_SUMMARY_FILTER_KEYS = ['all', 'open', 'closed'];
+    const OUTLET_SUMMARY_FILTER_KEYS = ['all', 'open', 'paused', 'closed'];
     let activeOutletSummaryFilter = 'all';
     let outletDetailActiveStoreId = '';
     let outletDetailRestoreFocusEl = null;
@@ -1281,6 +1281,7 @@
       if (!isMobileAdminViewport()) return true;
       const statusCategory = getAdminStatusCategory(store);
       if (summaryFilter === 'open') return statusCategory === 'open';
+      if (summaryFilter === 'paused') return statusCategory === 'paused';
       if (summaryFilter === 'closed') return statusCategory === 'closed';
       if (summaryFilter === 'subscription') return isStoreSubscriptionActive(store);
       return true;
@@ -1291,11 +1292,13 @@
       const summaryCounts = {
         all: stores.length,
         open: statusCategories.filter(value => value === 'open').length,
+        paused: statusCategories.filter(value => value === 'paused').length,
         closed: statusCategories.filter(value => value === 'closed').length
       };
       const countTargets = {
         all: 'metricChipAllCount',
         open: 'metricChipOpenCount',
+        paused: 'metricChipPausedCount',
         closed: 'metricChipClosedCount'
       };
 
@@ -2206,6 +2209,7 @@
       const icons = {
         groups: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"></circle><circle cx="16" cy="9" r="3"></circle><path d="M4 18c0-2.2 1.8-4 4-4s4 1.8 4 4"></path><path d="M12 18c0-2.2 1.8-4 4-4s4 1.8 4 4"></path></svg>',
         on: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="5"></rect><circle cx="16.5" cy="12" r="3.2"></circle></svg>',
+        paused: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="10" y1="15" x2="10" y2="9"></line><line x1="14" y1="15" x2="14" y2="9"></line></svg>',
         off: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="5"></rect><circle cx="7.5" cy="12" r="3.2"></circle></svg>',
         store: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4z"></path><path d="M2.5 10 5 5h14l2.5 5"></path><path d="M9 14h6"></path></svg>',
         open: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11H4z"></path><path d="M7 8V5h10v3"></path><path d="M8 14h8"></path></svg>',
@@ -2219,43 +2223,70 @@
       return `${((value / total) * 100).toFixed(1)}%`;
     }
 
+    function setVbFilterFromCard(statusVal) {
+      const current = (document.getElementById('vbStatusFilter')?.value || '').toUpperCase();
+      const targetVal = current === statusVal ? '' : statusVal;
+      setControlValue('vbStatusFilter', targetVal);
+      setControlValue('mobileVbStatusFilter', targetVal);
+      setupCustomFilterDropdowns();
+      filterVBTable();
+    }
+
     function renderVBStats(brands) {
       const stats = document.getElementById('vbStatsGrid');
       if (!stats) return;
       const totalGroups = brands.length;
-      const groupsOn = brands.filter(brand => brand.effectiveStatus === 'ON').length;
-      const groupsOff = brands.filter(brand => brand.effectiveStatus !== 'ON').length;
+      const groupsOpen = brands.filter(brand => brand.vbToggleState === 'open').length;
+      const groupsPaused = brands.filter(brand => brand.vbToggleState === 'paused').length;
+      const groupsClosed = brands.filter(brand => brand.vbToggleState === 'closed').length;
       const totalStores = brands.reduce((sum, brand) => sum + (brand.visibleStoreCount || 0), 0);
       const openStores = brands.reduce((sum, brand) => sum + (brand.openStoreCount || 0), 0);
       const closedStores = brands.reduce((sum, brand) => sum + (brand.closedStoreCount || 0), 0);
+      const activeStatusFilter = (document.getElementById('vbStatusFilter')?.value || '').toUpperCase();
+
       const cards = [
         {
           tone: 'is-groups',
           icon: 'groups',
+          filterVal: '',
+          isActive: activeStatusFilter === '',
           label: 'Total Grup VB',
           value: totalGroups,
-          detail: totalGroups ? 'Grup yang tampil saat ini.' : 'Belum ada grup VB aktif.'
+          detail: totalGroups ? 'Semua grup VB.' : 'Belum ada grup aktif.'
         },
         {
           tone: 'is-on',
           icon: 'on',
-          label: 'Grup Aktif',
-          value: groupsOn,
-          detail: `${formatVbPercent(groupsOn, totalGroups)} siap dijalankan`
+          filterVal: 'OPEN',
+          isActive: activeStatusFilter === 'OPEN',
+          label: 'Grup Buka (ON)',
+          value: groupsOpen,
+          detail: `${formatVbPercent(groupsOpen, totalGroups)} siap dijalankan`
+        },
+        {
+          tone: 'is-paused',
+          icon: 'paused',
+          filterVal: 'PAUSE',
+          isActive: activeStatusFilter === 'PAUSE',
+          label: 'Grup Pause (OFF)',
+          value: groupsPaused,
+          detail: `${formatVbPercent(groupsPaused, totalGroups)} target Force Open`
         },
         {
           tone: 'is-off',
-          icon: 'off',
-          label: 'Grup Nonaktif',
-          value: groupsOff,
-          detail: `${formatVbPercent(groupsOff, totalGroups)} sedang berhenti`
+          icon: 'closed',
+          filterVal: 'CLOSED',
+          isActive: activeStatusFilter === 'CLOSED',
+          label: 'Grup Di Luar Jadwal',
+          value: groupsClosed,
+          detail: `${formatVbPercent(groupsClosed, totalGroups)} jadwal Shopee tutup`
         },
         {
           tone: 'is-store',
           icon: 'store',
           label: 'Total Store ID',
           value: totalStores,
-          detail: totalStores ? 'Store ID hasil filter.' : 'Belum ada Store ID terhubung.'
+          detail: totalStores ? 'Store ID hasil filter.' : 'Belum ada Store ID.'
         },
         {
           tone: 'is-open',
@@ -2273,8 +2304,12 @@
         }
       ];
 
-      stats.innerHTML = cards.map(card => `
-        <article class="vb-stat-card ${card.tone}">
+      stats.innerHTML = cards.map(card => {
+        const isClickable = typeof card.filterVal === 'string';
+        const clickAttr = isClickable ? `onclick="setVbFilterFromCard('${card.filterVal}')" role="button" tabindex="0" title="Filter status ${escapeVBHtml(card.label)}"` : '';
+        const activeClass = card.isActive && card.filterVal ? 'is-card-active' : '';
+        return `
+        <article class="vb-stat-card ${card.tone} ${isClickable ? 'is-clickable' : ''} ${activeClass}" ${clickAttr}>
           <span class="vb-stat-icon">${getVbMetricIcon(card.icon)}</span>
           <div class="vb-stat-copy">
             <span>${escapeVBHtml(card.label)}</span>
@@ -2282,7 +2317,8 @@
             <small>${escapeVBHtml(card.detail)}</small>
           </div>
         </article>
-      `).join('');
+      `;
+      }).join('');
     }
     function renderVBTable(brands) {
       const body = document.getElementById('vbTableBody');
@@ -3503,8 +3539,29 @@
       const statusCategories = (stores || []).map(store => getAdminStatusCategory(store));
       if (metric('metricTotal')) metric('metricTotal').innerText = (stores || []).length;
       if (metric('metricOpen')) metric('metricOpen').innerText = statusCategories.filter(value => value === 'open').length;
+      if (metric('metricPaused')) metric('metricPaused').innerText = statusCategories.filter(value => value === 'paused').length;
       if (metric('metricClosed')) metric('metricClosed').innerText = statusCategories.filter(value => value === 'closed').length;
       if (metric('metricSubscription')) metric('metricSubscription').innerText = (stores || []).filter(isStoreSubscriptionActive).length;
+
+      const activeFilter = document.getElementById('statusFilter')?.value || '';
+      document.querySelectorAll('.admin-main .stats-grid .metric-card').forEach(card => {
+        card.classList.remove('is-card-active');
+      });
+      if (activeFilter === 'open') document.querySelector('.metric-card-open')?.classList.add('is-card-active');
+      else if (activeFilter === 'paused') document.querySelector('.metric-card-paused')?.classList.add('is-card-active');
+      else if (activeFilter === 'closed') document.querySelector('.metric-card-closed')?.classList.add('is-card-active');
+    }
+
+    function setAgencyFilterFromCard(statusVal) {
+      const current = document.getElementById('statusFilter')?.value || '';
+      const targetVal = current === statusVal ? '' : statusVal;
+      setControlValue('statusFilter', targetVal);
+      setControlValue('mobileStatusFilter', targetVal);
+      if (isMobileAdminViewport()) {
+        setOutletSummaryFilter(targetVal || 'all');
+      }
+      setupCustomFilterDropdowns();
+      filterTable();
     }
 
     function updateMetrics(stores) {
@@ -4024,13 +4081,7 @@
     }
 
     function getAdminStatusCategory(store, statusPresentation = getAdminStatusPresentation(store), stateContext = getAdminStateContext(store)) {
-      const explicitBucket = String(store?.display_status_bucket || '').trim().toLowerCase();
-      if (explicitBucket === 'open' || explicitBucket === 'closed') return explicitBucket;
-      if (stateContext.liveState === 'OPEN') return 'open';
-      if (stateContext.liveState === 'PAUSE' || stateContext.liveState === 'CLOSED') return 'closed';
-      if (typeof store?.display_toggle_on === 'boolean') return store.display_toggle_on ? 'open' : 'closed';
-      const label = String(statusPresentation?.label || '').trim().toLowerCase();
-      return label.startsWith('sedang buka') ? 'open' : 'closed';
+      return getAdminToggleState(store, stateContext);
     }
 
     function getAdminStatusTooltip(store, stateContext = getAdminStateContext(store)) {

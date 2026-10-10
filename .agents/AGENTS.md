@@ -24,7 +24,20 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.34.0`.
+Latest documented release: `1.35.0`.
+
+Unified Tri-State Operational Status Alignment & Interactive Force Open Widget Cards (Agency & Virtual Brand):
+- Menyelaraskan status operasional outlet (Agency) dan grup (Virtual Brand) menjadi 3-state deterministik:
+  1. `Buka` (Toggle ON - Hijau `#15803d`): Berada dalam jam operasional dan desired state `OPEN`.
+  2. `Tutup Sementara / Pause` (Toggle OFF - Merah `#dc2626`): Berada dalam jam operasional namun desired state `PAUSE` / manual off (Target Force Open jika mitra terlupa menyalakan kembali).
+  3. `Di Luar Jam Operasional` (Toggle Disable - Abu-abu `#9ca3af`): Di luar jadwal operasional Shopee atau Jadwal Khusus Tutup (toggle otomatis terkunci).
+- Menghadirkan widget card 4-kolom interaktif (*Click-to-Filter*) pada Tab Agency (`admin_tab_operasional.html`): `Total Outlet`, `Sedang Buka`, `Tutup Sementara` (Merah / counter target Force Open), dan `Di Luar Jadwal`. Mengklik kartu otomatis menyaring tabel outlet ke status tersebut.
+- Menghadirkan widget card grup 4-kolom interaktif (*Click-to-Filter*) pada Tab Virtual Brand (`admin_tab_vb.html` & `renderVBStats`): `Total Grup VB`, `Grup Buka (ON)`, `Grup Pause (OFF)` (Merah / counter target Force Open), dan `Grup Di Luar Jadwal (Closed)`. Mengklik kartu otomatis menyaring tabel brand ke status grup tersebut.
+- Menyelaraskan opsi dropdown filter status desktop dan mobile sheet di Agency (`#statusFilter` & `#mobileStatusFilter`): `Semua Status`, `Sedang Buka`, `Tutup Sementara (Pause)`, dan `Di Luar Jam Operasional`.
+- Menyelaraskan mobile quick summary strip (`#mobileSummaryStrip`) menjadi 4 segmen responsif: `Semua`, `Buka`, `Pause`, dan `Luar Jadwal`.
+- Memperbarui fungsi `_derive_display_status_bucket` dan `display_status_bucket` di `src/backend/db.py` serta `getAdminStatusCategory` di `admin_dashboard.html` untuk mengembalikan kategori deterministik (`open`, `paused`, `closed`) yang 100% konsisten dengan state visual toggle.
+- Memperbarui stylesheet version cache-buster menjadi `v=20261010-v1350-tristate-cards`.
+- Zero-Downtime Deployment: Berhasil me-rebuild dan menjalankan `fm-web` (`docker compose build web && docker compose up -d --no-deps web`) tanpa interupsi pada bot patroli.
 
 Mismatch-Driven Instant Schedule Verification & Special Hours Precedence:
 - Mengintegrasikan mekanisme On-Demand Schedule Verification pada `main-bot/src/worker.py` dan `main-vb/src/worker.py`: ketika status live outlet di Shopee terdeteksi `OPEN` namun evaluasi awal bot bernilai `ACTION_CLOSE` (akibat sisa jeda pause lama atau di luar jadwal reguler), bot secara instan melakukan verifikasi tarik ulang data `/special-hours` (serta regular hours jika kosong) dari Shopee ke database sebelum mengeksekusi penutupan paksa.

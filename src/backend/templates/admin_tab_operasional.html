@@ -1,9 +1,10 @@
     {# ── TAB PANE 1: OPERASIONAL OUTLET ── #}
     <div class="tab-pane" :class="{ 'active': currentTab === 'outlets' }" id="paneOutlets">
       <div class="stats-grid" aria-label="Ringkasan outlet">
-        <article class="metric-card metric-card-total"><div class="metric-card-icon"><img src="/static/icons/shop-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Total Outlet</span><strong id="metricTotal">0</strong></div></article>
-        <article class="metric-card metric-card-open"><div class="metric-card-icon"><img src="/static/icons/open-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Sedang Buka</span><strong id="metricOpen">0</strong></div></article>
-        <article class="metric-card metric-card-closed"><div class="metric-card-icon"><img src="/static/icons/closed-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Sedang Tutup</span><strong id="metricClosed">0</strong></div></article>
+        <article class="metric-card metric-card-total" role="button" tabindex="0" onclick="setAgencyFilterFromCard('')" title="Tampilkan semua outlet"><div class="metric-card-icon"><img src="/static/icons/shop-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Total Outlet</span><strong id="metricTotal">0</strong></div></article>
+        <article class="metric-card metric-card-open" role="button" tabindex="0" onclick="setAgencyFilterFromCard('open')" title="Filter outlet sedang buka"><div class="metric-card-icon"><img src="/static/icons/open-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Sedang Buka</span><strong id="metricOpen">0</strong></div></article>
+        <article class="metric-card metric-card-paused" role="button" tabindex="0" onclick="setAgencyFilterFromCard('paused')" title="Filter outlet tutup sementara / pause (Target Force Open)"><div class="metric-card-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="10" y1="15" x2="10" y2="9"></line><line x1="14" y1="15" x2="14" y2="9"></line></svg></div><div class="metric-card-content"><span class="metric-card-label">Tutup Sementara</span><strong id="metricPaused">0</strong></div></article>
+        <article class="metric-card metric-card-closed" role="button" tabindex="0" onclick="setAgencyFilterFromCard('closed')" title="Filter outlet di luar jam operasional"><div class="metric-card-icon"><img src="/static/icons/closed-svgrepo-com.svg" alt=""></div><div class="metric-card-content"><span class="metric-card-label">Di Luar Jadwal</span><strong id="metricClosed">0</strong></div></article>
       </div>
       <div class="mobile-summary-strip d-md-none" id="mobileSummaryStrip" aria-label="Quick filter outlet">
         <button type="button" class="mobile-summary-segment is-active" data-summary-filter="all" aria-pressed="true" onclick="setOutletSummaryFilter('all')">
@@ -14,8 +15,12 @@
           <span class="mobile-summary-label">Buka:</span>
           <strong id="metricChipOpenCount">0</strong>
         </button>
+        <button type="button" class="mobile-summary-segment" data-summary-filter="paused" aria-pressed="false" onclick="setOutletSummaryFilter('paused')">
+          <span class="mobile-summary-label">Pause:</span>
+          <strong id="metricChipPausedCount">0</strong>
+        </button>
         <button type="button" class="mobile-summary-segment" data-summary-filter="closed" aria-pressed="false" onclick="setOutletSummaryFilter('closed')">
-          <span class="mobile-summary-label">Tutup:</span>
+          <span class="mobile-summary-label">Luar Jadwal:</span>
           <strong id="metricChipClosedCount">0</strong>
         </button>
       </div>
@@ -37,7 +42,7 @@
               <label class="filter-field"><span>Nama pemilik</span><select id="ownerFilter" class="form-input filter-select" aria-label="Filter nama pemilik" onchange="filterTable()"><option value="">Semua pemilik</option></select></label>
               <label class="filter-field"><span>Nama outlet</span><select id="outletFilter" class="form-input filter-select" aria-label="Filter nama outlet" onchange="filterTable()"><option value="">Semua outlet</option></select></label>
               <label class="filter-field"><span>Store ID</span><select id="storeIdFilter" class="form-input filter-select" aria-label="Filter Store ID" onchange="filterTable()"><option value="">Semua Store ID</option></select></label>
-              <label class="filter-field"><span>Status</span><select id="statusFilter" class="form-input filter-select" aria-label="Filter status" onchange="filterTable()"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="closed">Sedang Tutup</option></select></label>
+              <label class="filter-field"><span>Status</span><select id="statusFilter" class="form-input filter-select" aria-label="Filter status" onchange="filterTable()"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="paused">Tutup Sementara</option><option value="closed">Di Luar Jam Operasional</option></select></label>
               <button class="btn-outline btn-compact reset-filter-button" type="button" onclick="resetOutletFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>Reset filter</button>
             </div>
           </div>
@@ -98,7 +103,7 @@
             <label class="filter-field"><span>Nama pemilik</span><select id="mobileOwnerFilter" class="form-input mobile-sheet-select" aria-label="Filter nama pemilik"><option value="">Semua pemilik</option></select></label>
             <label class="filter-field"><span>Nama outlet</span><select id="mobileOutletFilter" class="form-input mobile-sheet-select" aria-label="Filter nama outlet"><option value="">Semua outlet</option></select></label>
             <label class="filter-field"><span>Store ID</span><select id="mobileStoreIdFilter" class="form-input mobile-sheet-select" aria-label="Filter Store ID"><option value="">Semua Store ID</option></select></label>
-            <label class="filter-field"><span>Status</span><select id="mobileStatusFilter" class="form-input mobile-sheet-select" aria-label="Filter status"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="closed">Sedang Tutup</option></select></label>
+            <label class="filter-field"><span>Status</span><select id="mobileStatusFilter" class="form-input mobile-sheet-select" aria-label="Filter status"><option value="">Semua status</option><option value="open">Sedang Buka</option><option value="paused">Tutup Sementara</option><option value="closed">Di Luar Jam Operasional</option></select></label>
           </div>
           <div class="mobile-filter-sheet-footer">
             <button class="btn-outline" type="button" onclick="resetMobileFilterSheet()">Reset</button>
