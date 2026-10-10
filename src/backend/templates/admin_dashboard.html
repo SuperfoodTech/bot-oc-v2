@@ -19,7 +19,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261010-v1350-tristate-cards">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261010-v1351-consistent-labels">
 </head>
 
 <body x-data="adminApp()">
@@ -2259,7 +2259,7 @@
           icon: 'on',
           filterVal: 'OPEN',
           isActive: activeStatusFilter === 'OPEN',
-          label: 'Grup Buka (ON)',
+          label: 'Grup Buka',
           value: groupsOpen,
           detail: `${formatVbPercent(groupsOpen, totalGroups)} siap dijalankan`
         },
@@ -2268,7 +2268,7 @@
           icon: 'paused',
           filterVal: 'PAUSE',
           isActive: activeStatusFilter === 'PAUSE',
-          label: 'Grup Pause (OFF)',
+          label: 'Grup Tutup',
           value: groupsPaused,
           detail: `${formatVbPercent(groupsPaused, totalGroups)} target Force Open`
         },
