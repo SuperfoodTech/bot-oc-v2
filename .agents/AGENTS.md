@@ -24,7 +24,14 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.7`.
+Latest documented release: `1.36.8`.
+
+Churn Filter Dropdowns Synchronization & Search Integration:
+- **Sinkronisasi Opsi Filter Dropdown Churn**: Mengintegrasikan `populateChurnFilterDropdowns()` dengan komponen FoodMaster custom dropdown (`setupCustomFilterDropdowns()`) setelah data merchant churn ditarik dari API, memastikan opsi dropdown (`churnOwnerFilter`, `churnOutletFilter`, `churnStoreIdFilter`, `churnStatusFilter`) terpopulasi penuh dan tidak kosong.
+- **Searchable Dropdown Support**: Menambahkan identifier `churnOwnerFilter`, `churnOutletFilter`, dan `churnStoreIdFilter` ke dalam `SEARCHABLE_IDS` dan `PLACEHOLDERS` di `admin_dashboard.html`, memungkinkan admin mencari nama pemilik, outlet, atau Store ID langsung di dalam popup list dropdown.
+- **Sorting Lokal & Reset Reaktif**: Mengurutkan opsi dropdown secara alfabetis menggunakan `localeCompare(..., 'id')` serta merefresh UI custom dropdown secara reaktif saat tombol reset filter atau kartu summary diklik.
+- **Cache-Buster Stylesheet**: Memperbarui stylesheet version di `admin_dashboard.html` menjadi `v=20261012-v1368-churn-filter-sync`.
+- **Zero-Downtime Deployment**: Rebuild container `fm-backend` sukses tanpa interupsi pada service bot patroli (`force-bot`, `bot-oc`, dan `bot-vb`).
 
 Streamlined Churn Drawer Header (Pill Badges Elimination):
 - **Eliminasi Label Context di Drawer**: Menghapus blok pill badges (`.outlet-detail-context` yang memuat nama portal, username, dan masa paket) pada drawer Churn (`admin_tab_churn.html`), menyajikan tata letak atas drawer yang sangat bersih, minimalis, dan elegan.

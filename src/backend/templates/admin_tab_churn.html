@@ -291,9 +291,9 @@
     const currentOutlet = outletSelect.value;
     const currentStoreId = storeIdSelect.value;
 
-    const owners = [...new Set(stores.map(s => (s.nama_pemilik || '').trim()).filter(Boolean))].sort();
-    const outlets = [...new Set(stores.map(s => (s.nama_listing || '').trim()).filter(Boolean))].sort();
-    const storeIds = [...new Set(stores.map(s => (s.store_id || '').trim()).filter(Boolean))].sort();
+    const owners = [...new Set(stores.map(s => (s.nama_pemilik || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+    const outlets = [...new Set(stores.map(s => (s.nama_listing || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+    const storeIds = [...new Set(stores.map(s => (s.store_id || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
 
     ownerSelect.innerHTML = '<option value="">Semua pemilik</option>' + 
       owners.map(o => `<option value="${escapeHtml(o)}"${o === currentOwner ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
@@ -303,6 +303,10 @@
 
     storeIdSelect.innerHTML = '<option value="">Semua Store ID</option>' + 
       storeIds.map(id => `<option value="${escapeHtml(id)}"${id === currentStoreId ? ' selected' : ''}>${escapeHtml(id)}</option>`).join('');
+
+    if (typeof setupCustomFilterDropdowns === 'function') {
+      setupCustomFilterDropdowns();
+    }
   }
 
   function setChurnFilterFromCard(statusVal) {
@@ -348,6 +352,10 @@
     const statusSelect = document.getElementById('churnStatusFilter');
     if (statusSelect) statusSelect.value = statusVal;
 
+    if (typeof setupCustomFilterDropdowns === 'function') {
+      setupCustomFilterDropdowns();
+    }
+
     filterChurnTable();
   }
 
@@ -365,6 +373,10 @@
     const headerInput = getAdminHeaderSearchInput();
     if (headerInput) headerInput.value = '';
     setChurnFilterFromCard('');
+    if (typeof setupCustomFilterDropdowns === 'function') {
+      setupCustomFilterDropdowns();
+    }
+    filterChurnTable();
   }
 
   function filterChurnTable() {
