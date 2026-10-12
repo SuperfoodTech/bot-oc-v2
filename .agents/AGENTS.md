@@ -24,7 +24,15 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.8`.
+Latest documented release: `1.36.9`.
+
+Bot Profile & Session Role Swap (Virtual Brand & Close Bot):
+- **Pertukaran Profil Chrome & Kredensial Antar Bot**:
+  - `bot-vb` (Virtual Brand Bot) kini dialihkan menggunakan akun, profil, dan session `allvb` (`chrome_profile_allvb`, profile directory `profile_closebot`, session `session_allvb.json` Entity ID `14367488`, kredensial `credentials.json`).
+  - `force-bot` (Close Bot) kini dialihkan menggunakan akun, profil, dan session `allvbadmin` (`chrome_profile_allvbadmin`, profile directory `shopee_profile`, session `session_allvbadmin.json` Entity ID `15892383`, kredensial `credentials allvbadmin.json`).
+- **Sinkronisasi File Sesi & Direktori Data**: Memindahkan dan menyinkronkan file sesi `session_allvb.json` ke `src/data/` dan `main-vb/src/data/`, serta `session_allvbadmin.json` ke `close-bot/src/data/`, lengkap dengan symlink kompatibilitas agar path legacy tetap aman.
+- **Pembaruan Systemd & Environment**: Memperbarui `/etc/systemd/system/bot-vb.service`, `/etc/systemd/system/force-bot.service`, template systemd git, serta file `.env.vb` dan `.env.close`.
+- **Verifikasi Operasional**: Kedua daemon sukses booting ulang, membaca session aktif Shopee masing-masing tanpa prompt login ulang, dan langsung mengeksekusi patroli outlet ShopeeFood secara normal.
 
 Churn Filter Dropdowns Synchronization & Search Integration:
 - **Sinkronisasi Opsi Filter Dropdown Churn**: Mengintegrasikan `populateChurnFilterDropdowns()` dengan komponen FoodMaster custom dropdown (`setupCustomFilterDropdowns()`) setelah data merchant churn ditarik dari API, memastikan opsi dropdown (`churnOwnerFilter`, `churnOutletFilter`, `churnStoreIdFilter`, `churnStatusFilter`) terpopulasi penuh dan tidak kosong.
