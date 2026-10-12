@@ -24,7 +24,12 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.6`.
+Latest documented release: `1.36.7`.
+
+Streamlined Churn Drawer Header (Pill Badges Elimination):
+- **Eliminasi Label Context di Drawer**: Menghapus blok pill badges (`.outlet-detail-context` yang memuat nama portal, username, dan masa paket) pada drawer Churn (`admin_tab_churn.html`), menyajikan tata letak atas drawer yang sangat bersih, minimalis, dan elegan.
+- **Cache-Buster Stylesheet**: Memperbarui stylesheet version di `admin_dashboard.html` menjadi `v=20261012-v1367-churn-clean-drawer`.
+- **Zero-Downtime Deployment**: Rebuild container `fm-backend` sukses tanpa interupsi pada service bot patroli (`force-bot`, `bot-oc`, dan `bot-vb`).
 
 Strict Close-Only Log Filtering & Clean Reason Formatting in Churn Drawer:
 - **Filter Ketat Hanya Log Penutupan Bot (`ACTION_CLOSE`)**: Mengeliminasi seluruh log `ACTION_OPEN` / auto-open lama (`Vercel Toggle = ON (Auto Open)...`) dari drawer Churn. Drawer Churn kini secara ketat hanya menampilkan log aksi penutupan paksa bot patroli (`ACTION_CLOSE`).
