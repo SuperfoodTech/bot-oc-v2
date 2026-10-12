@@ -1,0 +1,998 @@
+"""
+worker.py
+=========
+Backend Worker Engine that syncs store states, evaluates PRD rules, and triggers direct API open/close actions or Selenium browser login.
+"""
+
+import sys
+import os
+import math
+import threading
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+from zoneinfo import ZoneInfo
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+
+from logger import get_logger
+from sheets import MerchantOutlet, WEEKDAY_MAP
+from decision import (
+    evaluate_outlet_status,
+    get_pause_recheck_delay_seconds,
+    ACTION_OPEN,
+    ACTION_CLOSE,
+    ACTION_NO_CHANGE,
+)
+import browser
+import db
+from shopee import store_status
+
+log = get_logger("backend_worker")
+
+# Filter account usernames allowed for bot execution (Default: auto7313 only)
+ALLOWED_USERNAMES_ENV = os.getenv("ALLOWED_USERNAMES", "auto7313")
+ALLOWED_USERNAMES = {u.strip() for u in ALLOWED_USERNAMES_ENV.split(",") if u.strip()}
+# One long-lived browser per Shopee bot account. Merchant switching happens in
+# this browser; the bot does not close/reopen Chrome for every outlet action.
+ACTIVE_SESSIONS = {}
+SYNC_LOCK = threading.Lock()
+_LAST_ON_DEMAND_SCHEDULE_REFRESH: Dict[str, float] = {}
+
+
+def _normalized_username(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _normalized_portal_name(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _merchant_group_key(outlet: MerchantOutlet) -> tuple[str, str]:
+    return (
+        _normalized_username(getattr(outlet, "username", "")),
+        _normalized_portal_name(getattr(outlet, "nama_portal", "")),
+    )
+
+
+def _normalize_live_status(live_info: dict) -> str:
+    """Preserve Shopee's PAUSE state instead of collapsing it into CLOSED."""
+    if not isinstance(live_info, dict):
+        return "UNKNOWN"
+    pause_info = live_info.get("pause_info") or {}
+    pause_start = pause_info.get("pause_start_time", 0) if isinstance(pause_info, dict) else 0
+    try:
+        pause_start = float(pause_start or 0)
+    except (TypeError, ValueError):
+        pause_start = 0
+    if pause_start > 0:
+        return "PAUSE"
+    return "ON" if live_info.get("status_str") == "OPEN" else "CLOSED"
+
+
+def _pause_end_time_ms(outlet: MerchantOutlet):
+    """Calculate pause end time for churn bot: 'Sepanjang Hari' (tomorrow 07:00 WIB)."""
+    pause_until = getattr(outlet, "pause_until", "") or ""
+    if pause_until:
+        try:
+            end_dt = datetime.fromisoformat(str(pause_until).replace("Z", "+00:00"))
+            if end_dt.tzinfo is None:
+                end_dt = end_dt.replace(tzinfo=ZoneInfo("Asia/Jakarta"))
+            now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+            if end_dt > now_dt:
+                return int(end_dt.timestamp() * 1000)
+        except (TypeError, ValueError):
+            pass
+    # Default for churn stores: Sepanjang Hari (tomorrow 07:00 WIB)
+    now_dt = datetime.now(ZoneInfo("Asia/Jakarta"))
+    tomorrow_7am = (now_dt + timedelta(days=1)).replace(hour=7, minute=0, second=0, microsecond=0)
+    return int(tomorrow_7am.timestamp() * 1000)
+
+
+def _normalize_shopee_regular_hours(payload: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Convert Shopee regular-hours relative seconds into read-only WIB ranges."""
+    # Shopee regular-hours API uses 1=Sunday through 7=Saturday.
+    day_names = {1: "Minggu", 2: "Senin", 3: "Selasa", 4: "Rabu", 5: "Kamis", 6: "Jumat", 7: "Sabtu"}
+    normalized = {name: [] for name in day_names.values()}
+    for day in payload.get("regular_hours", []) if isinstance(payload, dict) else []:
+        if not isinstance(day, dict):
+            continue
+        try:
+            name = day_names.get(int(day.get("weekday", 0)))
+        except (TypeError, ValueError):
+            continue
+        if not name or not day.get("config_enabled"):
+            continue
+        for interval in day.get("intervals", []) or []:
+            if not isinstance(interval, dict):
+                continue
+            try:
+                start = max(0, int(interval.get("start_relative_sec", 0)))
+                end = max(0, int(interval.get("end_relative_sec", 0)))
+            except (TypeError, ValueError):
+                continue
+            if end <= start or end > 24 * 60 * 60:
+                continue
+            value = f"{start // 3600:02d}:{(start % 3600) // 60:02d}-{end // 3600:02d}:{(end % 3600) // 60:02d}"
+            if value not in normalized[name]:
+                normalized[name].append(value)
+        normalized[name].sort()
+    return normalized
+
+
+def _is_schedule_stale(outlet: MerchantOutlet, now_dt: datetime) -> bool:
+    """Check if schedule was fetched > 24 hours ago or before today's start date."""
+    succeeded_at_str = str(getattr(outlet, "schedule_fetch_succeeded_at", "") or "").strip()
+    if not succeeded_at_str:
+        return False
+    try:
+        clean_str = succeeded_at_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=now_dt.tzinfo)
+        today_midnight = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        return dt < today_midnight or (now_dt - dt).total_seconds() > 86400
+    except Exception:
+        return False
+
+
+def _mark_schedule_fetch_retry(outlet: MerchantOutlet, message: str) -> None:
+    outlet.schedule_fetch_status = "FETCH_RETRYING"
+    try:
+        db.mark_schedule_fetch_retry(outlet.store_id, message)
+    except Exception as persist_err:
+        log.warning(
+            f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menyimpan status retry fetch jadwal Store {outlet.store_id}: "
+            f"{persist_err}"
+        )
+
+
+def _mark_schedule_fetch_empty(outlet: MerchantOutlet) -> None:
+    outlet.regular_hours = {}
+    outlet.shopee_regular_hours = {}
+    outlet.schedule_fetch_status = "FETCHED_EMPTY"
+    try:
+        db.mark_schedule_fetch_empty(outlet.store_id)
+    except Exception as persist_err:
+        log.warning(
+            f"  ⚠️ [REGULAR HOURS STATUS SYNC] Jadwal Shopee Store {outlet.store_id} kosong tetapi gagal "
+            f"menyimpan statusnya ke DB: {persist_err}"
+        )
+    else:
+        log.info(
+            f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} terkonfirmasi belum memiliki "
+            "jadwal Shopee yang diatur."
+        )
+
+
+def warmup_all_account_sessions():
+    """
+    On service startup, iterates over registered merchant accounts and ensures
+    each account is logged in to the Shopee Partner Dashboard, saving active sessions.
+    Only processes accounts matching ALLOWED_USERNAMES (e.g. auto7313).
+    """
+    log.info(f"🚀 [STARTUP WARMUP] Initializing & verifying Shopee Dashboard sessions for whitelisted accounts {ALLOWED_USERNAMES}...")
+    try:
+        outlets = db.fetch_merchant_outlets_from_db()
+    except Exception as e:
+        log.warning(f"⚠️ [STARTUP WARMUP] Could not fetch control source outlets for warmup: {e}")
+        return
+
+    processed_accounts = set()
+    for outlet in outlets:
+        username = _normalized_username(outlet.username)
+        if not username or username in processed_accounts:
+            continue
+
+        # Exclude usernames not in whitelist (username != auto7313)
+        if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+            log.info(f"  ⏭️ [STARTUP WARMUP] Excluding account '{username}' (username != auto7313).")
+            continue
+
+        processed_accounts.add(username)
+
+        local_session_file = SCRIPT_DIR / "data" / f"session_{username}.json"
+        session_file = local_session_file if local_session_file.exists() else (PROJECT_ROOT / "src" / "data" / f"session_{username}.json")
+        browser.set_session_file(session_file)
+
+        # Warmup: verifikasi login saja, tanpa switch ke portal tertentu.
+        # Switch portal dilakukan per-merchant-group saat sync_all_stores berjalan.
+        log.info(f"  🌐 [STARTUP WARMUP] Initializing active browser session for account '{username}'...")
+        try:
+            session = browser.get_session(
+                username=username,
+                password=outlet.password,
+                phone=outlet.hp,
+                target_name=None,  # Jangan paksa switch portal saat warmup
+                close_browser=False,
+                interactive=False,
+            )
+            if session and session.get("shopee_tob_token"):
+                ACTIVE_SESSIONS[username] = session
+                log.info(f"  ✅ [STARTUP WARMUP] Account '{username}' session active & stored (Entity ID: {session.get('shopee_tob_entity_id')}).")
+            else:
+                log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' login completed, session pending.")
+        except Exception as ex:
+            log.warning(f"  ⚠️ [STARTUP WARMUP] Account '{username}' warmup exception: {ex}")
+
+
+def recycle_browser_sessions():
+    """
+    Safely closes active browser instance(s) to release all Chromium native DOM/C++ memory,
+    and immediately spins up a fresh browser instance using the existing on-disk profile.
+    Must be called only during safe idle windows to guarantee zero cold-start latency.
+    """
+    log.info("🧹 [BROWSER RECYCLE] Starting proactive browser instance recycling...")
+    with SYNC_LOCK:
+        for username, session in list(ACTIVE_SESSIONS.items()):
+            driver = session.get("driver") if isinstance(session, dict) else None
+            if driver:
+                try:
+                    log.info(f"🧹 [BROWSER RECYCLE] Terminating stale browser session for '{username}'...")
+                    browser.cleanup_driver_process(driver)
+                except Exception as clean_err:
+                    log.warning(f"⚠️ [BROWSER RECYCLE] Cleanup warning for '{username}': {clean_err}")
+        ACTIVE_SESSIONS.clear()
+
+        # Flush Python cyclic references & glibc memory arena
+        try:
+            import gc
+            import ctypes
+            gc.collect()
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
+
+        # Re-warmup fresh browser instance with existing profile
+        log.info("🚀 [BROWSER RECYCLE] Re-warming fresh browser session...")
+        warmup_all_account_sessions()
+        log.info("✅ [BROWSER RECYCLE] Proactive browser recycling completed successfully.")
+
+
+def execute_outlet_shopee_action(outlet: MerchantOutlet, action: str) -> bool:
+    """
+    Executes actual Open/Close action on Shopee Partner API or via Selenium browser login.
+    Excludes execution if outlet.username != auto7313.
+    """
+    username = _normalized_username(outlet.username)
+    portal_name = _normalized_portal_name(outlet.nama_portal)
+
+    # Exclude accounts not in ALLOWED_USERNAMES whitelist
+    if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+        log.info(
+            f"  ⏭️ [SHOPEE EXECUTION] Excluding Store {outlet.store_id} - "
+            f"username '{username}' not in ALLOWED_USERNAMES."
+        )
+        return False
+
+    log.info(f"🌐 [SHOPEE EXECUTION] Initiating {action} for Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
+
+    # Set session file according to outlet username
+    if username:
+        local_sf = SCRIPT_DIR / "data" / f"session_{username}.json"
+        account_session_file = local_sf if local_sf.exists() else (PROJECT_ROOT / "src" / "data" / f"session_{username}.json")
+        if account_session_file.exists():
+            browser.set_session_file(account_session_file)
+
+    cached = ACTIVE_SESSIONS.get(username)
+    session = cached or browser.get_session(
+        username=username,
+        password=outlet.password,
+        phone=outlet.hp,
+        target_name=portal_name,
+        close_browser=False,
+        interactive=False,
+    )
+
+    if session:
+        driver = session.get("driver")
+        ACTIVE_SESSIONS[username] = session
+
+        # Primary Action: In-Browser XHR via store_status module (Instant execution)
+        if driver and outlet.store_id:
+            m_id = str(getattr(outlet, "merchant_id", "") or "14367488")
+            if action == ACTION_OPEN:
+                log.warning(f"  ⛔ [SAFETY GUARD] ACTION_OPEN is permanently disabled on churn terminator bot for Store {outlet.store_id}.")
+                return False
+            else:
+                success = store_status.pause_store_action(
+                    driver,
+                    outlet.store_id,
+                    merchant_id=m_id,
+                    pause_end_time_ms=_pause_end_time_ms(outlet),
+                )
+            if success:
+                log.info(f"  ✅ [IN-BROWSER XHR SUCCESS] {action} executed successfully for Store {outlet.store_id}.")
+                return True
+
+    log.error(f"  ❌ Gagal mengeksekusi {action} untuk Store {outlet.store_id}.")
+    return False
+
+
+def sync_all_stores(
+    execute_actions: bool = True,
+    default_interval_seconds: Optional[int] = None,
+    target_groups: Optional[set[tuple[str, str]]] = None,
+    target_store_ids: Optional[set[str] | list[str] | tuple[str, ...]] = None,
+    force_schedule_refresh: bool = False,
+) -> Dict[str, Any]:
+    if not SYNC_LOCK.acquire(blocking=False):
+        log.warning("⏭️ [BACKEND WORKER] Sync skipped because another cycle is still in progress.")
+        return {
+            "success": True,
+            "sync_skipped": True,
+            "total_stores_processed": 0,
+            "actions_taken": [],
+            "message": "Sync skipped because another cycle is still in progress.",
+            "next_wake_hint_seconds": 1,
+            "next_wake_hint_reason": "sync sebelumnya masih berjalan",
+        }
+
+    local_tz = ZoneInfo("Asia/Jakarta")
+    cycle_started_at = datetime.now(local_tz)
+    log.info("🔄 [BACKEND WORKER] Starting store synchronization...")
+
+    post_action_recheck_at: Optional[datetime] = None
+    post_action_recheck_reason = "default interval"
+
+    def _request_post_action_recheck(reason: str, delay_seconds: int = 15) -> None:
+        nonlocal post_action_recheck_at, post_action_recheck_reason
+        candidate_dt = datetime.now(local_tz) + timedelta(seconds=max(1, int(delay_seconds or 1)))
+        if post_action_recheck_at is None or candidate_dt < post_action_recheck_at:
+            post_action_recheck_at = candidate_dt
+            post_action_recheck_reason = reason
+
+    try:
+        if hasattr(db, "sync_expired_user_pauses"):
+            try:
+                db.sync_expired_user_pauses()
+            except Exception as e:
+                log.warning("  ⚠️ Failed to sync expired user pauses: %s", e)
+
+        # Runtime source of truth: PostgreSQL. Spreadsheet is import-only.
+        outlets = db.fetch_merchant_outlets_from_db()
+        actions_taken = []
+        watched_outlets: List[MerchantOutlet] = []
+
+        normalized_target_store_ids = (
+            {str(sid).strip() for sid in target_store_ids if str(sid).strip()}
+            if target_store_ids is not None
+            else None
+        )
+
+        # Group outlets by account and merchant portal (nama_portal)
+        # Format: { (username, nama_portal): [outlet1, outlet2, ...] }
+        grouped_outlets: Dict[tuple, List[MerchantOutlet]] = {}
+        for outlet in outlets:
+            username = _normalized_username(outlet.username)
+            if ALLOWED_USERNAMES and username not in ALLOWED_USERNAMES:
+                log.debug(
+                    f"  ⏭️ Excluding store {outlet.store_id} ({outlet.nama_panjang_outlet}) - "
+                    f"username '{username}' not in ALLOWED_USERNAMES"
+                )
+                continue
+            key = _merchant_group_key(outlet)
+            if key not in grouped_outlets:
+                grouped_outlets[key] = []
+            grouped_outlets[key].append(outlet)
+
+        if target_groups is not None:
+            grouped_outlets = {
+                key: merchant_outlets
+                for key, merchant_outlets in grouped_outlets.items()
+                if key in target_groups
+            }
+
+        if normalized_target_store_ids is not None:
+            grouped_outlets = {
+                key: [
+                    o for o in merchant_outlets
+                    if str(o.store_id).strip() in normalized_target_store_ids
+                ]
+                for key, merchant_outlets in grouped_outlets.items()
+            }
+            grouped_outlets = {
+                key: merchant_outlets
+                for key, merchant_outlets in grouped_outlets.items()
+                if merchant_outlets
+            }
+
+        yielded_for_preemption = False
+
+        # Process each merchant portal group
+        for (username, portal_name), merchant_outlets in grouped_outlets.items():
+            if yielded_for_preemption:
+                break
+
+            log.info(f"🏬 [MERCHANT GROUP] Processing {len(merchant_outlets)} outlets for Merchant Portal: '{portal_name}' (Account: {username})...")
+
+            cached = ACTIVE_SESSIONS.get(username)
+            driver = cached.get("driver") if cached else None
+
+            def _is_session_dead(drv) -> bool:
+                """Return True if the WebDriver session is no longer valid."""
+                if not drv:
+                    return True
+                try:
+                    _ = drv.current_url
+                    return False
+                except Exception:
+                    return True
+
+            def _recover_session(reason: str) -> None:
+                """Clear stale session cache and re-launch a fresh browser session."""
+                nonlocal cached, driver
+                log.warning(f"  🔁 [SESSION RECOVERY] Dead session detected ({reason}). Re-launching browser for account '{username}'...")
+                if driver:
+                    try:
+                        driver.quit()
+                    except Exception:
+                        pass
+                ACTIVE_SESSIONS.pop(username, None)
+                cached = None
+                driver = None
+                try:
+                    first_outlet = merchant_outlets[0]
+                    new_session = browser.get_session(
+                        username=username,
+                        password=first_outlet.password,
+                        phone=first_outlet.hp,
+                        target_name=portal_name,
+                        close_browser=False,
+                        interactive=False,
+                    )
+                    if new_session and new_session.get("shopee_tob_token"):
+                        ACTIVE_SESSIONS[username] = new_session
+                        cached = new_session
+                        driver = new_session.get("driver")
+                        log.info(f"  ✅ [SESSION RECOVERY] Browser session restored for account '{username}' (Portal: {portal_name}).")
+                    else:
+                        log.warning(f"  ⚠️ [SESSION RECOVERY] Re-launch completed but session token missing for '{username}'.")
+                except Exception as rec_err:
+                    log.error(f"  ❌ [SESSION RECOVERY] Failed to re-launch browser for '{username}': {rec_err}")
+
+            def _ensure_group_session_ready(reason: str) -> bool:
+                nonlocal cached, driver
+                cached = ACTIVE_SESSIONS.get(username) or cached
+                driver = cached.get("driver") if cached else driver
+                if _is_session_dead(driver):
+                    _recover_session(reason)
+                cached = ACTIVE_SESSIONS.get(username) or cached
+                driver = cached.get("driver") if cached else None
+                return bool(driver) and not _is_session_dead(driver)
+
+            if driver:
+                if _is_session_dead(driver):
+                    _recover_session("invalid session id")
+                else:
+                    try:
+                        current_merchant = ""
+                        try:
+                            current_merchant = driver.execute_script(
+                                "return (document.querySelector('.merchantName')?.innerText || '').trim();"
+                            )
+                        except Exception:
+                            pass
+
+                        already_active = False
+                        if portal_name and current_merchant:
+                            p_norm = portal_name.lower().strip()
+                            c_norm = current_merchant.lower().strip()
+                            if p_norm == c_norm or p_norm in c_norm or c_norm in p_norm:
+                                already_active = True
+
+                        if already_active:
+                            log.info(f"  ✅ [MERCHANT] Browser sudah aktif di portal merchant '{portal_name}' (Current UI: '{current_merchant}'). Skip switch.")
+                        else:
+                            log.info(f"  🔄 [MERCHANT] Current merchant di browser: '{current_merchant or 'Unknown'}' | Target group: '{portal_name}'. Executing auto_switch_merchant...")
+                            sw_ok = browser.auto_switch_merchant(driver, portal_name)
+                            if sw_ok:
+                                log.info(f"  ✅ [MERCHANT] Switched successfully to portal merchant '{portal_name}'.")
+                                tok, eid = browser.extract_tokens_from_driver(driver)
+                                if cached:
+                                    if tok:
+                                        cached["shopee_tob_token"] = tok
+                                    if eid:
+                                        cached["shopee_tob_entity_id"] = eid
+                            else:
+                                log.warning(f"  ⚠️ [MERCHANT] auto_switch_merchant ke '{portal_name}' gagal. Initiating session recovery...")
+                                _recover_session(f"switch merchant to {portal_name} failed")
+                    except Exception as sw_err:
+                        log.warning(f"  ⚠️ Merchant context switch warning: {sw_err}")
+                        if _is_session_dead(driver):
+                            _recover_session("switch merchant failed")
+            else:
+                try:
+                    first_outlet = merchant_outlets[0]
+                    session = browser.get_session(
+                        username=username,
+                        password=first_outlet.password,
+                        phone=first_outlet.hp,
+                        target_name=portal_name,
+                        close_browser=False,
+                        interactive=False,
+                    )
+                    if session and session.get("shopee_tob_token"):
+                        ACTIVE_SESSIONS[username] = session
+                        cached = session
+                        driver = session.get("driver")
+                except Exception as sess_err:
+                    log.warning(f"  ⚠️ Browser session init error for merchant '{portal_name}': {sess_err}")
+
+            _ensure_group_session_ready(f"group bootstrap for merchant '{portal_name}'")
+
+            for idx, outlet in enumerate(merchant_outlets):
+                # ── PREEMPTIVE ON-DEMAND CHECK ─────────────────────────────────────
+                # If currently running in routine PATROL LANE (not targeted express lane),
+                # check if a user just requested an on-demand brand toggle in DB.
+                if normalized_target_store_ids is None and hasattr(db, "has_pending_brand_actions"):
+                    try:
+                        if db.has_pending_brand_actions():
+                            log.info(
+                                f"⚡ [ON-DEMAND PREEMPTION] Urgent user brand toggle detected in DB! "
+                                f"Yielding routine patrol lane for '{portal_name}' (after outlet #{idx}/{len(merchant_outlets)}) to execute Express Lane immediately..."
+                            )
+                            yielded_for_preemption = True
+                            break
+                    except Exception as pre_err:
+                        log.debug(f"Preemption check error: {pre_err}")
+
+                outlet_username = _normalized_username(outlet.username)
+                if outlet_username:
+                    local_sf = SCRIPT_DIR / "data" / f"session_{outlet_username}.json"
+                    browser.set_session_file(
+                        local_sf if local_sf.exists() else (PROJECT_ROOT / "src" / "data" / f"session_{outlet_username}.json")
+                    )
+
+                driver_ready = _ensure_group_session_ready(f"before patrol Store {outlet.store_id}")
+                if not driver_ready:
+                    log.warning(
+                        f"  ⚠️ [SESSION READY] Browser session belum siap untuk Store {outlet.store_id} "
+                        f"({outlet.nama_panjang_outlet}). Bot akan memakai state DB sementara."
+                    )
+
+                log.info(f"📌 Memasuki tab Business Hours untuk Store {outlet.store_id} ({outlet.nama_panjang_outlet})...")
+
+                is_detected = False
+                if driver_ready and driver:
+                    is_detected = store_status.ensure_business_hours_page(driver, store_id=outlet.store_id)
+                    if not is_detected and _is_session_dead(driver):
+                        _recover_session(f"business hours page lost for Store {outlet.store_id}")
+                        driver_ready = _ensure_group_session_ready(f"retry patrol Store {outlet.store_id}")
+                        if driver_ready and driver:
+                            is_detected = store_status.ensure_business_hours_page(driver, store_id=outlet.store_id)
+
+                if is_detected:
+                    log.info(f"  ✅ [BUSINESS HOURS CONFIRMED] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) TERDETEKSI & TER-LOAD SEMPURNA di menu Business Hours!")
+                else:
+                    log.warning(f"  ⚠️ [BUSINESS HOURS WARNING] Target Store {outlet.store_id} ({outlet.nama_panjang_outlet}) BELUM TERDETEKSI SEMPURNA di menu Business Hours!")
+
+                # Keep the last known Shopee schedule in-memory unless this cycle
+                # successfully fetches a newer one. This prevents multi-schedule
+                # pauses from being lost when the boundary recheck lands on a
+                # temporary regular-hours fetch failure.
+                last_known_regular_hours = (
+                    getattr(outlet, "regular_hours", None)
+                    or getattr(outlet, "shopee_regular_hours", None)
+                    or {}
+                )
+                last_known_schedule_available = any(last_known_regular_hours.values())
+                current_schedule_fetch_status = str(getattr(outlet, "schedule_fetch_status", "") or "").strip().upper()
+                outlet.regular_hours = last_known_regular_hours
+                outlet.shopee_regular_hours = last_known_regular_hours
+                schedule_identity_valid = True
+                is_stale_schedule = _is_schedule_stale(outlet, datetime.now(local_tz))
+                needs_schedule_fetch = (
+                    force_schedule_refresh
+                    or is_stale_schedule
+                    or (not last_known_schedule_available and current_schedule_fetch_status != "FETCHED_EMPTY")
+                    or current_schedule_fetch_status in ("NOT_FETCHED_YET", "FETCH_RETRYING", "STATUS_UNKNOWN", "")
+                )
+
+                if needs_schedule_fetch:
+                    if driver_ready and driver:
+                        try:
+                            shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
+                            if isinstance(shopee_hours, dict) and "regular_hours" in shopee_hours:
+                                normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
+                                if not any(normalized_hours.values()):
+                                    _mark_schedule_fetch_empty(outlet)
+                                else:
+                                    outlet.regular_hours = normalized_hours
+                                    outlet.shopee_regular_hours = normalized_hours
+                                    outlet.schedule_fetch_status = "READY"
+
+                                    try:
+                                        db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                                    except Exception as persist_err:
+                                        log.warning(
+                                            f"  ⚠️ [REGULAR HOURS STATUS SYNC] Jadwal Shopee Store {outlet.store_id} berhasil diambil "
+                                            f"tetapi gagal disimpan ke DB: {persist_err}"
+                                        )
+                                    else:
+                                        log.info(
+                                            f"  ✅ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} jadwal Shopee tersimpan "
+                                            f"({sum(bool(v) for v in normalized_hours.values())} hari aktif)."
+                                        )
+                            elif shopee_hours is None:
+                                if current_schedule_fetch_status == "FETCHED_EMPTY":
+                                    log.info(
+                                        f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} mempertahankan status jadwal kosong "
+                                        "karena fetch saat ini tidak mengembalikan data."
+                                    )
+                                elif last_known_schedule_available:
+                                    log.info(
+                                        f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "
+                                        "yang valid karena fetch saat ini tidak mengembalikan data."
+                                    )
+                                else:
+                                    _mark_schedule_fetch_retry(outlet, "Shopee tidak mengembalikan data jadwal.")
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
+                                        "Bot akan retry fetch pada patroli berikutnya."
+                                    )
+                            else:
+                                if current_schedule_fetch_status == "FETCHED_EMPTY":
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
+                                        "Status jadwal kosong terakhir dipertahankan."
+                                    )
+                                elif last_known_schedule_available:
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Response jadwal Shopee Store {outlet.store_id} tidak valid. "
+                                        "Tetap memakai jadwal terakhir yang valid."
+                                    )
+                                else:
+                                    _mark_schedule_fetch_retry(outlet, "Response jadwal Shopee tidak valid.")
+                                    log.warning(
+                                        f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
+                                        "Response tidak valid dan bot akan retry."
+                                    )
+                        except store_status.StoreIdentityMismatch as identity_err:
+                            schedule_identity_valid = False
+                            if not last_known_schedule_available and current_schedule_fetch_status != "FETCHED_EMPTY":
+                                _mark_schedule_fetch_retry(
+                                    outlet,
+                                    f"Store identity mismatch saat fetch jadwal: {identity_err}",
+                                )
+                            log.error(
+                                f"  ❌ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: {identity_err}. "
+                                "Tidak ada decision/action yang dijalankan memakai jadwal yang tidak terpercaya."
+                            )
+                        except Exception as hours_err:
+                            if current_schedule_fetch_status == "FETCHED_EMPTY":
+                                log.warning(
+                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
+                                    "Status jadwal kosong terakhir dipertahankan."
+                                )
+                            elif last_known_schedule_available:
+                                log.warning(
+                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Gagal menarik jadwal Shopee Store {outlet.store_id}: {hours_err}. "
+                                    "Tetap memakai jadwal terakhir yang valid."
+                                )
+                            else:
+                                _mark_schedule_fetch_retry(outlet, str(hours_err))
+                                log.warning(
+                                    f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid. "
+                                    "Bot akan retry setelah fetch gagal."
+                                )
+
+                        if schedule_identity_valid:
+                            try:
+                                special_res = store_status.get_special_hours(driver, store_id=outlet.store_id)
+                                if isinstance(special_res, dict):
+                                    special_list = special_res.get("special_hours", [])
+                                    outlet.shopee_special_hours = special_list
+                                    try:
+                                        db.update_shopee_special_hours(outlet.store_id, special_list)
+                                    except Exception as sp_persist_err:
+                                        log.warning(
+                                            f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Jadwal khusus Shopee Store {outlet.store_id} berhasil diambil "
+                                            f"tetapi gagal disimpan ke DB: {sp_persist_err}"
+                                        )
+                                    else:
+                                        log.info(
+                                            f"  ✅ [SPECIAL HOURS STATUS SYNC] Store {outlet.store_id} jadwal khusus Shopee tersimpan "
+                                            f"({len(special_list)} entri)."
+                                        )
+                            except store_status.StoreIdentityMismatch as sp_identity_err:
+                                schedule_identity_valid = False
+                                log.error(
+                                    f"  ❌ [SPECIAL HOURS QUARANTINE] Store {outlet.store_id} identity mismatch pada jadwal khusus: {sp_identity_err}"
+                                )
+                            except Exception as sp_err:
+                                log.warning(
+                                    f"  ⚠️ [SPECIAL HOURS STATUS SYNC] Gagal menarik jadwal khusus Shopee Store {outlet.store_id}: {sp_err}"
+                                )
+                    else:
+                        if current_schedule_fetch_status == "FETCHED_EMPTY":
+                            log.info(
+                                f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} mempertahankan status jadwal kosong "
+                                "karena sesi browser belum siap."
+                            )
+                        elif last_known_schedule_available:
+                            log.info(
+                                f"  ℹ️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} tetap memakai jadwal Shopee terakhir "
+                                "yang valid karena sesi browser belum siap."
+                            )
+                        else:
+                            _mark_schedule_fetch_retry(outlet, "Sesi browser belum siap untuk fetch jadwal.")
+                            log.warning(
+                                f"  ⚠️ [REGULAR HOURS STATUS SYNC] Store {outlet.store_id} belum memiliki jadwal Shopee valid "
+                                "karena sesi browser belum siap. Bot akan retry."
+                            )
+
+                if driver_ready and driver:
+                    live_identity_valid = True
+                    try:
+                        live_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
+                        if live_info and live_info.get("timezone"):
+                            outlet.timezone = live_info["timezone"]
+                            db.update_outlet_timezone(outlet.store_id, outlet.timezone)
+                        if live_info and live_info.get("store_name"):
+                            store_name = live_info["store_name"]
+                            outlet.nama_panjang_outlet = store_name
+                            db.update_outlet_name(outlet.store_id, store_name)
+                        if live_info and live_info.get("status_str") in ("OPEN", "CLOSED"):
+                            actual_st = _normalize_live_status(live_info)
+                            outlet.status_aktual = actual_st
+                            db.update_shopee_actual_status(outlet.store_id, actual_st)
+                    except store_status.StoreIdentityMismatch as identity_err:
+                        live_identity_valid = False
+                        log.error(
+                            f"  ❌ [LIVE STATE QUARANTINE] Store {outlet.store_id} dilewati pada cycle ini: {identity_err}. "
+                            "Tidak ada decision/action yang dijalankan memakai live state yang tidak terpercaya."
+                        )
+                    except Exception as st_err:
+                        log.debug(f"  ⚠️ Live Shopee status query skipped for Store {outlet.store_id}: {st_err}")
+                else:
+                    live_identity_valid = True
+                    log.debug(f"  ⚠️ Live Shopee status query skipped for Store {outlet.store_id}: browser session belum siap")
+
+                watched_outlets.append(outlet)
+
+                if not schedule_identity_valid or not live_identity_valid:
+                    continue
+
+                decision = evaluate_outlet_status(
+                    outlet,
+                    current_time=datetime.now(local_tz),
+                    require_regular_schedule=True,
+                )
+                shopee_before = (outlet.status_aktual or "UNKNOWN").upper()
+                vercel_status = (outlet.status_utama or "OFF").upper()
+
+                log.info(
+                    f"  🔍 [PRE-CHECK] Store {outlet.store_id} ({outlet.nama_panjang_outlet}) | "
+                    f"Shopee Status Sebelum: {shopee_before} | Vercel Toggle: {vercel_status} | "
+                    f"Decision: {decision.action} ({decision.reason})"
+                )
+
+                if (
+                    decision.action == ACTION_CLOSE
+                    and shopee_before in ("ON", "OPEN", "2")
+                    and driver_ready
+                    and driver
+                ):
+                    now_ts = time.time()
+                    last_rf = _LAST_ON_DEMAND_SCHEDULE_REFRESH.get(str(outlet.store_id), 0.0)
+                    if (now_ts - last_rf) >= 180.0:
+                        _LAST_ON_DEMAND_SCHEDULE_REFRESH[str(outlet.store_id)] = now_ts
+                        log.info(
+                            f"  🔍 [ON-DEMAND SCHEDULE CHECK] Store {outlet.store_id} ({outlet.nama_panjang_outlet}) "
+                            f"live di Shopee berstatus OPEN ({shopee_before}), tetapi evaluasi bot bernilai ACTION_CLOSE "
+                            f"({decision.reason}). Menarik jadwal Shopee secara instan untuk verifikasi..."
+                        )
+                        schedule_changed = False
+                        try:
+                            special_res = store_status.get_special_hours(driver, store_id=outlet.store_id)
+                            if isinstance(special_res, dict):
+                                special_list = special_res.get("special_hours", [])
+                                outlet.shopee_special_hours = special_list
+                                try:
+                                    db.update_shopee_special_hours(outlet.store_id, special_list)
+                                    log.info(
+                                        f"  ✅ [ON-DEMAND SPECIAL SYNC] Store {outlet.store_id} jadwal khusus Shopee tersimpan "
+                                        f"({len(special_list)} entri)."
+                                    )
+                                except Exception as e:
+                                    log.warning(f"  ⚠️ Gagal simpan special_hours ke DB: {e}")
+                                schedule_changed = True
+                        except store_status.StoreIdentityMismatch as sp_err:
+                            log.error(f"  ❌ [SPECIAL HOURS QUARANTINE] Store {outlet.store_id} identity mismatch: {sp_err}")
+                        except Exception as sp_err:
+                            log.warning(f"  ⚠️ Gagal on-demand fetch special_hours untuk Store {outlet.store_id}: {sp_err}")
+
+                        weekday_name = WEEKDAY_MAP.get(datetime.now(local_tz).weekday(), "Senin")
+                        curr_sched = getattr(outlet, "regular_hours", None) or getattr(outlet, "shopee_regular_hours", None) or {}
+                        if not curr_sched.get(weekday_name):
+                            try:
+                                shopee_hours = store_status.get_regular_hours(driver, store_id=outlet.store_id)
+                                if isinstance(shopee_hours, dict) and "regular_hours" in shopee_hours:
+                                    normalized_hours = _normalize_shopee_regular_hours(shopee_hours)
+                                    if any(normalized_hours.values()):
+                                        outlet.regular_hours = normalized_hours
+                                        outlet.shopee_regular_hours = normalized_hours
+                                        outlet.schedule_fetch_status = "READY"
+                                        try:
+                                            db.update_shopee_regular_hours(outlet.store_id, normalized_hours)
+                                            log.info(
+                                                f"  ✅ [ON-DEMAND REGULAR SYNC] Store {outlet.store_id} jadwal Shopee tersimpan."
+                                            )
+                                        except Exception as e:
+                                            log.warning(f"  ⚠️ Gagal simpan regular_hours ke DB: {e}")
+                                        schedule_changed = True
+                            except store_status.StoreIdentityMismatch as reg_err:
+                                log.error(f"  ❌ [REGULAR HOURS QUARANTINE] Store {outlet.store_id} identity mismatch: {reg_err}")
+                            except Exception as reg_err:
+                                log.warning(f"  ⚠️ Gagal on-demand fetch regular_hours untuk Store {outlet.store_id}: {reg_err}")
+
+                        if schedule_changed:
+                            decision = evaluate_outlet_status(
+                                outlet,
+                                current_time=datetime.now(local_tz),
+                                require_regular_schedule=True,
+                            )
+                            log.info(
+                                f"  🔄 [ON-DEMAND RE-EVALUATION] Store {outlet.store_id} setelah re-fetch jadwal -> "
+                                f"Decision: {decision.action} ({decision.reason})"
+                            )
+                            if decision.action != ACTION_CLOSE:
+                                log.info(
+                                    f"  ✅ [MISMATCH RESOLVED] Store {outlet.store_id} tidak jadi ditutup paksa! "
+                                    f"Shopee schedule aktif terkonfirmasi ({decision.reason})."
+                                )
+                                if getattr(outlet, "pause_until", None):
+                                    outlet.pause_until = None
+                                    try:
+                                        db.update_vercel_toggle(outlet.store_id, outlet.status_utama, pause_until=None)
+                                        log.info(f"  ✅ [DB CLEANUP] Stale pause_until untuk Store {outlet.store_id} berhasil di-clear.")
+                                    except Exception as clean_err:
+                                        log.warning(f"  ⚠️ Gagal clear stale pause_until di DB: {clean_err}")
+
+                if decision.action in (ACTION_OPEN, ACTION_CLOSE) and execute_actions:
+                    log.info(f"⚡ [ACTION TRIGGERED] Executing {decision.action} for Store {outlet.store_id} (Target: {decision.target_state})...")
+                    exec_ok = execute_outlet_shopee_action(outlet, decision.action)
+                    expected_st = "ON" if decision.target_state == "OPEN" else "PAUSE"
+                    verification_note = ""
+                    verification_ok = False
+
+                    if exec_ok:
+                        driver_ready = _ensure_group_session_ready(f"post action verify Store {outlet.store_id}")
+                        if not driver_ready:
+                            verification_note = " | Verification: pending browser recovery"
+                            _request_post_action_recheck(
+                                f"post-action verify tertunda untuk Store {outlet.store_id}: browser recovery"
+                            )
+                        else:
+                            log.info(f"  🔍 [POST-EXECUTION VERIFICATION] Memverifikasi ulang status live Shopee setelah {decision.action} untuk Store {outlet.store_id}...")
+                            time.sleep(1.5)
+                            post_info = None
+                            try:
+                                post_info = store_status.get_actual_store_status(driver, store_id=outlet.store_id)
+                            except Exception as post_err:
+                                log.warning(f"  ⚠️ [POST-EXECUTION VERIFICATION] Gagal membaca live state pasca-aksi untuk Store {outlet.store_id}: {post_err}")
+
+                            if post_info and post_info.get("status_str") in ("OPEN", "CLOSED"):
+                                verified_st = _normalize_live_status(post_info)
+                                outlet.status_aktual = verified_st
+                                verification_note = f" | Verification: LIVE={verified_st}"
+                                log.info(f"  ✅ [POST-EXECUTION VERIFIED] Status Live Shopee Pasca-{decision.action}: '{verified_st}' (Expected: '{expected_st}').")
+                                try:
+                                    db.update_shopee_actual_status(outlet.store_id, verified_st)
+                                    log.info(f"  ✅ [DB STATUS SYNC] Status shopee_actual_status Store {outlet.store_id} berhasil diupdate ke '{verified_st}' di DB.")
+                                except Exception as sync_err:
+                                    log.warning(f"  ⚠️ Gagal mengupdate DB shopee_actual_status: {sync_err}")
+
+                                if verified_st != expected_st:
+                                    verification_note = f"{verification_note} (expected {expected_st})"
+                                    _request_post_action_recheck(
+                                        f"post-action verify mismatch untuk Store {outlet.store_id}: live {verified_st}, expected {expected_st}"
+                                    )
+                                    _mark_schedule_fetch_retry(
+                                        outlet,
+                                        f"Verification mismatch ({verified_st} != {expected_st}): re-fetching schedule on next pass"
+                                    )
+                                else:
+                                    verification_ok = True
+                            else:
+                                verification_note = " | Verification: pending recheck"
+                                log.warning(
+                                    f"  ⚠️ [POST-EXECUTION VERIFICATION] Live state pasca-aksi untuk Store {outlet.store_id} "
+                                    "belum bisa diverifikasi. Menjadwalkan recheck cepat."
+                                )
+                                _request_post_action_recheck(
+                                    f"post-action verify ulang untuk Store {outlet.store_id}: live state belum terbaca"
+                                )
+                    else:
+                        verification_note = " | Verification: action failed"
+                        _request_post_action_recheck(
+                            f"retry action Store {outlet.store_id}: eksekusi {decision.action} gagal"
+                        )
+
+                    action_success = exec_ok and verification_ok
+                    action_result = "SUCCESS" if exec_ok else "FAILED"
+                    if exec_ok and not verification_ok:
+                        action_result = "VERIFICATION_MISMATCH"
+                    reason_text = f"{decision.reason} | Shopee Action: {action_result}{verification_note}"
+                    actions_taken.append({
+                        "store_id": outlet.store_id,
+                        "store_name": outlet.nama_panjang_outlet,
+                        "action": decision.action,
+                        "target_state": decision.target_state,
+                        "reason": reason_text,
+                        "success": action_success,
+                        "action_result": action_result,
+                        "merchant_key": (outlet.username, outlet.nama_portal),
+                    })
+
+                    db.record_log(
+                        store_id=outlet.store_id,
+                        store_name=outlet.nama_panjang_outlet,
+                        action=decision.action,
+                        target_state=decision.target_state,
+                        reason=reason_text,
+                        success=action_success,
+                        error_message=None if action_success else reason_text,
+                    )
+
+                    if not action_success:
+                        try:
+                            from core.notifier import send_discord_error
+                            send_discord_error(
+                                merchant=outlet.nama_portal,
+                                outlet=outlet.nama_panjang_outlet,
+                                action=decision.action,
+                                store_id=outlet.store_id,
+                                error_type="ACTION_CLOSE_FAILED",
+                                message=f"Gagal menutup toko {outlet.nama_panjang_outlet} ({outlet.store_id}) di portal {outlet.nama_portal}: {reason_text}",
+                            )
+                        except Exception as notif_err:
+                            log.warning(f"  ⚠️ Gagal mengirim alert error Discord: {notif_err}")
+
+        db.record_log(
+            store_id="SYSTEM",
+            store_name="BOT_DAEMON",
+            action="SYNC_CYCLE",
+            target_state="SYNCED",
+            reason=f"Evaluasi bot selesai untuk {len(actions_taken)} aksi dijalankan (Filtered: username == auto7313)"
+        )
+
+        cycle_finished_at = datetime.now(local_tz)
+        next_wake_hint_seconds = None
+        next_wake_hint_reason = "default interval"
+        if default_interval_seconds:
+            next_wake_hint_seconds, next_wake_hint_reason = get_pause_recheck_delay_seconds(
+                watched_outlets,
+                default_interval_seconds=default_interval_seconds,
+                now_dt=cycle_started_at,
+                effective_now_dt=cycle_finished_at,
+            )
+
+        if post_action_recheck_at:
+            post_action_delay_seconds = max(
+                1,
+                math.ceil((post_action_recheck_at - cycle_finished_at).total_seconds()),
+            )
+            if next_wake_hint_seconds is None or post_action_delay_seconds < next_wake_hint_seconds:
+                next_wake_hint_seconds = post_action_delay_seconds
+                next_wake_hint_reason = post_action_recheck_reason
+
+        return {
+            "success": True,
+            "total_stores_processed": sum(len(group) for group in grouped_outlets.values()),
+            "actions_taken": actions_taken,
+            "processed_merchant_groups": [
+                {"username": username, "portal_name": portal_name}
+                for username, portal_name in grouped_outlets
+            ],
+            "message": f"Successfully processed stores for allowed usernames {ALLOWED_USERNAMES}.",
+            "next_wake_hint_seconds": next_wake_hint_seconds,
+            "next_wake_hint_reason": next_wake_hint_reason,
+            "yielded_for_preemption": yielded_for_preemption,
+        }
+    finally:
+        SYNC_LOCK.release()

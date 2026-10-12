@@ -1,0 +1,128 @@
+:root {
+  --vb-accent: #be1a1a;
+  --vb-accent-soft: #f9e4e1;
+  --vb-ink: #111827;
+  --vb-muted: #374151;
+  --vb-line: #f3dcd9;
+  --vb-surface: #ffffff;
+  --vb-canvas: #fdf8f8;
+  --vb-success: #15803d;
+  --vb-radius: 16px;
+  --vb-shadow: 0 4px 20px rgba(190, 26, 26, 0.08);
+}
+
+.vb-pane {
+  padding: 24px 28px 40px;
+  color: var(--vb-ink);
+  background: var(--vb-canvas);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.vb-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.vb-eyebrow {
+  margin: 0 0 6px;
+  color: var(--vb-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.vb-heading h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+.vb-description {
+  max-width: 560px;
+  margin: 7px 0 0;
+  color: var(--vb-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.vb-heading-actions {
+  min-width: 210px;
+}
+
+.vb-search-label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--vb-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vb-search {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 11px;
+  color: var(--vb-ink);
+  background: var(--vb-surface);
+  border: 1px solid var(--vb-line);
+  border-radius: 10px;
+  outline: none;
+}
+
+.vb-search:focus {
+  border-color: var(--vb-accent);
+  box-shadow: 0 0 0 3px var(--vb-accent-soft);
+}
+
+.vb-table-card {
+  overflow: hidden;
+  background: var(--vb-surface);
+  border: 1px solid var(--vb-line);
+  border-radius: var(--vb-radius);
+  box-shadow: var(--vb-shadow);
+}
+
+.vb-table-scroll { overflow-x: auto; }
+
+.vb-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.vb-table th,
+.vb-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--vb-line);
+  vertical-align: middle;
+}
+
+.vb-table th {
+  color: var(--vb-muted);
+  background: #fffafa;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.vb-table tbody tr:last-child td { border-bottom: 0; }
+.vb-table tbody tr:hover { background: #fff8f6; }
+
+.vb-empty-state {
+  padding: 46px 16px !important;
+  color: var(--vb-muted);
+  text-align: center !important;
+}
+
+@media (max-width: 720px) {
+  .vb-pane { padding: 18px 16px 32px; }
+  .vb-heading { align-items: stretch; flex-direction: column; gap: 14px; }
+  .vb-heading-actions { min-width: 0; }
+}

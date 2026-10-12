@@ -30,8 +30,13 @@ secrets/
 data/
 src/data/
 main-bot/data/
+close-bot/data/
+close-bot/src/data/
 *.log
+*.png
 daemon.lock
+*.lock
+!uv.lock
 otp_request_*.json
 session_*.json
 bot_state.json

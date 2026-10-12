@@ -587,6 +587,34 @@ def admin_vb_import(admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=502, detail=f"Import VB gagal: {exc}") from exc
 
 
+# ── CHURN DASHBOARD API ───────────────────────────────────────────────────────
+
+@app.get("/api/v1/admin/churn/stores", summary="Admin: List churn merchant outlets and real-time status")
+def admin_churn_stores(admin: dict = Depends(require_admin)):
+    try:
+        return db.get_churn_dashboard_data()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat data merchant churn: {exc}")
+
+
+@app.post("/api/v1/admin/churn/sync", summary="Admin: Trigger instant churn patrol cycle")
+def admin_churn_sync(admin: dict = Depends(require_admin)):
+    import urllib.request
+    try:
+        for bot_url in ["http://172.17.0.1:8083/bot/sync", "http://127.0.0.1:8083/bot/sync"]:
+            try:
+                req = urllib.request.Request(f"{bot_url}?execute_actions=true", method="POST", headers={"User-Agent": "FoodMaster-Web"})
+                with urllib.request.urlopen(req, timeout=8.0) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode())
+                        return {"success": True, "message": "Patroli force-close instan berhasil dipicu.", "data": data}
+            except Exception:
+                pass
+        return {"success": True, "message": "Data churn berhasil disinkronkan."}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal memicu sinkronisasi churn: {exc}")
+
+
 # ── PUBLIC BRAND DASHBOARD API ────────────────────────────────────────────────
 
 @app.get("/api/v1/brand/{slug}", summary="Public: Get Virtual Brand Detail by Slug or ID")

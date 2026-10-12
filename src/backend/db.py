@@ -1910,3 +1910,203 @@ def get_entity_analytics_detail(
 
 
 init_state = init_db
+
+CHURN_CSV_DEFAULT = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/"
+    "pub?gid=1463294207&single=true&output=csv"
+)
+
+
+def get_churn_dashboard_data() -> dict:
+    """Fetch churn merchants from Google Sheets and correlate with PostgreSQL states."""
+    import csv
+    import io
+    import requests
+    import urllib.request
+
+    csv_url = os.getenv("CLOSE_BOT_CSV_URL", "").strip() or CHURN_CSV_DEFAULT
+    raw_rows = []
+
+    try:
+        resp = requests.get(csv_url, timeout=12)
+        resp.raise_for_status()
+        content = resp.content.decode("utf-8-sig")
+        reader = csv.reader(io.StringIO(content))
+        raw_rows = list(reader)
+    except Exception as fetch_err:
+        raw_rows = []
+
+    header = [cell.strip().casefold() for cell in raw_rows[0]] if raw_rows else []
+
+    def find_col(patterns: List[str], exclude: list = None, default: int = -1) -> int:
+        for i, col in enumerate(header):
+            if exclude and any(ex in col for ex in exclude):
+                continue
+            if any(pat in col for pat in patterns):
+                return i
+        return default
+
+    col_nama_pemilik = find_col(["nama pemilik", "pemilik"], exclude=["wa", "hp"], default=0)
+    col_hp = find_col(["wa", "whatsapp", "no hp", "hp"], default=1)
+    col_status_bot = find_col(["status"], exclude=["langganan", "subscription"], default=2)
+    col_paket = find_col(["paket", "package"], default=3)
+    col_tanggal_mulai = find_col(["mulai", "start"], default=4)
+    col_tanggal_berakhir = find_col(["berakhir", "expired", "end"], default=5)
+    col_username = find_col(["username", "user"], exclude=["vercel", "dashboard"], default=6)
+    col_nama_portal = find_col(["nama portal", "portal", "merchant"], default=8)
+    col_store_id = find_col(["store id", "store_id", "store"], default=9)
+    col_nama_listing = find_col(["nama listing", "listing", "nama panjang", "panjang", "outlet"], exclude=["portal"], default=10)
+
+    raw_items = []
+    store_ids = []
+    if len(raw_rows) > 1:
+        for row in raw_rows[1:]:
+            if not row or not any(cell.strip() for cell in row):
+                continue
+
+            def get_val(idx: int) -> str:
+                return row[idx].strip() if 0 <= idx < len(row) else ""
+
+            sid = get_val(col_store_id)
+            if not sid or not sid.isdigit():
+                continue
+
+            store_ids.append(sid)
+            raw_items.append({
+                "nama_pemilik": get_val(col_nama_pemilik),
+                "nomor_hp": get_val(col_hp),
+                "status_bot": get_val(col_status_bot) or "Tutup",
+                "paket": get_val(col_paket),
+                "tanggal_mulai_layanan": get_val(col_tanggal_mulai),
+                "tanggal_berakhir_layanan": get_val(col_tanggal_berakhir),
+                "username": get_val(col_username),
+                "nama_portal": get_val(col_nama_portal),
+                "store_id": sid,
+                "nama_listing": get_val(col_nama_listing),
+            })
+
+    db_states = {}
+    if store_ids:
+        query = """
+            SELECT o.store_id, o.long_name, os.shopee_actual_status, os.last_checked_at,
+                   al.action AS last_action, al.reason AS last_reason, al.checked_at AS last_action_at
+            FROM outlets o
+            LEFT JOIN outlet_states os ON os.outlet_id = o.id
+            LEFT JOIN LATERAL (
+                SELECT action, reason, checked_at
+                FROM automation_logs
+                WHERE outlet_id = o.id
+                ORDER BY checked_at DESC
+                LIMIT 1
+            ) al ON true
+            WHERE o.store_id = ANY(%s)
+        """
+        with get_db_connection() as conn:
+            records = conn.execute(query, (store_ids,)).fetchall()
+            for r in records:
+                db_states[str(r["store_id"])] = r
+
+    # Query force-bot daemon info
+    bot_info = {
+        "is_online": False,
+        "bot_status": "offline",
+        "cycle_count": 0,
+        "last_cycle_at": None,
+        "total_stores_processed": 0,
+    }
+    for bot_url in ["http://172.17.0.1:8083/bot/status", "http://127.0.0.1:8083/bot/status"]:
+        try:
+            req = urllib.request.Request(bot_url, headers={"User-Agent": "FoodMaster-Web"})
+            with urllib.request.urlopen(req, timeout=1.2) as resp:
+                if resp.status == 200:
+                    payload = json.loads(resp.read().decode())
+                    bot_info = {
+                        "is_online": True,
+                        "bot_status": payload.get("bot_status", "running"),
+                        "cycle_count": payload.get("cycle_count", 0),
+                        "last_cycle_at": payload.get("last_cycle_at"),
+                        "total_stores_processed": payload.get("total_stores_processed", 0),
+                    }
+                    break
+        except Exception:
+            pass
+
+    total_churn = len(raw_items)
+    total_paused = 0
+    total_closed = 0
+    total_open = 0
+    total_unknown = 0
+
+    processed_stores = []
+    for item in raw_items:
+        sid = item["store_id"]
+        st = db_states.get(sid)
+        live_raw = (st["shopee_actual_status"] if st and st.get("shopee_actual_status") else "UNKNOWN").upper()
+
+        if live_raw in ("ON", "OPEN", "2"):
+            live_status = "OPEN"
+            total_open += 1
+            is_paused = False
+        elif live_raw == "PAUSE":
+            live_status = "PAUSE"
+            total_paused += 1
+            is_paused = True
+        elif live_raw in ("OFF", "CLOSED", "CLOSE"):
+            live_status = "CLOSED"
+            total_closed += 1
+            is_paused = True
+        else:
+            live_status = "UNKNOWN"
+            total_unknown += 1
+            is_paused = False
+
+        last_checked = None
+        if st and st.get("last_checked_at"):
+            last_checked = st["last_checked_at"].strftime("%d/%m/%Y %H:%M:%S WIB")
+
+        last_action = st.get("last_action") if st else None
+        last_reason = st.get("last_reason") if st else None
+        last_action_at = st["last_action_at"].strftime("%d/%m/%Y %H:%M:%S WIB") if st and st.get("last_action_at") else None
+
+        processed_stores.append({
+            "store_id": sid,
+            "nama_pemilik": item["nama_pemilik"],
+            "nomor_hp": item["nomor_hp"],
+            "status_bot": item["status_bot"],
+            "paket": item["paket"],
+            "tanggal_mulai_layanan": item["tanggal_mulai_layanan"],
+            "tanggal_berakhir_layanan": item["tanggal_berakhir_layanan"],
+            "username": item["username"],
+            "nama_portal": item["nama_portal"],
+            "nama_listing": item["nama_listing"] or (st.get("long_name") if st else sid),
+            "target_status": "OFF",
+            "shopee_actual_status": live_status,
+            "is_paused": is_paused,
+            "last_checked_at": last_checked,
+            "last_action": last_action,
+            "last_reason": last_reason,
+            "last_action_at": last_action_at,
+        })
+
+    all_paused = (total_open == 0 and total_churn > 0)
+
+    summary = {
+        "total_churn": total_churn,
+        "total_paused": total_paused,
+        "total_closed": total_closed,
+        "total_safe": total_paused + total_closed,
+        "total_open": total_open,
+        "total_unknown": total_unknown,
+        "all_paused": all_paused,
+        "bot_info": bot_info,
+        "csv_source_url": csv_url,
+    }
+
+    return {
+        "success": True,
+        "summary": summary,
+        "stores": processed_stores,
+        "updated_at": datetime.now(WIB).strftime("%d/%m/%Y %H:%M:%S WIB"),
+    }
+

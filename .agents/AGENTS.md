@@ -24,7 +24,26 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.35.0`.
+Latest documented release: `1.36.0`.
+
+Merchant Churn Monitoring Dashboard & Dedicated Force-Close Bot Engine:
+- Menghadirkan menu baru **Churn** di sidebar navigasi admin tepat di bawah menu **Virtual Brand** (`#tabBtnChurn`), terintegrasi penuh ke dalam Single Page Application (SPA) dashboard admin (`switchTab('churn')` & `admin_tab_churn.html`).
+- Menyediakan Status Guard Alert Banner interaktif (`#churnAlertBanner`): Menampilkan status deterministik apakah seluruh merchant churn sudah terpause aman di ShopeeFood (`all_paused`), atau memberikan peringatan kritis jika ada outlet churn yang masih terdeteksi buka.
+- Menghadirkan widget card 4-kolom interaktif (*Click-to-Filter*) pada Dashboard Churn:
+  1. `Total Merchant Churn`: Jumlah keseluruhan outlet yang berstatus churn dari Google Spreadsheet (`gid=1463294207`).
+  2. `Sudah Terpause (Aman)`: Counter outlet churn dengan status live Shopee `PAUSE` atau `CLOSED`.
+  3. `Masih Buka (Perlu Tutup)`: Counter outlet churn yang masih `OPEN` di ShopeeFood (target penutupan paksa).
+  4. `Force-Bot Engine`: Pemantauan real-time status kesehatan daemon bot terminator (`force-bot.service` port 8083) yang melakukan patroli 24/7.
+- Antarmuka Responsif Desktop & Mobile:
+  - Desktop: Tabel komprehensif menampilkan nomor urut, pemilik & kontak WhatsApp, nama portal & username, Store ID, nama listing outlet, badge target bot `FORCE-CLOSE`, status live Shopee (badge `PAUSE`, `CLOSED`, `OPEN`), timestamp pemeriksaan terakhir, dan riwayat alasan log guarding.
+  - Mobile: Kartu ringkas responsif dengan kode warna sisi kiri (hijau jika terpause aman, merah jika masih buka).
+  - Mobile Bottom Navbar Guard: Menu `Churn` disembunyikan pada mode mobile (`#tabBtnChurn` dengan `display: none !important`), mempertahankan presisi layout 5 tombol simetris bottom navbar sesuai SOP.
+- Integrasi Backend & On-Demand Trigger:
+  - Endpoint REST API baru `@app.get("/api/v1/admin/churn/stores")` untuk penarikan data gabungan dari Google Sheet, database PostgreSQL (`outlets`, `outlet_states`, `automation_logs`), dan status engine `force-bot`.
+  - Endpoint REST API baru `@app.post("/api/v1/admin/churn/sync")` dan tombol "Picu Patroli Bot" untuk memicu patroli penutupan paksa secara on-demand kapan saja.
+  - Tombol tautan langsung "Buka Sheet" menuju Google Sheet sumber churn.
+- Zero-Downtime Deployment: Berhasil me-rebuild dan merestart container `fm-web` (`docker compose build web && docker compose up -d --no-deps web`) tanpa interupsi pada bot patroli yang sedang aktif (`force-bot`, `bot-oc`, dan `bot-vb`).
+
 
 Unified Tri-State Operational Status Alignment & Interactive Force Open Widget Cards (Agency & Virtual Brand):
 - Menyelaraskan status operasional outlet (Agency) dan grup (Virtual Brand) menjadi 3-state deterministik:

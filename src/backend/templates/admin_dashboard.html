@@ -19,7 +19,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261010-v1351-consistent-labels">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261012-v1360-churn-dashboard">
 </head>
 
 <body x-data="adminApp()">
@@ -40,6 +40,12 @@
             <rect x="4" y="4" width="16" height="16" rx="2" />
             <path d="m8 9 3 3-3 3m5 0h3" />
           </svg><span>Virtual Brand</span></button>
+        <button class="tab-btn" :class="{ 'active': currentTab === 'churn' }" id="tabBtnChurn" onclick="switchTab('churn')"><svg
+            class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="17" y1="11" x2="23" y2="11" />
+          </svg><span>Churn</span></button>
         <button class="mobile-fetch-nav d-md-none" id="mobileFetchButton" type="button"
           onclick="triggerMobileNavFetch()" aria-label="Fetch data Agency" title="Fetch data Agency">
           <span class="mobile-fetch-nav-core" aria-hidden="true">
@@ -111,6 +117,8 @@
         {% include "admin_tab_operasional.html" %}
 
         {% include "admin_tab_vb.html" %}
+
+        {% include "admin_tab_churn.html" %}
 
         {% include "admin_tab_analytics.html" %}
 
@@ -652,6 +660,7 @@
     const adminHeaderSearchValues = {
       outlets: '',
       vb: '',
+      churn: '',
       logs: '',
       settings: ''
     };
@@ -880,6 +889,16 @@
         searchPlaceholder: 'Cari grup, portal, atau Store ID...',
         searchLabel: 'Cari grup, portal, atau Store ID',
         fetchVisible: true,
+        fetchLabel: 'Fetch dari Sheet'
+      },
+      churn: {
+        title: 'Merchant Churn & Force Pause',
+        breadcrumb: ['Churn', 'Daftar Outlet Churn'],
+        breadcrumbVisible: false,
+        searchVisible: false,
+        searchPlaceholder: '',
+        searchLabel: '',
+        fetchVisible: false,
         fetchLabel: 'Fetch dari Sheet'
       },
       analytics: {
@@ -1453,6 +1472,8 @@
             loadStoresData(true);
           } else if (getAdminActiveTab() === 'vb') {
             loadVBData(true);
+          } else if (getAdminActiveTab() === 'churn') {
+            if (typeof loadChurnData === 'function') loadChurnData(true);
           }
           fetchBotStatus();
         }
@@ -1460,11 +1481,11 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
-      const initialTab = tabParam && ['outlets', 'vb', 'analytics', 'logs', 'wa', 'settings'].includes(tabParam) ? tabParam : 'outlets';
+      const initialTab = tabParam && ['outlets', 'vb', 'churn', 'analytics', 'logs', 'wa', 'settings'].includes(tabParam) ? tabParam : 'outlets';
       syncAdminHeaderForTab(initialTab);
       syncMobileFetchButton(initialTab);
       syncDesktopWrapperScrollState(initialTab);
-      if (tabParam && ['outlets', 'vb', 'analytics', 'logs', 'wa', 'settings'].includes(tabParam) && tabParam !== 'outlets') {
+      if (tabParam && ['outlets', 'vb', 'churn', 'analytics', 'logs', 'wa', 'settings'].includes(tabParam) && tabParam !== 'outlets') {
         switchTab(tabParam, { skipHistory: true });
       }
     });
@@ -1500,7 +1521,7 @@
     window.addEventListener('popstate', () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab') || 'outlets';
-      if (['outlets', 'vb', 'analytics', 'logs', 'wa', 'settings'].includes(tabParam) && tabParam !== getAdminActiveTab()) {
+      if (['outlets', 'vb', 'churn', 'analytics', 'logs', 'wa', 'settings'].includes(tabParam) && tabParam !== getAdminActiveTab()) {
         switchTab(tabParam, { skipHistory: true });
       } else {
         syncMobileFetchButton(tabParam);
@@ -1570,6 +1591,16 @@
         if (btn) btn.classList.add('active');
         if (pane) pane.classList.add('active');
         loadVBData();
+      } else if (tabName === 'churn') {
+        const btn = document.getElementById('tabBtnChurn');
+        const pane = document.getElementById('paneChurn');
+        if (btn) btn.classList.add('active');
+        if (pane) pane.classList.add('active');
+        const churnShell = pane ? pane.querySelector('.churn-page-shell') : null;
+        if (churnShell) churnShell.scrollTop = 0;
+        if (typeof loadChurnData === 'function') {
+          loadChurnData();
+        }
       } else if (tabName === 'analytics') {
         const btn = document.getElementById('tabBtnAnalytics');
         const pane = document.getElementById('paneAnalytics');

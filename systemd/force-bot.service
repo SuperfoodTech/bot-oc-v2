@@ -1,0 +1,36 @@
+[Unit]
+Description=FoodMaster Force-Bot Daemon (Close Bot Automation)
+After=network.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%PROJECT_DIR%
+EnvironmentFile=%PROJECT_DIR%/.env
+EnvironmentFile=-%PROJECT_DIR%/.env.close
+Environment="PYTHONPATH=%PROJECT_DIR%/close-bot/src:%PROJECT_DIR%/src"
+Environment="HEADLESS=true"
+Environment="TZ=Asia/Jakarta"
+Environment="BOT_API_PORT=8083"
+Environment="CLOSE_BOT_CSV_URL=https://docs.google.com/spreadsheets/d/e/2PACX-1vSsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/pub?gid=1463294207&single=true&output=csv"
+Environment="ALLOWED_USERNAMES=allvb,auto7313"
+Environment="SHOPEE_BOT_USERNAME=allvb"
+Environment="VB_SHOPEE_USERNAME=allvb"
+Environment="VB_SESSION_FILE=%PROJECT_DIR%/close-bot/src/data/session_allvb.json"
+Environment="VB_CREDENTIALS_FILE=%PROJECT_DIR%/close-bot/src/data/credentials.json"
+Environment="VB_CHROME_PROFILE_DIR=%PROJECT_DIR%/close-bot/src/data/chrome_profile"
+Environment="VB_CHROME_PROFILE_NAME=profile_closebot"
+Environment="VB_PATROL_INTERVAL_SECONDS=30"
+Environment="VB_MAX_RETRIES=2"
+ExecStart=%UV_BIN% run --no-env-file python close-bot/src/daemon.py
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

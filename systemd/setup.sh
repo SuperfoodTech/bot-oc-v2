@@ -53,6 +53,7 @@ render_service "bot-oc"
 render_service "bot-vb"
 render_service "bot-web"
 render_service "bot-wa"
+render_service "force-bot"
 
 echo "🔄 Menjalankan systemctl daemon-reload..."
 sudo systemctl daemon-reload
