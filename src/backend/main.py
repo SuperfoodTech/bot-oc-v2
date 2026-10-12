@@ -615,6 +615,40 @@ def admin_churn_sync(admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=500, detail=f"Gagal memicu sinkronisasi churn: {exc}")
 
 
+class ChurnBotToggleRequest(BaseModel):
+    enable: bool
+
+
+@app.post("/api/v1/admin/churn/bot-toggle", summary="Admin: Toggle Force-Bot Daemon running or paused")
+def admin_churn_bot_toggle(req: ChurnBotToggleRequest, admin: dict = Depends(require_admin)):
+    import urllib.request
+    target_action = "start" if req.enable else "pause"
+    for bot_url in [f"http://172.17.0.1:8083/bot/{target_action}", f"http://127.0.0.1:8083/bot/{target_action}"]:
+        try:
+            r = urllib.request.Request(bot_url, method="POST", headers={"User-Agent": "FoodMaster-Web"})
+            with urllib.request.urlopen(r, timeout=4.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode())
+                    state.record_log(
+                        store_id="SYSTEM",
+                        store_name="Force-Bot Engine",
+                        action="ADMIN_START_FORCE_BOT" if req.enable else "ADMIN_PAUSE_FORCE_BOT",
+                        target_state="RUNNING" if req.enable else "PAUSED",
+                        reason=f"Admin {admin.get('username')} mengubah status Force-Bot ke {'AKTIF' if req.enable else 'NONAKTIF'}"
+                    )
+                    return {
+                        "success": True,
+                        "enable": req.enable,
+                        "bot_status": "running" if req.enable else "paused",
+                        "message": f"Bot patroli force-close berhasil {'diaktifkan' if req.enable else 'dinonaktifkan'}."
+                    }
+        except Exception:
+            pass
+
+    raise HTTPException(status_code=500, detail="Gagal menghubungi engine force-bot di port 8083.")
+
+
+
 # ── PUBLIC BRAND DASHBOARD API ────────────────────────────────────────────────
 
 @app.get("/api/v1/brand/{slug}", summary="Public: Get Virtual Brand Detail by Slug or ID")

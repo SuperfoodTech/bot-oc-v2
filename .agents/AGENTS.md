@@ -24,7 +24,17 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.2`.
+Latest documented release: `1.36.3`.
+
+Dedicated Force-Close Bot On/Off Switch Toggle & Target Bot Column Elimination:
+- **Eliminasi Kolom Target Bot**: Menghapus kolom redundan "Target Bot" (`<th>Target Bot</th>` dan badge `FORCE-CLOSE`) dari tabel desktop dan kartu mobile pada Tab Churn (`admin_tab_churn.html`), mendistribusikan lebar kolom secara optimal untuk nama listing, Store ID, dan pemilik outlet.
+- **Switch Toggle On/Off Bot Patroli**: Menggantikan tombol aksi "Picu Patroli Bot" dengan switch toggle interaktif modern (`.switch-toggle.admin-table-toggle`):
+  - Desktop: Kontrol toggle di `.churn-filter-actions` berdampingan dengan label status bot dinamis (`Bot: AKTIF` / `Bot: NONAKTIF`).
+  - Mobile: Chip toggle ringkas (`.churn-bot-toggle-group.is-mobile-chip`) pada toolbar mobile agar admin dapat menyalakan/mematikan patroli force-close kapan saja secara instan.
+- **API Backend Bot Control**: Endpoint baru `@app.post("/api/v1/admin/churn/bot-toggle")` di `src/backend/main.py` yang mengendalikan daemon `force-bot` (port 8083) melalui `/bot/start` dan `/bot/pause` secara mulus tanpa mematikan browser session.
+- **Peningkatan Styling & Mobile Layout**: Menambahkan styling native `.churn-bot-toggle-group` (termasuk Dark Mode) serta menyelaraskan toolbar mobile churn agar kolom search, toggle bot, dan tombol "Buka Sheet" tersusun simetris dalam satu baris.
+- **Cache-Buster Stylesheet**: Memperbarui stylesheet version di `admin_dashboard.html` menjadi `v=20261012-v1363-bot-toggle`.
+- **Zero-Downtime Deployment**: Berhasil me-rebuild dan merestart container `fm-web` tanpa interupsi pada bot patroli aktif (`force-bot`, `bot-oc`, dan `bot-vb`).
 
 Unified Header Fetch, 3-Card Stat Grid & Text-Only Streamlined Actions for Churn Dashboard:
 - Menyelaraskan tombol Header Fetch di Tab Churn menjadi **"Fetch dari Sheet"** (`#fetchSheetHeader`), identik 1:1 dengan Tab Agency dan Virtual Brand untuk mengambil data terbaru langsung dari Google Sheet dan DB.

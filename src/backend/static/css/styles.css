@@ -11964,7 +11964,56 @@ body:has(.mobile-wrapper.is-dashboard-view) {
     grid-template-columns: 1fr !important;
     gap: 8px !important;
   }
+  .admin-shell .admin-main #churnTab .mobile-outlet-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .admin-shell .admin-main #churnTab .mobile-outlet-search {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+  .admin-shell .admin-main #churnTab .mobile-outlet-toolbar .btn-compact {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
 }
 
+.churn-bot-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--bg-surface-soft, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  min-height: 36px;
+  height: 36px;
+  box-sizing: border-box;
+}
 
+.churn-bot-toggle-text {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary, #475569);
+  white-space: nowrap;
+}
 
+.churn-bot-toggle-group.is-mobile-chip {
+  padding: 0 6px;
+  min-height: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .churn-bot-toggle-group {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .churn-bot-toggle-text {
+  color: #94a3b8;
+}

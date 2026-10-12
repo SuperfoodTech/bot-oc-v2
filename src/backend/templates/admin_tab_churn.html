@@ -57,7 +57,12 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
         <input type="search" id="mobileChurnSearchInput" placeholder="Cari pemilik atau Store ID" aria-label="Cari merchant churn" oninput="handleChurnMobileSearch(this.value)">
       </label>
-      <button class="btn-outline btn-compact" type="button" onclick="triggerChurnPatrol()">Picu Bot</button>
+      <div class="churn-bot-toggle-group is-mobile-chip" title="Toggle On/Off Bot Patroli">
+        <label class="switch-toggle admin-table-toggle state-open" id="mobileChurnBotToggleContainer">
+          <input type="checkbox" id="mobileChurnBotToggleInput" checked onchange="handleChurnBotToggle(this.checked, this)">
+          <span class="slider"></span>
+        </label>
+      </div>
       <a class="btn-outline btn-compact" href="https://docs.google.com/spreadsheets/d/1SsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/edit#gid=1463294207" target="_blank" rel="noopener noreferrer">Buka Sheet</a>
     </div>
 
@@ -92,7 +97,13 @@
           </label>
           <div class="churn-filter-actions">
             <button class="btn-outline btn-compact" type="button" onclick="resetChurnFilters()">Reset filter</button>
-            <button class="btn-outline btn-compact" id="churnSyncActionBtn" type="button" onclick="triggerChurnPatrol()">Picu Patroli Bot</button>
+            <div class="churn-bot-toggle-group" title="Aktifkan atau Nonaktifkan Bot Patroli Force-Close">
+              <span class="churn-bot-toggle-text" id="churnBotToggleLabel">Bot: AKTIF</span>
+              <label class="switch-toggle admin-table-toggle state-open" id="churnBotToggleContainer">
+                <input type="checkbox" id="churnBotToggleInput" checked onchange="handleChurnBotToggle(this.checked, this)">
+                <span class="slider"></span>
+              </label>
+            </div>
             <a class="btn-outline btn-compact" id="churnSheetLink" href="https://docs.google.com/spreadsheets/d/1SsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/edit#gid=1463294207" target="_blank" rel="noopener noreferrer">Buka Spreadsheet</a>
           </div>
         </div>
@@ -107,17 +118,16 @@
         <table class="data-table" id="churnTable">
           <thead>
             <tr>
-              <th style="width: 16%;">Nama Pemilik</th>
-              <th style="width: 14%;">Portal / Akun</th>
-              <th style="width: 22%;">Nama Listing</th>
+              <th style="width: 18%;">Nama Pemilik</th>
+              <th style="width: 16%;">Portal / Akun</th>
+              <th style="width: 26%;">Nama Listing</th>
               <th style="width: 14%;">Store ID</th>
-              <th style="width: 10%; text-align: center;">Target Bot</th>
-              <th style="width: 10%;">Link Shopee</th>
+              <th style="width: 12%;">Link Shopee</th>
               <th style="width: 14%;">Status Live Shopee</th>
             </tr>
           </thead>
           <tbody id="churnTableBody">
-            <tr><td colspan="7" class="table-loading-state">Memuat data merchant churn...</td></tr>
+            <tr><td colspan="6" class="table-loading-state">Memuat data merchant churn...</td></tr>
           </tbody>
         </table>
       </div>
@@ -137,7 +147,7 @@
     if (!isSilent) {
       const tbody = document.getElementById('churnTableBody');
       const mobileList = document.getElementById('mobileChurnList');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-state">Memuat data merchant churn...</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="table-loading-state">Memuat data merchant churn...</td></tr>';
       if (mobileList) mobileList.innerHTML = '<div class="mobile-loading-state">Memuat data merchant churn...</div>';
     }
 
@@ -153,7 +163,7 @@
     } catch (err) {
       console.error('Error loadChurnData:', err);
       const tbody = document.getElementById('churnTableBody');
-      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="table-loading-state" style="color: var(--danger-text);">Gagal memuat data churn: ${escapeHtml(err.message)}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="table-loading-state" style="color: var(--danger-text);">Gagal memuat data churn: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -177,11 +187,81 @@
     if (elChipSafe) elChipSafe.textContent = summary.total_safe ?? 0;
     if (elChipOpen) elChipOpen.textContent = summary.total_open ?? 0;
 
-    // 2. Populate Dropdown Options
+    // 2. Sync Bot Toggle State
+    const botStatus = summary.bot_info?.bot_status || 'running';
+    const isBotRunning = botStatus === 'running';
+    syncChurnBotToggleVisual(isBotRunning);
+
+    // 3. Populate Dropdown Options
     populateChurnFilterDropdowns(allChurnStores);
 
-    // 3. Render Table & Mobile List
+    // 4. Render Table & Mobile List
     filterChurnTable();
+  }
+
+  function syncChurnBotToggleVisual(isRunning) {
+    const inputs = [
+      document.getElementById('churnBotToggleInput'),
+      document.getElementById('mobileChurnBotToggleInput')
+    ];
+    const containers = [
+      document.getElementById('churnBotToggleContainer'),
+      document.getElementById('mobileChurnBotToggleContainer')
+    ];
+    const label = document.getElementById('churnBotToggleLabel');
+
+    inputs.forEach(i => { if (i) i.checked = isRunning; });
+    containers.forEach(c => {
+      c?.classList.remove('state-open', 'state-paused');
+      c?.classList.add(isRunning ? 'state-open' : 'state-paused');
+    });
+    if (label) {
+      label.textContent = isRunning ? 'Bot: AKTIF' : 'Bot: NONAKTIF';
+    }
+  }
+
+  async function handleChurnBotToggle(isChecked, control) {
+    const containers = [
+      document.getElementById('churnBotToggleContainer'),
+      document.getElementById('mobileChurnBotToggleContainer')
+    ];
+    const inputs = [
+      document.getElementById('churnBotToggleInput'),
+      document.getElementById('mobileChurnBotToggleInput')
+    ];
+    const label = document.getElementById('churnBotToggleLabel');
+
+    containers.forEach(c => c?.classList.add('is-toggle-pending'));
+    inputs.forEach(i => { if (i) i.disabled = true; });
+
+    try {
+      const resp = await fetch('/api/v1/admin/churn/bot-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ enable: isChecked })
+      });
+      const res = await resp.json();
+      if (!resp.ok || !res.success) {
+        throw new Error(res.detail || 'Gagal mengubah status bot');
+      }
+
+      const isRunning = res.bot_status === 'running';
+      syncChurnBotToggleVisual(isRunning);
+
+      if (typeof showToast === 'function') {
+        showToast(res.message || (isRunning ? 'Bot patroli diaktifkan' : 'Bot patroli dinonaktifkan'), 'success');
+      }
+    } catch (err) {
+      console.error('handleChurnBotToggle error:', err);
+      // Revert checkbox state
+      syncChurnBotToggleVisual(!isChecked);
+      if (typeof showToast === 'function') {
+        showToast(err.message || 'Gagal mengubah status bot', 'error');
+      }
+    } finally {
+      containers.forEach(c => c?.classList.remove('is-toggle-pending'));
+      inputs.forEach(i => { if (i) i.disabled = false; });
+    }
   }
 
   function populateChurnFilterDropdowns(stores) {
@@ -311,7 +391,7 @@
     if (!tbody) return;
 
     if (!stores.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="table-loading-state">Tidak ada merchant churn yang sesuai dengan filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="table-loading-state">Tidak ada merchant churn yang sesuai dengan filter.</td></tr>';
       return;
     }
 
@@ -372,9 +452,6 @@
               </button>
             </div>
           </td>
-          <td style="text-align: center;">
-            <span class="badge-target-close">FORCE-CLOSE</span>
-          </td>
           <td>${linkCellMarkup}</td>
           <td>${statusMarkup}</td>
         </tr>`;
@@ -426,14 +503,10 @@
 
           <dl class="admin-mobile-outlet-grid">
             <div class="admin-mobile-data-block">
-              <dt>Target Bot</dt>
-              <dd><span class="badge-target-close">FORCE-CLOSE</span></dd>
-            </div>
-            <div class="admin-mobile-data-block">
               <dt>Paket</dt>
               <dd><span>${escapeHtml(s.paket || '-')}</span></dd>
             </div>
-            <div class="admin-mobile-data-block is-wide">
+            <div class="admin-mobile-data-block">
               <dt>Terakhir dicek</dt>
               <dd><span>${escapeHtml(s.last_checked_at || 'Menunggu patroli')}</span></dd>
             </div>
@@ -455,44 +528,5 @@
     });
 
     listEl.innerHTML = cardsHtml;
-  }
-
-  async function triggerChurnPatrol() {
-    const syncBtn = document.getElementById('churnSyncActionBtn');
-    if (syncBtn) {
-      syncBtn.disabled = true;
-      syncBtn.classList.add('is-loading');
-    }
-
-    try {
-      if (typeof showToast === 'function') {
-        showToast('Memulai patroli force-close untuk merchant churn...', 'info');
-      }
-      const resp = await fetch('/api/v1/admin/churn/sync', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' }
-      });
-      const res = await resp.json();
-      if (res.success) {
-        if (typeof showToast === 'function') {
-          showToast(res.message || 'Patroli bot berhasil dipicu!', 'success');
-        }
-        await loadChurnData(true);
-      } else {
-        if (typeof showToast === 'function') {
-          showToast(res.detail || 'Gagal memicu patroli bot', 'error');
-        }
-      }
-    } catch (e) {
-      console.error('triggerChurnPatrol error:', e);
-      if (typeof showToast === 'function') {
-        showToast('Terjadi kesalahan memicu bot patroli', 'error');
-      }
-    } finally {
-      if (syncBtn) {
-        syncBtn.disabled = false;
-        syncBtn.classList.remove('is-loading');
-      }
-    }
   }
 </script>
