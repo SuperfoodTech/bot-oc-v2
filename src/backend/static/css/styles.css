@@ -11924,4 +11924,47 @@ body:has(.mobile-wrapper.is-dashboard-view) {
   border-color: rgba(220, 38, 38, 0.3);
 }
 
+/* ── CHURN DASHBOARD TIGHT LAYOUT ── */
+.admin-shell .admin-main .churn-stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  margin-bottom: 18px !important;
+}
+
+.churn-filter-toolbar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+.churn-filter-toolbar .filter-field {
+  flex: 1 1 170px !important;
+  min-width: 140px !important;
+}
+
+.churn-filter-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-shell .admin-main #churnTable.data-table {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+}
+
+@media (max-width: 767.98px) {
+  .admin-shell .admin-main .churn-stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+
 

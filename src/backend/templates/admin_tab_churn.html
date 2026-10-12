@@ -1,8 +1,8 @@
 {# ── TAB PANE: CHURN MERCHANTS (TERMINATOR FORCE-CLOSE) ── #}
 <div class="tab-pane" :class="{ 'active': currentTab === 'churn' }" id="paneChurn">
   
-  <!-- Metric Cards Grid (Sesuai Desain Agency & VB) -->
-  <div class="stats-grid" aria-label="Ringkasan status merchant churn">
+  <!-- Metric Cards Grid (3 Cards Sesuai Request) -->
+  <div class="stats-grid churn-stats-grid" aria-label="Ringkasan status merchant churn">
     <article class="metric-card metric-card-total is-card-active" id="churnCardTotal" role="button" tabindex="0" onclick="setChurnFilterFromCard('')" title="Tampilkan semua merchant churn">
       <div class="metric-card-icon">
         <img src="/static/icons/shop-svgrepo-com.svg" alt="">
@@ -32,16 +32,6 @@
         <strong id="churnMetricOpen">0</strong>
       </div>
     </article>
-
-    <article class="metric-card metric-card-closed" id="churnCardBot" role="button" tabindex="0" onclick="triggerChurnPatrol()" title="Status Daemon Force-Bot (Klik untuk picu patroli)">
-      <div class="metric-card-icon">
-        <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
-      </div>
-      <div class="metric-card-content">
-        <span class="metric-card-label">Force-Bot Engine</span>
-        <strong id="churnMetricBot" style="font-size: 20px;">AKTIF</strong>
-      </div>
-    </article>
   </div>
 
   <!-- Mobile Quick Summary Strip -->
@@ -60,24 +50,20 @@
     </button>
   </div>
 
-  <!-- Filter Card (Sesuai Desain Agency & VB) -->
+  <!-- Filter Card: Full-width tanpa white space -->
   <div class="outlet-filter-card">
     <div class="mobile-outlet-toolbar d-md-none">
       <label class="mobile-outlet-search" for="mobileChurnSearchInput">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
         <input type="search" id="mobileChurnSearchInput" placeholder="Cari pemilik atau Store ID" aria-label="Cari merchant churn" oninput="handleChurnMobileSearch(this.value)">
       </label>
-      <button class="btn-outline btn-compact" type="button" onclick="triggerChurnPatrol()" title="Picu patroli bot instan">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-        </svg>
-        <span>Patroli</span>
-      </button>
+      <button class="btn-outline btn-compact" type="button" onclick="triggerChurnPatrol()">Picu Bot</button>
+      <a class="btn-outline btn-compact" href="https://docs.google.com/spreadsheets/d/1SsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/edit#gid=1463294207" target="_blank" rel="noopener noreferrer">Buka Sheet</a>
     </div>
 
     <div class="table-heading desktop-outlet-filter-heading d-none d-md-flex">
       <div class="table-heading-actions">
-        <div class="outlet-filter-toolbar">
+        <div class="outlet-filter-toolbar churn-filter-toolbar">
           <label class="filter-field">
             <span>Nama pemilik</span>
             <select id="churnOwnerFilter" class="form-input filter-select" aria-label="Filter nama pemilik" onchange="filterChurnTable()">
@@ -104,27 +90,11 @@
               <option value="open">Masih Buka (Perlu Tutup)</option>
             </select>
           </label>
-          <button class="btn-outline btn-compact reset-filter-button" type="button" onclick="resetChurnFilters()">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>
-            Reset filter
-          </button>
-        </div>
-
-        <div class="churn-filter-actions-right" style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
-          <button type="button" class="btn-outline btn-compact" id="churnSyncActionBtn" onclick="triggerChurnPatrol()" title="Picu eksekusi patroli force-close instan">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-            </svg>
-            <span>Picu Patroli Bot</span>
-          </button>
-          <a id="churnSheetLink" href="https://docs.google.com/spreadsheets/d/1SsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/edit#gid=1463294207" target="_blank" rel="noopener noreferrer" class="btn-outline btn-compact" title="Buka Spreadsheet Churn di Tab Baru">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-            <span>Buka Sheet</span>
-          </a>
+          <div class="churn-filter-actions">
+            <button class="btn-outline btn-compact" type="button" onclick="resetChurnFilters()">Reset filter</button>
+            <button class="btn-outline btn-compact" id="churnSyncActionBtn" type="button" onclick="triggerChurnPatrol()">Picu Patroli Bot</button>
+            <a class="btn-outline btn-compact" id="churnSheetLink" href="https://docs.google.com/spreadsheets/d/1SsAq8JmDfGI8KY7aSCRpzC2EaQARkK1OvhWrll7g3qlxFMIcwtDpAF-Wxf4aQnGET4eCmncjdEgre5/edit#gid=1463294207" target="_blank" rel="noopener noreferrer">Buka Spreadsheet</a>
+          </div>
         </div>
       </div>
     </div>
@@ -137,13 +107,13 @@
         <table class="data-table" id="churnTable">
           <thead>
             <tr>
-              <th style="width: 15%;">Nama Pemilik</th>
+              <th style="width: 16%;">Nama Pemilik</th>
               <th style="width: 14%;">Portal / Akun</th>
-              <th style="width: 20%;">Nama Listing</th>
-              <th style="width: 12%;">Store ID</th>
-              <th style="width: 11%; text-align: center;">Target Bot</th>
-              <th style="width: 13%;">Link Shopee</th>
-              <th style="width: 15%;">Status Live Shopee</th>
+              <th style="width: 22%;">Nama Listing</th>
+              <th style="width: 14%;">Store ID</th>
+              <th style="width: 10%; text-align: center;">Target Bot</th>
+              <th style="width: 10%;">Link Shopee</th>
+              <th style="width: 14%;">Status Live Shopee</th>
             </tr>
           </thead>
           <tbody id="churnTableBody">
@@ -164,9 +134,6 @@
   let activeChurnStatusFilter = '';
 
   async function loadChurnData(isSilent = false) {
-    const fetchBtn = document.getElementById('fetchSheetHeader');
-    const syncBtn = document.getElementById('churnSyncActionBtn');
-    
     if (!isSilent) {
       const tbody = document.getElementById('churnTableBody');
       const mobileList = document.getElementById('mobileChurnList');
@@ -198,7 +165,6 @@
     const elTotal = document.getElementById('churnMetricTotal');
     const elSafe = document.getElementById('churnMetricSafe');
     const elOpen = document.getElementById('churnMetricOpen');
-    const elBot = document.getElementById('churnMetricBot');
 
     if (elTotal) elTotal.textContent = summary.total_churn ?? 0;
     if (elSafe) elSafe.textContent = summary.total_safe ?? 0;
@@ -210,12 +176,6 @@
     if (elChipAll) elChipAll.textContent = summary.total_churn ?? 0;
     if (elChipSafe) elChipSafe.textContent = summary.total_safe ?? 0;
     if (elChipOpen) elChipOpen.textContent = summary.total_open ?? 0;
-
-    const botOnline = summary.bot_info?.is_online;
-    if (elBot) {
-      elBot.textContent = botOnline ? 'AKTIF' : 'OFFLINE';
-      elBot.style.color = botOnline ? '#15803d' : '#dc2626';
-    }
 
     // 2. Populate Dropdown Options
     populateChurnFilterDropdowns(allChurnStores);
@@ -449,7 +409,7 @@
                 <span class="admin-mobile-store-chip">
                   Store ID ${escapeHtml(s.store_id)}
                   <button type="button" class="btn-copy-icon is-chip" onclick="copyStoreId(event, '${escapeHtml(s.store_id)}')">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                   </button>
                 </span>
               </div>

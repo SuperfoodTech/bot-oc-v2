@@ -24,7 +24,16 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.1`.
+Latest documented release: `1.36.2`.
+
+Unified Header Fetch, 3-Card Stat Grid & Text-Only Streamlined Actions for Churn Dashboard:
+- Menyelaraskan tombol Header Fetch di Tab Churn menjadi **"Fetch dari Sheet"** (`#fetchSheetHeader`), identik 1:1 dengan Tab Agency dan Virtual Brand untuk mengambil data terbaru langsung dari Google Sheet dan DB.
+- Menghapus kartu ke-4 (*Force Bot Engine*) dan menerapkan layout grid 3-kolom presisi (`.churn-stats-grid`: `Total Merchant Churn`, `Sudah Terpause (Aman)`, `Masih Buka (Perlu Tutup)`) yang membagi lebar baris secara seimbang tanpa sisa white space kosong.
+- Memperbaiki layout toolbar filter desktop (`.churn-filter-toolbar`) dengan flex-grow dinamis sehingga seluruh form input menyebar proporsional mengisi kartu filter.
+- Menghilangkan seluruh ikon dan emoji pada tombol aksi, menyajikan tipografi tombol bersih (*text-only*): `Reset filter`, `Picu Patroli Bot` (mobile: `Picu Bot`), dan `Buka Spreadsheet` (mobile: `Buka Sheet`).
+- Memperbarui stylesheet version cache-buster menjadi `v=20261012-v1362-tight-layout`.
+- Zero-Downtime Deployment: Berhasil me-rebuild dan merestart container `fm-web` tanpa interupsi pada bot patroli aktif.
+
 
 Anti-Slop UI & Native Design System Alignment for Merchant Churn Dashboard:
 - Menyelaraskan seluruh antarmuka Tab Churn (`admin_tab_churn.html`) 100% mengikuti bahasa desain dan tema bawaan FoodMaster (`admin_tab_operasional.html` & `admin_tab_vb.html`):
