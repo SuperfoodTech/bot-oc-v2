@@ -136,6 +136,22 @@
         <div class="mobile-empty-state">Memuat data merchant churn...</div>
       </div>
     </div>
+
+    <!-- Drawer Panel Detail Churn -->
+    <aside class="outlet-detail-panel" id="churnDetailPanel" aria-labelledby="churnDetailTitle" aria-modal="true" role="dialog" tabindex="-1" hidden>
+      <div class="outlet-detail-panel-head">
+        <button type="button" class="outlet-detail-back d-md-none" onclick="closeChurnDetail()" aria-label="Kembali ke daftar merchant churn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          <span>Kembali</span>
+        </button>
+        <h2 id="churnDetailTitle">Detail Merchant Churn</h2>
+        <div class="outlet-detail-panel-actions">
+          <button type="button" class="outlet-detail-close" onclick="closeChurnDetail()" aria-label="Tutup detail merchant churn">×</button>
+        </div>
+      </div>
+      <div id="churnDetailContent" class="outlet-detail-content"></div>
+    </aside>
+    <div class="outlet-detail-backdrop" id="churnDetailBackdrop" onclick="closeChurnDetail()" hidden></div>
   </div>
 </div>
 
@@ -386,6 +402,247 @@
     renderChurnMobileCards(filtered);
   }
 
+  let churnDetailActiveStoreId = '';
+  let churnDetailHideTimer = null;
+
+  function isChurnDetailOpen() {
+    const panel = document.getElementById('churnDetailPanel');
+    return Boolean(panel && !panel.hidden && panel.classList.contains('is-open'));
+  }
+
+  function handleChurnRowClick(event, storeId) {
+    if (event.target.closest('a, button, input, label')) return;
+    openChurnDetail(storeId);
+  }
+
+  function openChurnDetail(storeId) {
+    const panel = document.getElementById('churnDetailPanel');
+    const backdrop = document.getElementById('churnDetailBackdrop');
+    const content = document.getElementById('churnDetailContent');
+    const store = allChurnStores.find(s => String(s.store_id) === String(storeId));
+    if (!panel || !content || !store) return;
+
+    churnDetailActiveStoreId = String(storeId);
+
+    // Sync selected class on table rows & mobile cards
+    document.querySelectorAll('.churn-data-row').forEach(tr => {
+      tr.classList.toggle('is-selected', tr.dataset.storeId === String(storeId));
+    });
+    document.querySelectorAll('.churn-mobile-card').forEach(card => {
+      card.classList.toggle('is-selected', card.dataset.storeId === String(storeId));
+    });
+
+    const isSafe = store.is_paused;
+    const storeIdVal = String(store.store_id || '').trim();
+    const shopeeFoodUrl = storeIdVal ? getShopeeFoodStoreUrl(storeIdVal) : '';
+
+    const statusBadgeText = isSafe
+      ? (store.shopee_actual_status === 'PAUSE' ? 'Tutup Sementara (Aman)' : 'Sedang Tutup (Aman)')
+      : 'Sedang Buka (Perlu Tutup)';
+
+    content.innerHTML = `
+      <div class="outlet-detail-identity">
+        <div class="outlet-detail-identity-copy">
+          <div class="outlet-detail-eyebrow">${escapeHtml(store.nama_pemilik || '-')}</div>
+          <h3>${escapeHtml(store.nama_listing || store.store_id)}</h3>
+          <p class="outlet-detail-store-id">
+            <span>Store ID&nbsp; ${escapeHtml(store.store_id)}</span>
+            <button type="button" class="btn-copy-icon" onclick="copyStoreId(event, '${escapeHtml(store.store_id)}')" title="Salin Store ID" aria-label="Salin Store ID">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </p>
+          <div class="outlet-detail-context">
+            <span>${escapeHtml(store.nama_portal || '-')}</span>
+            <span>${escapeHtml(store.username || '-')}</span>
+            ${store.paket ? `<span>Paket: ${escapeHtml(store.paket)}</span>` : ''}
+          </div>
+        </div>
+        <img class="outlet-detail-store-logo" src="/static/icons/icons8-shopeefood-96.svg" alt="ShopeeFood">
+      </div>
+
+      ${shopeeFoodUrl ? `
+      <div class="outlet-detail-mitra-action" style="margin-top: 14px; margin-bottom: 4px;">
+        <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="btn-outline btn-compact" style="display: inline-flex; align-items: center; justify-content: center; width: 100%; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Buka di ShopeeFood</span>
+        </a>
+      </div>` : ''}
+
+      <section class="outlet-detail-section">
+        <div class="outlet-detail-section-heading">
+          <h4>Informasi Terakhir & Status Live</h4>
+        </div>
+        <dl class="outlet-detail-list" style="margin-top: 8px;">
+          <div>
+            <dt>Status Live Shopee</dt>
+            <dd>
+              <span class="table-status ${isSafe ? 'is-success' : 'is-danger'}" style="margin-top: 4px;">
+                ${statusBadgeText}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt>Nomor WhatsApp / HP</dt>
+            <dd>${escapeHtml(store.nomor_hp || '-')}</dd>
+          </div>
+          <div>
+            <dt>Waktu Terakhir Dicek</dt>
+            <dd>${escapeHtml(store.last_checked_at || 'Menunggu patroli')}</dd>
+          </div>
+          ${store.last_action_at ? `
+          <div>
+            <dt>Waktu Terakhir Aksi Eksekusi Bot</dt>
+            <dd>${escapeHtml(store.last_action_at)}</dd>
+          </div>` : ''}
+          ${store.last_reason ? `
+          <div>
+            <dt>Alasan / Hasil Patroli Terakhir</dt>
+            <dd style="font-weight: 500; font-size: 11px; color: var(--muted);">${escapeHtml(store.last_reason)}</dd>
+          </div>` : ''}
+          ${store.tanggal_berakhir_layanan ? `
+          <div>
+            <dt>Masa Layanan</dt>
+            <dd>${escapeHtml(store.tanggal_mulai_layanan || '-')} s/d ${escapeHtml(store.tanggal_berakhir_layanan)}</dd>
+          </div>` : ''}
+        </dl>
+      </section>
+
+      <section class="outlet-detail-history-section" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle, #edf2f7);">
+        <div class="outlet-detail-history-heading">
+          <h4>Riwayat Aktivitas Penutupan Bot</h4>
+        </div>
+        <p style="font-size: 11px; color: var(--muted); margin: 2px 0 10px 0;">Catatan penegakan dan status keberhasilan penutupan otomatis</p>
+        <div class="outlet-detail-history-list" id="churnDetailHistoryLogs">
+          <div class="history-item is-empty"><span>Memuat riwayat aktivitas bot...</span></div>
+        </div>
+      </section>
+    `;
+
+    fetchChurnDetailHistory(storeId);
+
+    if (churnDetailHideTimer) {
+      clearTimeout(churnDetailHideTimer);
+      churnDetailHideTimer = null;
+    }
+
+    panel.hidden = false;
+    panel.removeAttribute('aria-hidden');
+    if (backdrop) backdrop.hidden = false;
+
+    panel.classList.remove('is-open');
+    if (backdrop) backdrop.classList.remove('is-open');
+
+    void panel.offsetWidth;
+
+    requestAnimationFrame(() => {
+      panel.classList.add('is-open');
+      if (backdrop) backdrop.classList.add('is-open');
+    });
+
+    document.body.classList.add('outlet-detail-open');
+  }
+
+  function closeChurnDetail() {
+    const panel = document.getElementById('churnDetailPanel');
+    const backdrop = document.getElementById('churnDetailBackdrop');
+    if (!panel) return;
+
+    panel.classList.remove('is-open');
+    panel.setAttribute('aria-hidden', 'true');
+    if (backdrop) backdrop.classList.remove('is-open');
+    document.body.classList.remove('outlet-detail-open');
+
+    churnDetailActiveStoreId = '';
+    document.querySelectorAll('.churn-data-row.is-selected').forEach(tr => tr.classList.remove('is-selected'));
+    document.querySelectorAll('.churn-mobile-card.is-selected').forEach(card => card.classList.remove('is-selected'));
+
+    if (churnDetailHideTimer) clearTimeout(churnDetailHideTimer);
+    churnDetailHideTimer = setTimeout(() => {
+      panel.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+      churnDetailHideTimer = null;
+    }, 240);
+  }
+
+  async function fetchChurnDetailHistory(storeId) {
+    const container = document.getElementById('churnDetailHistoryLogs');
+    if (!container) return;
+
+    try {
+      const resp = await fetch(`/api/v1/user/history?store_ids=${encodeURIComponent(storeId)}`);
+      if (!resp.ok) throw new Error('Gagal memuat log');
+      const data = await resp.json();
+
+      if (churnDetailActiveStoreId !== String(storeId)) return;
+
+      const logs = Array.isArray(data.logs) ? data.logs : [];
+      if (!logs.length) {
+        container.innerHTML = '<div class="history-item is-empty"><span>Belum ada riwayat aktivitas penutupan otomatis untuk outlet ini.</span></div>';
+        return;
+      }
+
+      let logsHtml = '';
+      logs.slice(0, 10).forEach(l => {
+        const timeText = (typeof formatHistoryLogTimestamp === 'function')
+          ? formatHistoryLogTimestamp(l.timestamp)
+          : (l.timestamp || '-');
+
+        const isCloseAction = String(l.action || '').toUpperCase() === 'ACTION_CLOSE';
+        const isSuccess = l.success !== false;
+
+        let badgeClass = 'is-bot is-success';
+        let badgeLabel = 'SUKSES';
+        let titleText = 'Bot Berhasil Menutup Outlet';
+
+        if (isCloseAction) {
+          if (isSuccess) {
+            badgeClass = 'is-bot is-success';
+            badgeLabel = 'TUTUP SUKSES';
+            titleText = 'Bot Berhasil Menutup Outlet';
+          } else {
+            badgeClass = 'is-fail';
+            badgeLabel = 'TUTUP GAGAL';
+            titleText = 'Bot Gagal Menutup Outlet';
+          }
+        } else if (String(l.action || '').toUpperCase() === 'ACTION_OPEN') {
+          badgeClass = 'is-bot';
+          badgeLabel = 'BUKA';
+          titleText = 'Bot Membuka Outlet';
+        } else {
+          badgeClass = 'is-admin';
+          badgeLabel = escapeHtml(l.action || 'LOG');
+          titleText = escapeHtml(l.action || 'Aktivitas Sistem');
+        }
+
+        const reasonText = l.reason || l.error_message || '-';
+
+        logsHtml += `
+          <div class="history-item">
+            <span class="history-role-pill ${badgeClass}">${badgeLabel}</span>
+            <span class="history-time">${escapeHtml(timeText)}</span>
+            <span class="mitra-history-body">
+              <strong style="${!isSuccess ? 'color: var(--danger-text, #991b1b);' : ''}">${escapeHtml(titleText)}</strong>
+              <span style="font-size: 11px; color: var(--muted); line-height: 1.4;">${escapeHtml(reasonText)}</span>
+            </span>
+          </div>
+        `;
+      });
+
+      container.innerHTML = logsHtml;
+    } catch (err) {
+      if (churnDetailActiveStoreId !== String(storeId)) return;
+      container.innerHTML = '<div class="history-item is-empty"><span>Gagal memuat log riwayat. Coba beberapa saat lagi.</span></div>';
+    }
+  }
+
+  // Escape key closes churn drawer
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && isChurnDetailOpen()) {
+      event.preventDefault();
+      closeChurnDetail();
+    }
+  });
+
   function renderChurnDesktopTable(stores) {
     const tbody = document.getElementById('churnTableBody');
     if (!tbody) return;
@@ -409,27 +666,21 @@
       ` : '<span class="compact-meta">-</span>';
 
       const statusMarkup = isSafe ? `
-        <div class="admin-status-summary">
-          <span class="table-status is-success" title="Outlet sudah terpause/tutup di Shopee">
-            <span>${s.shopee_actual_status === 'PAUSE' ? 'Tutup Sementara (Aman)' : 'Sedang Tutup (Aman)'}</span>
-          </span>
-          <small class="table-cell-note" title="${escapeHtml(s.last_reason || '')}">
-            ${escapeHtml(s.last_action_at || s.last_checked_at || 'Menunggu patroli')}
-          </small>
-        </div>
+        <span class="table-status is-success" title="Outlet sudah terpause/tutup di Shopee">
+          <span>${s.shopee_actual_status === 'PAUSE' ? 'Tutup Sementara (Aman)' : 'Sedang Tutup (Aman)'}</span>
+        </span>
       ` : `
-        <div class="admin-status-summary">
-          <span class="table-status is-danger" title="Outlet masih terdeteksi buka! Target force close">
-            <span>Sedang Buka (Perlu Tutup)</span>
-          </span>
-          <small class="table-cell-note" style="color: var(--danger-text);" title="${escapeHtml(s.last_reason || '')}">
-            ${escapeHtml(s.last_action_at || s.last_checked_at || 'Menunggu patroli')}
-          </small>
-        </div>
+        <span class="table-status is-danger" title="Outlet masih terdeteksi buka! Target force close">
+          <span>Sedang Buka (Perlu Tutup)</span>
+        </span>
       `;
 
       rowsHtml += `
-        <tr>
+        <tr class="outlet-data-row churn-data-row ${churnDetailActiveStoreId === String(s.store_id) ? 'is-selected' : ''}"
+            data-store-id="${escapeHtml(s.store_id)}"
+            onclick="handleChurnRowClick(event, '${escapeHtml(s.store_id)}')"
+            tabindex="0"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openChurnDetail('${escapeHtml(s.store_id)}');}">
           <td>
             <div class="admin-table-owner-cell">
               <strong>${escapeHtml(s.nama_pemilik || '-')}</strong>
@@ -476,7 +727,12 @@
       const shopeeFoodUrl = storeIdVal ? getShopeeFoodStoreUrl(storeIdVal) : '';
 
       cardsHtml += `
-        <article class="mobile-outlet-card admin-mobile-outlet-card">
+        <article class="mobile-outlet-card admin-mobile-outlet-card churn-mobile-card ${churnDetailActiveStoreId === String(s.store_id) ? 'is-selected' : ''}"
+                 data-store-id="${escapeHtml(s.store_id)}"
+                 onclick="handleChurnRowClick(event, '${escapeHtml(s.store_id)}')"
+                 style="cursor: pointer;"
+                 tabindex="0"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openChurnDetail('${escapeHtml(s.store_id)}');}">
           <div class="admin-mobile-outlet-head">
             <div class="admin-mobile-outlet-copy">
               <div class="admin-mobile-outlet-owner">${escapeHtml(s.nama_pemilik || '-')} · ${escapeHtml(s.nomor_hp || '-')}</div>
@@ -496,7 +752,6 @@
                 <span class="table-status ${isSafe ? 'is-success' : 'is-danger'}">
                   ${isSafe ? 'Tutup (Aman)' : 'Masih Buka'}
                 </span>
-                <small class="admin-mobile-status-note">${escapeHtml(s.shopee_actual_status)}</small>
               </div>
             </div>
           </div>
@@ -507,19 +762,14 @@
               <dd><span>${escapeHtml(s.paket || '-')}</span></dd>
             </div>
             <div class="admin-mobile-data-block">
-              <dt>Terakhir dicek</dt>
-              <dd><span>${escapeHtml(s.last_checked_at || 'Menunggu patroli')}</span></dd>
+              <dt>Portal</dt>
+              <dd><span>${escapeHtml(s.nama_portal || '-')}</span></dd>
             </div>
-            ${s.last_reason ? `
-            <div class="admin-mobile-data-block is-wide">
-              <dt>Log Patroli Terakhir</dt>
-              <dd><span style="font-size: 11px; color: var(--muted);">${escapeHtml(s.last_reason)}</span></dd>
-            </div>` : ''}
           </dl>
 
           ${shopeeFoodUrl ? `
           <div class="admin-mobile-shopeefood-action">
-            <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link">
+            <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link" onclick="event.stopPropagation()">
               <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
               <span>Lihat di ShopeeFood</span>
             </a>

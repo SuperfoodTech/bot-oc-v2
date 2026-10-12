@@ -24,7 +24,17 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.3`.
+Latest documented release: `1.36.4`.
+
+Interactive Churn Detail Drawer, Clean Status Badges & Bot Close Activity Logs:
+- **Eliminasi Inline Timestamp di Kolom Status Live Shopee**: Menghapus catatan tanggal/waktu di bawah badge Status Live Shopee pada tabel desktop dan kartu mobile Tab Churn (`admin_tab_churn.html`), menyajikan kolom status yang bersih, rapi, dan konsisten.
+- **Interactive Slide-over Detail Drawer (Konsisten dengan Tab Agency)**: Mengintegrasikan drawer geser samping (`#churnDetailPanel` & `#churnDetailBackdrop`) yang terbuka secara mulus ketika baris tabel desktop atau kartu mobile diklik:
+  - **Identitas Merchant**: Nama Pemilik, Nama Listing Outlet, Store ID (lengkap tombol copy), badge Nama Portal, Username, Paket Layanan, dan tautan langsung ke outlet ShopeeFood.
+  - **Informasi Terakhir & Status Live**: Status Live Shopee, nomor WhatsApp, waktu terakhir dicek (`last_checked_at`), waktu terakhir eksekusi bot (`last_action_at`), catatan hasil patroli (`last_reason`), dan masa layanan dari Google Sheet.
+  - **Riwayat Aktivitas Penutupan Bot**: Menampilkan log penutupan paksa real-time dari database (`/api/v1/user/history?store_ids={storeId}`) dengan indikator status jelas (`TUTUP SUKSES` hijau vs `TUTUP GAGAL` merah), timestamp WIB, dan rincian evaluasi hasil patroli.
+- **Peningkatan Aksesibilitas & Styling**: Menambahkan shortcut keyboard (`Escape` untuk menutup, `Enter`/`Space` untuk membuka), styling badge `.history-role-pill.is-fail` / `.is-success` (termasuk Dark Mode) di `styles.css`.
+- **Cache-Buster Stylesheet**: Memperbarui stylesheet version di `admin_dashboard.html` menjadi `v=20261012-v1364-churn-drawer`.
+- **Zero-Downtime Deployment**: Rebuild container `fm-backend` sukses tanpa interupsi pada service bot (`force-bot`, `bot-oc`, dan `bot-vb`).
 
 Dedicated Force-Close Bot On/Off Switch Toggle & Target Bot Column Elimination:
 - **Eliminasi Kolom Target Bot**: Menghapus kolom redundan "Target Bot" (`<th>Target Bot</th>` dan badge `FORCE-CLOSE`) dari tabel desktop dan kartu mobile pada Tab Churn (`admin_tab_churn.html`), mendistribusikan lebar kolom secara optimal untuk nama listing, Store ID, dan pemilik outlet.

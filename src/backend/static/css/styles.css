@@ -12017,3 +12017,29 @@ body:has(.mobile-wrapper.is-dashboard-view) {
 [data-theme="dark"] .churn-bot-toggle-text {
   color: #94a3b8;
 }
+
+.history-role-pill.is-fail,
+.history-role-pill.is-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.history-role-pill.is-success {
+  background: #e9f9e8;
+  color: #2f8a42;
+}
+
+[data-theme="dark"] .history-role-pill.is-fail,
+[data-theme="dark"] .history-role-pill.is-danger {
+  background: rgba(153, 27, 27, 0.25);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .history-role-pill.is-success {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.churn-data-row {
+  cursor: pointer;
+}
