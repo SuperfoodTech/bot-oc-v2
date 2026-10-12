@@ -536,7 +536,13 @@
 
       if (churnDetailActiveStoreId !== String(storeId)) return;
 
-      const logs = Array.isArray(data.logs) ? data.logs : [];
+      const rawLogs = Array.isArray(data.logs) ? data.logs : [];
+      // Filter strictly to close bot actions only (exclude regular bot auto-open / Vercel toggle logs)
+      const logs = rawLogs.filter(l => {
+        const act = String(l.action || '').toUpperCase();
+        return act === 'ACTION_CLOSE' || act === 'CLOSE_STORE' || act === 'CLOSE';
+      });
+
       if (!logs.length) {
         container.innerHTML = '<div class="history-item is-empty"><span>Belum ada riwayat aktivitas penutupan otomatis untuk outlet ini.</span></div>';
         return;
@@ -548,34 +554,18 @@
           ? formatHistoryLogTimestamp(l.timestamp)
           : (l.timestamp || '-');
 
-        const isCloseAction = String(l.action || '').toUpperCase() === 'ACTION_CLOSE';
         const isSuccess = l.success !== false;
+        const badgeClass = isSuccess ? 'is-bot is-success' : 'is-fail';
+        const badgeLabel = isSuccess ? 'TUTUP SUKSES' : 'TUTUP GAGAL';
+        const titleText = isSuccess ? 'Bot Berhasil Menutup Outlet' : 'Bot Gagal Menutup Outlet';
 
-        let badgeClass = 'is-bot is-success';
-        let badgeLabel = 'SUKSES';
-        let titleText = 'Bot Berhasil Menutup Outlet';
-
-        if (isCloseAction) {
-          if (isSuccess) {
-            badgeClass = 'is-bot is-success';
-            badgeLabel = 'TUTUP SUKSES';
-            titleText = 'Bot Berhasil Menutup Outlet';
-          } else {
-            badgeClass = 'is-fail';
-            badgeLabel = 'TUTUP GAGAL';
-            titleText = 'Bot Gagal Menutup Outlet';
-          }
-        } else if (String(l.action || '').toUpperCase() === 'ACTION_OPEN') {
-          badgeClass = 'is-bot';
-          badgeLabel = 'BUKA';
-          titleText = 'Bot Membuka Outlet';
-        } else {
-          badgeClass = 'is-admin';
-          badgeLabel = escapeHtml(l.action || 'LOG');
-          titleText = escapeHtml(l.action || 'Aktivitas Sistem');
+        // Clean raw technical debug string if present
+        let cleanReason = '';
+        if (l.reason) {
+          cleanReason = l.reason.split('|')[0].trim();
+        } else if (l.error_message) {
+          cleanReason = l.error_message.trim();
         }
-
-        const reasonText = l.reason || l.error_message || '-';
 
         logsHtml += `
           <div class="history-item">
@@ -583,7 +573,7 @@
             <span class="history-time">${escapeHtml(timeText)}</span>
             <span class="mitra-history-body">
               <strong style="${!isSuccess ? 'color: var(--danger-text, #991b1b);' : ''}">${escapeHtml(titleText)}</strong>
-              <span style="font-size: 11px; color: var(--muted); line-height: 1.4;">${escapeHtml(reasonText)}</span>
+              ${cleanReason ? `<span style="font-size: 11px; color: var(--muted); line-height: 1.4;">${escapeHtml(cleanReason)}</span>` : ''}
             </span>
           </div>
         `;

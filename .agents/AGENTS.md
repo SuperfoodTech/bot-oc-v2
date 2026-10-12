@@ -24,7 +24,13 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.5`.
+Latest documented release: `1.36.6`.
+
+Strict Close-Only Log Filtering & Clean Reason Formatting in Churn Drawer:
+- **Filter Ketat Hanya Log Penutupan Bot (`ACTION_CLOSE`)**: Mengeliminasi seluruh log `ACTION_OPEN` / auto-open lama (`Vercel Toggle = ON (Auto Open)...`) dari drawer Churn. Drawer Churn kini secara ketat hanya menampilkan log aksi penutupan paksa bot patroli (`ACTION_CLOSE`).
+- **Pembersihan String Debug Teknis**: Memotong format pipe debug (`| Shopee Action: ... | Verification: ...`) pada teks alasan log, menyajikan pesan hasil evaluasi patroli yang bersih, ringkas, dan mudah dipahami.
+- **Cache-Buster Stylesheet**: Memperbarui stylesheet version di `admin_dashboard.html` menjadi `v=20261012-v1366-churn-strict-close-logs`.
+- **Zero-Downtime Deployment**: Rebuild container `fm-backend` sukses tanpa interupsi pada service bot patroli (`force-bot`, `bot-oc`, dan `bot-vb`).
 
 Churn Drawer Streamlining & Max-10 Focused Bot Activity Logs:
 - **Eliminasi Section Informasi Terakhir & Status Live di Drawer**: Menghapus blok duplikasi "Informasi Terakhir & Status Live" pada drawer Churn (`#churnDetailPanel` di `admin_tab_churn.html`), menyajikan tata letak drawer yang ringkas dan terfokus langsung ke log intervensi bot.
