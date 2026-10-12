@@ -19,7 +19,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/css/styles.css?v=20261012-v1360-churn-dashboard">
+  <link rel="stylesheet" href="/static/css/styles.css?v=20261012-v1361-anti-slop-theme">
 </head>
 
 <body x-data="adminApp()">
@@ -892,14 +892,14 @@
         fetchLabel: 'Fetch dari Sheet'
       },
       churn: {
-        title: 'Merchant Churn & Force Pause',
-        breadcrumb: ['Churn', 'Daftar Outlet Churn'],
+        title: 'Merchant Churn',
+        breadcrumb: ['Churn', 'Daftar Merchant Churn'],
         breadcrumbVisible: false,
-        searchVisible: false,
-        searchPlaceholder: '',
-        searchLabel: '',
-        fetchVisible: false,
-        fetchLabel: 'Fetch dari Sheet'
+        searchVisible: true,
+        searchPlaceholder: 'Cari pemilik, portal, atau Store ID',
+        searchLabel: 'Cari pemilik, portal, atau Store ID',
+        fetchVisible: true,
+        fetchLabel: 'Picu Patroli Bot'
       },
       analytics: {
         title: 'Analisis Operasional',
@@ -986,6 +986,13 @@
         return;
       }
 
+      if (tabName === 'churn') {
+        const mobileSearch = document.getElementById('mobileChurnSearchInput');
+        if (mobileSearch && mobileSearch.value !== value) mobileSearch.value = value;
+        if (typeof filterChurnTable === 'function') filterChurnTable();
+        return;
+      }
+
       if (tabName === 'outlets') {
         filterTable();
       }
@@ -995,6 +1002,10 @@
       const tabName = getAdminActiveTab();
       if (tabName === 'vb') {
         await importVBData();
+        return;
+      }
+      if (tabName === 'churn') {
+        if (typeof triggerChurnPatrol === 'function') await triggerChurnPatrol();
         return;
       }
       if (tabName === 'outlets') {

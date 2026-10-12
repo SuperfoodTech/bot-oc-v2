@@ -1,117 +1,116 @@
 {# ── TAB PANE: CHURN MERCHANTS (TERMINATOR FORCE-CLOSE) ── #}
 <div class="tab-pane" :class="{ 'active': currentTab === 'churn' }" id="paneChurn">
-  <div class="churn-page-shell">
-    <div class="churn-panel">
-
-      <!-- Status Guard Alert Banner -->
-      <div id="churnAlertBanner" class="churn-alert-banner" role="status" aria-live="polite">
-        <div class="churn-alert-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="m9 12 2 2 4-4"/>
-          </svg>
-        </div>
-        <div class="churn-alert-content">
-          <strong id="churnAlertTitle">Memeriksa status operasional merchant churn...</strong>
-          <span id="churnAlertSubtitle">Menghubungkan ke data spreadsheet & live state ShopeeFood...</span>
-        </div>
-        <div class="churn-alert-action">
-          <button type="button" class="btn-outline btn-compact" id="churnRefreshBtn" onclick="loadChurnData()" title="Muat ulang data status Shopee">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-            </svg>
-            <span>Refresh</span>
-          </button>
-        </div>
+  
+  <!-- Metric Cards Grid (Sesuai Desain Agency & VB) -->
+  <div class="stats-grid" aria-label="Ringkasan status merchant churn">
+    <article class="metric-card metric-card-total is-card-active" id="churnCardTotal" role="button" tabindex="0" onclick="setChurnFilterFromCard('')" title="Tampilkan semua merchant churn">
+      <div class="metric-card-icon">
+        <img src="/static/icons/shop-svgrepo-com.svg" alt="">
       </div>
+      <div class="metric-card-content">
+        <span class="metric-card-label">Total Merchant Churn</span>
+        <strong id="churnMetricTotal">0</strong>
+      </div>
+    </article>
 
-      <!-- Metric Cards Grid (Click-to-Filter) -->
-      <section id="churnStatsGrid" class="churn-stat-grid" aria-label="Ringkasan status merchant churn">
-        <article class="metric-card metric-card-total churn-stat-card is-active" id="churnCardTotal" role="button" tabindex="0" onclick="setChurnFilterFromCard('')" title="Tampilkan semua merchant churn">
-          <div class="metric-card-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-          </div>
-          <div class="metric-card-content">
-            <span class="metric-card-label">Total Merchant Churn</span>
-            <strong id="churnMetricTotal">0</strong>
-            <small class="churn-card-hint">Semua toko churn</small>
-          </div>
-        </article>
+    <article class="metric-card metric-card-paused" id="churnCardSafe" role="button" tabindex="0" onclick="setChurnFilterFromCard('safe')" title="Filter toko yang sudah aman terpause / tutup">
+      <div class="metric-card-icon">
+        <img src="/static/icons/closed-svgrepo-com.svg" alt="">
+      </div>
+      <div class="metric-card-content">
+        <span class="metric-card-label">Sudah Terpause (Aman)</span>
+        <strong id="churnMetricSafe">0</strong>
+      </div>
+    </article>
 
-        <article class="metric-card metric-card-paused churn-stat-card" id="churnCardSafe" role="button" tabindex="0" onclick="setChurnFilterFromCard('safe')" title="Filter toko yang sudah aman terpause / tutup">
-          <div class="metric-card-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="10" y1="15" x2="10" y2="9"></line>
-              <line x1="14" y1="15" x2="14" y2="9"></line>
-            </svg>
-          </div>
-          <div class="metric-card-content">
-            <span class="metric-card-label">Sudah Terpause (Aman)</span>
-            <strong id="churnMetricSafe">0</strong>
-            <small class="churn-card-hint">Status PAUSE / CLOSED</small>
-          </div>
-        </article>
+    <article class="metric-card metric-card-open" id="churnCardOpen" role="button" tabindex="0" onclick="setChurnFilterFromCard('open')" title="Filter toko yang masih terdeteksi buka (Target force close)">
+      <div class="metric-card-icon">
+        <img src="/static/icons/open-svgrepo-com.svg" alt="">
+      </div>
+      <div class="metric-card-content">
+        <span class="metric-card-label">Masih Buka (Perlu Tutup)</span>
+        <strong id="churnMetricOpen">0</strong>
+      </div>
+    </article>
 
-        <article class="metric-card metric-card-open churn-stat-card" id="churnCardOpen" role="button" tabindex="0" onclick="setChurnFilterFromCard('open')" title="Filter toko yang masih terdeteksi buka (Target force close)">
-          <div class="metric-card-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </div>
-          <div class="metric-card-content">
-            <span class="metric-card-label">Masih Buka (Perlu Tutup)</span>
-            <strong id="churnMetricOpen">0</strong>
-            <small class="churn-card-hint" id="churnMetricOpenHint">Semua terhenti aman</small>
-          </div>
-        </article>
+    <article class="metric-card metric-card-closed" id="churnCardBot" role="button" tabindex="0" onclick="triggerChurnPatrol()" title="Status Daemon Force-Bot (Klik untuk picu patroli)">
+      <div class="metric-card-icon">
+        <img src="/static/icons/shield-check-svgrepo-com.svg" alt="">
+      </div>
+      <div class="metric-card-content">
+        <span class="metric-card-label">Force-Bot Engine</span>
+        <strong id="churnMetricBot" style="font-size: 20px;">AKTIF</strong>
+      </div>
+    </article>
+  </div>
 
-        <article class="metric-card metric-card-closed churn-stat-card" id="churnCardBot" role="button" tabindex="0" onclick="triggerChurnPatrol()" title="Status Daemon Bot Terminator">
-          <div class="metric-card-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="11" width="18" height="10" rx="2"></rect>
-              <circle cx="12" cy="5" r="2"></circle>
-              <path d="M12 7v4"></path>
-              <line x1="8" y1="16" x2="8.01" y2="16"></line>
-              <line x1="16" y1="16" x2="16.01" y2="16"></line>
-            </svg>
-          </div>
-          <div class="metric-card-content">
-            <span class="metric-card-label">Force-Bot Engine</span>
-            <strong id="churnMetricBot">AKTIF</strong>
-            <small class="churn-card-hint" id="churnMetricBotHint">Port 8083 | 24/7 Patrol</small>
-          </div>
-        </article>
-      </section>
+  <!-- Mobile Quick Summary Strip -->
+  <div class="mobile-summary-strip d-md-none" id="churnMobileSummaryStrip" aria-label="Quick filter merchant churn">
+    <button type="button" class="mobile-summary-segment is-active" id="churnChipAll" data-churn-filter="" onclick="setChurnFilterFromCard('')">
+      <span class="mobile-summary-label">Semua:</span>
+      <strong id="churnChipAllCount">0</strong>
+    </button>
+    <button type="button" class="mobile-summary-segment" id="churnChipSafe" data-churn-filter="safe" onclick="setChurnFilterFromCard('safe')">
+      <span class="mobile-summary-label">Aman:</span>
+      <strong id="churnChipSafeCount">0</strong>
+    </button>
+    <button type="button" class="mobile-summary-segment" id="churnChipOpen" data-churn-filter="open" onclick="setChurnFilterFromCard('open')">
+      <span class="mobile-summary-label">Buka:</span>
+      <strong id="churnChipOpenCount">0</strong>
+    </button>
+  </div>
 
-      <!-- Toolbar & Filters -->
-      <div class="churn-toolbar">
-        <div class="churn-toolbar-left">
-          <label class="churn-search-box" for="churnSearchInput">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input type="search" id="churnSearchInput" placeholder="Cari pemilik, portal, nama listing, atau Store ID..." aria-label="Cari toko churn" oninput="filterChurnTable()">
-          </label>
+  <!-- Filter Card (Sesuai Desain Agency & VB) -->
+  <div class="outlet-filter-card">
+    <div class="mobile-outlet-toolbar d-md-none">
+      <label class="mobile-outlet-search" for="mobileChurnSearchInput">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+        <input type="search" id="mobileChurnSearchInput" placeholder="Cari pemilik atau Store ID" aria-label="Cari merchant churn" oninput="handleChurnMobileSearch(this.value)">
+      </label>
+      <button class="btn-outline btn-compact" type="button" onclick="triggerChurnPatrol()" title="Picu patroli bot instan">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+        <span>Patroli</span>
+      </button>
+    </div>
 
-          <label class="filter-field churn-filter-select-wrap">
-            <span class="sr-only">Status Toko</span>
-            <select id="churnStatusFilter" class="form-input filter-select" onchange="filterChurnTable()" aria-label="Filter status toko churn">
-              <option value="">Semua Status</option>
-              <option value="safe">Sudah Terpause / Tutup</option>
-              <option value="pause">Terpause (PAUSE)</option>
-              <option value="closed">Tutup (CLOSED)</option>
-              <option value="open">Masih Buka (OPEN)</option>
+    <div class="table-heading desktop-outlet-filter-heading d-none d-md-flex">
+      <div class="table-heading-actions">
+        <div class="outlet-filter-toolbar">
+          <label class="filter-field">
+            <span>Nama pemilik</span>
+            <select id="churnOwnerFilter" class="form-input filter-select" aria-label="Filter nama pemilik" onchange="filterChurnTable()">
+              <option value="">Semua pemilik</option>
             </select>
           </label>
+          <label class="filter-field">
+            <span>Nama outlet</span>
+            <select id="churnOutletFilter" class="form-input filter-select" aria-label="Filter nama outlet" onchange="filterChurnTable()">
+              <option value="">Semua outlet</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Store ID</span>
+            <select id="churnStoreIdFilter" class="form-input filter-select" aria-label="Filter Store ID" onchange="filterChurnTable()">
+              <option value="">Semua Store ID</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Status</span>
+            <select id="churnStatusFilter" class="form-input filter-select" aria-label="Filter status" onchange="filterChurnTable()">
+              <option value="">Semua status</option>
+              <option value="safe">Sudah Terpause / Tutup</option>
+              <option value="open">Masih Buka (Perlu Tutup)</option>
+            </select>
+          </label>
+          <button class="btn-outline btn-compact reset-filter-button" type="button" onclick="resetChurnFilters()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v5h5"/><path d="M5.5 10A7 7 0 1 1 6 16"/></svg>
+            Reset filter
+          </button>
         </div>
 
-        <div class="churn-toolbar-right">
+        <div class="churn-filter-actions-right" style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
           <button type="button" class="btn-outline btn-compact" id="churnSyncActionBtn" onclick="triggerChurnPatrol()" title="Picu eksekusi patroli force-close instan">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
@@ -128,56 +127,51 @@
           </a>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Results Summary Bar -->
-      <div id="churnResultsSummary" class="churn-results-summary" aria-live="polite">
-        <span>Menampilkan seluruh merchant churn.</span>
+  <!-- Content Layout: Data Table (Desktop) & Mobile Cards -->
+  <div class="outlet-content-layout">
+    <div class="table-card outlet-section">
+      <div class="table-scroll d-none d-md-block">
+        <table class="data-table" id="churnTable">
+          <thead>
+            <tr>
+              <th style="width: 15%;">Nama Pemilik</th>
+              <th style="width: 14%;">Portal / Akun</th>
+              <th style="width: 20%;">Nama Listing</th>
+              <th style="width: 12%;">Store ID</th>
+              <th style="width: 11%; text-align: center;">Target Bot</th>
+              <th style="width: 13%;">Link Shopee</th>
+              <th style="width: 15%;">Status Live Shopee</th>
+            </tr>
+          </thead>
+          <tbody id="churnTableBody">
+            <tr><td colspan="7" class="table-loading-state">Memuat data merchant churn...</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <!-- Desktop Table Card -->
-      <div class="table-card churn-table-card d-none d-md-block">
-        <div class="table-responsive">
-          <table class="admin-table churn-table" id="churnTable">
-            <thead>
-              <tr>
-                <th style="width: 44px; text-align: center;">#</th>
-                <th style="min-width: 170px;">Pemilik & Kontak</th>
-                <th style="min-width: 140px;">Portal / Akun</th>
-                <th style="min-width: 120px;">Store ID</th>
-                <th style="min-width: 220px;">Nama Listing Outlet</th>
-                <th style="min-width: 110px; text-align: center;">Target Bot</th>
-                <th style="min-width: 160px; text-align: center;">Status Live Shopee</th>
-                <th style="min-width: 160px;">Terakhir Diperiksa</th>
-                <th style="min-width: 240px;">Keterangan & Log Terakhir</th>
-              </tr>
-            </thead>
-            <tbody id="churnTableBody">
-              <tr>
-                <td colspan="9" class="table-loading-state">Memuat data merchant churn...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div id="mobileChurnList" class="mobile-outlet-list d-md-none">
+        <div class="mobile-empty-state">Memuat data merchant churn...</div>
       </div>
-
-      <!-- Mobile Outlet Card List -->
-      <div class="mobile-outlet-list churn-mobile-list d-md-none" id="churnMobileList">
-        <div class="mobile-loading-state">Memuat data merchant churn...</div>
-      </div>
-
     </div>
   </div>
 </div>
 
 <script>
   let allChurnStores = [];
-  let activeChurnCardFilter = '';
+  let activeChurnStatusFilter = '';
 
   async function loadChurnData(isSilent = false) {
-    const refreshBtn = document.getElementById('churnRefreshBtn');
-    if (!isSilent && refreshBtn) {
-      refreshBtn.disabled = true;
-      refreshBtn.classList.add('is-loading');
+    const fetchBtn = document.getElementById('fetchSheetHeader');
+    const syncBtn = document.getElementById('churnSyncActionBtn');
+    
+    if (!isSilent) {
+      const tbody = document.getElementById('churnTableBody');
+      const mobileList = document.getElementById('mobileChurnList');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-state">Memuat data merchant churn...</td></tr>';
+      if (mobileList) mobileList.innerHTML = '<div class="mobile-loading-state">Memuat data merchant churn...</div>';
     }
 
     try {
@@ -191,19 +185,8 @@
       renderChurnDashboard(data);
     } catch (err) {
       console.error('Error loadChurnData:', err);
-      const banner = document.getElementById('churnAlertBanner');
-      if (banner) {
-        banner.className = 'churn-alert-banner is-warning';
-        const titleEl = document.getElementById('churnAlertTitle');
-        const subEl = document.getElementById('churnAlertSubtitle');
-        if (titleEl) titleEl.textContent = 'Gagal memuat data merchant churn';
-        if (subEl) subEl.textContent = err.message || 'Terjadi kesalahan jaringan atau autentikasi.';
-      }
-    } finally {
-      if (refreshBtn) {
-        refreshBtn.disabled = false;
-        refreshBtn.classList.remove('is-loading');
-      }
+      const tbody = document.getElementById('churnTableBody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="table-loading-state" style="color: var(--danger-text);">Gagal memuat data churn: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -211,195 +194,229 @@
     const summary = data.summary || {};
     allChurnStores = data.stores || [];
 
-    // 1. Update Alert Banner
-    const banner = document.getElementById('churnAlertBanner');
-    const titleEl = document.getElementById('churnAlertTitle');
-    const subtitleEl = document.getElementById('churnAlertSubtitle');
-
-    if (summary.all_paused) {
-      if (banner) banner.className = 'churn-alert-banner is-safe';
-      if (titleEl) titleEl.textContent = `Seluruh Merchant Churn Terpause Aman (${summary.total_safe} / ${summary.total_churn} Toko)`;
-      if (subtitleEl) subtitleEl.textContent = `Semua toko churn (${summary.total_paused} PAUSE, ${summary.total_closed} CLOSED) telah terhenti dan tidak ada yang buka di ShopeeFood. Patroli berjalan otomatis 24/7.`;
-    } else if (summary.total_open > 0) {
-      if (banner) banner.className = 'churn-alert-banner is-warning';
-      if (titleEl) titleEl.textContent = `Perhatian: ${summary.total_open} Merchant Churn Masih BUKA di Shopee!`;
-      if (subtitleEl) subtitleEl.textContent = `Terdapat toko churn yang masih aktif buka. Bot Terminator Force-Close sedang menjadwalkan penutupan paksa, atau klik 'Picu Patroli Bot'.`;
-    } else {
-      if (banner) banner.className = 'churn-alert-banner is-info';
-      if (titleEl) titleEl.textContent = `Memantau ${summary.total_churn} Merchant Churn`;
-      if (subtitleEl) subtitleEl.textContent = `Total ${summary.total_safe} toko terhenti. Terakhir disinkronisasi: ${data.updated_at || '-'}.`;
-    }
-
-    // 2. Update Metric Cards
+    // 1. Update Metric Cards
     const elTotal = document.getElementById('churnMetricTotal');
     const elSafe = document.getElementById('churnMetricSafe');
     const elOpen = document.getElementById('churnMetricOpen');
-    const elOpenHint = document.getElementById('churnMetricOpenHint');
     const elBot = document.getElementById('churnMetricBot');
-    const elBotHint = document.getElementById('churnMetricBotHint');
 
     if (elTotal) elTotal.textContent = summary.total_churn ?? 0;
     if (elSafe) elSafe.textContent = summary.total_safe ?? 0;
     if (elOpen) elOpen.textContent = summary.total_open ?? 0;
-    if (elOpenHint) {
-      elOpenHint.textContent = summary.total_open > 0 ? 'Perlu tindakan penutupan' : 'Semua terhenti aman';
-    }
 
-    const botOnline = summary.bot_info?.online;
+    const elChipAll = document.getElementById('churnChipAllCount');
+    const elChipSafe = document.getElementById('churnChipSafeCount');
+    const elChipOpen = document.getElementById('churnChipOpenCount');
+    if (elChipAll) elChipAll.textContent = summary.total_churn ?? 0;
+    if (elChipSafe) elChipSafe.textContent = summary.total_safe ?? 0;
+    if (elChipOpen) elChipOpen.textContent = summary.total_open ?? 0;
+
+    const botOnline = summary.bot_info?.is_online;
     if (elBot) {
       elBot.textContent = botOnline ? 'AKTIF' : 'OFFLINE';
       elBot.style.color = botOnline ? '#15803d' : '#dc2626';
     }
-    if (elBotHint) {
-      elBotHint.textContent = botOnline ? 'Port 8083 (Patrol 24/7)' : 'Service offline';
-    }
 
-    // 3. Render Table
+    // 2. Populate Dropdown Options
+    populateChurnFilterDropdowns(allChurnStores);
+
+    // 3. Render Table & Mobile List
     filterChurnTable();
   }
 
-  function setChurnFilterFromCard(filterType) {
-    activeChurnCardFilter = filterType;
-    const cards = document.querySelectorAll('.churn-stat-card');
-    cards.forEach(c => c.classList.remove('is-active', 'is-card-active'));
+  function populateChurnFilterDropdowns(stores) {
+    const ownerSelect = document.getElementById('churnOwnerFilter');
+    const outletSelect = document.getElementById('churnOutletFilter');
+    const storeIdSelect = document.getElementById('churnStoreIdFilter');
 
-    const sel = document.getElementById('churnStatusFilter');
+    if (!ownerSelect || !outletSelect || !storeIdSelect) return;
 
-    if (filterType === 'safe') {
-      document.getElementById('churnCardSafe')?.classList.add('is-active', 'is-card-active');
-      if (sel) sel.value = 'safe';
-    } else if (filterType === 'open') {
-      document.getElementById('churnCardOpen')?.classList.add('is-active', 'is-card-active');
-      if (sel) sel.value = 'open';
+    const currentOwner = ownerSelect.value;
+    const currentOutlet = outletSelect.value;
+    const currentStoreId = storeIdSelect.value;
+
+    const owners = [...new Set(stores.map(s => (s.nama_pemilik || '').trim()).filter(Boolean))].sort();
+    const outlets = [...new Set(stores.map(s => (s.nama_listing || '').trim()).filter(Boolean))].sort();
+    const storeIds = [...new Set(stores.map(s => (s.store_id || '').trim()).filter(Boolean))].sort();
+
+    ownerSelect.innerHTML = '<option value="">Semua pemilik</option>' + 
+      owners.map(o => `<option value="${escapeHtml(o)}"${o === currentOwner ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
+
+    outletSelect.innerHTML = '<option value="">Semua outlet</option>' + 
+      outlets.map(o => `<option value="${escapeHtml(o)}"${o === currentOutlet ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
+
+    storeIdSelect.innerHTML = '<option value="">Semua Store ID</option>' + 
+      storeIds.map(id => `<option value="${escapeHtml(id)}"${id === currentStoreId ? ' selected' : ''}>${escapeHtml(id)}</option>`).join('');
+  }
+
+  function setChurnFilterFromCard(statusVal) {
+    activeChurnStatusFilter = statusVal;
+
+    // Highlight desktop metric card
+    const cardTotal = document.getElementById('churnCardTotal');
+    const cardSafe = document.getElementById('churnCardSafe');
+    const cardOpen = document.getElementById('churnCardOpen');
+
+    [cardTotal, cardSafe, cardOpen].forEach(c => c?.classList.remove('is-card-active'));
+
+    if (statusVal === 'safe') {
+      cardSafe?.classList.add('is-card-active');
+    } else if (statusVal === 'open') {
+      cardOpen?.classList.add('is-card-active');
     } else {
-      document.getElementById('churnCardTotal')?.classList.add('is-active', 'is-card-active');
-      if (sel) sel.value = '';
+      cardTotal?.classList.add('is-card-active');
     }
 
+    // Highlight mobile segments
+    const chipAll = document.getElementById('churnChipAll');
+    const chipSafe = document.getElementById('churnChipSafe');
+    const chipOpen = document.getElementById('churnChipOpen');
+
+    [chipAll, chipSafe, chipOpen].forEach(c => {
+      c?.classList.remove('is-active');
+      c?.setAttribute('aria-pressed', 'false');
+    });
+
+    if (statusVal === 'safe') {
+      chipSafe?.classList.add('is-active');
+      chipSafe?.setAttribute('aria-pressed', 'true');
+    } else if (statusVal === 'open') {
+      chipOpen?.classList.add('is-active');
+      chipOpen?.setAttribute('aria-pressed', 'true');
+    } else {
+      chipAll?.classList.add('is-active');
+      chipAll?.setAttribute('aria-pressed', 'true');
+    }
+
+    // Sync status dropdown
+    const statusSelect = document.getElementById('churnStatusFilter');
+    if (statusSelect) statusSelect.value = statusVal;
+
     filterChurnTable();
+  }
+
+  function handleChurnMobileSearch(value) {
+    const headerInput = getAdminHeaderSearchInput();
+    if (headerInput) headerInput.value = value;
+    filterChurnTable();
+  }
+
+  function resetChurnFilters() {
+    ['churnOwnerFilter', 'churnOutletFilter', 'churnStoreIdFilter', 'churnStatusFilter', 'mobileChurnSearchInput'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const headerInput = getAdminHeaderSearchInput();
+    if (headerInput) headerInput.value = '';
+    setChurnFilterFromCard('');
   }
 
   function filterChurnTable() {
-    const searchVal = (document.getElementById('churnSearchInput')?.value || '').trim().toLowerCase();
-    const selectVal = document.getElementById('churnStatusFilter')?.value || activeChurnCardFilter;
+    const headerSearch = (getAdminHeaderSearchInput()?.value || document.getElementById('mobileChurnSearchInput')?.value || '').trim().toLowerCase();
+    const ownerFilter = (document.getElementById('churnOwnerFilter')?.value || '').trim().toLowerCase();
+    const outletFilter = (document.getElementById('churnOutletFilter')?.value || '').trim().toLowerCase();
+    const storeIdFilter = (document.getElementById('churnStoreIdFilter')?.value || '').trim().toLowerCase();
+    const statusFilter = document.getElementById('churnStatusFilter')?.value || activeChurnStatusFilter;
 
-    const filtered = allChurnStores.filter(store => {
-      // Status filtering
-      if (selectVal === 'safe' && !store.is_paused) return false;
-      if (selectVal === 'open' && store.shopee_actual_status !== 'OPEN') return false;
-      if (selectVal === 'pause' && store.shopee_actual_status !== 'PAUSE') return false;
-      if (selectVal === 'closed' && store.shopee_actual_status !== 'CLOSED') return false;
+    const filtered = allChurnStores.filter(s => {
+      if (statusFilter === 'safe' && !s.is_paused) return false;
+      if (statusFilter === 'open' && s.shopee_actual_status !== 'OPEN') return false;
 
-      // Text search
-      if (searchVal) {
+      if (ownerFilter && (s.nama_pemilik || '').trim().toLowerCase() !== ownerFilter) return false;
+      if (outletFilter && (s.nama_listing || '').trim().toLowerCase() !== outletFilter) return false;
+      if (storeIdFilter && (s.store_id || '').trim().toLowerCase() !== storeIdFilter) return false;
+
+      if (headerSearch) {
         const textToSearch = [
-          store.store_id || '',
-          store.nama_pemilik || '',
-          store.nomor_hp || '',
-          store.nama_portal || '',
-          store.nama_listing || '',
-          store.username || '',
-          store.status_bot || ''
+          s.store_id || '',
+          s.nama_pemilik || '',
+          s.nomor_hp || '',
+          s.nama_portal || '',
+          s.nama_listing || '',
+          s.username || ''
         ].join(' ').toLowerCase();
 
-        if (!textToSearch.includes(searchVal)) return false;
+        if (!textToSearch.includes(headerSearch)) return false;
       }
 
       return true;
     });
 
-    renderChurnTableRows(filtered);
+    renderChurnDesktopTable(filtered);
     renderChurnMobileCards(filtered);
-
-    // Summary info
-    const summaryEl = document.getElementById('churnResultsSummary');
-    if (summaryEl) {
-      if (filtered.length === allChurnStores.length) {
-        summaryEl.innerHTML = `<span>Menampilkan seluruh <strong>${allChurnStores.length}</strong> merchant churn.</span>`;
-      } else {
-        summaryEl.innerHTML = `<span>Menampilkan <strong>${filtered.length}</strong> dari <strong>${allChurnStores.length}</strong> merchant churn.</span>`;
-      }
-    }
   }
 
-  function escapeChurnHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function getShopeeStatusBadge(status) {
-    const s = String(status || '').toUpperCase();
-    if (s === 'PAUSE') {
-      return '<span class="churn-badge churn-badge-pause"><span class="churn-badge-dot"></span>PAUSE (TERPAUSE)</span>';
-    } else if (s === 'CLOSED' || s === 'OFF' || s === 'CLOSE') {
-      return '<span class="churn-badge churn-badge-closed"><span class="churn-badge-dot"></span>CLOSED (TUTUP)</span>';
-    } else if (s === 'OPEN') {
-      return '<span class="churn-badge churn-badge-open"><span class="churn-badge-dot"></span>OPEN (MASIH BUKA)</span>';
-    } else {
-      return '<span class="churn-badge churn-badge-unknown"><span class="churn-badge-dot"></span>UNKNOWN</span>';
-    }
-  }
-
-  function renderChurnTableRows(stores) {
+  function renderChurnDesktopTable(stores) {
     const tbody = document.getElementById('churnTableBody');
     if (!tbody) return;
 
     if (!stores.length) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" class="table-empty-state" style="text-align: center; padding: 32px 16px; color: #64748b;">
-            Tidak ada merchant churn yang sesuai dengan filter pencarian.
-          </td>
-        </tr>`;
+      tbody.innerHTML = '<tr><td colspan="7" class="table-loading-state">Tidak ada merchant churn yang sesuai dengan filter.</td></tr>';
       return;
     }
 
     let rowsHtml = '';
-    stores.forEach((s, idx) => {
+    stores.forEach(s => {
       const isSafe = s.is_paused;
-      const rowClass = isSafe ? 'is-row-safe' : 'is-row-danger';
-      const statusBadge = getShopeeStatusBadge(s.shopee_actual_status);
-      const targetBadge = '<span class="churn-badge churn-badge-target">FORCE-CLOSE</span>';
+      const storeIdVal = String(s.store_id || '').trim();
+      const shopeeFoodUrl = storeIdVal ? getShopeeFoodStoreUrl(storeIdVal) : '';
 
-      const lastChecked = s.last_checked_at || '<span class="text-muted">Menunggu patroli</span>';
-      
-      let logDesc = '';
-      if (s.last_reason) {
-        logDesc = `<div class="churn-log-reason">${escapeChurnHtml(s.last_reason)}</div>`;
-        if (s.last_action_at) {
-          logDesc += `<small class="text-muted" style="display: block; margin-top: 2px;">${escapeChurnHtml(s.last_action_at)}</small>`;
-        }
-      } else {
-        logDesc = '<span class="text-muted">Dalam antrean patroli</span>';
-      }
+      const linkCellMarkup = shopeeFoodUrl ? `
+        <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link" onclick="event.stopPropagation()" aria-label="Buka outlet ShopeeFood untuk store ${storeIdVal}">
+          <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+          <span>Lihat di Shopee</span>
+        </a>
+      ` : '<span class="compact-meta">-</span>';
+
+      const statusMarkup = isSafe ? `
+        <div class="admin-status-summary">
+          <span class="table-status is-success" title="Outlet sudah terpause/tutup di Shopee">
+            <span>${s.shopee_actual_status === 'PAUSE' ? 'Tutup Sementara (Aman)' : 'Sedang Tutup (Aman)'}</span>
+          </span>
+          <small class="table-cell-note" title="${escapeHtml(s.last_reason || '')}">
+            ${escapeHtml(s.last_action_at || s.last_checked_at || 'Menunggu patroli')}
+          </small>
+        </div>
+      ` : `
+        <div class="admin-status-summary">
+          <span class="table-status is-danger" title="Outlet masih terdeteksi buka! Target force close">
+            <span>Sedang Buka (Perlu Tutup)</span>
+          </span>
+          <small class="table-cell-note" style="color: var(--danger-text);" title="${escapeHtml(s.last_reason || '')}">
+            ${escapeHtml(s.last_action_at || s.last_checked_at || 'Menunggu patroli')}
+          </small>
+        </div>
+      `;
 
       rowsHtml += `
-        <tr class="${rowClass}">
-          <td style="text-align: center; font-weight: 600; color: #94a3b8;">${idx + 1}</td>
+        <tr>
           <td>
-            <div style="font-weight: 600; color: #1e293b;">${escapeChurnHtml(s.nama_pemilik || '-')}</div>
-            <div style="font-size: 11px; color: #64748b;">${escapeChurnHtml(s.nomor_hp || '-')}</div>
+            <div class="admin-table-owner-cell">
+              <strong>${escapeHtml(s.nama_pemilik || '-')}</strong>
+            </div>
+            <small class="compact-meta compact-meta-merchant">${escapeHtml(s.nomor_hp || '-')}</small>
           </td>
           <td>
-            <div style="font-weight: 500;">${escapeChurnHtml(s.nama_portal || '-')}</div>
-            <div style="font-size: 11px; color: #64748b;">${escapeChurnHtml(s.username || '-')}</div>
+            <div>${escapeHtml(s.nama_portal || '-')}</div>
+            <small class="compact-meta" style="color: var(--muted);">${escapeHtml(s.username || '-')}</small>
           </td>
           <td>
-            <code class="churn-code">${escapeChurnHtml(s.store_id || '-')}</code>
+            <div>${escapeHtml(s.nama_listing || '-')}</div>
+            <small class="compact-meta" style="color: var(--muted);">Paket: ${escapeHtml(s.paket || '-')}</small>
           </td>
           <td>
-            <div style="font-weight: 600; color: #0f172a;">${escapeChurnHtml(s.nama_listing || '-')}</div>
-            <small class="text-muted" style="font-size: 11px;">Paket: ${escapeChurnHtml(s.paket || '-')}</small>
+            <div class="store-id-cell">
+              <code>${escapeHtml(s.store_id || '-')}</code>
+              <button type="button" class="btn-copy-icon" onclick="copyStoreId(event, '${escapeHtml(s.store_id)}')" title="Salin Store ID ${escapeHtml(s.store_id)}" aria-label="Salin Store ID">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
           </td>
-          <td style="text-align: center;">${targetBadge}</td>
-          <td style="text-align: center;">${statusBadge}</td>
-          <td style="font-size: 12px; color: #475569;">${lastChecked}</td>
-          <td style="font-size: 12px;">${logDesc}</td>
+          <td style="text-align: center;">
+            <span class="badge-target-close">FORCE-CLOSE</span>
+          </td>
+          <td>${linkCellMarkup}</td>
+          <td>${statusMarkup}</td>
         </tr>`;
     });
 
@@ -407,62 +424,84 @@
   }
 
   function renderChurnMobileCards(stores) {
-    const listEl = document.getElementById('churnMobileList');
+    const listEl = document.getElementById('mobileChurnList');
     if (!listEl) return;
 
     if (!stores.length) {
-      listEl.innerHTML = `
-        <div class="mobile-empty-state" style="text-align: center; padding: 32px 16px; color: #64748b;">
-          Tidak ada merchant churn yang cocok.
-        </div>`;
+      listEl.innerHTML = '<div class="mobile-empty-state">Tidak ada merchant churn yang sesuai dengan pencarian.</div>';
       return;
     }
 
     let cardsHtml = '';
-    stores.forEach((s) => {
+    stores.forEach(s => {
       const isSafe = s.is_paused;
-      const cardBorder = isSafe ? 'border-left: 4px solid #15803d;' : 'border-left: 4px solid #dc2626;';
-      const statusBadge = getShopeeStatusBadge(s.shopee_actual_status);
+      const storeIdVal = String(s.store_id || '').trim();
+      const shopeeFoodUrl = storeIdVal ? getShopeeFoodStoreUrl(storeIdVal) : '';
 
       cardsHtml += `
-        <div class="churn-mobile-card" style="${cardBorder}">
-          <div class="churn-mobile-card-header">
-            <div>
-              <strong style="color: #0f172a; font-size: 14px;">${escapeChurnHtml(s.nama_listing || s.store_id)}</strong>
-              <div style="font-size: 11px; color: #64748b;">Store ID: <code>${escapeChurnHtml(s.store_id)}</code></div>
+        <article class="mobile-outlet-card admin-mobile-outlet-card">
+          <div class="admin-mobile-outlet-head">
+            <div class="admin-mobile-outlet-copy">
+              <div class="admin-mobile-outlet-owner">${escapeHtml(s.nama_pemilik || '-')} · ${escapeHtml(s.nomor_hp || '-')}</div>
+              <h3>${escapeHtml(s.nama_listing || s.store_id)}</h3>
+              <div class="admin-mobile-outlet-meta">
+                <span class="admin-mobile-outlet-merchant">${escapeHtml(s.nama_portal || '-')}</span>
+                <span class="admin-mobile-store-chip">
+                  Store ID ${escapeHtml(s.store_id)}
+                  <button type="button" class="btn-copy-icon is-chip" onclick="copyStoreId(event, '${escapeHtml(s.store_id)}')">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
+                </span>
+              </div>
             </div>
-            <div>${statusBadge}</div>
+            <div class="admin-mobile-outlet-side">
+              <div class="admin-status-summary admin-status-summary-mobile">
+                <span class="table-status ${isSafe ? 'is-success' : 'is-danger'}">
+                  ${isSafe ? 'Tutup (Aman)' : 'Masih Buka'}
+                </span>
+                <small class="admin-mobile-status-note">${escapeHtml(s.shopee_actual_status)}</small>
+              </div>
+            </div>
           </div>
-          <div class="churn-mobile-card-body">
-            <div class="churn-mobile-meta-row">
-              <span class="churn-meta-label">Pemilik:</span>
-              <span class="churn-meta-val">${escapeChurnHtml(s.nama_pemilik || '-')} (${escapeChurnHtml(s.nomor_hp || '-')})</span>
+
+          <dl class="admin-mobile-outlet-grid">
+            <div class="admin-mobile-data-block">
+              <dt>Target Bot</dt>
+              <dd><span class="badge-target-close">FORCE-CLOSE</span></dd>
             </div>
-            <div class="churn-mobile-meta-row">
-              <span class="churn-meta-label">Portal:</span>
-              <span class="churn-meta-val">${escapeChurnHtml(s.nama_portal || '-')} (${escapeChurnHtml(s.username || '-')})</span>
+            <div class="admin-mobile-data-block">
+              <dt>Paket</dt>
+              <dd><span>${escapeHtml(s.paket || '-')}</span></dd>
             </div>
-            <div class="churn-mobile-meta-row">
-              <span class="churn-meta-label">Terakhir Dicek:</span>
-              <span class="churn-meta-val">${escapeChurnHtml(s.last_checked_at || 'Menunggu patroli')}</span>
+            <div class="admin-mobile-data-block is-wide">
+              <dt>Terakhir dicek</dt>
+              <dd><span>${escapeHtml(s.last_checked_at || 'Menunggu patroli')}</span></dd>
             </div>
             ${s.last_reason ? `
-            <div class="churn-mobile-meta-row">
-              <span class="churn-meta-label">Log Terakhir:</span>
-              <span class="churn-meta-val" style="color: #475569;">${escapeChurnHtml(s.last_reason)}</span>
+            <div class="admin-mobile-data-block is-wide">
+              <dt>Log Patroli Terakhir</dt>
+              <dd><span style="font-size: 11px; color: var(--muted);">${escapeHtml(s.last_reason)}</span></dd>
             </div>` : ''}
-          </div>
-        </div>`;
+          </dl>
+
+          ${shopeeFoodUrl ? `
+          <div class="admin-mobile-shopeefood-action">
+            <a href="${shopeeFoodUrl}" target="_blank" rel="noopener noreferrer" class="mitra-outlet-integration admin-table-shopeefood-link">
+              <img src="/static/icons/icons8-shopeefood-96.svg" alt="">
+              <span>Lihat di ShopeeFood</span>
+            </a>
+          </div>` : ''}
+        </article>`;
     });
 
     listEl.innerHTML = cardsHtml;
   }
 
   async function triggerChurnPatrol() {
-    const btn = document.getElementById('churnSyncActionBtn');
-    if (btn) {
-      btn.disabled = true;
-      btn.classList.add('is-loading');
+    const syncBtn = document.getElementById('churnSyncActionBtn');
+    if (syncBtn) {
+      syncBtn.disabled = true;
+      syncBtn.classList.add('is-loading');
     }
 
     try {
@@ -490,9 +529,9 @@
         showToast('Terjadi kesalahan memicu bot patroli', 'error');
       }
     } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.classList.remove('is-loading');
+      if (syncBtn) {
+        syncBtn.disabled = false;
+        syncBtn.classList.remove('is-loading');
       }
     }
   }

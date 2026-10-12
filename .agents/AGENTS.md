@@ -24,7 +24,20 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.0`.
+Latest documented release: `1.36.1`.
+
+Anti-Slop UI & Native Design System Alignment for Merchant Churn Dashboard:
+- Menyelaraskan seluruh antarmuka Tab Churn (`admin_tab_churn.html`) 100% mengikuti bahasa desain dan tema bawaan FoodMaster (`admin_tab_operasional.html` & `admin_tab_vb.html`):
+  1. **Metric Cards Grid**: Menggunakan tata letak grid standar `.stats-grid` dengan kartu `.metric-card` (`.metric-card-total`, `.metric-card-paused`, `.metric-card-open`, `.metric-card-closed`) dan ikon SVG resmi dari `/static/icons/` (`shop-svgrepo-com.svg`, `closed-svgrepo-com.svg`, `open-svgrepo-com.svg`, `shield-check-svgrepo-com.svg`).
+  2. **Mobile Quick Summary Strip**: Mengintegrasikan strip filter mobile responsif (`#churnMobileSummaryStrip`) dengan 3 segmen status (`Semua`, `Aman`, `Buka`) konsisten dengan Tab Agency.
+  3. **Filter Card Standar**: Mengadopsi struktur `.outlet-filter-card` lengkap dengan toolbar `.table-heading.desktop-outlet-filter-heading`, label input filter seragam (`Nama pemilik`, `Nama outlet`, `Store ID`, `Status`), tombol reset filter, tombol instan `Picu Patroli Bot`, dan tautan `Buka Sheet`.
+  4. **Tabel Data Native**: Menggunakan tabel `.data-table` di dalam `.table-card.outlet-section` dengan tipografi presisi, layout cell seragam (`.admin-table-owner-cell`, `.store-id-cell` lengkap dengan tombol copy `.btn-copy-icon`, dan tautan ShopeeFood `.admin-table-shopeefood-link` dengan logo resmi ShopeeFood).
+  5. **Status Live Deterministik**: Menggunakan kelas status bawaan `.table-status.is-success` (Tutup Sementara/Sedang Tutup - Aman) dan `.table-status.is-danger` (Sedang Buka - Perlu Tutup) serta badge target bot `.badge-target-close`.
+  6. **Integrasi Search & Fetch Header**: Mengintegrasikan input search header utama (`#searchInput`) dan tombol fetch header (`#fetchSheetHeader` "Picu Patroli Bot") saat berada di Tab Churn.
+  7. **Mobile Card Native**: Menyelaraskan kartu mobile churn menggunakan kelas `.mobile-outlet-card.admin-mobile-outlet-card`.
+- Menghapus seluruh CSS ad-hoc tidak standar dari `styles.css` dan menaikkan cache-buster versi stylesheet menjadi `v=20261012-v1361-anti-slop-theme`.
+- Zero-Downtime Deployment: Berhasil me-rebuild dan merestart container `fm-web` tanpa memutus jalannya bot patroli aktif.
+
 
 Merchant Churn Monitoring Dashboard & Dedicated Force-Close Bot Engine:
 - Menghadirkan menu baru **Churn** di sidebar navigasi admin tepat di bawah menu **Virtual Brand** (`#tabBtnChurn`), terintegrasi penuh ke dalam Single Page Application (SPA) dashboard admin (`switchTab('churn')` & `admin_tab_churn.html`).
