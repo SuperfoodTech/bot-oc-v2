@@ -468,50 +468,11 @@
         </a>
       </div>` : ''}
 
-      <section class="outlet-detail-section">
-        <div class="outlet-detail-section-heading">
-          <h4>Informasi Terakhir & Status Live</h4>
-        </div>
-        <dl class="outlet-detail-list" style="margin-top: 8px;">
-          <div>
-            <dt>Status Live Shopee</dt>
-            <dd>
-              <span class="table-status ${isSafe ? 'is-success' : 'is-danger'}" style="margin-top: 4px;">
-                ${statusBadgeText}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt>Nomor WhatsApp / HP</dt>
-            <dd>${escapeHtml(store.nomor_hp || '-')}</dd>
-          </div>
-          <div>
-            <dt>Waktu Terakhir Dicek</dt>
-            <dd>${escapeHtml(store.last_checked_at || 'Menunggu patroli')}</dd>
-          </div>
-          ${store.last_action_at ? `
-          <div>
-            <dt>Waktu Terakhir Aksi Eksekusi Bot</dt>
-            <dd>${escapeHtml(store.last_action_at)}</dd>
-          </div>` : ''}
-          ${store.last_reason ? `
-          <div>
-            <dt>Alasan / Hasil Patroli Terakhir</dt>
-            <dd style="font-weight: 500; font-size: 11px; color: var(--muted);">${escapeHtml(store.last_reason)}</dd>
-          </div>` : ''}
-          ${store.tanggal_berakhir_layanan ? `
-          <div>
-            <dt>Masa Layanan</dt>
-            <dd>${escapeHtml(store.tanggal_mulai_layanan || '-')} s/d ${escapeHtml(store.tanggal_berakhir_layanan)}</dd>
-          </div>` : ''}
-        </dl>
-      </section>
-
-      <section class="outlet-detail-history-section" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle, #edf2f7);">
+      <section class="outlet-detail-history-section" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle, #edf2f7);">
         <div class="outlet-detail-history-heading">
           <h4>Riwayat Aktivitas Penutupan Bot</h4>
         </div>
-        <p style="font-size: 11px; color: var(--muted); margin: 2px 0 10px 0;">Catatan penegakan dan status keberhasilan penutupan otomatis</p>
+        <p style="font-size: 11px; color: var(--muted); margin: 2px 0 12px 0;">Menampilkan maksimal 10 log aktivitas penutupan otomatis</p>
         <div class="outlet-detail-history-list" id="churnDetailHistoryLogs">
           <div class="history-item is-empty"><span>Memuat riwayat aktivitas bot...</span></div>
         </div>

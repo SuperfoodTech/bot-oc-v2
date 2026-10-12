@@ -24,7 +24,13 @@ Setiap update kode yang **TIDAK** berhubungan secara langsung dengan logika bot 
 
 Baseline version project dimulai dari `1.0.0`.
 
-Latest documented release: `1.36.4`.
+Latest documented release: `1.36.5`.
+
+Churn Drawer Streamlining & Max-10 Focused Bot Activity Logs:
+- **Eliminasi Section Informasi Terakhir & Status Live di Drawer**: Menghapus blok duplikasi "Informasi Terakhir & Status Live" pada drawer Churn (`#churnDetailPanel` di `admin_tab_churn.html`), menyajikan tata letak drawer yang ringkas dan terfokus langsung ke log intervensi bot.
+- **Fokus Riwayat Aktivitas Penutupan Bot (Maximal 10 Log)**: Drawer kini berfokus menampilkan maksimal 10 riwayat eksekusi bot terbaru (`logs.slice(0, 10)`), menyajikan status intervensi yang jelas (`TUTUP SUKSES` / `TUTUP GAGAL`), timestamp WIB, serta pesan alasan patroli bot.
+- **Cache-Buster Stylesheet**: Memperbarui stylesheet version di `admin_dashboard.html` menjadi `v=20261012-v1365-churn-drawer-logs`.
+- **Zero-Downtime Deployment**: Rebuild container `fm-backend` sukses tanpa interupsi pada service bot patroli (`force-bot`, `bot-oc`, dan `bot-vb`).
 
 Interactive Churn Detail Drawer, Clean Status Badges & Bot Close Activity Logs:
 - **Eliminasi Inline Timestamp di Kolom Status Live Shopee**: Menghapus catatan tanggal/waktu di bawah badge Status Live Shopee pada tabel desktop dan kartu mobile Tab Churn (`admin_tab_churn.html`), menyajikan kolom status yang bersih, rapi, dan konsisten.
